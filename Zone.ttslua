@@ -1,0 +1,79 @@
+#include ~/CrLua/Util
+
+-------------------------------------------------------------------------------
+--- Lua zone (board area) functions
+-- @author bonkersbgg on BoardGameGeek.com
+-------------------------------------------------------------------------------
+
+local TAG = 'CrLua.Zone'
+
+local CrLua = CrLua or {}
+CrLua.Zone = assert(not CrLua.Zone) and {}
+
+CrLua.Zone._zones = {}
+
+-------------------------------------------------------------------------------
+--- Set the collection of zones.
+-- To keep things simple there can only be one set of zones active at a time.
+-- Zones are tables with {name, xmin, xmax, ymin, ymax, zmin, zmax} keys,
+-- name is required, each {xyz}min/max are optional.
+-- @param ... : zero or more arguments, each is a zone.
+-------------------------------------------------------------------------------
+function CrLua.Zone.set(...)
+    CrLua.Zone._zones = {}
+    for _, zone in ipairs(...) do
+        local name = zone.name
+        assert(name, TAG .. ': zone missing "name"')
+        assert(not CrLua.Zone._zones[name], TAG .. ': duplicate zone name "' .. name .. '"')
+        CrLua.Zone._zones[name] = zone
+    end
+end
+
+-------------------------------------------------------------------------------
+--- Get the closest zone.
+-- @param position table : {x,y,z} entries.
+-- @return zone.name string, or nil if no zones.
+-------------------------------------------------------------------------------
+function CrLua.Zone.closest(position)
+    local function distanceFunction(zone)
+        local zonePosition = {
+            x = ((zone.xmin or 0) + (zone.xmax or 0)) / 2,
+            y = ((zone.ymin or 0) + (zone.ymax or 0)) / 2,
+            z = ((zone.zmin or 0) + (zone.zmax or 0)) / 2
+        }
+        return CrLua.Util.distanceSq(position, zonePosition)
+    end
+    local zone = CrLua.Util.min(CrLua.Zone._zones, distanceFunction)
+    return zone and zone.name
+end
+
+function CrLua.Zone._testClosest()
+    CrLua.Zone.set({{ name = 'neg', xmax = -0.01 }, { name = 'pos', xmin = 0.01 }})
+    local closestMinus = CrLua.Zone.closest({ x = -1, y = 0, z = 0 })
+    assert(closestMinus == 'neg')
+    local closestPlus = CrLua.Zone.closest({ x = 1, y = 0, z = 0 })
+    assert(closestPlus == 'pos')
+end
+
+-------------------------------------------------------------------------------
+--- Is position inside zone?
+-- @param zoneName string : zone.name applied via Zone.set(...).
+-- @param position table : {x,y,z} entries.
+-- @return boolean : true if position is inside zone.
+-------------------------------------------------------------------------------
+function CrLua.Zone.isInside(zoneName, position)
+    local zone = CrLua.Zone._zones[zoneName]
+    assert(zone, TAG .. ': no such zone "' .. (zoneName or '<nil>') .. '"')
+    return (not zone.xmin or position.x >= zone.xmin) and
+        (not zone.xmax or position.x <= zone.xmax) and
+        (not zone.ymin or position.y >= zone.ymin) and
+        (not zone.ymax or position.y <= zone.ymax) and
+        (not zone.zmin or position.z >= zone.zmin) and
+        (not zone.zmax or position.z <= zone.zmax)
+end
+
+function CrLua.Zone._testIsInside()
+    CrLua.Zone.set({{ name = 'neg', xmax = 0 }, { name = 'pos', xmin = 0 }})
+    assert(CrLua.Zone.isInside('neg', { x = -1, y = 0, z = 0 }), 'neg')
+    assert(not CrLua.Zone.isInside('neg', { x = 1, y = 0, z = 0 }), 'pos')
+end

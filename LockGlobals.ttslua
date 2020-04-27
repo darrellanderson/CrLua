@@ -1,7 +1,9 @@
 -------------------------------------------------------------------------------
 --- Lock the _G global variables table, prevent accidental creation of globals.
--- Handy for catching variable spelling errors, as well as globals in general.
 -- Include this AFTER creating any necessary globals to prevent new ones.
+-- This helps catch typos where what was meant to access a local instead
+-- references a (hopefully non-existent) global, as well as forgetting to use
+-- "local" when creating objects.
 -- @author bonkersbgg on BoardGameGeek.com
 -------------------------------------------------------------------------------
 

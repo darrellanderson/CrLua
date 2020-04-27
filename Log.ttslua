@@ -9,13 +9,13 @@ local CrLua = CrLua or {}
 CrLua.Log = assert(not CrLua.Log) and {}
 
 CrLua.Log.LOG_LEVEL = {
-    DEBUG = 1,
-    INFO = 2,
-    WARNING = 3,
-	ERROR = 4,
-    NONE = 5,
+    DEBUG = { level = 1, shortString = 'd' },
+    INFO = { level = 2, shortString = 'i' },
+    WARNING = { level = 3, shortString = 'w' },
+	ERROR = { level = 4, shortString = 'e' },
+    NONE = { level = 5, shortString = 'x' },
 }
-CrLua.Log._level = LOG_LEVEL.NONE
+CrLua.Log._level = CrLua.Log.LOG_LEVEL.NONE
 
 -------------------------------------------------------------------------------
 --- Set the log level, only log messagees at this level and above.
@@ -23,34 +23,44 @@ CrLua.Log._level = LOG_LEVEL.NONE
 -- @table optional table, logging contents if given.
 -------------------------------------------------------------------------------
 function CrLua.Log.setLogLevel(level)
-    assert(level >= 1 and level <= 5)
+    assert(level and type(level.level) == 'number' and type(level.shortString) == 'string')
     CrLua.Log._level = level
 end
 
 function CrLua.Log._logTable(message, prefix, table)
     print(prefix .. message .. ' = {')
-    prefix = '  ' .. prefix
+    local indentedPrefix = prefix .. '   '
     for k, v in pairs(table) do
         if type(v) == 'table' then
-            print(prefix .. k .. ' = {')
-            CrLua.Log._logTable(prefix .. k, prefix, v)
-            print(prefix .. '}')
+            CrLua.Log._logTable(k, indentedPrefix, v)
         else
-            print(prefix .. k .. ' = ' .. v)
+            print(indentedPrefix .. k .. ' = ' .. v)
         end
     end
-    print('}')
+    print(prefix .. '}')
 end
 
 function CrLua.Log._log(logLevel, message, table)
-    if logLevel < CrLua.Log._level then
+    if logLevel.level < CrLua.Log._level.level then
         return
     end
+
+    -- Inject a [timestamp/level] prefix.
+    local timestamp = os.date('%I:%M.%S')
+    message = '[' .. timestamp .. '/' .. logLevel.shortString .. '] ' .. message
+
     if table then
         CrLua.Log._logTable(message, '', table)
     else
         print(message)
     end
+end
+
+function CrLua.Log._testLog()
+    local originalLogLevel = CrLua.Log._level
+    CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
+    CrLua.Log._log(CrLua.Log.LOG_LEVEL.DEBUG, 'test message', { foo = 1, bar = { a = 1, b = 2 } })
+    CrLua.Log.setLogLevel(originalLogLevel)
 end
 
 -------------------------------------------------------------------------------
@@ -59,7 +69,7 @@ end
 -- @table optional table, logging contents if given.
 -------------------------------------------------------------------------------
 function CrLua.Log.d(message, table)
-    assert(type(message) == 'string' and not table or type(table) == 'table')
+    assert(type(message) == 'string' and (not table or type(table) == 'table'))
     CrLua.Log._log(CrLua.Log.LOG_LEVEL.DEBUG, message, table)
 end
 
@@ -69,7 +79,7 @@ end
 -- @table optional table, logging contents if given.
 -------------------------------------------------------------------------------
 function CrLua.Log.i(message, table)
-    assert(type(message) == 'string' and not table or type(table) == 'table')
+    assert(type(message) == 'string' and (not table or type(table) == 'table'))
     CrLua.Log._log(CrLua.Log.LOG_LEVEL.INFO, message, table)
 end
 
@@ -79,7 +89,7 @@ end
 -- @table optional table, logging contents if given.
 -------------------------------------------------------------------------------
 function CrLua.Log.w(message, table)
-    assert(type(message) == 'string' and not table or type(table) == 'table')
+    assert(type(message) == 'string' and (not table or type(table) == 'table'))
     CrLua.Log._log(CrLua.Log.LOG_LEVEL.WARNING, message, table)
 end
 
@@ -89,6 +99,6 @@ end
 -- @table optional table, logging contents if given.
 -------------------------------------------------------------------------------
 function CrLua.Log.e(message, table)
-    assert(type(message) == 'string' and not table or type(table) == 'table')
+    assert(type(message) == 'string' and (not table or type(table) == 'table'))
     CrLua.Log._log(CrLua.Log.LOG_LEVEL.ERROR, message, table)
 end

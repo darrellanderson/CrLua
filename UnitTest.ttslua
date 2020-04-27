@@ -23,6 +23,7 @@ function CrLua.UnitTest.runTests(prefix, table, recurse, isRecurse)
     end
 
     local passed, failed = 0, 0
+    local firstFailure = false
     for k, v in pairs(table) do
         local startPos, endPos = string.find(tostring(k), '_test')
         if startPos == 1 then
@@ -34,25 +35,27 @@ function CrLua.UnitTest.runTests(prefix, table, recurse, isRecurse)
             else
                 failed = failed + 1
                 print(TAG .. ': "' .. prefix .. '.' .. k .. '" FAILED: ' .. err)
+                firstFailure = firstFailure or v
             end
         elseif type(v) == 'table' and recurse then
-            local p, f = CrLua.UnitTest.runTests(prefix .. '.' .. k, v, recurse, true)
+            local p, f, ff = CrLua.UnitTest.runTests(prefix .. '.' .. k, v, recurse, true)
             passed = passed + p
             failed = failed + f
+            firstFailure = firstFailure or ff
         end
     end
 
     if not isRecurse then
         print(TAG .. ': finished #passed=' .. passed .. ' #failed=' .. failed)
+        if firstFailure then
+            print(TAG .. ': re-running first failure without pcall to get normal error handling')
+            firstFailure()
+        end
     end
 
-    return passed, failed
+    return passed, failed, firstFailure
 end
 
-function CrLua.UnitTest._testExamplePass()
+function CrLua.UnitTest._testExample()
     assert(true)
-end
-
-function CrLua.UnitTest._testExampleFail()
-    assert(false)
 end

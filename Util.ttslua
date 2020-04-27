@@ -59,3 +59,65 @@ function CrLua.Util._testDistanceSq()
     local distanceSq = CrLua.Util.distanceSq(a, b)
     assert(distanceSq == 14)
 end
+
+-------------------------------------------------------------------------------
+--- Find the minimum value in a table, with optional function for value.
+-- @param table : table with arbitrary keys (may be a list).
+-- @param optional minFunction : call for each value to minimize.
+-- @return ? : table value with the min value.
+-------------------------------------------------------------------------------
+function CrLua.Util.min(table, minFunction)
+    assert(type(table) == 'table' and ((not minFunction) or type(minFunction) == 'function'))
+
+    local minScore = nil
+    local minItem = nil
+    for _, v in pairs(table) do
+        local score = (minFunction and minFunction(v)) or tonumber(v)
+        if (not minScore) or score < minScore then
+            minScore = score
+            minItem = v
+        end
+    end
+    return minItem
+end
+
+function CrLua.Util._testMin()
+    local list = { 2, 1, 3, 5, 4 }
+    local minFunction = function(v)
+        return v
+    end
+    local min1 = CrLua.Util.min(list)
+    local min2 = CrLua.Util.min(list, minFunction)
+    assert(min1 == min2 and min1 == 1)
+end
+
+-------------------------------------------------------------------------------
+--- Find the maximum value in a table, with optional function for value.
+-- @param table : table with arbitrary keys (may be a list).
+-- @param optional maxFunction : call for each value to maximize.
+-- @return ? : table value with the max value.
+-------------------------------------------------------------------------------
+function CrLua.Util.max(table, maxFunction)
+    assert(type(table) == 'table' and ((not maxFunction) or type(maxFunction) == 'function'))
+
+    local maxScore = nil
+    local maxItem = nil
+    for _, v in pairs(table) do
+        local score = (maxFunction and maxFunction(v)) or tonumber(v)
+        if (not maxScore) or score > maxScore then
+            maxScore = score
+            maxItem = v
+        end
+    end
+    return maxItem
+end
+
+function CrLua.Util._testMax()
+    local list = { 2, 1, 3, 5, 4 }
+    local maxFunction = function(v)
+        return v
+    end
+    local max1 = CrLua.Util.max(list)
+    local max2 = CrLua.Util.max(list, maxFunction)
+    assert(max1 == max2 and max1 == 5)
+end

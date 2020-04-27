@@ -1,0 +1,61 @@
+-------------------------------------------------------------------------------
+--- Lua utility functions
+-- @author bonkersbgg on BoardGameGeek.com
+-------------------------------------------------------------------------------
+
+local TAG = 'CrLua.Util'
+
+local CrLua = CrLua or {}
+CrLua.Util = assert(not CrLua.Util) and {}
+
+-------------------------------------------------------------------------------
+--- Make a table read-only.
+-- Note that the table cannot contain <nil> values, use false instead.
+-- @param table : table.
+-- @return table : the original table, made read-only.
+-------------------------------------------------------------------------------
+function CrLua.Util.readOnly(table)
+    assert(type(table) == 'table')
+
+    setmetatable(table, {
+        __newindex = function(_, key, value)
+            error(TAG .. ': write "' .. tostring(key or '<nil>') .. '" to read-only table')
+        end,
+    })
+    return table
+end
+
+function CrLua.Util._testReadOnly()
+    local readOnlyTable = CrLua.Util.readOnly({ 'foo', 'bar' })
+
+    -- Access.
+    assert(readOnlyTable[1] == 'foo' and readOnlyTable[2] == 'bar')
+
+    -- Can read missing key.
+    assert(not readOnlyTable.missingKey)
+
+    -- Cannot write missing key.
+    if pcall(function() readOnlyTable.missingKey = 1 end) then
+        error('wrote to a missing key')
+    end
+end
+
+-------------------------------------------------------------------------------
+--- Compute the distance between two {x,y,z} vectors.
+-- @param a table : {x,y,z} keys.
+-- @param b table : {x,y,z} keys.
+-- @return distance squared (sqrt it if need exact, sq is fine for sorting).
+-------------------------------------------------------------------------------
+function CrLua.Util.distanceSq(a, b)
+    local dx = a.x - b.x
+    local dy = a.y - b.y
+    local dz = a.z - b.z
+    return (dx * dx) + (dy * dy) + (dz * dz)
+end
+
+function CrLua.Util._testDistanceSq()
+    local a = { x = 0, y = 0, z = 0 }
+    local b = { x = 1, y = 2, z = 3 }
+    local distanceSq = CrLua.Util.distanceSq(a, b)
+    assert(distanceSq == 14)
+end

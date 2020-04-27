@@ -1,0 +1,21 @@
+-------------------------------------------------------------------------------
+--- Lock the _G global variables table, prevent accidental creation of globals.
+-- Handy for catching variable spelling errors, as well as globals in general.
+-- Include this AFTER creating any necessary globals to prevent new ones.
+-- @author bonkersbgg on BoardGameGeek.com
+-------------------------------------------------------------------------------
+
+local TAG = 'CrLuaLockGlobals'
+
+setmetatable(_G, {
+    __index = function(tbl, key)
+        local result = rawget(_G, key)
+        if result == nil then
+            error(TAG .. ': accessing missing global "' .. key .. '", typo?')
+        end
+        return result
+    end,
+    __newindex = function(tbl, key, value)
+        error(TAG .. ': globals are locked, cannot create global variable "' .. key .. '"')
+    end
+})

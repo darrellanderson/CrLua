@@ -1,0 +1,58 @@
+-------------------------------------------------------------------------------
+--- Lua unit testing functions
+-- @author bonkersbgg on BoardGameGeek.com
+-------------------------------------------------------------------------------
+
+local TAG = 'CrLua.UnitTest'
+
+local CrLua = CrLua or {}
+CrLua.UnitTest = assert(not CrLua.UnitTest) and {}
+
+-------------------------------------------------------------------------------
+--- Run tests in a table, optionally recursing to sub-tables.
+-- @param prefix string: print this when announcing tests in that table.
+-- @param table: look for _testX functions here.
+-- @param recurse boolean: if true, also look for tests in sub-tables.
+-- @return passed integer, failed integer: number of tests that passed and failed.
+-------------------------------------------------------------------------------
+function CrLua.UnitTest.runTests(prefix, table, recurse, isRecurse)
+    assert(type(prefix) == 'string' and type(table) == 'table' and type(recurse) == 'boolean')
+
+    if not isRecurse then
+        print(TAG .. ': running tests')
+    end
+
+    local passed, failed = 0, 0
+    for k, v in pairs(table) do
+        local startPos, endPos = string.find(tostring(k), '_test')
+        if startPos == 1 then
+            assert(type(v) == 'function')
+            print(TAG .. ': running "' .. prefix .. '.' .. k .. '"')
+            local success, err = pcall(function() v() end)
+            if success then
+                passed = passed + 1
+            else
+                failed = failed + 1
+                print(TAG .. ': "' .. prefix .. '.' .. k .. '" FAILED: ' .. err)
+            end
+        elseif type(v) == 'table' and recurse then
+            local p, f = CrLua.UnitTest.runTests(prefix .. '.' .. k, v, recurse, true)
+            passed = passed + p
+            failed = failed + f
+        end
+    end
+
+    if not isRecurse then
+        print(TAG .. ': finished #passed=' .. passed .. ' #failed=' .. failed)
+    end
+
+    return passed, failed
+end
+
+function CrLua.UnitTest._testExamplePass()
+    assert(true)
+end
+
+function CrLua.UnitTest._testExampleFail()
+    assert(false)
+end

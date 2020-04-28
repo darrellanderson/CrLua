@@ -1,0 +1,61 @@
+#include ~/CrLua/Util
+
+-------------------------------------------------------------------------------
+--- Tabletop Simulator helper functions.
+-- Unlike the other scripts, this one requires the Tabletop Simulator runtime
+-- (e.g., to call getSeatedPlayers).
+-- @author bonkersbgg on BoardGameGeek.com
+-------------------------------------------------------------------------------
+
+local TAG = 'CrLua.TTS'
+
+local CrLua = CrLua or {}
+CrLua.TTS = assert(not CrLua.TTS) and {}
+
+-------------------------------------------------------------------------------
+--- Get the closest player (hand)
+-- @param position table : {x,y,z}.
+-- @return string : player color.
+-------------------------------------------------------------------------------
+function CrLua.TTS.closestPlayer(position)
+    assert(position and type(position.x) == 'number')
+    local function distanceFunction(color)
+        local player = Player[color]
+        if not player then
+            return false
+        end
+        if player.getHandCount() == 0 then
+            return false
+        end
+        local handPosition = player.getHandTransform(1).position
+        return CrLua.Util.distanceSq(position, handPosition)
+    end
+    local seated = getSeatedPlayers()
+    return CrLua.Util.min(seated, distanceFunction)
+end
+
+function CrLua.TTS._testClosestPlayer()
+    local color = CrLua.TTS.closestPlayer({x = 0, y = 0, z = 0})
+    assert(color)
+end
+
+-------------------------------------------------------------------------------
+--- Does the player exist?
+-- @param color string : player color.
+-- @return boolean : true if player is seated at the table.
+-------------------------------------------------------------------------------
+function CrLua.TTS.isSeated(color)
+    assert(type(color) == 'string')
+    for _, seated in ipairs(getSeatedPlayers()) do
+        if seated == color then
+            return true
+        end
+    end
+    return false
+end
+
+function CrLua.TTS._testIsSeated()
+    local color = getSeatedPlayers()[1]
+    assert(CrLua.TTS.isSeated(color))
+    assert(not CrLua.TTS.isSeated('does_not_exist'))
+end

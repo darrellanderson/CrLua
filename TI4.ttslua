@@ -1,0 +1,128 @@
+#include ~/CrLua/Polygon
+
+-------------------------------------------------------------------------------
+--- Functions for Darth Batman and Raptor1210's "Twilight Imperium IV" TTS mod.
+-- @author bonkersbgg on BoardGameGeek.com
+-------------------------------------------------------------------------------
+
+local TAG = 'CrLua.TI4'
+
+local CrLua = CrLua or {}
+CrLua.TI4 = assert(not CrLua.TI4) and {}
+
+--- List of per-player zone polygons.  Final entry (7) is the map/tiles area.
+CrLua.TI4._zones = {
+    {
+        defaultColor = 'Yellow',
+        polygon = {
+            { 21, -50 }, { 21, -6 }, { 51, -6 }, { 51, -50 }
+        }
+    },
+    {
+        defaultColor = 'Red',
+        polygon = {
+            { -21, -50 }, { -21, -6 }, { -1.5, -21 }, { 1.5, -21 }, { 21, -6 }, { 21, -50 }
+        }
+    },
+    {
+        defaultColor = 'Green',
+        polygon = {
+            { -51, -50 }, { -51, -6 }, { -21, -6 }, { -21, -50 }
+        }
+    },
+    {
+        defaultColor = 'Purple',
+        polygon = {
+            { 21, 6 }, { 21, 49 }, { 51, 49 }, { 51, 6 }
+        }
+    },
+
+    {
+        defaultColor = 'Blue',
+        polygon = {
+            { -21, 6 }, { -21, 49 }, { 21, 49 }, { 21, 6 }, { 1.5, 21 }, { -1.5, 21 }
+        }
+    },
+    {
+        defaultColor = 'White',
+        polygon = {
+            { -51, 6 }, { -51, 49 }, { -21, 49 }, { -21, 6 }
+        }
+    },
+    {
+        isTiles = true,
+        polygon = {
+            { -28, -28 }, { -28, 28 }, { 28, 28 }, { 28, -28 }
+        }
+    }
+}
+
+-------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+function CrLua.TI4.closestZone(position)
+    assert(position and type(position.x) == 'number')
+end
+
+function CrLua.TI4.insideZone(zoneIndex, position)
+    local zone = CrLua.TI4._zones[zoneIndex]
+    local polygon = zone.polygon
+    return CrLua.Polygon.inside(polygon, { pos.x, pos.z })
+end
+
+function CrLua.TI4.zoneColors()
+    local colorToZoneIndex = {}
+    local zoneIndexToColor = {}
+
+    for _, obj in ipairs(getAllObjects()) do
+        local name = obj.getName()
+        local checkName = string.find(name, 'Command Sheet')
+        if checkName ~= nil then
+            local cmdSheetColor = string.sub(name, 16, -2)
+            local pos = obj.getPosition()
+            for i, zone in ipairs(CrLua.TI4._zones) do
+                if not zoneIndexToColor[i] and (not zone.isTiles) and CrLua.TI4.insideZone(i) then
+                    colorToZoneIndex[cmdSheetColor] = i
+                    zoneIndexToColor[i] = cmdSheetColor
+                end
+            end
+        end
+    end
+    return colorToZoneIndex, zoneIndexToColor
+end
+
+
+--- Get the list of zones, each zone is the polygon about the zone (not closed).
+-- @return table : list of TI4 player zones.
+-------------------------------------------------------------------------------
+function CrLua.TI4.zones()
+    return CrLua.TI4._zones
+end
+
+-------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+function CrLua.TI4.zoneColor(zoneIndex)
+end
+
+function CrLua.TI4.zoneVectorLines()
+end
+
+#include ~/CrLua/UnitTest
+-- #include ~/CrLua/TI4
+function onLoad()
+    print('xxx onLoad')
+    --[[
+    local lines = {}
+    for color, line in pairs(zones) do
+        table.insert(lines, {
+            points = line,
+            color = color,
+            thickness = 0.5,
+            rotation = { 0, 0, 0 },
+            loop = true,
+            square = false
+        })
+    end
+    Global.setVectorLines(lines)
+    ]]
+    CrLua.UnitTest.runTests('xxx', CrLua, true)
+end

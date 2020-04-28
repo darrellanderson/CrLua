@@ -62,6 +62,7 @@ end
 
 -------------------------------------------------------------------------------
 --- Find the minimum value in a table, with optional function for value.
+-- Function can return false/nil to reject value from consideration.
 -- @param table : table with arbitrary keys (may be a list).
 -- @param optional minFunction : call for each value to minimize.
 -- @return ? : table value with the min value.
@@ -70,15 +71,16 @@ function CrLua.Util.min(table, minFunction)
     assert(type(table) == 'table' and ((not minFunction) or type(minFunction) == 'function'))
 
     local minScore = nil
-    local minItem = nil
-    for _, v in pairs(table) do
+    local minKey, minValue = nil, nil
+    for k, v in pairs(table) do
         local score = (minFunction and minFunction(v)) or tonumber(v)
-        if (not minScore) or score < minScore then
+        if score and (not minScore or score < minScore) then
             minScore = score
-            minItem = v
+            minKey = k
+            minValue = v
         end
     end
-    return minItem
+    return minKey, minValue
 end
 
 function CrLua.Util._testMin()
@@ -86,13 +88,15 @@ function CrLua.Util._testMin()
     local minFunction = function(v)
         return v
     end
-    local min1 = CrLua.Util.min(list)
-    local min2 = CrLua.Util.min(list, minFunction)
+    local k1, min1 = CrLua.Util.min(list)
+    local k2, min2 = CrLua.Util.min(list, minFunction)
+    assert(k1 == k2 and k1 == 2, 'k=' .. (k1 or '<nil>'))
     assert(min1 == min2 and min1 == 1)
 end
 
 -------------------------------------------------------------------------------
 --- Find the maximum value in a table, with optional function for value.
+-- Function can return false/nil to reject value from consideration.
 -- @param table : table with arbitrary keys (may be a list).
 -- @param optional maxFunction : call for each value to maximize.
 -- @return ? : table value with the max value.
@@ -101,15 +105,16 @@ function CrLua.Util.max(table, maxFunction)
     assert(type(table) == 'table' and ((not maxFunction) or type(maxFunction) == 'function'))
 
     local maxScore = nil
-    local maxItem = nil
-    for _, v in pairs(table) do
+    local maxKey, maxValue = nil, nil
+    for k, v in pairs(table) do
         local score = (maxFunction and maxFunction(v)) or tonumber(v)
-        if (not maxScore) or score > maxScore then
+        if score and (not maxScore or score > maxScore) then
             maxScore = score
-            maxItem = v
+            maxKey = k
+            maxValue = v
         end
     end
-    return maxItem
+    return maxKey, maxValue
 end
 
 function CrLua.Util._testMax()
@@ -117,7 +122,8 @@ function CrLua.Util._testMax()
     local maxFunction = function(v)
         return v
     end
-    local max1 = CrLua.Util.max(list)
-    local max2 = CrLua.Util.max(list, maxFunction)
+    local k1, max1 = CrLua.Util.max(list)
+    local k2, max2 = CrLua.Util.max(list, maxFunction)
+    assert(k1 == k2 and k1 == 4)
     assert(max1 == max2 and max1 == 5)
 end

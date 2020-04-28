@@ -13,11 +13,13 @@ setmetatable(_G, {
     __index = function(tbl, key)
         local result = rawget(_G, key)
         if result == nil then
-            error(TAG .. ': accessing missing global "' .. key .. '", typo?')
+            -- Passing 2 as the second value is supposed to assign the error
+            -- to the caller.  That does not seem to work in Moonsharp Lua?
+            error(TAG .. ': accessing missing global "' .. key .. '", typo?', 2)
         end
         return result
     end,
     __newindex = function(tbl, key, value)
-        error(TAG .. ': globals are locked, cannot create global variable "' .. key .. '"')
+        error(TAG .. ': globals are locked, cannot create global variable "' .. key .. '"', 2)
     end
 })

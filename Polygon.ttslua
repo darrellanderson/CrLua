@@ -1,0 +1,64 @@
+-------------------------------------------------------------------------------
+--- Polygon utility functions.
+-- @author bonkersbgg on BoardGameGeek.com
+-------------------------------------------------------------------------------
+
+local TAG = 'CrLua.Polygon'
+
+local CrLua = CrLua or {}
+CrLua.Polygon = assert(not CrLua.Polygon) and {}
+
+-------------------------------------------------------------------------------
+--- Is the point inside the polygon (2D)?
+-- Uses the "ray casting method".
+-- @see https://gist.github.com/GiriB/320a4c22ab3483d0ec6500edb957380e
+-- @param polygon table : list of 2d points, each point is a list of two numbers.
+-- @param point table : list of 2 numbers.
+-- @param optional xIndex : if x is not point[1], find it as point[xIndex].
+-- @param optional yIndex : if y is not point[2], find it as point[yIndex].
+-- @return boolean : true if point is inside polygon.
+-------------------------------------------------------------------------------
+function CrLua.Polygon.inside(polygon, point, xIndex, yIndex)
+    assert(type(polygon) == 'table' and type(point) == 'table')
+
+    local vertexCount = #polygon
+    if vertexCount == 0 then
+        return false
+    end
+
+    local x = xIndex or 1
+    local y = yIndex or 2
+
+    local inside = false
+    local p1x = polygon[1][x]
+	local p1y = polygon[1][y]
+    local xinters = 0
+
+    for i, vertex in ipairs(polygon) do
+        local index = (i % vertexCount) + 1
+        local p = polygon[index]
+		local p2x = p[x]
+		local p2y = p[y]
+
+		if y > math.min(p1y,p2y) then
+			if y <= math.max(p1y,p2y) then
+				if x <= math.max(p1x,p2x) then
+					if p1y ~= p2y then
+						xinters = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
+					end
+					if p1x == p2x or x <= xinters then
+						inside = not inside
+					end
+				end
+			end
+		end
+		p1x, p1y = p2x, p2y
+	end
+	return inside
+end
+
+function CrLua.Polygon._testInside()
+    local polygon = { {0,10}, {10,10}, {10,0}, {0,0} }
+    assert(CrLua.Polygon.inside(polygon, { 5,5 }))
+    assert(not CrLua.Polygon.inside(polygon, { 15,15 }))
+end

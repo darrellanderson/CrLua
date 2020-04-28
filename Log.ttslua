@@ -10,13 +10,13 @@ local TAG = 'CrLua.Log'
 local CrLua = CrLua or {}
 CrLua.Log = assert(not CrLua.Log) and {}
 
-CrLua.Log.LOG_LEVEL = {
+CrLua.Log.LOG_LEVEL = CrLua.Util.lockRecursive(TAG .. '.LOG_LEVEL', {
     DEBUG = { level = 1, shortString = 'd' },
     INFO = { level = 2, shortString = 'i' },
     WARNING = { level = 3, shortString = 'w' },
 	ERROR = { level = 4, shortString = 'e' },
     NONE = { level = 5, shortString = 'x' },
-}
+})
 CrLua.Log._level = CrLua.Log.LOG_LEVEL.NONE
 
 -------------------------------------------------------------------------------

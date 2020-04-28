@@ -120,4 +120,33 @@ function CrLua.List._testToSet()
     assert(not set.c)
 end
 
+-------------------------------------------------------------------------------
+--- Convert a set to a list.
+-- The list is dependent on table key iteration order, make no assumptions!
+-- @param set table : map from key to true.
+-- @return list : table with number indices.
+-------------------------------------------------------------------------------
+function CrLua.List.fromSet(set)
+    assert(type(set) == 'table')
+
+    local result = {}
+    for k, v in pairs(set) do
+        assert(v == true)
+        table.insert(result, k)
+    end
+    return result
+end
+
+function CrLua.List._testToSet()
+    local set = { a = true, b = true }
+    local list = CrLua.List.fromSet(set)
+    assert(#list == 2, '#list=' .. #list)
+    if list[1] == 'a' then
+        assert(list[1] == 'a' and list[2] == 'b')
+    else
+        assert(list[1] == 'b' and list[2] == 'a')
+    end
+end
+
+
 CrLua.Util.lock(TAG, CrLua.List)

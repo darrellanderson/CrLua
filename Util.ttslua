@@ -46,7 +46,7 @@ end
 -- Note that the table cannot contain <nil> values, use false instead.
 -- @param tableName string : table name.
 -- @param table : table.
--- @return table : the original table, made read-only.
+-- @return table : the original table, locked.
 -------------------------------------------------------------------------------
 function CrLua.Util.lock(tableName, table, exceptions)
     assert(type(tableName) == 'string' and type(table) == 'table')
@@ -62,6 +62,7 @@ function CrLua.Util.lock(tableName, table, exceptions)
         hidden[k] = v
         table[k] = nil
     end
+
     setmetatable(table, {
         __index = function(_, key)
             local result = hidden[key]
@@ -90,8 +91,23 @@ function CrLua.Util.lock(tableName, table, exceptions)
                 return v and i + 1, v
             end
             return iter, table, 0
-        end
+        end,
+        __len = function(_)
+            return #hidden
+        end,
     })
+    return table
+end
+
+function CrLua.Util.lockRecursive(tableName, table, exceptions)
+    assert(type(tableName) == 'string' and type(table) == 'table')
+
+    for k, v in pairs(table) do
+        if type(v) == 'table' then
+            CrLua.Util.lockRecursive(tableName, v, exceptions)
+        end
+    end
+    CrLua.Util.lock(tableName, table, exceptions)
     return table
 end
 
@@ -133,6 +149,8 @@ function CrLua.Util._testLock()
         count = count + 1
     end
     assert(count == 2)
+
+    assert(#lockedTable == 2)
 end
 
 -------------------------------------------------------------------------------

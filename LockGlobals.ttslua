@@ -1,23 +1,24 @@
 -------------------------------------------------------------------------------
 --- Lock the _G global variables table, prevent accidental creation of globals.
 -- Include this AFTER creating any necessary globals to prevent new ones.
+--
+-- - Existing globals can still be read AND WRITTEN.
+-- - Cannot read non-existent globals.
+-- - Cannot write new globals.
+--
 -- This helps catch typos where what was meant to access a local instead
 -- references a (hopefully non-existent) global, as well as forgetting to use
 -- "local" when creating objects.
+--
 -- @author bonkersbgg on BoardGameGeek.com
 -------------------------------------------------------------------------------
 
 local TAG = 'CrLuaLockGlobals'
 
 setmetatable(_G, {
+    -- Index is only called when the key does not already exist.
     __index = function(tbl, key)
-        local result = rawget(_G, key)
-        if result == nil then
-            -- Passing 2 as the second value is supposed to assign the error
-            -- to the caller.  That does not seem to work in Moonsharp Lua?
-            error(TAG .. ': accessing missing global "' .. key .. '", typo?', 2)
-        end
-        return result
+        error(TAG .. ': accessing missing global "' .. key .. '", typo?', 2)
     end,
     __newindex = function(tbl, key, value)
         error(TAG .. ': globals are locked, cannot create global variable "' .. key .. '"', 2)

@@ -61,20 +61,55 @@ end
 -- @return table : new table with inset min, max points using same xIndex, yIndex.
 -------------------------------------------------------------------------------
 function CrLua.Polygon.insetBoundingBox(box, inset, xIndex, yIndex)
+    assert(type(box) == 'table' and box.min and type(inset) == 'number')
+
     local x = xIndex or 1
     local y = yIndex or 2
 
+    CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
+    CrLua.Log.d('box', box)
     return {
         min = { [x] = box.min[x] + inset, [y] = box.min[y] + inset },
-        max = { [x] = box.max[x] - inset, [y] = box.max[y] - inset },
+        max = { [x] = box.max[x] - inset, [y] = box.max[y] - inset }
     }
 end
 
 function CrLua.Polygon._testInsetBoundingBox()
-    local box = { min = { 1, 2 }, max = { 8, 9 }}
+    local box = { min = { 1, 2 }, max = { 8, 9 } }
     local inset = CrLua.Polygon.insetBoundingBox(box, 2)
     assert(inset.min[1] == 3 and inset.min[2] == 4)
     assert(inset.max[1] == 6 and inset.max[2] == 7)
+end
+
+-------------------------------------------------------------------------------
+--- Get bounding box corners.
+-- @param box table : {min, max} points.
+-- @param optional xIndex : if x is not point[1], find it as point[xIndex].
+-- @param optional yIndex : if y is not point[2], find it as point[yIndex].
+-- @return table : list of four corner points using same xIndex, yIndex.
+-------------------------------------------------------------------------------
+function CrLua.Polygon.corners(box, xIndex, yIndex)
+    assert(type(box) == 'table' and box.min)
+
+    local x = xIndex or 1
+    local y = yIndex or 2
+
+    return {
+        { [x] = box.min[x], [y] = box.min[y] },
+        { [x] = box.min[x], [y] = box.max[y] },
+        { [x] = box.max[x], [y] = box.min[y] },
+        { [x] = box.max[x], [y] = box.max[y] }
+    }
+end
+
+function CrLua.Polygon._testCorners()
+    local box = { min = { 1, 2 }, max = { 8, 9 } }
+    local corners = CrLua.Polygon.corners(box)
+    assert(#corners == 4)
+    assert(corners[1][1] == 1 and corners[1][2] == 2)
+    assert(corners[2][1] == 1 and corners[2][2] == 9)
+    assert(corners[3][1] == 8 and corners[3][2] == 2)
+    assert(corners[4][1] == 8 and corners[4][2] == 9)
 end
 
 -------------------------------------------------------------------------------

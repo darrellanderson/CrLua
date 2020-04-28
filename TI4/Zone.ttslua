@@ -196,35 +196,36 @@ end
 function CrLua.TI4.Zone.closestPlayerZone(position)
     assert(position and type(position.x) == 'number')
 
-    local function distance(zone)
-        -- Because the zones are not equal sized, distance to centers can
-        -- give incorrect results.  Instead, use the distance to the closest
-        -- (slightly inset) corner.
+    local zones = CrLua.TI4.Zone.playerZones()
+
+    -- Precompute and cache zone bounding boxes.
+    for _, zone in ipairs(zones) do
         if not zone.boundingBox then
             zone.boundingBox = CrLua.Polygon.boundingBox(zone.polygon)
-            zone.boundingBox = CrLua.Polygon.insetBoundingBox(0.01)
+            zone.boundingBox = CrLua.Polygon.insetBoundingBox(zone.boundingBox, 0.01)
         end
-        local box = zone.boundingBox
-        local corners = {
-            { x = box.min[1], y = 1, z = box.min[2] },
-            { x = box.min[1], y = 1, z = box.max[2] },
-            { x = box.max[1], y = 1, z = box.min[2] },
-            { x = box.max[1], y = 1, z = box.max[2] }
-        }
-        local distances = {}
-        for _, insetCorner in ipairs(corners) do
-            local distanceSq = CrLua.Util.distanceSq(position, corners)
-            table.insert(distances, distanceSq)
-        end
-        return math.min(table.unpack(distances))
     end
-    local _, zone = CrLua.Util.min(CrLua.TI4.Zone.playerZones(), distance)
+
+    -- Because the zones are not equal sized, distance to centers can
+    -- give incorrect results.  Instead, use the distance to the closest
+    -- (slightly inset) corner.
+    local function distanceToCorner(point2D)
+        return CrLua.Util.distanceSq(position, { x = point2D[1], y = 1, z = point2D[2] })
+    end
+    local function distanceToZone(zone)
+        local corners = CrLua.Polygon.corners(zone.boundingBox)
+        local distanceToCorners = CrLua.List.map(corners, distanceToCorner)
+        return math.min(table.unpack(distanceToCorners))
+    end
+    local _, zone = CrLua.Util.min(zones, distanceToZone)
 
     return zone
 end
 
 -------------------------------------------------------------------------------
 --- Get a "setVectorLines" entry for a zone.
+-- Must be added to a list of lines, then passed to setVectorLines:
+-- 'linesList = { vectorLines(zone) }; Global.setVectorLines(linesList)'
 -- @param zone table
 -- @param parameters table : override setVectorLines parameters.
 -------------------------------------------------------------------------------
@@ -251,6 +252,7 @@ end
 
 -------------------------------------------------------------------------------
 --- Get a "setVectorLines" list for all zones.
+-- This result can be used directly, 'Global.setVectorLines(allZonesVectorLines())'.
 -- @param parameters table : override setVectorLines parameters.
 -------------------------------------------------------------------------------
 function CrLua.TI4.Zone.allZonesVectorLines(parameters)
@@ -265,34 +267,4 @@ function CrLua.TI4.Zone.allZonesVectorLines(parameters)
     local tilesZone = CrLua.TI4.Zone.tilesZone()
     table.insert(lines, CrLua.TI4.Zone.vectorLines(tilesZone, {}))
     return lines
-end
-
-function onLoad()
-    print('xxx onLoad')
-
-    CrLua.TI4.Zone.updateZoneColors()
-
-    local lines = CrLua.TI4.Zone.allZonesVectorLines({})
-    Global.setVectorLines(lines)
-
-    --[[
-    local lines = {}
-    for color, line in pairs(zones) do
-        table.insert(lines, {
-            points = line,
-            color = color,
-            thickness = 0.5,
-            rotation = { 0, 0, 0 },
-            loop = true,
-            square = false
-        })
-    end
-    Global.setVectorLines(lines)
-    ]]
-end
-
-function onDrop(player_color)
-    local pos = self.getPosition()
-    local zone = CrLua.TI4.Zone.closestPlayerZone(pos)
-    self.setColorTint(zone.color)
 end

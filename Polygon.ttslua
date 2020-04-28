@@ -66,8 +66,6 @@ function CrLua.Polygon.insetBoundingBox(box, inset, xIndex, yIndex)
     local x = xIndex or 1
     local y = yIndex or 2
 
-    CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
-    CrLua.Log.d('box', box)
     return {
         min = { [x] = box.min[x] + inset, [y] = box.min[y] + inset },
         max = { [x] = box.max[x] - inset, [y] = box.max[y] - inset }

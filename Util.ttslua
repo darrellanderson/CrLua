@@ -11,22 +11,23 @@ CrLua.Util = assert(not CrLua.Util) and {}
 -------------------------------------------------------------------------------
 --- Make a table read-only.
 -- Note that the table cannot contain <nil> values, use false instead.
+-- @param tableName string : table name.
 -- @param table : table.
 -- @return table : the original table, made read-only.
 -------------------------------------------------------------------------------
-function CrLua.Util.readOnly(table)
-    assert(type(table) == 'table')
+function CrLua.Util.readOnly(tableName, table)
+    assert(type(tableName) == 'string' and type(table) == 'table')
 
     setmetatable(table, {
         __newindex = function(_, key, value)
-            error(TAG .. ': write "' .. tostring(key or '<nil>') .. '" to read-only table')
+            error(TAG .. ': write "' .. tostring(key or '<nil>') .. '" to read-only table "' .. tableName .. '"')
         end,
     })
     return table
 end
 
 function CrLua.Util._testReadOnly()
-    local readOnlyTable = CrLua.Util.readOnly({ 'foo', 'bar' })
+    local readOnlyTable = CrLua.Util.readOnly('myTable', { 'foo', 'bar' })
 
     -- Access.
     assert(readOnlyTable[1] == 'foo' and readOnlyTable[2] == 'bar')
@@ -38,6 +39,100 @@ function CrLua.Util._testReadOnly()
     if pcall(function() readOnlyTable.missingKey = 1 end) then
         error('wrote to a missing key')
     end
+end
+
+-------------------------------------------------------------------------------
+--- Make a table immutable, also report errors when accessing missing keys.
+-- Note that the table cannot contain <nil> values, use false instead.
+-- @param tableName string : table name.
+-- @param table : table.
+-- @return table : the original table, made read-only.
+-------------------------------------------------------------------------------
+function CrLua.Util.lock(tableName, table, exceptions)
+    assert(type(tableName) == 'string' and type(table) == 'table')
+
+    local exceptionsSet = {}
+    for _, exception in ipairs(exceptions or {}) do
+        exceptionsSet[exception] = true
+    end
+
+    -- Move contents to a hidden table.
+    local hidden = {}
+    for k, v in pairs(table) do
+        hidden[k] = v
+        table[k] = nil
+    end
+    setmetatable(table, {
+        __index = function(_, key)
+            local result = hidden[key]
+            if not result then
+                error(TAG .. ': read missing key "' .. (key or '<nil>') .. '" in locked table "' .. tableName .. '"')
+            end
+            return result
+        end,
+        __newindex = function(_, key, value)
+            if exceptionsSet[key] then
+                hidden[key] = value
+            else
+                error(TAG .. ': write key "' .. (key or '<nil>') .. '" to locked table "' .. tableName .. '"')
+            end
+        end,
+        __pairs = function(_)
+            local function iter(_, k)
+                local k, v = next(hidden, k)
+                return v and k, v
+            end
+            return iter, table, nil
+        end,
+        __ipairs = function(_)
+            local function iter(_, i)
+                local v = hidden[i + 1]
+                return v and i + 1, v
+            end
+            return iter, table, 0
+        end
+    })
+    return table
+end
+
+function CrLua.Util._testLock()
+    local lockedTable = CrLua.Util.lock('myTable', { 'foo', 'bar' }, { 2 })
+
+    -- Access.
+    assert(lockedTable[1] == 'foo' and lockedTable[2] == 'bar')
+
+    -- Cannot read missing key.
+    if pcall(function() local _ = lockedTable.missingKey end) then
+        error('read a missing key')
+    end
+
+    -- Cannot write locked key.
+    if pcall(function() lockedTable[1] = 1 end) then
+        error('wrote a locked key')
+    end
+
+    -- CAN WRITE exceptions-list key.
+    lockedTable[2] = 'baz'
+    assert(lockedTable[2] == 'baz')
+
+    -- Cannot write missing key.
+    if pcall(function() lockedTable.missingKey = 1 end) then
+        error('wrote a missing key')
+    end
+
+    local count = 0
+    for k, v in pairs(lockedTable) do
+        assert((k == 1 and v == 'foo') or (k == 2 and v == 'baz'))
+        count = count + 1
+    end
+    assert(count == 2)
+
+    local count = 0
+    for i, v in ipairs(lockedTable) do
+        assert((i == 1 and v == 'foo') or (i == 2 and v == 'baz'))
+        count = count + 1
+    end
+    assert(count == 2)
 end
 
 -------------------------------------------------------------------------------
@@ -127,3 +222,5 @@ function CrLua.Util._testMax()
     assert(k1 == k2 and k1 == 4)
     assert(max1 == max2 and max1 == 5)
 end
+
+CrLua.Util.lock(TAG, CrLua.Util)

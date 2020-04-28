@@ -1,3 +1,5 @@
+#include ~/CrLua/Util
+
 -------------------------------------------------------------------------------
 --- Polygon utility functions.
 -- @author bonkersbgg on BoardGameGeek.com
@@ -122,3 +124,5 @@ function CrLua.Polygon._testInside()
     assert(CrLua.Polygon.inside(polygon, {1,1}))
     assert(not CrLua.Polygon.inside(polygon, {3,3}))
 end
+
+CrLua.Util.lock(TAG, CrLua.Polygon)

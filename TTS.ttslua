@@ -59,3 +59,5 @@ function CrLua.TTS._testIsSeated()
     assert(CrLua.TTS.isSeated(color))
     assert(not CrLua.TTS.isSeated('does_not_exist'))
 end
+
+CrLua.Util.lock(TAG, CrLua.TTS)

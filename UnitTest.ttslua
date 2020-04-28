@@ -1,3 +1,5 @@
+#include ~/CrLua/Util
+
 -------------------------------------------------------------------------------
 --- Lua unit testing functions
 -- @author bonkersbgg on BoardGameGeek.com
@@ -59,3 +61,5 @@ end
 function CrLua.UnitTest._testExample()
     assert(true)
 end
+
+CrLua.Util.lock(TAG, CrLua.UnitTest)

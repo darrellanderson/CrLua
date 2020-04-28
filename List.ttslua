@@ -1,3 +1,5 @@
+#include ~/CrLua/Util
+
 -------------------------------------------------------------------------------
 --- Lua list utility functions
 -- @author bonkersbgg on BoardGameGeek.com
@@ -117,3 +119,5 @@ function CrLua.List._testToSet()
     assert(set.b)
     assert(not set.c)
 end
+
+CrLua.Util.lock(TAG, CrLua.List)

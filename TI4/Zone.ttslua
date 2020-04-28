@@ -3,46 +3,54 @@
 #include ~/CrLua/Util
 
 -------------------------------------------------------------------------------
---- Functions for Darth Batman and Raptor1210's "Twilight Imperium IV" TTS mod.
+--- Zone utils for Darth Batman and Raptor1210's "Twilight Imperium IV" TTS mod.
 -- @author bonkersbgg on BoardGameGeek.com
 -------------------------------------------------------------------------------
 
 local TAG = 'CrLua.TI4'
 
 local CrLua = CrLua or {}
-CrLua.TI4 = assert(not CrLua.TI4) and {}
+CrLua.TI4 = CrLua.TI4 or {}
+CrLua.TI4.Zone = assert(not CrLua.TI4.Zone) and {}
 
 --- List of per-player zone polygons.  Final entry (7) is the map/tiles area.
--- Zones include the default color, computed actual color (based on command
--- sheet within the zone), and the unclosed XZ polygon about the zone.
-CrLua.TI4._zones = {
+-- Zones include:
+-- - current color (based on command sheet within zone).
+-- - default color based on standard game setup.
+-- - polygon not-closed XZ polygon around the zone.
+-- - bounding box of zone, XZ (computed on demand).
+CrLua.TI4.Zone._zones = {
     {
         color = false,
         defaultColor = 'Yellow',
         polygon = {
             { 21, -50 }, { 21, -6 }, { 51, -6 }, { 51, -50 }
-        }
+        },
+        boundingBox = false
     },
     {
         color = false,
         defaultColor = 'Red',
         polygon = {
             { -21, -50 }, { -21, -6 }, { -1.5, -21 }, { 1.5, -21 }, { 21, -6 }, { 21, -50 }
-        }
+        },
+        boundingBox = false
     },
     {
         color = false,
         defaultColor = 'Green',
         polygon = {
             { -51, -50 }, { -51, -6 }, { -21, -6 }, { -21, -50 }
-        }
+        },
+        boundingBox = false
     },
     {
         color = false,
         defaultColor = 'Purple',
         polygon = {
             { 21, 6 }, { 21, 49 }, { 51, 49 }, { 51, 6 }
-        }
+        },
+        boundingBox = false
     },
 
     {
@@ -50,14 +58,16 @@ CrLua.TI4._zones = {
         defaultColor = 'Blue',
         polygon = {
             { -21, 6 }, { -21, 49 }, { 21, 49 }, { 21, 6 }, { 1.5, 21 }, { -1.5, 21 }
-        }
+        },
+        boundingBox = false
     },
     {
         color = false,
         defaultColor = 'White',
         polygon = {
             { -51, 6 }, { -51, 49 }, { -21, 49 }, { -21, 6 }
-        }
+        },
+        boundingBox = false
     },
     {
         isTiles = true,
@@ -65,14 +75,15 @@ CrLua.TI4._zones = {
         defaultColor = 'Grey',
         polygon = {
             { -28, -28 }, { -28, 28 }, { 28, 28 }, { 28, -28 }
-        }
+        },
+        boundingBox = false
     }
 }
 -------------------------------------------------------------------------------
 --- Fill in the zones' color field.
 -- Scans the table for command sheeds in each zone.
 -------------------------------------------------------------------------------
-function CrLua.TI4.applyZoneColors()
+function CrLua.TI4.Zone.updateZoneColors()
     local foundZoneIndexSet = {}
     for _, obj in ipairs(getAllObjects()) do
         local name = obj.getName()
@@ -80,8 +91,8 @@ function CrLua.TI4.applyZoneColors()
         if checkName ~= nil then
             local cmdSheetColor = string.sub(name, 16, -2)
             local pos = obj.getPosition()
-            for i, zone in ipairs(CrLua.TI4._zones) do
-                if not foundZoneIndexSet[i] and (not zone.isTiles) and CrLua.TI4.insideZone(zone, pos) then
+            for i, zone in ipairs(CrLua.TI4.Zone._zones) do
+                if not foundZoneIndexSet[i] and (not zone.isTiles) and CrLua.TI4.Zone.inside(zone, pos) then
                     foundZoneIndexSet[i] = true
                     zone.color = cmdSheetColor
                 end
@@ -94,16 +105,16 @@ end
 --- Get the list of zones.
 -- @return table : list of TI4 player zones.
 -------------------------------------------------------------------------------
-function CrLua.TI4.playerZones()
-    return { table.unpack(CrLua.TI4._zones, 1, 6) }
+function CrLua.TI4.Zone.playerZones()
+    return { table.unpack(CrLua.TI4.Zone._zones, 1, 6) }
 end
 
 -------------------------------------------------------------------------------
 --- Get the tiles/map zone.
 -- @return table : tiles/map zone.
 -------------------------------------------------------------------------------
-function CrLua.TI4.tilesZone()
-    return CrLua.TI4._zones[7]
+function CrLua.TI4.Zone.tilesZone()
+    return CrLua.TI4.Zone._zones[7]
 end
 
 -------------------------------------------------------------------------------
@@ -111,14 +122,34 @@ end
 -- @param position table : {x,y,z}.
 -- @return zone table
 -------------------------------------------------------------------------------
-function CrLua.TI4.closestPlayerZone(position)
+function CrLua.TI4.Zone.closestPlayerZone(position)
     assert(position and type(position.x) == 'number')
+
     local function distance(zone)
-        local min, max = CrLua.Polygon.boundingBox(zone.polygon)
-        local zonePosition = { x = (min[1] + max[1]) / 2, y = 1, z = (min[2] + max[2]) / 2 }
-        return CrLua.Util.distanceSq(position, zonePosition)
+        -- Because the zones are not equal sized, distance to centers can
+        -- give incorrect results.  Instead, use the distance to the closest
+        -- (slightly inset) corner.
+        if not zone.boundingBox then
+            local min, max = CrLua.Polygon.boundingBox(zone.polygon)
+            zone.boundingBox = { min = min, max = max }
+        end
+        local box = zone.boundingBox
+        local inset = 0.01
+        local insetCorners = {
+            { x = box.min[1] + inset, y = 1, z = box.min[2] + inset },
+            { x = box.min[1] + inset, y = 1, z = box.max[2] - inset },
+            { x = box.max[1] - inset, y = 1, z = box.min[2] + inset },
+            { x = box.max[1] - inset, y = 1, z = box.max[2] - inset }
+        }
+        local distances = {}
+        for _, insetCorner in ipairs(insetCorners) do
+            local distanceSq = CrLua.Util.distanceSq(position, insetCorner)
+            table.insert(distances, distanceSq)
+        end
+        return math.min(table.unpack(distances))
     end
-    local _, zone = CrLua.Util.min(CrLua.TI4.playerZones(), distance)
+    local _, zone = CrLua.Util.min(CrLua.TI4.Zone.playerZones(), distance)
+
     return zone
 end
 
@@ -128,7 +159,7 @@ end
 -- @param position table : {x,y,z}.
 -- @return boolean : true if inside zone.
 -------------------------------------------------------------------------------
-function CrLua.TI4.insideZone(zone, position)
+function CrLua.TI4.Zone.inside(zone, position)
     assert(zone and type(zone) == 'table' and zone.polygon)
     return CrLua.Polygon.inside(zone.polygon, { position.x, position.z })
 end
@@ -138,7 +169,7 @@ end
 -- @param zone table
 -- @param parameters table : override setVectorLines parameters.
 -------------------------------------------------------------------------------
-function CrLua.TI4.zoneVectorLines(zone, parameters)
+function CrLua.TI4.Zone.vectorLines(zone, parameters)
     assert(type(zone) == 'table' and zone.polygon and type(parameters) == 'table' and not parameters.points)
 
     local function addY(point)
@@ -164,16 +195,16 @@ end
 function onLoad()
     print('xxx onLoad')
 
-    CrLua.TI4.applyZoneColors()
+    CrLua.TI4.Zone.updateZoneColors()
 
     local lines = {}
-    local playerZones = CrLua.TI4.playerZones()
+    local playerZones = CrLua.TI4.Zone.playerZones()
     for _, zone in ipairs(playerZones) do
         assert(zone.color)
-        table.insert(lines, CrLua.TI4.zoneVectorLines(zone, {}))
+        table.insert(lines, CrLua.TI4.Zone.vectorLines(zone, {}))
     end
-    local tilesZone = CrLua.TI4.tilesZone()
-    table.insert(lines, CrLua.TI4.zoneVectorLines(tilesZone, {}))
+    local tilesZone = CrLua.TI4.Zone.tilesZone()
+    table.insert(lines, CrLua.TI4.Zone.vectorLines(tilesZone, {}))
     Global.setVectorLines(lines)
 
     --[[
@@ -190,13 +221,10 @@ function onLoad()
     end
     Global.setVectorLines(lines)
     ]]
-    CrLua.UnitTest.runTests('xxx', CrLua, true)
 end
 
 function onDrop(player_color)
     local pos = self.getPosition()
-    local zone = CrLua.TI4.closestPlayerZone(pos)
+    local zone = CrLua.TI4.Zone.closestPlayerZone(pos)
     self.setColorTint(zone.color)
 end
-
-#include ~/CrLua/LockGlobals

@@ -1,8 +1,12 @@
+#include ~/CrLua/Util
+
 -------------------------------------------------------------------------------
 --- Lua utility functions
 -- Hex math courtesy of Reb Blob Games
 -- @author bonkersbgg on BoardGameGeek.com
 -------------------------------------------------------------------------------
+
+local TAG = 'CrLua.Hex'
 
 local CrLua = CrLua or {}
 CrLua.Hex = assert(not CrLua.Hex) and {}
@@ -21,3 +25,5 @@ end
 
 function CrLua.Hex.neighbors(hex)
 end
+
+CrLua.Util.lock(TAG, CrLua.Hex)

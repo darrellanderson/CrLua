@@ -29,15 +29,27 @@ function CrLua.Log.setLogLevel(level)
     CrLua.Log._level = level
 end
 
-function CrLua.Log._logTable(message, prefix, table)
-    print(prefix .. message .. ' = {')
+function CrLua.Log._logTable(message, table, depth)
+    assert(type(message) == 'string' and type(table) == 'table' and type(depth) == 'number')
+    local indent = '   '
+    local prefix = ''
+    for i = 1, depth + 1 do
+        prefix = prefix .. indent
+    end
     local indentedPrefix = prefix .. '   '
-    for k, v in pairs(table) do
-        if type(v) == 'table' then
-            CrLua.Log._logTable(k, indentedPrefix, v)
-        else
-            print(indentedPrefix .. k .. ' = ' .. v)
+
+    print(prefix .. message .. ' = {')
+    if depth < 2 then
+        for k, v in pairs(table) do
+            if type(v) == 'table' then
+                CrLua.Log._logTable(tostring(k), v, depth + 1)
+            else
+                print(indentedPrefix .. tostring(k) .. ' = ' .. tostring(v))
+            end
         end
+    else
+        -- Stop once too deep (also prevents infinite loops if cycles).
+        print(indentedPrefix .. '...')
     end
     print(prefix .. '}')
 end
@@ -52,7 +64,7 @@ function CrLua.Log._log(logLevel, message, table)
     message = '[' .. timestamp .. '/' .. logLevel.shortString .. '] ' .. message
 
     if table then
-        CrLua.Log._logTable(message, '', table)
+        CrLua.Log._logTable(message, table, 1)
     else
         print(message)
     end

@@ -19,6 +19,7 @@ CrLua.TTS = assert(not CrLua.TTS) and {}
 -------------------------------------------------------------------------------
 function CrLua.TTS.closestPlayer(position)
     assert(position and type(position.x) == 'number')
+
     local function distanceFunction(color)
         local player = Player[color]
         if not player then
@@ -30,13 +31,15 @@ function CrLua.TTS.closestPlayer(position)
         local handPosition = player.getHandTransform(1).position
         return CrLua.Util.distanceSq(position, handPosition)
     end
+    
     local seated = getSeatedPlayers()
-    return CrLua.Util.min(seated, distanceFunction)
+    local _, color = CrLua.Util.min(seated, distanceFunction)
+    return color
 end
 
 function CrLua.TTS._testClosestPlayer()
     local color = CrLua.TTS.closestPlayer({x = 0, y = 0, z = 0})
-    assert(color)
+    assert(color and type(color) == 'string')
 end
 
 -------------------------------------------------------------------------------

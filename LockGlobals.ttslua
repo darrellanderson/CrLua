@@ -18,9 +18,9 @@ local TAG = 'CrLuaLockGlobals'
 setmetatable(_G, {
     -- Index is only called when the key does not already exist.
     __index = function(tbl, key)
-        error(TAG .. ': accessing missing global "' .. key .. '", typo?', 2)
+        error(TAG .. ': accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
     end,
     __newindex = function(tbl, key, value)
-        error(TAG .. ': globals are locked, cannot create global variable "' .. key .. '"', 2)
+        error(TAG .. ': globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
     end
 })

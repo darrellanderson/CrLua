@@ -94,7 +94,7 @@ CrLua.TI4.Zone._zones = {
 -------------------------------------------------------------------------------
 --- Fill in the zones' color field.
 -- Scans the table for command sheeds in each zone.
--- @return list : table of updated zones, with integer indices.
+-- @return list : table of updated zones with integer indices, or nil if none updated.
 -------------------------------------------------------------------------------
 function CrLua.TI4.Zone.updateZoneColors()
     -- Once updated, no need to check if later command sheets are inside.
@@ -114,7 +114,8 @@ function CrLua.TI4.Zone.updateZoneColors()
         end
     end
 
-    return CrLua.List.fromSet(updatedZonesSet)
+    local updatedZonesList = CrLua.List.fromSet(updatedZonesSet)
+    return #updatedZonesList > 0 and updatedZonesList
 end
 
 function CrLua.TI4.Zone._testUpdateZoneColors()
@@ -177,11 +178,13 @@ end
 
 -------------------------------------------------------------------------------
 --- Return player zone containing position.
+-- @param position table : {x,y,z}.
+-- @return zone table, or false if not inside any.
 -------------------------------------------------------------------------------
 function CrLua.TI4.Zone.insideWhichPlayerZone(position)
     assert(position and type(position.x) == 'number')
     for _, zone in ipairs(CrLua.TI4.Zone._zones) do
-        if zone.isPlayer and CrLua.TI4.Zone.inside(zone, pos) then
+        if zone.type == CrLua.TI4.Zone.TYPE.PLAYER and CrLua.TI4.Zone.inside(zone, position) then
             return zone
         end
     end

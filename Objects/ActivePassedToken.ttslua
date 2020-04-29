@@ -7,10 +7,10 @@
 -- When flipped to "passed" the token will automatically skip that player's
 -- turn, broadcasting to all players that player has passed.
 --
--- Once all players have passed, the token disables turns (via Turns.enable).
--- When turns get re-enabled, tokens flip back to "active" (if not already).
+-- Once all players have passed, the token disables turns (via Turns.enable)
+-- and all tokens flip back to active.
 
--- CrLua is a collection of utility functions.
+-- Utility functions, defined at end.
 local CrLua = {}
 
 local data = {
@@ -19,47 +19,34 @@ local data = {
 
     -- Reset when turns get enabled again (boolean).
     needsReset = false,
+
+    -- Use TI4 zone, or seated player locations to assign color?
+    -- (Initially nil, set to true or false to choose TI4 zone or seat location.)
+    useTI4Zones = nil,
 }
 
 -------------------------------------------------------------------------------
 -- OBJECT EVENT METHODS
 
 function onLoad()
-    CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
+    CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.NONE)
     CrLua.Log.d('onLoad')
-    CrLua.UnitTest.runTests('xxx', CrLua, true)
 end
 
-function onDrop(player_color)
+function onDrop(playerColor)
     resetTokenForNewOwner()
 end
 
-function onPlayerChangeColor(player_color)
+function onPlayerChangeColor(playerColor)
     resetTokenForNewOwner()
 end
 
-function onPlayerConnect(player_id)
-    resetTokenForNewOwner()
-end
+function onPlayerTurnStart(playerColorStart, playerColorPrevious)
+    CrLua.Log.d('onPlayerTurnStart ' .. playerColorStart)
 
-function onPlayerDisconnect(player_id)
-    resetTokenForNewOwner()
-end
-
-function onPlayerTurnStart(player_color_start, player_color_previous)
-    CrLua.Log.d('onPlayerTurnStart ' .. player_color_start)
-
-    -- If the token does not yet have a color, assign one now.
+    -- If not yet assigned to a player, do so now.
     if not data.ownerPlayerColor then
         resetTokenForNewOwner()
-    end
-
-    -- Reset to active when starting a new turn after all players have passed.
-    if maybeReset() then
-        -- We reset ourselves to active, proceed with the current turn.
-        -- (NB: this also avoids a race with self.is_face_down being false
-        -- while object flip is in progress.)
-        return
     end
 
     -- Do not manipulate any Turns state now, let all objects process the
@@ -74,7 +61,7 @@ end
 --- Is this object an Active/Passed token?
 -- @return boolean true if peer.
 function isPeer(object)
-    return object.getName() == self.getName() and object.getDescription() == self.getDescription()
+    return object.getName() == self.getName()
 end
 
 --- Get all Active/Passed tokens on the board.
@@ -84,7 +71,7 @@ function getPeers(includeSelf)
     local result = {}
     for _, object in ipairs(getAllObjects()) do
         if isPeer(object) and (object ~= self or includeSelf) then
-            result[#result + 1] = object
+            table.insert(result, object)
         end
     end
     CrLua.Log.d('getPeers: found ' .. #result .. ' peers')
@@ -97,8 +84,10 @@ function sanityCheckPeersWithIncludeSelf(peers)
     local result = true
     local colorCount = {}
     for _, peer in ipairs(peers) do
-        local color = peer.call('getOwnerPlayerColor')
-        colorCount[color] = (colorCount[color] or 0) + 1
+        local color = playerColorAtPosition(peer.getPosition())
+        if color then
+            colorCount[color] = (colorCount[color] or 0) + 1
+        end
     end
     for color, count in pairs(colorCount) do
         if count > 1 then
@@ -108,7 +97,8 @@ function sanityCheckPeersWithIncludeSelf(peers)
             printToAll('Warning: player ' .. name .. ' has multiple active/passed tokens', color)
         end
     end
-    for _, color in ipairs(getSeatedPlayers()) do
+    local seated = getSeatedPlayers()
+    for _, color in ipairs(seated) do
         if not colorCount[color] then
             result = false
             local player = Player[color]
@@ -117,11 +107,6 @@ function sanityCheckPeersWithIncludeSelf(peers)
         end
     end
     return result
-end
-
---- Player associated with this token.
-function getOwnerPlayerColor()
-    return data.ownerPlayerColor
 end
 
 --- Is this token showing "active"?
@@ -138,7 +123,7 @@ end
 function anyPeerIsActive(peers)
     local result = false
     for _, peer in ipairs(peers) do
-        if peer.call('isActive') then
+        if not peer.is_face_down then
             result = true
             break
         end
@@ -147,16 +132,9 @@ function anyPeerIsActive(peers)
     return result
 end
 
---- Mark this object as needing to be reset when turns get enabled.
-function setNeedsReset()
-    data.needsReset = true
-end
-
--- Mark peers as needing to be reset when turns get enabled.
--- @param peers list of active/passed token objects.
-function setPeersNeedsReset(peers)
+function resetPeersWithIncludeSelf(peers)
     for _, peer in ipairs(peers) do
-        peer.call('setNeedsReset')
+        peer.flip()
     end
 end
 
@@ -173,30 +151,15 @@ end
 --- Assign this to the closest seated player.
 -- Also tints the side of the token for a visual confirmation.
 function resetTokenForNewOwner()
-    local newOwnerPlayerColor = CrLua.TTS.closestPlayer(self.getPosition())
-    if newOwnerPlayerColor == data.ownerPlayerColor then
+    local playerColor = playerColorAtPosition(self.getPosition())
+
+    if playerColor == data.ownerPlayerColor then
         return
     end
 
-    CrLua.Log.d('resetTokenForNewOwner ' .. tostring(newOwnerPlayerColor))
-    data.ownerPlayerColor = newOwnerPlayerColor
-    if data.ownerPlayerColor then
-        self.setColorTint(data.ownerPlayerColor)
-    end
-end
-
---- Reset to active if needs reset when starting a new turn.
--- @return boolean true if reset happened.
-function maybeReset()
-    if not Turns.enable or not data.needsReset then
-        return false
-    end
-
-    data.needsReset = false
-    if self.is_face_down then
-        self.flip()
-    end
-    return true
+    CrLua.Log.d('resetTokenForNewOwner ' .. (playerColor or '<nil>'))
+    data.ownerPlayerColor = playerColor
+    self.setColorTint(data.ownerPlayerColor or 'Grey')
 end
 
 --- Pass turn if this token is set to "passed".  If all tokens are set to
@@ -237,7 +200,7 @@ function maybePassTurn()
     else
         CrLua.Log.d('maybePassTurn: no active peers, disabling turns')
         broadcastToAll('All players have passed.', data.ownerPlayerColor)
-        setPeersNeedsReset(peers)
+        resetPeersWithIncludeSelf(peers)
         Turns.enable = false
     end
     return true
@@ -245,8 +208,33 @@ end
 
 -------------------------------------------------------------------------------
 
+--- Get player for the given table position.
+-- @param position table : {x,y,z} table.
+-- @return color string : player at postition, or nil if none.
+function playerColorAtPosition(position)
+    -- Detect and apply TI4 zones (cache for later use).
+    if data.useTI4Zones == nil then
+        local updatedZones = CrLua.TI4.Zone.updateZoneColors()
+        data.useTI4Zones = (updatedZones and true) or false
+        CrLua.Log.d('useTI4Zones=' .. tostring(data.useTI4Zones))
+    end
+
+    -- If we have TI4 zones, use them.  Otherwise use closest seated player.
+    -- With TI4 zones, it is possible a token is not in any player's zone!
+    local playerColor
+    if data.useTI4Zones then
+        local zone = CrLua.TI4.Zone.insideWhichPlayerZone(position)
+        playerColor = zone and CrLua.TI4.Zone.color(zone)
+    else
+        playerColor = CrLua.TTS.closestPlayer(position)
+    end
+    CrLua.Log.d('playerColorAtPosition -> ' .. (playerColor or '<nil>'))
+    return playerColor
+end
+
+-------------------------------------------------------------------------------
+
 #include ~/CrLua/Log
 #include ~/CrLua/TTS
-#include ~/CrLua/UnitTest
-#include ~/CrLua/Zone
+#include ~/CrLua/TI4/Zone
 #include ~/CrLua/LockGlobals

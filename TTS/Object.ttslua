@@ -1,0 +1,52 @@
+#include ~/CrLua/List
+#include ~/CrLua/LockTable
+
+-------------------------------------------------------------------------------
+--- Tabletop Simulator helper functions.
+-- Unlike the other scripts, requires the Tabletop Simulator runtime
+-- (e.g., to call getSeatedPlayers).
+-- @author bonkersbgg on BoardGameGeek.com
+-------------------------------------------------------------------------------
+
+local TAG = 'CrLua.TTS.Object'
+
+local CrLua = CrLua or {}
+CrLua.TTS = CrLua.TTS or {}
+CrLua.TTS.Object = assert(not CrLua.TTS.Object) and {}
+
+-------------------------------------------------------------------------------
+--- Get multiple objects with a single getAllObjects pass.
+-- @param names table : list of object names.
+-- @return table : map from name to list of matching objects.
+-------------------------------------------------------------------------------
+function CrLua.TTS.Object.getByName(names)
+    assert(type(names) == 'table')
+
+    local nameSet = CrLua.List.toSet(names)
+
+    local result = {}
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        if nameSet[name] then
+            local namedObjects = result[name]
+            if not namedObjects then
+                namedObjects = {}
+                result[name] = namedObjects
+            end
+            table.insert(namedObjects, object)
+        end
+    end
+    return result
+end
+
+function CrLua.TTS.Object._testGetByName()
+    local name = self.getName()
+    local nameToObjects = CrLua.TTS.Object.getByName({ name })
+    local found = false
+    for _, object in ipairs(nameToObjects[name]) do
+        found = found or object == self
+    end
+    assert(found)
+end
+
+CrLua.LockTable.readOnlyRequireKey(TAG, CrLua.TTS.Object)

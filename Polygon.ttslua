@@ -1,5 +1,3 @@
-#include ~/CrLua/LockTable
-
 -------------------------------------------------------------------------------
 --- Polygon utility functions.
 -- @author bonkersbgg on BoardGameGeek.com
@@ -7,7 +5,6 @@
 
 local TAG = 'CrLua.Polygon'
 
-local CrLua = CrLua or {}
 CrLua.Polygon = assert(not CrLua.Polygon) and {}
 
 -------------------------------------------------------------------------------
@@ -182,5 +179,3 @@ function CrLua.Polygon._testInside()
     assert(CrLua.Polygon.inside(polygon, {1,1}))
     assert(not CrLua.Polygon.inside(polygon, {3,3}))
 end
-
-CrLua.LockTable.readOnlyRequireKey(TAG, CrLua.Polygon)

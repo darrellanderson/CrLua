@@ -1,124 +1,155 @@
-#include ~/CrLua/Polygon
-#include ~/CrLua/List
-#include ~/CrLua/LockTable
-#include ~/CrLua/Util
-
 -------------------------------------------------------------------------------
 --- Zone utils for Darth Batman and Raptor1210's "Twilight Imperium IV" TTS mod.
 -- @author bonkersbgg on BoardGameGeek.com
 -------------------------------------------------------------------------------
 
+CrLua.require('List')
+CrLua.require('Polygon')
+CrLua.require('Util')
+
 local TAG = 'CrLua.TI4.Zone'
 
-local CrLua = CrLua or {}
 CrLua.TI4 = CrLua.TI4 or {}
 CrLua.TI4.Zone = assert(not CrLua.TI4.Zone) and {}
 
-CrLua.TI4.Zone.TYPE = CrLua.LockTable.readOnlyRequireKey(TAG .. '.TYPE', {
+CrLua.TI4.Zone.TYPE = {
     PLAYER = 'player',
     TILES = 'tiles'
-})
+}
 
 --- List of per-player zone polygons.  Final entry (7) is the map/tiles area.
 -- Zones include:
--- - current color (based on command sheet within zone).
--- - default color based on standard game setup.
--- - polygon not-closed XZ polygon around the zone.
--- - bounding box of zone, XZ (computed on demand).
+-- FIXED VALUES:
+--     - type string : CrLua.TI4.Zone.TYPE value.
+--     - defaultColor string : color in a standard game setup.
+--     - polygon : not-closed XZ polygon around the zone.
+-- - MUTABLE VALUES:
+--     - faction string (based on faction sheet within zone)
+--     - color (based on command sheet within zone).
+--     - bounding box of zone, XZ (computed on demand).
+--
 CrLua.TI4.Zone._zones = {
     {
         type = CrLua.TI4.Zone.TYPE.PLAYER,
-        color = false,
         defaultColor = 'Yellow',
         polygon = {{ 21, -50 }, { 21, -6 }, { 51, -6 }, { 51, -50 }},
-        boundingBox = false,
+        _data = { faction = false, color = false, boundingBox = false },
     },
     {
         type = CrLua.TI4.Zone.TYPE.PLAYER,
-        color = false,
         defaultColor = 'Red',
         polygon = {{ -21, -50 }, { -21, -6 }, { -1.5, -21 }, { 1.5, -21 }, { 21, -6 }, { 21, -50 }},
-        boundingBox = false,
+        _data = { faction = false, color = false, boundingBox = false },
     },
     {
         type = CrLua.TI4.Zone.TYPE.PLAYER,
-        color = false,
         defaultColor = 'Green',
         polygon = {{ -51, -50 }, { -51, -6 }, { -21, -6 }, { -21, -50 }},
-        boundingBox = false,
+        _data = { faction = false, color = false, boundingBox = false },
     },
     {
         type = CrLua.TI4.Zone.TYPE.PLAYER,
-        color = false,
         defaultColor = 'Purple',
         polygon = {{ 21, 6 }, { 21, 49 }, { 51, 49 }, { 51, 6 }},
-        boundingBox = false,
+        _data = { faction = false, color = false, boundingBox = false },
     },
     {
         type = CrLua.TI4.Zone.TYPE.PLAYER,
-        color = false,
         defaultColor = 'Blue',
         polygon = {{ -21, 6 }, { -21, 49 }, { 21, 49 }, { 21, 6 }, { 1.5, 21 }, { -1.5, 21 }},
-        boundingBox = false,
+        _data = { faction = false, color = false, boundingBox = false },
     },
     {
         type = CrLua.TI4.Zone.TYPE.PLAYER,
-        color = false,
         defaultColor = 'White',
         polygon = {{ -51, 6 }, { -51, 49 }, { -21, 49 }, { -21, 6 }},
-        boundingBox = false,
+        _data = { faction = false, color = false, boundingBox = false },
     },
     {
         type = CrLua.TI4.Zone.TYPE.TILES,
-        color = false,
         defaultColor = 'Grey',
         polygon = {{ -28, -28 }, { -28, 28 }, { 28, 28 }, { 28, -28 }},
-        boundingBox = false,
+        _data = { faction = false, color = false, boundingBox = false },
     }
 }
 
 -------------------------------------------------------------------------------
---- Fill in the zones' color field.
+--- Fill in the zones' runtime fields (faction, color).
 -- Scans the table for command sheeds in each zone.
--- @return list : table of updated zones with integer indices, or nil if none updated.
+-- @return boolean : true if any were updated.
 -------------------------------------------------------------------------------
-function CrLua.TI4.Zone.updateZoneColors()
+function CrLua.TI4.Zone.updateZones()
     -- Once updated, no need to check if later command sheets are inside.
-    local updatedZonesSet = {}
+    local updatedZoneColorSet = {}
+    local updatedZoneFactionSet = {}
+    local anyUpdated = false
 
     for _, obj in ipairs(getAllObjects()) do
         local name = obj.getName()
-        if string.find(name, 'Command Sheet') then
-            local cmdSheetColor = string.sub(name, 16, -2)
+
+        -- Look for 'Command Sheet (COLOR)' and 'FACTION Sheet' objects.
+        -- First use the cheap string.find to test if 'Sheet' is in the name.
+        -- Once we have a candidate, do more expensive pattern matching to
+        -- extract values followed by the marginally expensive zone checks.
+        if string.find(name, 'Sheet') then
             local pos = obj.getPosition()
-            for i, zone in ipairs(CrLua.TI4.Zone.playerZones()) do
-                if not updatedZonesSet[zone] and CrLua.TI4.Zone.inside(zone, pos) then
-                    zone.color = cmdSheetColor
-                    updatedZonesSet[zone] = true
+
+            -- Command Sheet (COLOR)
+            local color = string.match(name, '^Command Sheet %((%a+)%)$')
+            if color then
+                for _, zone in ipairs(CrLua.TI4.Zone.playerZones()) do
+                    if not updatedZoneColorSet[zone] and CrLua.TI4.Zone.inside(zone, pos) then
+                        zone._data.color = color
+                        updatedZoneColorSet[zone] = true
+                        anyUpdated = true
+                    end
                 end
             end
+
+            -- FACTION Sheet
+            local faction = string.match(name, '^(.+) Sheet$')
+            if faction then
+                for _, zone in ipairs(CrLua.TI4.Zone.playerZones()) do
+                    if not updatedZoneFactionSet[zone] and CrLua.TI4.Zone.inside(zone, pos) then
+                        zone._data.faction = faction
+                        updatedZoneFactionSet[zone] = true
+                        anyUpdated = true
+                    end
+                end
+            end
+
         end
     end
 
-    local updatedZonesList = CrLua.List.fromKeys(updatedZonesSet)
-    return #updatedZonesList > 0 and updatedZonesList
+    return anyUpdated
 end
 
-function CrLua.TI4.Zone._testUpdateZoneColors()
-    local updatedZones = CrLua.TI4.Zone.updateZoneColors()
+function CrLua.TI4.Zone._testUpdateZones()
+    local updatedZones = CrLua.TI4.Zone.updateZones()
     -- do not assert anything in case test is not running against TI4.
 end
 
 -------------------------------------------------------------------------------
 --- Get zone color.
 -- Zones have a default color for a "normal" TI4 mod setup, or call
--- "updateZoneColors" to assign colors based on command sheet in zone.
+-- "updateZones" to assign colors based on command sheet in zone.
 -- @param zone table
 -- @return string : color name.
 -------------------------------------------------------------------------------
 function CrLua.TI4.Zone.color(zone)
     assert(zone and type(zone) == 'table' and zone.polygon)
-    return zone.color or zone.defaultColor
+    return zone._data.color or zone.defaultColor
+end
+
+-------------------------------------------------------------------------------
+--- Get zone faction.
+-- Call "updateZones" to assign factions based on faction sheet in zone.
+-- @param zone table
+-- @return string : faction name, or nil if unknown
+-------------------------------------------------------------------------------
+function CrLua.TI4.Zone.faction(zone)
+    assert(zone and type(zone) == 'table' and zone.polygon)
+    return zone._data.faction
 end
 
 -------------------------------------------------------------------------------
@@ -189,9 +220,9 @@ function CrLua.TI4.Zone.closestPlayerZone(position)
 
     -- Precompute and cache zone bounding boxes.
     for _, zone in ipairs(zones) do
-        if not zone.boundingBox then
-            zone.boundingBox = CrLua.Polygon.boundingBox(zone.polygon)
-            zone.boundingBox = CrLua.Polygon.insetBoundingBox(zone.boundingBox, 0.01)
+        if not zone._data.boundingBox then
+            zone._data.boundingBox = CrLua.Polygon.boundingBox(zone.polygon)
+            zone._data.boundingBox = CrLua.Polygon.insetBoundingBox(zone._data.boundingBox, 0.01)
         end
     end
 
@@ -202,7 +233,7 @@ function CrLua.TI4.Zone.closestPlayerZone(position)
         return CrLua.Util.distanceSq(position, { x = point2D[1], y = 1, z = point2D[2] })
     end
     local function distanceToZone(zone)
-        local corners = CrLua.Polygon.corners(zone.boundingBox)
+        local corners = CrLua.Polygon.corners(zone._data.boundingBox)
         local distanceToCorners = CrLua.List.map(corners, distanceToCorner)
         return math.min(table.unpack(distanceToCorners))
     end
@@ -227,7 +258,7 @@ function CrLua.TI4.Zone.vectorLines(zone, parameters)
     local points = CrLua.List.map(zone.polygon, addY)
     local result = {
         points = points,
-        color = zone.color or zone.defaultColor,
+        color = zone._data.color or zone.defaultColor,
         thickness = 0.1,
         rotation = { 0, 0, 0 },
         loop = true,
@@ -250,12 +281,9 @@ function CrLua.TI4.Zone.allZonesVectorLines(parameters)
     local lines = {}
     local playerZones = CrLua.TI4.Zone.playerZones()
     for _, zone in ipairs(playerZones) do
-        assert(zone.color)
         table.insert(lines, CrLua.TI4.Zone.vectorLines(zone, {}))
     end
     local tilesZone = CrLua.TI4.Zone.tilesZone()
     table.insert(lines, CrLua.TI4.Zone.vectorLines(tilesZone, {}))
     return lines
 end
-
-CrLua.LockTable.readOnlyRequireKey(TAG, CrLua.TI4.Zone)

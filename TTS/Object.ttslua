@@ -1,5 +1,4 @@
-#include ~/CrLua/List
-#include ~/CrLua/LockTable
+CrLua.require('List')
 
 -------------------------------------------------------------------------------
 --- Tabletop Simulator helper functions.
@@ -10,7 +9,6 @@
 
 local TAG = 'CrLua.TTS.Object'
 
-local CrLua = CrLua or {}
 CrLua.TTS = CrLua.TTS or {}
 CrLua.TTS.Object = assert(not CrLua.TTS.Object) and {}
 
@@ -48,5 +46,3 @@ function CrLua.TTS.Object._testGetByName()
     end
     assert(found)
 end
-
-CrLua.LockTable.readOnlyRequireKey(TAG, CrLua.TTS.Object)

@@ -1,5 +1,3 @@
-#include ~/CrLua/LockTable
-
 -------------------------------------------------------------------------------
 --- Lua logging functions
 -- @author bonkersbgg on BoardGameGeek.com
@@ -7,8 +5,9 @@
 
 local TAG = 'CrLua.Log'
 
-local CrLua = CrLua or {}
-CrLua.Log = assert(not CrLua.Log) and {}
+CrLua.Log = assert(not CrLua.Log) and {
+    _data = {}
+}
 
 CrLua.Log.LOG_LEVEL = {
     DEBUG = { level = 1, shortString = 'd' },
@@ -18,22 +17,15 @@ CrLua.Log.LOG_LEVEL = {
     NONE = { level = 5, shortString = 'x' },
 }
 
--- Store current level in a nested table to avoid mutating anything in Log.
-CrLua.Log._current = {
-    level = CrLua.Log.LOG_LEVEL.NONE.level,
-    shortString = CrLua.Log.LOG_LEVEL.NONE.shortString
-}
+-- Store mutable level in a nested table to avoid mutating anything in Log.
+CrLua.Log._data.level = CrLua.Log.LOG_LEVEL.NONE
 
 -------------------------------------------------------------------------------
 --- Get the current log level.
--- @return table : current log level values.
+-- @return table : current log level.
 -------------------------------------------------------------------------------
 function CrLua.Log.getLogLevel()
-    local result = {}
-    for k, v in pairs(CrLua.Log._current) do
-        result[k] = v
-    end
-    return result
+    return CrLua.Log._data.level
 end
 
 -------------------------------------------------------------------------------
@@ -43,9 +35,7 @@ end
 -------------------------------------------------------------------------------
 function CrLua.Log.setLogLevel(level)
     assert(level and type(level.level) == 'number' and type(level.shortString) == 'string')
-    for k, v in pairs(level) do
-        CrLua.Log._current[k] = v
-    end
+    CrLua.Log._data.level = level
 end
 
 function CrLua.Log._logTable(message, table, depth)
@@ -74,7 +64,7 @@ function CrLua.Log._logTable(message, table, depth)
 end
 
 function CrLua.Log._log(logLevel, message, table)
-    if logLevel.level < CrLua.Log._current.level then
+    if logLevel.level < CrLua.Log._data.level.level then
         return
     end
 
@@ -135,5 +125,3 @@ function CrLua.Log.e(message, table)
     assert(type(message) == 'string' and (not table or type(table) == 'table'))
     CrLua.Log._log(CrLua.Log.LOG_LEVEL.ERROR, message, table)
 end
-
-CrLua.LockTable.readOnlyRequireKey(TAG, CrLua.Log)

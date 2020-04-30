@@ -1,5 +1,3 @@
-#include ~/CrLua/LockTable
-
 -------------------------------------------------------------------------------
 --- Partially lock the _G global variable table.
 -- Include this AFTER creating any necessary globals to prevent new ones.
@@ -16,13 +14,23 @@
 -------------------------------------------------------------------------------
 
 local TAG = 'CrLua.LockGlobals'
+local _lockGlobalsMetaTable = {}
 
-local CrLua = CrLua or {}
+-- Index is only called when the key does not already exist.
+function _lockGlobalsMetaTable.__index(table, key)
+    error(TAG .. ': accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error(TAG .. ': globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+
+setmetatable(_G, _lockGlobalsMetaTable)
+
+-------------------------------------------------------------------------------
+
+-- Add a test function to the CrLua "namespace".
 CrLua.LockGlobals = assert(not CrLua.LockGlobals) and {}
-
-CrLua.LockGlobals._metatable = {}
-
--- Run this after globals are locked to make sure.
 function CrLua.LockGlobals._testLockGlobals()
     -- Can read existing global.
     assert(_VERSION)
@@ -37,15 +45,3 @@ function CrLua.LockGlobals._testLockGlobals()
         error('was able to write missing global')
     end
 end
-
-
--- Index is only called when the key does not already exist.
-function CrLua.LockGlobals._metatable.__index(table, key)
-    error(TAG .. ': accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
-end
-
-function CrLua.LockGlobals._metatable.__newindex(table, key, value)
-    error(TAG .. ': globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
-end
-
-setmetatable(_G, CrLua.LockGlobals._metatable)

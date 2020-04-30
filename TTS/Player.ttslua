@@ -1,5 +1,4 @@
-#include ~/CrLua/LockTable
-#include ~/CrLua/Util
+CrLua.require('Util')
 
 -------------------------------------------------------------------------------
 --- Tabletop Simulator helper functions.
@@ -10,7 +9,6 @@
 
 local TAG = 'CrLua.TTS.Player'
 
-local CrLua = CrLua or {}
 CrLua.TTS = CrLua.TTS or {}
 CrLua.TTS.Player = assert(not CrLua.TTS.Player) and {}
 
@@ -64,5 +62,3 @@ function CrLua.TTS.Player._testIsSeated()
     assert(CrLua.TTS.Player.isSeated(color))
     assert(not CrLua.TTS.Player.isSeated('does_not_exist'))
 end
-
-CrLua.LockTable.readOnlyRequireKey(TAG, CrLua.TTS.Player)

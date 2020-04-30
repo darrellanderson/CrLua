@@ -12,7 +12,6 @@
 
 local TAG = 'CrLua.LockTable'
 
-local CrLua = CrLua or {}
 CrLua.LockTable = assert(not CrLua.LockTable) and {}
 
 CrLua.LockTable.ATTR = {
@@ -45,7 +44,7 @@ function CrLua.LockTable._apply(tableName, attrs, table)
     assert(type(tableName) == 'string' and type(attrs) == 'table' and type(table) == 'table')
 
     -- Do not attempt to lock a table that already has a metatable.
-    assert(not getmetatable(table), 'cannot apply LockTable when a metatable is already set')
+    assert(not getmetatable(table), 'cannot apply LockTable when a metatable is already set: ' .. tableName)
 
     local newMetaTable = {
         _name = tableName,
@@ -81,7 +80,8 @@ function CrLua.LockTable._metatable.__index(lockedTable, key)
     local attrSet = metatable._attrSet
     local tableContents = metatable._tableContents
     local value = tableContents[key]
-    if not value and attrSet[CrLua.LockTable.ATTR.REQUIRE_KEY] then
+    local existing = value ~= nil
+    if not existing and attrSet[CrLua.LockTable.ATTR.REQUIRE_KEY] then
         CrLua.LockTable._error(lockedTable, key, CrLua.LockTable.ACCESS_TYPE.READ_MISSING)
     end
     return value
@@ -91,7 +91,7 @@ function CrLua.LockTable._metatable.__newindex(lockedTable, key, value)
     local metatable = getmetatable(lockedTable)
     local attrSet = metatable._attrSet
     local tableContents = metatable._tableContents
-    local existing = tableContents[key] and true
+    local existing = tableContents[key] ~= nil
     if attrSet[CrLua.LockTable.ATTR.READ_ONLY] then
         local accessType = existing and CrLua.LockTable.ACCESS_TYPE.OVERWRITE or CrLua.LockTable.ACCESS_TYPE.WRITE_NEW
         CrLua.LockTable._error(lockedTable, key, accessType)
@@ -106,7 +106,9 @@ function CrLua.LockTable._metatable.__pairs(lockedTable)
     local tableContents = metatable._tableContents
     local function iter(_, k)
         local k, v = next(tableContents, k)
-        return v and k, v
+        if v ~= nil then
+            return k, v
+        end
     end
     return iter, lockedTable, nil
 end
@@ -116,7 +118,9 @@ function CrLua.LockTable._metatable.__ipairs(lockedTable)
     local tableContents = metatable._tableContents
     local function iter(_, i)
         local v = tableContents[i + 1]
-        return v and i + 1, v
+        if v ~= nil then
+            return i + 1, v
+        end
     end
     return iter, lockedTable, 0
 end
@@ -289,5 +293,3 @@ function CrLua.LockTable._testreadWriteRequireKey()
     -- Verify len.
     assert(#table == 2)
 end
-
-CrLua.LockTable.readOnlyRequireKey(TAG, CrLua.LockTable)

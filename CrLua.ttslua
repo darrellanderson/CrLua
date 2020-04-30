@@ -1,0 +1,110 @@
+-------------------------------------------------------------------------------
+--- Create the base CrLua table, with require function for dependencies.
+-- @author bonkersbgg on BoardGameGeek.com
+--
+-- Suggested use: at the END of the object script (so #include does not affect
+-- line number reporting in the above portion), include CrLua and dependencies:
+--
+-- #include <~/CrLua/CrLua>
+-- #include <~/CrLua/LockGlobals>
+--
+-- #include <~/CrLua/[OTHER_DEPENDENCY]>
+-- ...
+-- #include <~/CrLua/[OTHER_DEPENDENCY]>
+--
+-- CrLua.assertRequired() -- do this BEFORE lock
+-- CrLua.lock()
+--
+-- -- Optionally enable logging.
+-- CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
+--
+-------------------------------------------------------------------------------
+
+local TAG = 'CrLua'
+
+-- Create a GLOBAL CrLua table.
+assert(not CrLua)
+CrLua = {
+    _requireSet = { ['LockTable'] = true }
+}
+
+-------------------------------------------------------------------------------
+--- Add a CrLua.<package> requirement.
+-- @param package string : package name.
+-------------------------------------------------------------------------------
+function CrLua.require(package)
+    assert(type(package) == 'string')
+    CrLua._requireSet[package] = true
+end
+
+-------------------------------------------------------------------------------
+--- Assert all required packages exist.
+-------------------------------------------------------------------------------
+function CrLua.assertRequired()
+    local message = false
+    for package, _ in pairs(CrLua._requireSet) do
+        assert(type(package) == 'string')
+        -- Descend dot-delimited sub-package names.
+        local entry = CrLua
+        CrLua.Log.d(TAG .. '.assertRequired: ' .. package)
+        for subPackage in string.gmatch(package, '[^%.]+') do
+            entry = entry and entry[subPackage]
+        end
+        if not entry then
+            message = (message and message .. ', ' or '') .. package
+        end
+    end
+    if message then
+        error(TAG .. ': assertRequired missing ' .. message)
+    end
+end
+
+-------------------------------------------------------------------------------
+--- Lock CrLua packages.
+-- Make CrLua and nested packages read-only, with access requiring keys exist.
+--
+-- Locking rules:
+--
+-- (1.) '_data' is a reserved table name for mutable tables.  Do not lock.
+--
+-- (2.) If the table starts with a capital letter, make it read-only and
+-- require keys exist.  These are packages or constants, attempting to access
+-- a missing field is probably a typo.
+--
+-- (2.) Otherwise make it read-only but allow reads to missing keys (value nil).
+-- One can query membership by checking if a key exists.
+--
+-- This helps catch typos calling non-existent functions, or overwriting
+-- a constant value by mistake.
+-------------------------------------------------------------------------------
+function CrLua.lock()
+    local sawSet = {}
+
+    local function lockRecursive(tableName, table)
+        -- Watch out for cycles!  This might happen if a script defines
+        -- an enum table, then later uses one of them in a different table.
+        if sawSet[table] then
+            return
+        end
+        sawSet[table] = true
+
+        local isData = tableName == '_data'
+        local firstLetter = string.match(tableName, '%a')
+        local isUpper = firstLetter and firstLetter == string.upper(firstLetter)
+
+        if not isData then
+            if isUpper then
+                CrLua.LockTable.readOnlyRequireKey(tableName, table)
+            else
+                CrLua.LockTable.readOnly(tableName, table)
+            end
+            for k, v in pairs(table) do
+                if type(v) == 'table' then
+                    lockRecursive(tostring(k), v)
+                end
+            end
+        end
+    end
+
+    lockRecursive('CrLua', CrLua)
+end

@@ -10,9 +10,6 @@
 -- Once all players have passed, the token disables turns (via Turns.enable)
 -- and all tokens flip back to active.
 
--- Utility functions, defined at end.
-local CrLua = {}
-
 local data = {
     -- This token belongs to which seated player (string).
     ownerPlayerColor = nil,
@@ -214,7 +211,7 @@ end
 function playerColorAtPosition(position)
     -- Detect and apply TI4 zones (cache for later use).
     if data.useTI4Zones == nil then
-        local updatedZones = CrLua.TI4.Zone.updateZoneColors()
+        local updatedZones = CrLua.TI4.Zone.updateZones()
         data.useTI4Zones = (updatedZones and true) or false
         CrLua.Log.d('useTI4Zones=' .. tostring(data.useTI4Zones))
     end
@@ -234,9 +231,21 @@ end
 
 -------------------------------------------------------------------------------
 
-#include ~/CrLua/LockGlobals
-#include ~/CrLua/Log
-#include ~/CrLua/TTS/Player
-#include ~/CrLua/TI4/Zone
+#include <~/CrLua/CrLua>
+#include <~/CrLua/LockGlobals>
 
-#include ~/CrLua/LockGlobals
+#include <~/CrLua/List>
+#include <~/CrLua/LockTable>
+#include <~/CrLua/Log>
+#include <~/CrLua/Polygon>
+#include <~/CrLua/Util>
+#include <~/CrLua/TTS/Player>
+#include <~/CrLua/TI4/Zone>
+
+--[[
+#include <~/CrLua/UnitTest>
+CrLua.UnitTest.runTests('CrLua', CrLua, true)
+--]]
+
+CrLua.assertRequired() -- do this BEFORE lock
+CrLua.lock()

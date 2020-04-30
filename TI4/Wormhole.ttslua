@@ -1,23 +1,21 @@
-#include ~/CrLua/List
-#include ~/CrLua/LockTable
-#include ~/CrLua/TTS/Object
-
 -------------------------------------------------------------------------------
 --- Wormhole utils for Darth Batman and Raptor1210's "Twilight Imperium IV" TTS mod.
 -- @author bonkersbgg on BoardGameGeek.com
 -------------------------------------------------------------------------------
 
+CrLua.require('List')
+CrLua.require('TTS.Object')
+
 local TAG = 'CrLua.TI4.Wormhole'
 
-local CrLua = CrLua or {}
 CrLua.TI4 = CrLua.TI4 or {}
 CrLua.TI4.Wormhole = assert(not CrLua.TI4.Wormhole) and {}
 
-CrLua.TI4.Wormhole.WORMHOLES = CrLua.LockTable.readOnlyRequireKey('Wormholes', {
+CrLua.TI4.Wormhole.WORMHOLES = {
     ALPHA = 'alpha',
     BETA = 'beta',
     DELTA = 'delta',
-})
+}
 
 CrLua.TI4.Wormhole.GUIDS = {
     -- Planet tiles.
@@ -70,5 +68,3 @@ function CrLua.TI4.Wormhole.findWormholes()
 
     return result
 end
-
-CrLua.LockTable.readOnlyRequireKey(TAG, CrLua.TI4.Wormhole)

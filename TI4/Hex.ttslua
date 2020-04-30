@@ -1,14 +1,12 @@
-#include ~/CrLua/RedBlobHex
-#include ~/CrLua/LockTable
-
 -------------------------------------------------------------------------------
 --- Hex utils for Darth Batman and Raptor1210's "Twilight Imperium IV" TTS mod.
 -- @author bonkersbgg on BoardGameGeek.com
 -------------------------------------------------------------------------------
 
+CrLua.require('RedBlobHex')
+
 local TAG = 'CrLua.TI4.Hex'
 
-local CrLua = CrLua or {}
 CrLua.TI4 = CrLua.TI4 or {}
 CrLua.TI4.Hex = assert(not CrLua.TI4.Hex) and {}
 
@@ -105,5 +103,3 @@ function CrLua.TI4.Hex.vectorLines(hexString, override)
     end
     return result
 end
-
-CrLua.LockTable.readOnlyRequireKey(TAG, CrLua.TI4.Hex)

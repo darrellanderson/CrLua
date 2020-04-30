@@ -1,5 +1,3 @@
-#include ~/CrLua/LockTable
-
 -------------------------------------------------------------------------------
 --- Lua utility functions
 -- @author bonkersbgg on BoardGameGeek.com
@@ -97,5 +95,3 @@ function CrLua.Util._testMax()
     assert(k1 == k2 and k1 == 4)
     assert(max1 == max2 and max1 == 5)
 end
-
-CrLua.LockTable.readOnlyRequireKey(TAG, CrLua.Util)

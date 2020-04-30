@@ -1,18 +1,3 @@
-#include ~/CrLua/List
-#include ~/CrLua/Log
-#include ~/CrLua/Polygon
-#include ~/CrLua/RedBlobHex
-#include ~/CrLua/TI4/Hex
-#include ~/CrLua/TI4/WormHole
-#include ~/CrLua/TI4/Zone
-
-#include ~/CrLua/TTS/Player
-#include ~/CrLua/UnitTest
-
-CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
-if false then
-    CrLua.Log.d('_G', _G)
-end
 
 function onLoad(save_state)
     print('onLoad')
@@ -21,6 +6,14 @@ end
 
 function onDrop(playerColor)
     print('onDrop')
+
+    -- Set color to zone color.
+    CrLua.TI4.Zone.updateZones()
+    local zone = CrLua.TI4.Zone.insideWhichPlayerZone(self.getPosition())
+    local zoneColor = zone and CrLua.TI4.Zone.color(zone)
+    local zoneFaction = zone and CrLua.TI4.Zone.faction(zone)
+    self.setColorTint(zoneColor or 'Grey')
+    print('onDrop: zone faction = "' .. (zoneFaction or '<nil>') .. '"')
 
     local position = self.getPosition()
     local selfHex = CrLua.TI4.Hex.fromPosition(position)
@@ -69,4 +62,25 @@ function onDrop(playerColor)
     Global.setVectorLines(vectorLines)
 end
 
-#include ~/CrLua/LockGlobals
+-------------------------------------------------------------------------------
+
+#include <~/CrLua/CrLua>
+#include <~/CrLua/LockGlobals>
+
+#include <~/CrLua/List>
+#include <~/CrLua/LockTable>
+#include <~/CrLua/Log>
+#include <~/CrLua/Polygon>
+#include <~/CrLua/RedBlobHex>
+#include <~/CrLua/TI4/Hex>
+#include <~/CrLua/TI4/WormHole>
+#include <~/CrLua/TI4/Zone>
+#include <~/CrLua/TTS/Object>
+#include <~/CrLua/TTS/Player>
+#include <~/CrLua/UnitTest>
+#include <~/CrLua/Util>
+
+CrLua.assertRequired() -- do this BEFORE lock
+CrLua.lock()
+
+CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)

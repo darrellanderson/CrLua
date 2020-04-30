@@ -100,13 +100,13 @@ function CrLua.TI4.Zone.updateZoneColors()
         end
     end
 
-    local updatedZonesList = CrLua.List.fromSet(updatedZonesSet)
+    local updatedZonesList = CrLua.List.fromKeys(updatedZonesSet)
     return #updatedZonesList > 0 and updatedZonesList
 end
 
 function CrLua.TI4.Zone._testUpdateZoneColors()
     local updatedZones = CrLua.TI4.Zone.updateZoneColors()
-    assert(#updatedZones > 0)
+    -- do not assert anything in case test is not running against TI4.
 end
 
 -------------------------------------------------------------------------------

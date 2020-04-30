@@ -1,0 +1,74 @@
+#include ~/CrLua/List
+#include ~/CrLua/LockTable
+#include ~/CrLua/TTS/Object
+
+-------------------------------------------------------------------------------
+--- Wormhole utils for Darth Batman and Raptor1210's "Twilight Imperium IV" TTS mod.
+-- @author bonkersbgg on BoardGameGeek.com
+-------------------------------------------------------------------------------
+
+local TAG = 'CrLua.TI4.Wormhole'
+
+local CrLua = CrLua or {}
+CrLua.TI4 = CrLua.TI4 or {}
+CrLua.TI4.Wormhole = assert(not CrLua.TI4.Wormhole) and {}
+
+CrLua.TI4.Wormhole.WORMHOLES = CrLua.LockTable.readOnlyRequireKey('Wormholes', {
+    ALPHA = 'alpha',
+    BETA = 'beta',
+    DELTA = 'delta',
+})
+
+CrLua.TI4.Wormhole.GUIDS = {
+    -- Planet tiles.
+    ['c56a8a'] = CrLua.TI4.Wormhole.WORMHOLES.DELTA,
+    ['71e1bf'] = CrLua.TI4.Wormhole.WORMHOLES.BETA,
+    ['f11ef5'] = CrLua.TI4.Wormhole.WORMHOLES.ALPHA,
+    ['0378a4'] = CrLua.TI4.Wormhole.WORMHOLES.ALPHA,
+    ['ccd7ac'] = CrLua.TI4.Wormhole.WORMHOLES.BETA,
+    ['f38182'] = CrLua.TI4.Wormhole.WORMHOLES.DELTA,
+
+    -- Ghost flagship.
+    -- Hmm, is this static?  Find it by name rather than guid.
+
+    -- Ghost extra wormhole tokens.
+    ['0d2f86'] = CrLua.TI4.Wormhole.WORMHOLES.ALPHA,
+    ['cba3a7'] = CrLua.TI4.Wormhole.WORMHOLES.BETA,
+}
+
+CrLua.TI4.Wormhole.OBJECT_NAMES = {
+    ['Hil Colish'] = CrLua.TI4.Wormhole.WORMHOLES.DELTA,
+}
+
+-------------------------------------------------------------------------------
+--- Find wormholes.
+-- @return table : list of tables with {wormhole->string, object->Object}.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Wormhole.findWormholes()
+    local result = {}
+
+    local function addResult(object, wormhole)
+        assert(type(wormhole) == 'string')
+        table.insert(result, { object = object, wormhole = wormhole })
+    end
+
+    for guid, wormhole in pairs(CrLua.TI4.Wormhole.GUIDS) do
+        local object = getObjectFromGUID(guid)
+        if object then
+            addResult(object, wormhole)
+        end
+    end
+
+    local objectNames = CrLua.List.fromKeys(CrLua.TI4.Wormhole.OBJECT_NAMES)
+    local objectsByName = CrLua.TTS.Object.getByName(objectNames)
+    for name, objects in pairs(objectsByName) do
+        local wormhole = CrLua.TI4.Wormhole.OBJECT_NAMES[name]
+        for _, object in ipairs(objects) do
+            addResult(object, wormhole)
+        end
+    end
+
+    return result
+end
+
+CrLua.LockTable.readOnlyRequireKey(TAG, CrLua.TI4.Wormhole)

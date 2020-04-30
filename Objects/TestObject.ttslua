@@ -1,0 +1,72 @@
+#include ~/CrLua/List
+#include ~/CrLua/Log
+#include ~/CrLua/Polygon
+#include ~/CrLua/RedBlobHex
+#include ~/CrLua/TI4/Hex
+#include ~/CrLua/TI4/WormHole
+#include ~/CrLua/TI4/Zone
+
+#include ~/CrLua/TTS/Player
+#include ~/CrLua/UnitTest
+
+CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
+if false then
+    CrLua.Log.d('_G', _G)
+end
+
+function onLoad(save_state)
+    print('onLoad')
+    CrLua.UnitTest.runTests('CrLua', CrLua, true)
+end
+
+function onDrop(playerColor)
+    print('onDrop')
+
+    local position = self.getPosition()
+    local selfHex = CrLua.TI4.Hex.fromPosition(position)
+    local vectorLines = {
+        CrLua.TI4.Hex.vectorLines(selfHex, {
+            color = { 1, 0, 0 },
+            thickness = 0.6
+        })
+    }
+
+    local neighborHexes = CrLua.TI4.Hex.neighbors(selfHex)
+    for _, neighborHex in ipairs(neighborHexes) do
+        local lines = CrLua.TI4.Hex.vectorLines(neighborHex, {
+            color = { 0, 1, 0 },
+            thickness = 0.4
+        })
+        table.insert(vectorLines, lines)
+    end
+
+    local wormholes = CrLua.TI4.Wormhole.findWormholes()
+    CrLua.Log.d('wormholes', wormholes)
+    local selfWormholeSet = {}
+    for _, wormhole in ipairs(wormholes) do
+        CrLua.Log.d('wormhole ' .. wormhole.wormhole)
+        local wormholeHex = CrLua.TI4.Hex.fromPosition(wormhole.object.getPosition())
+        if wormholeHex == selfHex then
+            selfWormholeSet[wormhole.wormhole] = true
+        end
+    end
+    CrLua.Log.d('selfWormholeSet', selfWormholeSet)
+    local wormholeNeighborHexSet = {}
+    for _, wormhole in ipairs(wormholes) do
+        if selfWormholeSet[wormhole.wormhole] then
+            local wormholeHex = CrLua.TI4.Hex.fromPosition(wormhole.object.getPosition())
+            wormholeNeighborHexSet[wormholeHex] = true
+        end
+    end
+    for wormholeNeighborHex, _ in pairs(wormholeNeighborHexSet) do
+        local lines = CrLua.TI4.Hex.vectorLines(wormholeNeighborHex, {
+            color = { 0, 0, 1 },
+            thickness = 0.2
+        })
+        table.insert(vectorLines, lines)
+    end
+
+    Global.setVectorLines(vectorLines)
+end
+
+#include ~/CrLua/LockGlobals

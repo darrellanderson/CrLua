@@ -121,31 +121,53 @@ function CrLua.List._testToSet()
 end
 
 -------------------------------------------------------------------------------
---- Convert a set to a list.
+--- Convert the keys of a table to a list.
 -- The list is dependent on table key iteration order, make no assumptions!
 -- @param set table : map from key to true.
 -- @return list : table with number indices.
 -------------------------------------------------------------------------------
-function CrLua.List.fromSet(set)
+function CrLua.List.fromKeys(set)
     assert(type(set) == 'table')
 
     local result = {}
     for k, v in pairs(set) do
-        assert(v == true)
         table.insert(result, k)
     end
     return result
 end
 
-function CrLua.List._testToSet()
+function CrLua.List._testFromKeys()
     local set = { a = true, b = true }
-    local list = CrLua.List.fromSet(set)
+    local list = CrLua.List.fromKeys(set)
     assert(#list == 2, '#list=' .. #list)
     if list[1] == 'a' then
         assert(list[1] == 'a' and list[2] == 'b')
     else
         assert(list[1] == 'b' and list[2] == 'a')
     end
+end
+
+-------------------------------------------------------------------------------
+--- Reduce a list to unique elements.
+-- @param list : table with number inidice.
+-- @return list : table with number indices and unique elements.
+-------------------------------------------------------------------------------
+function CrLua.List.unique(list)
+    local result = {}
+    local seen = {}
+    for _, v in ipairs(list) do
+        if not seen[v] then
+            seen[v] = true
+            table.insert(result, v)
+        end
+    end
+    return result
+end
+
+function CrLua.List._testUnique()
+    local list = { 'a', 'b', 'a', 'b', 'c' }
+    local unique = CrLua.List.unique(list)
+    assert(#unique == 3 and unique[1] == 'a' and unique[2] == 'b' and unique[3] == 'c')
 end
 
 CrLua.LockTable.readOnlyRequireKey(TAG, CrLua.List)

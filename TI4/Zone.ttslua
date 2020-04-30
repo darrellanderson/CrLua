@@ -14,7 +14,7 @@ local CrLua = CrLua or {}
 CrLua.TI4 = CrLua.TI4 or {}
 CrLua.TI4.Zone = assert(not CrLua.TI4.Zone) and {}
 
-CrLua.TI4.Zone.TYPE = CrLua.Util.lock(TAG .. '.TYPE', {
+CrLua.TI4.Zone.TYPE = CrLua.LockTable.readOnlyRequireKey(TAG .. '.TYPE', {
     PLAYER = 'player',
     TILES = 'tiles'
 })

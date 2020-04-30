@@ -1,4 +1,4 @@
-#include ~/CrLua/Util
+#include ~/CrLua/LockTable
 
 -------------------------------------------------------------------------------
 --- Polygon utility functions.
@@ -183,4 +183,4 @@ function CrLua.Polygon._testInside()
     assert(not CrLua.Polygon.inside(polygon, {3,3}))
 end
 
-CrLua.Util.lock(TAG, CrLua.Polygon)
+CrLua.LockTable.readOnlyRequireKey(TAG, CrLua.Polygon)

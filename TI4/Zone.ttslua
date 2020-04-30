@@ -1,5 +1,6 @@
 #include ~/CrLua/Polygon
 #include ~/CrLua/List
+#include ~/CrLua/LockTable
 #include ~/CrLua/Util
 
 -------------------------------------------------------------------------------
@@ -271,3 +272,5 @@ function CrLua.TI4.Zone.allZonesVectorLines(parameters)
     table.insert(lines, CrLua.TI4.Zone.vectorLines(tilesZone, {}))
     return lines
 end
+
+CrLua.LockTable.readOnlyRequireKey(TAG, CrLua.TI4.Zone)

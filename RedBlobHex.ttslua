@@ -1,4 +1,4 @@
-#include ~/CrLua/Util
+#include ~/CrLua/LockTable
 
 -------------------------------------------------------------------------------
 --- Hex math functions
@@ -14,10 +14,10 @@ local CrLua = CrLua or {}
 CrLua.RedBlobHex = assert(not CrLua.RedBlobHex) and {}
 
 --- Standard hex orientations.
-CrLua.RedBlobHex.ORIENTATION = CrLua.Util.lock(TAG .. '.ORIENTATION', {
+CrLua.RedBlobHex.ORIENTATION = {
     POINTY_TOP = 1,
     FLAT_TOP = 2
-})
+}
 
 -------------------------------------------------------------------------------
 --- Hex grid orientation, used to translate between screen position and unit hex
@@ -263,4 +263,4 @@ function CrLua.RedBlobHex.neighbors(hex)
     }
 end
 
-CrLua.Util.lock(TAG, CrLua.RedBlobHex)
+CrLua.LockTable.readOnlyRequireKey(TAG, CrLua.RedBlobHex)

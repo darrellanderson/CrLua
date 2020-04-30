@@ -1,4 +1,4 @@
-#include ~/CrLua/Util
+#include ~/CrLua/LockTable
 
 -------------------------------------------------------------------------------
 --- Lua list utility functions
@@ -148,5 +148,4 @@ function CrLua.List._testToSet()
     end
 end
 
-
-CrLua.Util.lock(TAG, CrLua.List)
+CrLua.LockTable.readOnlyRequireKey(TAG, CrLua.List)

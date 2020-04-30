@@ -1,3 +1,4 @@
+#include ~/CrLua/LockTable
 #include ~/CrLua/Util
 
 -------------------------------------------------------------------------------
@@ -31,7 +32,7 @@ function CrLua.TTS.closestPlayer(position)
         local handPosition = player.getHandTransform(1).position
         return CrLua.Util.distanceSq(position, handPosition)
     end
-    
+
     local seated = getSeatedPlayers()
     local _, color = CrLua.Util.min(seated, distanceFunction)
     return color
@@ -63,4 +64,4 @@ function CrLua.TTS._testIsSeated()
     assert(not CrLua.TTS.isSeated('does_not_exist'))
 end
 
-CrLua.Util.lock(TAG, CrLua.TTS)
+CrLua.LockTable.readOnlyRequireKey(TAG, CrLua.TTS)

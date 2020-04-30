@@ -1,4 +1,4 @@
-#include ~/CrLua/Util
+#include ~/CrLua/LockTable
 
 -------------------------------------------------------------------------------
 --- Lua logging functions
@@ -10,14 +10,31 @@ local TAG = 'CrLua.Log'
 local CrLua = CrLua or {}
 CrLua.Log = assert(not CrLua.Log) and {}
 
-CrLua.Log.LOG_LEVEL = CrLua.Util.lockRecursive(TAG .. '.LOG_LEVEL', {
+CrLua.Log.LOG_LEVEL = {
     DEBUG = { level = 1, shortString = 'd' },
     INFO = { level = 2, shortString = 'i' },
     WARNING = { level = 3, shortString = 'w' },
 	ERROR = { level = 4, shortString = 'e' },
     NONE = { level = 5, shortString = 'x' },
-})
-CrLua.Log._level = CrLua.Log.LOG_LEVEL.NONE
+}
+
+-- Store current level in a nested table to avoid mutating anything in Log.
+CrLua.Log._current = {
+    level = CrLua.Log.LOG_LEVEL.NONE.level,
+    shortString = CrLua.Log.LOG_LEVEL.NONE.shortString
+}
+
+-------------------------------------------------------------------------------
+--- Get the current log level.
+-- @return table : current log level values.
+-------------------------------------------------------------------------------
+function CrLua.Log.getLogLevel()
+    local result = {}
+    for k, v in pairs(CrLua.Log._current) do
+        result[k] = v
+    end
+    return result
+end
 
 -------------------------------------------------------------------------------
 --- Set the log level, only log messagees at this level and above.
@@ -26,7 +43,9 @@ CrLua.Log._level = CrLua.Log.LOG_LEVEL.NONE
 -------------------------------------------------------------------------------
 function CrLua.Log.setLogLevel(level)
     assert(level and type(level.level) == 'number' and type(level.shortString) == 'string')
-    CrLua.Log._level = level
+    for k, v in pairs(level) do
+        CrLua.Log._current[k] = v
+    end
 end
 
 function CrLua.Log._logTable(message, table, depth)
@@ -55,7 +74,7 @@ function CrLua.Log._logTable(message, table, depth)
 end
 
 function CrLua.Log._log(logLevel, message, table)
-    if logLevel.level < CrLua.Log._level.level then
+    if logLevel.level < CrLua.Log._current.level then
         return
     end
 
@@ -71,7 +90,7 @@ function CrLua.Log._log(logLevel, message, table)
 end
 
 function CrLua.Log._testLog()
-    local originalLogLevel = CrLua.Log._level
+    local originalLogLevel = CrLua.Log.getLogLevel()
     CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
     CrLua.Log._log(CrLua.Log.LOG_LEVEL.DEBUG, 'test message', { foo = 1, bar = { a = 1, b = 2 } })
     CrLua.Log.setLogLevel(originalLogLevel)
@@ -117,4 +136,4 @@ function CrLua.Log.e(message, table)
     CrLua.Log._log(CrLua.Log.LOG_LEVEL.ERROR, message, table)
 end
 
-CrLua.Util.lock(TAG, CrLua.Log, { '_level' })
+CrLua.LockTable.readOnlyRequireKey(TAG, CrLua.Log)

@@ -1,5 +1,7 @@
+#include ~/CrLua/LockTable
+
 -------------------------------------------------------------------------------
---- Lock the _G global variables table, prevent accidental creation of globals.
+--- Partially lock the _G global variable table.
 -- Include this AFTER creating any necessary globals to prevent new ones.
 --
 -- - Existing globals can still be read AND WRITTEN.
@@ -13,14 +15,37 @@
 -- @author bonkersbgg on BoardGameGeek.com
 -------------------------------------------------------------------------------
 
-local TAG = 'CrLuaLockGlobals'
+local TAG = 'CrLua.LockGlobals'
 
-setmetatable(_G, {
-    -- Index is only called when the key does not already exist.
-    __index = function(tbl, key)
-        error(TAG .. ': accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
-    end,
-    __newindex = function(tbl, key, value)
-        error(TAG .. ': globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+local CrLua = CrLua or {}
+CrLua.LockGlobals = assert(not CrLua.LockGlobals) and {}
+
+CrLua.LockGlobals._metatable = {}
+
+-- Run this after globals are locked to make sure.
+function CrLua.LockGlobals._testLockGlobals()
+    -- Can read existing global.
+    assert(_VERSION)
+
+    -- Cannot read missing global.
+    if pcall(function() return thisGlobalVariableDoesNotExistHopefully end) then
+        error('was able to write missing global')
     end
-})
+
+    -- Cannot write missing global.
+    if pcall(function() thisGlobalVariableDoesNotExistHopefully = 1 end) then
+        error('was able to write missing global')
+    end
+end
+
+
+-- Index is only called when the key does not already exist.
+function CrLua.LockGlobals._metatable.__index(table, key)
+    error(TAG .. ': accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+
+function CrLua.LockGlobals._metatable.__newindex(table, key, value)
+    error(TAG .. ': globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+
+setmetatable(_G, CrLua.LockGlobals._metatable)

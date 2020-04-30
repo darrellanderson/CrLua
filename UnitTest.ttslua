@@ -1,4 +1,4 @@
-#include ~/CrLua/Util
+#include ~/CrLua/LockTable
 
 -------------------------------------------------------------------------------
 --- Lua unit testing functions
@@ -62,4 +62,4 @@ function CrLua.UnitTest._testExample()
     assert(true)
 end
 
-CrLua.Util.lock(TAG, CrLua.UnitTest)
+CrLua.LockTable.readOnlyRequireKey(TAG, CrLua.UnitTest)

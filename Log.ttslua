@@ -58,7 +58,7 @@ function CrLua.Log._logTable(message, table, depth)
     local indentedPrefix = prefix .. '   '
 
     print(prefix .. message .. ' = {')
-    if depth < 2 then
+    if depth < 4 then
         for k, v in pairs(table) do
             if type(v) == 'table' then
                 CrLua.Log._logTable(tostring(k), v, depth + 1)

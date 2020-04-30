@@ -1,0 +1,109 @@
+#include ~/CrLua/RedBlobHex
+#include ~/CrLua/LockTable
+
+-------------------------------------------------------------------------------
+--- Hex utils for Darth Batman and Raptor1210's "Twilight Imperium IV" TTS mod.
+-- @author bonkersbgg on BoardGameGeek.com
+-------------------------------------------------------------------------------
+
+local TAG = 'CrLua.TI4.Hex'
+
+local CrLua = CrLua or {}
+CrLua.TI4 = CrLua.TI4 or {}
+CrLua.TI4.Hex = assert(not CrLua.TI4.Hex) and {}
+
+if true then -- "do" causes linter warnings, boo.
+    local orientation = CrLua.RedBlobHex.ORIENTATION.FLAT_TOP
+    local hexSize = CrLua.RedBlobHex.point(3.5, 3.5)
+    local origin = CrLua.RedBlobHex.point(0, 0)
+    CrLua.TI4.Hex._layout = CrLua.RedBlobHex.layout(orientation, hexSize, origin)
+end
+
+-------------------------------------------------------------------------------
+--- Get hex from world position.
+-- @param position table : {x,y,z} keys.
+-- @return hex string : hex, string encoded.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Hex.fromPosition(position)
+    assert(type(position.x) == 'number')
+    local point = CrLua.RedBlobHex.point(position.x, position.z)
+    local hex = CrLua.RedBlobHex.fromPoint(CrLua.TI4.Hex._layout, point)
+    local roundedHex = CrLua.RedBlobHex.round(hex)
+    return CrLua.RedBlobHex.toString(roundedHex)
+end
+
+function CrLua.TI4.Hex._testFromPosition()
+    local position = { x = 0, y = 0, z = 0 }
+    local hexString = CrLua.TI4.Hex.fromPosition(position)
+    assert(hexString == '<0,0,0>')
+end
+
+-------------------------------------------------------------------------------
+--- Get world position from hex.
+-- @param hexString string : string-encoded hex
+-- @return table : {x,y,z} position.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Hex.toPosition(hexString)
+    assert(type(hexString) == 'string')
+    local hex = CrLua.RedBlobHex.fromString(hexString)
+    local point = CrLua.RedBlobHex.toPoint(CrLua.TI4.Hex._layout, hex)
+    return { x = point.x, y = 1, z = point.y }
+end
+
+function CrLua.TI4.Hex._testToPosition()
+    local hexString = '<0,0,0>'
+    local position = CrLua.TI4.Hex.toPosition(hexString)
+    assert(position.x == 0 and position.y == 1 and position.z == 0)
+end
+
+-------------------------------------------------------------------------------
+--- Get adjacent hexes.
+-- @param hexString string : string-encoded hex
+-- @return table : list of string-encoded neighbor hexes.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Hex.neighbors(hexString)
+    assert(type(hexString) == 'string')
+    local hex = CrLua.RedBlobHex.fromString(hexString)
+    local neighborHexes = CrLua.RedBlobHex.neighbors(hex)
+    local result = {}
+    for _, neighborHex in ipairs(neighborHexes) do
+        local neighborHexString = CrLua.RedBlobHex.toString(neighborHex)
+        table.insert(result, neighborHexString)
+    end
+    return result
+end
+
+function CrLua.TI4.Hex._testNeighbors()
+    local hexString = '<0,0,0>'
+    local neighbors = CrLua.TI4.Hex.neighbors(hexString)
+    assert(#neighbors == 6)
+end
+
+-------------------------------------------------------------------------------
+--- Generate a vector lines entry for Global.setVectorLines.
+-- @param hexString string : string-encoded hex
+-- @return table : vector lines entry.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Hex.vectorLines(hexString, override)
+    assert(type(hexString) == 'string' and type(override) == 'table' and not override.points)
+    local hex = CrLua.RedBlobHex.fromString(hexString)
+    local corners = CrLua.RedBlobHex.corners(CrLua.TI4.Hex._layout, hex)
+    local points = {}
+    for _, corner in ipairs(corners) do
+        table.insert(points, { x = corner.x, y = 1, z = corner.y })
+    end
+    local result = {
+        points = points,
+        color = {1, 1, 1},
+        thickness = 0.1,
+        rotation = {0, 0, 0},
+        loop = true,
+        square = false,
+    }
+    for k, v in pairs(override) do
+        result[k] = v
+    end
+    return result
+end
+
+CrLua.LockTable.readOnlyRequireKey(TAG, CrLua.TI4.Hex)

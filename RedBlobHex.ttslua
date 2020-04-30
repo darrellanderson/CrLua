@@ -239,12 +239,23 @@ function CrLua.RedBlobHex.corners(layout, hex)
         return CrLua.RedBlobHex.point(size.x * math.cos(angle), size.y * math.sin(angle))
     end
     local corners = {}
-    local center = CrLua.RedBlobHex.toPoint(layout, h)
+    local center = CrLua.RedBlobHex.toPoint(layout, hex)
     for i = 0, 5 do
-        local offset = hexCornerOffset(layout, i)
+        local offset = hexCornerOffset(i)
         table.insert(corners, CrLua.RedBlobHex.point(center.x + offset.x, center.y + offset.y))
     end
     return corners
+end
+
+function CrLua.RedBlobHex._testCorners()
+    local orientation = CrLua.RedBlobHex.ORIENTATION.FLAT_TOP
+    local hexSize = CrLua.RedBlobHex.point(1, 1)
+    local origin = CrLua.RedBlobHex.point(0, 0)
+    local layout = CrLua.RedBlobHex.layout(orientation, hexSize, origin)
+
+    local hex = CrLua.RedBlobHex.hex(0, 0, 0)
+    local corners = CrLua.RedBlobHex.corners(layout, hex)
+    assert(#corners == 6)
 end
 
 -------------------------------------------------------------------------------
@@ -254,13 +265,19 @@ end
 -------------------------------------------------------------------------------
 function CrLua.RedBlobHex.neighbors(hex)
     return {
-        { q = hex.q + 1.0, hex.r + 0.0, hex.s - 1.0 },
-        { q = hex.q + 1.0, hex.r - 1.0, hex.s + 0.0 },
-        { q = hex.q + 0.0, hex.r - 1.0, hex.s + 1.0 },
-        { q = hex.q - 1.0, hex.r + 0.0, hex.s + 1.0 },
-        { q = hex.q - 1.0, hex.r + 1.0, hex.s + 0.0 },
-        { q = hex.q + 0.0, hex.r + 1.0, hex.s - 1.0 }
+        CrLua.RedBlobHex.hex(hex.q + 1.0, hex.r + 0.0, hex.s - 1.0),
+        CrLua.RedBlobHex.hex(hex.q + 1.0, hex.r - 1.0, hex.s + 0.0),
+        CrLua.RedBlobHex.hex(hex.q + 0.0, hex.r - 1.0, hex.s + 1.0),
+        CrLua.RedBlobHex.hex(hex.q - 1.0, hex.r + 0.0, hex.s + 1.0),
+        CrLua.RedBlobHex.hex(hex.q - 1.0, hex.r + 1.0, hex.s + 0.0),
+        CrLua.RedBlobHex.hex(hex.q + 0.0, hex.r + 1.0, hex.s - 1.0)
     }
+end
+
+function CrLua.RedBlobHex._testNeighbors()
+    local hex = CrLua.RedBlobHex.hex(0, 0, 0)
+    local neighbors = CrLua.RedBlobHex.neighbors(hex)
+    assert(#neighbors == 6)
 end
 
 CrLua.LockTable.readOnlyRequireKey(TAG, CrLua.RedBlobHex)

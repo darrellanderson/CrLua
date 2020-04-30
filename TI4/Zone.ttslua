@@ -30,65 +30,50 @@ CrLua.TI4.Zone._zones = {
         type = CrLua.TI4.Zone.TYPE.PLAYER,
         color = false,
         defaultColor = 'Yellow',
-        polygon = {
-            { 21, -50 }, { 21, -6 }, { 51, -6 }, { 51, -50 }
-        },
-        boundingBox = false
+        polygon = {{ 21, -50 }, { 21, -6 }, { 51, -6 }, { 51, -50 }},
+        boundingBox = false,
     },
     {
         type = CrLua.TI4.Zone.TYPE.PLAYER,
         color = false,
         defaultColor = 'Red',
-        polygon = {
-            { -21, -50 }, { -21, -6 }, { -1.5, -21 }, { 1.5, -21 }, { 21, -6 }, { 21, -50 }
-        },
-        boundingBox = false
+        polygon = {{ -21, -50 }, { -21, -6 }, { -1.5, -21 }, { 1.5, -21 }, { 21, -6 }, { 21, -50 }},
+        boundingBox = false,
     },
     {
         type = CrLua.TI4.Zone.TYPE.PLAYER,
         color = false,
         defaultColor = 'Green',
-        polygon = {
-            { -51, -50 }, { -51, -6 }, { -21, -6 }, { -21, -50 }
-        },
-        boundingBox = false
+        polygon = {{ -51, -50 }, { -51, -6 }, { -21, -6 }, { -21, -50 }},
+        boundingBox = false,
     },
     {
         type = CrLua.TI4.Zone.TYPE.PLAYER,
         color = false,
         defaultColor = 'Purple',
-        polygon = {
-            { 21, 6 }, { 21, 49 }, { 51, 49 }, { 51, 6 }
-        },
-        boundingBox = false
+        polygon = {{ 21, 6 }, { 21, 49 }, { 51, 49 }, { 51, 6 }},
+        boundingBox = false,
     },
-
     {
         type = CrLua.TI4.Zone.TYPE.PLAYER,
         color = false,
         defaultColor = 'Blue',
-        polygon = {
-            { -21, 6 }, { -21, 49 }, { 21, 49 }, { 21, 6 }, { 1.5, 21 }, { -1.5, 21 }
-        },
-        boundingBox = false
+        polygon = {{ -21, 6 }, { -21, 49 }, { 21, 49 }, { 21, 6 }, { 1.5, 21 }, { -1.5, 21 }},
+        boundingBox = false,
     },
     {
         type = CrLua.TI4.Zone.TYPE.PLAYER,
         color = false,
         defaultColor = 'White',
-        polygon = {
-            { -51, 6 }, { -51, 49 }, { -21, 49 }, { -21, 6 }
-        },
-        boundingBox = false
+        polygon = {{ -51, 6 }, { -51, 49 }, { -21, 49 }, { -21, 6 }},
+        boundingBox = false,
     },
     {
         type = CrLua.TI4.Zone.TYPE.TILES,
         color = false,
         defaultColor = 'Grey',
-        polygon = {
-            { -28, -28 }, { -28, 28 }, { 28, 28 }, { 28, -28 }
-        },
-        boundingBox = false
+        polygon = {{ -28, -28 }, { -28, 28 }, { 28, 28 }, { 28, -28 }},
+        boundingBox = false,
     }
 }
 

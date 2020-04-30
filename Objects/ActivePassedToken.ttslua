@@ -226,7 +226,7 @@ function playerColorAtPosition(position)
         local zone = CrLua.TI4.Zone.insideWhichPlayerZone(position)
         playerColor = zone and CrLua.TI4.Zone.color(zone)
     else
-        playerColor = CrLua.TTS.closestPlayer(position)
+        playerColor = CrLua.TTS.Player.closest(position)
     end
     CrLua.Log.d('playerColorAtPosition -> ' .. (playerColor or '<nil>'))
     return playerColor
@@ -236,7 +236,7 @@ end
 
 #include ~/CrLua/LockGlobals
 #include ~/CrLua/Log
-#include ~/CrLua/TTS
+#include ~/CrLua/TTS/Player
 #include ~/CrLua/TI4/Zone
 
 #include ~/CrLua/LockGlobals

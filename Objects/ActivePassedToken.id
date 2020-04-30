@@ -1,0 +1,7 @@
+Steam workshop id encoded via:
+
+   echo "<ID>" | openssl enc -aes-256-cbc -a -pass pass:<PASSWORD>
+
+Decode via:
+
+   echo "U2FsdGVkX19ayQr1MV1IeCnEVEs5lSca565gl3XbmeE=" | openssl enc -d -aes-256-cbc -a

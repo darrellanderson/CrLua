@@ -8,7 +8,8 @@ local TAG = 'CrLua.TI4.Unit'
 CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
 CrLua.TI4 = CrLua.TI4 or {}
 CrLua.TI4.Unit = assert(not CrLua.TI4.Unit) and {
-    _require = { 'List', 'Table', 'Util', 'TTS.Object' }
+    _require = { 'List', 'Table', 'Util', 'TTS.Object' },
+    _allowMissingKeys = { 'UNIT', 'FLAGSHIP', 'UNIT_COLORS' }
 }
 
 CrLua.TI4.Unit.ATTR = {
@@ -44,7 +45,6 @@ CrLua.TI4.Unit.ATTR = {
 --     - bombardment number : if set, hit value for bombardment.
 --     - plasmaScoringButton string : if set, MultiRoller button name for plasma scoring.
 CrLua.TI4.Unit.UNIT = {
-    _allowMissingKeys = true,  -- see CrLua.lock
     ['Infantry'] = {},
     ['Fighter'] = { ship = true },
     ['Cruiser'] = { ship = true },
@@ -65,7 +65,6 @@ CrLua.TI4.Unit.UNIT = {
 --     - infantryInSpace boolean : do in-system infantry participate in space combat?
 --     - nonFighterDice boolean : dice count is equal to the number of non-fighter enemy ships?
 CrLua.TI4.Unit.FLAGSHIP = {
-    _allowMissingKeys = true,  -- see CrLua.lock
     ['Duha Menaimon'] = { faction = 'The Arborec' },
     ['Arc Secundus'] = { faction = 'The Barony of Letnev', bombardment = 5 },
     ['Son of Ragh'] = { faction = 'The Clan of Saar' },
@@ -87,7 +86,6 @@ CrLua.TI4.Unit.FLAGSHIP = {
 
 -- Unit object tint colors, hard coded from TTS/TI4 workshop objects.
 CrLua.TI4.Unit.UNIT_COLORS = {
-    _allowMissingKeys = true,  -- see CrLua.lock
     White = { 204/255, 205/255, 204/255 },
     Blue = { 7/255, 178/255, 255/255 },
     Purple = { 118/255, 0, 183/255 },

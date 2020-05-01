@@ -84,7 +84,8 @@ end
 -- (2.) If the table starts with a capital letter, make it read-only and
 -- require keys exist.  These are packages or constants, attempting to access
 -- a missing field is probably a typo.  (Override by adding an
--- _allowMissingKeys = true entry, that key gets removed in the process.)
+-- _allowMissingKeys = true entry to allow reads to missing keys to that table
+-- as well as any tables inside it.  That key gets removed in the process.)
 --
 -- (2.) Otherwise make it read-only but allow reads to missing keys (value nil).
 -- One can query membership by checking if a key exists.
@@ -95,7 +96,7 @@ end
 function CrLua.lock()
     local seen = {}
 
-    local function lockRecursive(tableName, table)
+    local function lockRecursive(tableName, table, allowMissingKeys)
         -- Watch out for cycles!  This might happen if a script defines
         -- an enum table, then later uses one of them in a different table.
         if seen[table] then
@@ -107,20 +108,24 @@ function CrLua.lock()
         local firstLetter = string.match(tableName, '%a')
         local isUpper = firstLetter and firstLetter == string.upper(firstLetter)
 
+        if table._allowMissingKeys then
+            allowMissingKeys = true
+            table._allowMissingKeys = nil
+        end
+
         if not isData then
-            if isUpper and not table._allowMissingKeys then
+            if isUpper and not allowMissingKeys then
                 CrLua.LockTable.readOnlyRequireKey(tableName, table)
             else
-                table._allowMissingKeys = nil -- remove these
                 CrLua.LockTable.readOnly(tableName, table)
             end
             for k, v in pairs(table) do
                 if type(v) == 'table' then
-                    lockRecursive(tostring(k), v)
+                    lockRecursive(tostring(k), v, allowMissingKeys)
                 end
             end
         end
     end
 
-    lockRecursive('CrLua', CrLua)
+    lockRecursive('CrLua', CrLua, false)
 end

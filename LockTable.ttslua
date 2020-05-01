@@ -140,7 +140,7 @@ end
 -- @param table : the same table as the argument for convenience assignment.
 -------------------------------------------------------------------------------
 function CrLua.LockTable.readOnly(tableName, table)
-    assert(type(tableName) == 'string' and not string.find(tableName, ' '), 'table name must be a string without spaces')
+    assert(type(tableName) == 'string' and type(table) == 'table')
     assert(type(table) == 'table')
 
     local attrs = { CrLua.LockTable.ATTR.READ_ONLY }
@@ -246,8 +246,7 @@ end
 -- @param table : the same table as the argument for convenience assignment.
 -------------------------------------------------------------------------------
 function CrLua.LockTable.readWriteRequireKey(tableName, table)
-    assert(type(tableName) == 'string' and not string.find(tableName, ' '), 'table name must be a string without spaces')
-    assert(type(table) == 'table')
+    assert(type(tableName) == 'string' and type(table) == 'table')
 
     local attrs = { CrLua.LockTable.ATTR.REQUIRE_KEY }
     return CrLua.LockTable._apply(tableName, attrs, table)

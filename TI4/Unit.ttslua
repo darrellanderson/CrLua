@@ -97,59 +97,101 @@ CrLua.TI4.Unit.UNIT_COLORS = {
 }
 
 -------------------------------------------------------------------------------
+--- Create a unit table.
+-- @param unitName string : unit name.
+-- @param color string : unit player color.
+-- @param count number : number of units (e.g. "x3 Infantry" token).
+-- @param object : game Object.
+-- @return unit table.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Unit.unit(unitName, color, count, object)
+    assert(CrLua.TI4.Unit.UNIT[unitName])
+    assert(not color or CrLua.TI4.Unit.UNIT_COLORS[color])
+    assert(type(count) == 'number')
+
+    return {
+        unitName = unitName,
+        color = color,
+        count = count,
+        object = object
+    }
+end
+
+-------------------------------------------------------------------------------
 --- Identify the unit from the game object.
 -- @param object : game Object.
--- @return table or nil : { color, unitName, object } keys.
+-- @return table or nil : { color, unitName, count, object } keys.
 -------------------------------------------------------------------------------
 function CrLua.TI4.Unit.fromObject(object)
     local name = object.getName()
 
     local flagship = CrLua.TI4.Unit.FLAGSHIP[name]
     if flagship then
-
         -- Could get the color from Zone, but for now use the tint color.
-        -- local zone = CrLua.TI4.Zone.fromFaction(flagship.faction)
-        -- local color = CrLua.TI4.Zone.color(zone)
+        -- zone = CrLua.TI4.Zone.fromFaction(flagship.faction)
+        -- color = CrLua.TI4.Zone.color(zone)
         local color = CrLua.TI4.Unit.colorFromObjectColorTint(object.getColorTint())
-        return {
-            color = color,
-            unitName = 'Flagship',
-            object = object
-        }
+        return CrLua.TI4.Unit.unit('Flagship', color, 1, object)
     end
 
+    -- Unit tokens do not have an explicit color.  One can guess based on the
+    -- closest plastic unit color, but that could be an expensive operation.
+    -- Do not attempt to assign a color now, let the caller decide if they
+    -- care about the unit, then they can fill in the color.
+    -- @see CrLua.TI4.Unit.assignUnitTokenColors()
+    if name == 'x3 Fighter Token' then
+        return CrLua.TI4.Unit.unit('Fighter', false, 3, object)
+    end
+    if name == 'x1 Fighter Token' then
+        return CrLua.TI4.Unit.unit('Fighter', false, 1, object)
+    end
+    if name == 'x3 Infantry' then
+        return CrLua.TI4.Unit.unit('Infantry', false, 3, object)
+    end
+    if name == 'x1 Infantry' then
+        return CrLua.TI4.Unit.unit('Infantry', false, 1, object)
+    end
+
+    -- Most units have a "{color} {unitName}" object name, e.g. "Red Infantry".
     local startPos, endPos = string.find(name, ' ')
     if startPos then
         local color = string.sub(name, 1, startPos - 1)
         local unitName = string.sub(name, startPos + 1)
         if CrLua.TI4.Unit.UNIT_COLORS[color] and CrLua.TI4.Unit.UNIT[unitName] then
-            return {
-                color = color,
-                unitName = unitName,
-                object = object
-            }
+            return CrLua.TI4.Unit.unit(unitName, color, 1, object)
         end
     end
+
+    -- Object is not a unit.
+    return false
 end
 
 function CrLua.TI4.Unit._testFromObject()
-    local function fakeObject(name, color)
-        local colorTint = CrLua.Table.copy(CrLua.TI4.Unit.UNIT_COLORS[color])
+    local function fakeObject(name, colorTint)
+        local colorTint = colorTint and CrLua.Table.copy(CrLua.TI4.Unit.UNIT_COLORS[colorTint])
         local result = {}
         function result.getName() return name end
         function result.getColorTint() return colorTint end
         return result
     end
 
-    local object = fakeObject('Red Infantry', 'Red')
-    local unit = CrLua.TI4.Unit.fromObject(object)
-    assert(unit.color == 'Red' and unit.unitName == 'Infantry')
-
+    -- Flagship.
     local object = fakeObject('Hil Colish', 'Green')
     local unit = CrLua.TI4.Unit.fromObject(object)
-    assert(unit.color == 'Green' and unit.unitName == 'Flagship')
+    assert(unit.color == 'Green' and unit.unitName == 'Flagship' and unit.count == 1)
 
-    local object = fakeObject('Not a unit', 'Blue')
+    -- Anonymous token.
+    local object = fakeObject('x3 Infantry', false)
+    local unit = CrLua.TI4.Unit.fromObject(object)
+    assert(not unit.color and unit.unitName == 'Infantry' and unit.count == 3)
+
+    -- Typical unit.
+    local object = fakeObject('Red Infantry', false)
+    local unit = CrLua.TI4.Unit.fromObject(object)
+    assert(unit.color == 'Red' and unit.unitName == 'Infantry' and unit.count == 1)
+
+    -- Not a unit.
+    local object = fakeObject('Not a unit', false)
     local unit = CrLua.TI4.Unit.fromObject(object)
     assert(not unit)
 end
@@ -201,4 +243,72 @@ function CrLua.TI4.Unit._testColorFromObjectColorTint()
     local tintColor = { 1, 0, 0 }
     local color = CrLua.TI4.Unit.colorFromObjectColorTint(tintColor)
     assert(color == 'Red', tostring(color or '<nil>'))
+end
+
+-------------------------------------------------------------------------------
+--- Fill in color for unit tokens.
+-- @param units table : list of units.
+-- Some units such as "x3 Infantry" tokens have no explicit color.  Given a list
+-- of units, fill in the color field of units to the color of the closest
+-- same-type (ship vs ground) unit.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Unit.assignUnitTokenColors(units)
+    local haveColorShipUnits = {}
+    local haveColorGroundUnits = {}
+    local needColorShipUnits = {}
+    local needColorGroundUnits = {}
+
+    for _, unit in ipairs(units) do
+        local attributes = CrLua.TI4.Unit.UNIT[unit.unitName]
+        if unit.color then
+            if attributes.ship then
+                table.insert(haveColorShipUnits, unit)
+            else
+                table.insert(haveColorGroundUnits, unit)
+            end
+        else
+            if attributes.ship then
+                table.insert(needColorShipUnits, unit)
+            else
+                table.insert(needColorGroundUnits, unit)
+            end
+        end
+    end
+
+    local function fillColors(needColorUnits, haveColorUnits)
+        for _, needColorUnit in ipairs(needColorUnits) do
+            local needColorPosition = needColorUnit.object.getPosition()
+            local function distance(haveColorUnit)
+                local haveColorPosition = haveColorUnit.object.getPosition()
+                return CrLua.Util.distanceSq(needColorPosition, haveColorPosition)
+            end
+            local _, haveColorUnit = CrLua.Util.min(haveColorUnits, distance)
+            if haveColorUnit then
+                needColorUnit.color = haveColorUnit.color
+            end
+        end
+    end
+
+    fillColors(needColorShipUnits, haveColorShipUnits)
+    fillColors(needColorGroundUnits, haveColorGroundUnits)
+end
+
+function CrLua.TI4.Unit._testAssignUnitTokenColors()
+    local function fakeObject(position)
+        local position = { x = position.x or 0, y = position.y or 0, z = position.z or 0 }
+        local result = {}
+        function result.getPosition() return position end
+        return result
+    end
+
+    -- Test assign to closest same-type (ship vs ground).
+    local units = {
+        CrLua.TI4.Unit.unit('Infantry', false, 1, fakeObject({ x = 1 })),
+        CrLua.TI4.Unit.unit('Fighter', false, 1, fakeObject({ x = 4 })),
+        CrLua.TI4.Unit.unit('Flagship', 'White', 1, fakeObject({ x = 2 })),
+        CrLua.TI4.Unit.unit('Infantry', 'Green', 1, fakeObject({ x = 3 }))
+    }
+    CrLua.TI4.Unit.assignUnitTokenColors(units)
+    assert(units[1].color == 'Green')
+    assert(units[2].color == 'White')
 end

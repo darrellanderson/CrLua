@@ -89,7 +89,7 @@ function CrLua.TI4.Hex.vectorLines(hexString, override)
     local corners = CrLua.RedBlobHex.corners(CrLua.TI4.Hex._layout, hex)
     local points = {}
     for _, corner in ipairs(corners) do
-        table.insert(points, { x = corner.x, y = 1, z = corner.y })
+        table.insert(points, { x = corner.x, y = 1.2, z = corner.y })
     end
     local result = {
         points = points,

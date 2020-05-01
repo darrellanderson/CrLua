@@ -1,5 +1,3 @@
-CrLua.require('List')
-
 -------------------------------------------------------------------------------
 --- Tabletop Simulator helper functions.
 -- Unlike the other scripts, requires the Tabletop Simulator runtime
@@ -9,6 +7,7 @@ CrLua.require('List')
 
 local TAG = 'CrLua.TTS.Object'
 
+CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
 CrLua.TTS = CrLua.TTS or {}
 CrLua.TTS.Object = assert(not CrLua.TTS.Object) and {}
 

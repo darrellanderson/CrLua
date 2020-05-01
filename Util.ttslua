@@ -5,7 +5,7 @@
 
 local TAG = 'CrLua.Util'
 
-local CrLua = CrLua or {}
+CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
 CrLua.Util = assert(not CrLua.Util) and {}
 
 -------------------------------------------------------------------------------
@@ -30,10 +30,10 @@ end
 
 -------------------------------------------------------------------------------
 --- Find the minimum value in a table, with optional function for value.
--- Function can return false/nil to reject value from consideration.
 -- @param table : table with arbitrary keys (may be a list).
 -- @param optional minFunction : call for each value to minimize.
 -- @return ? : table value with the min value.
+-- Function can return false/nil to reject value from consideration.
 -------------------------------------------------------------------------------
 function CrLua.Util.min(table, minFunction)
     assert(type(table) == 'table' and ((not minFunction) or type(minFunction) == 'function'))
@@ -64,10 +64,10 @@ end
 
 -------------------------------------------------------------------------------
 --- Find the maximum value in a table, with optional function for value.
--- Function can return false/nil to reject value from consideration.
 -- @param table : table with arbitrary keys (may be a list).
 -- @param optional maxFunction : call for each value to maximize.
 -- @return ? : table value with the max value.
+-- Function can return false/nil to reject value from consideration.
 -------------------------------------------------------------------------------
 function CrLua.Util.max(table, maxFunction)
     assert(type(table) == 'table' and ((not maxFunction) or type(maxFunction) == 'function'))

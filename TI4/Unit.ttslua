@@ -1,0 +1,180 @@
+-------------------------------------------------------------------------------
+--- Unit utils for Darth Batman and Raptor1210's "Twilight Imperium IV" TTS mod.
+-- @author bonkersbgg on BoardGameGeek.com
+-------------------------------------------------------------------------------
+
+local TAG = 'CrLua.TI4.Unit'
+
+CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
+CrLua.TI4 = CrLua.TI4 or {}
+CrLua.TI4.Unit = assert(not CrLua.TI4.Unit) and {
+    _require = { 'List', 'Table', 'Util', 'TTS.Object' }
+}
+
+CrLua.TI4.Unit.ATTR = {
+
+    -- Boolean, is this unit a ship?
+    SHIP = 'ship',
+
+    -- Number, space cannon hit value.
+    SPACE_CANNON = 'spaceCannon',
+
+    -- Number, bombardment hit value.
+    BOMBARDMENT = 'bombardment',
+
+    -- String wormhole type (e.g. "delta").
+    WORMHOLE = 'wormhole',
+
+    -- Boolean, do fighters in system participate in ground combat?
+    FIGHTERS_ON_GROUND = 'fightersOnGround',
+
+    -- Boolean, do infantry in system participate in space combat?
+    INFANTRY_IN_SPACE = 'infantryInSpace',
+
+    -- Boolean, unit dice count is equal to the number of non-fighter enemy ships?
+    NON_FIGHTER_DICE = 'nonFighterDice',
+
+    -- String name of the associated Plasma Sccoring button in the MultiRoller.
+    MULTIROLLER_PS = 'multirollerPS'
+}
+
+-- Unit attributes:
+--     - ship boolean : is a ship?
+--     - spaceCannon number : if set, hit value for space cannon.
+--     - bombardment number : if set, hit value for bombardment.
+--     - plasmaScoringButton string : if set, MultiRoller button name for plasma scoring.
+CrLua.TI4.Unit.UNIT = {
+    _allowMissingKeys = true,  -- see CrLua.lock
+    ['Infantry'] = {},
+    ['Fighter'] = { ship = true },
+    ['Cruiser'] = { ship = true },
+    ['Destroyer'] = { ship = true },
+    ['Carrier'] = { ship = true },
+    ['Space Dock'] = {},
+    ['PDS'] = { spaceCannon = 5, multirollerPS = 'PS9' },
+    ['Dreadnought'] = { ship = true, bombardment = 5, multirollerPS = 'PS4' },
+    ['War Sun'] = { ship = true, bombardment = 3, multirollerPS = 'PS2' },
+    ['Flagship'] = { ship = true, multirollerPS = 'PS1' }
+}
+
+-- Flagship attributes:
+--     - faction string : owning faction name.
+--     - wormhole string : if set, flagship is this wormhole type.
+--     - bombardment number : if set, hit value for bombardment.
+--     - fighersOnGround boolean : do in-system fighters participate in ground combat?
+--     - infantryInSpace boolean : do in-system infantry participate in space combat?
+--     - nonFighterDice boolean : dice count is equal to the number of non-fighter enemy ships?
+CrLua.TI4.Unit.FLAGSHIP = {
+    _allowMissingKeys = true,  -- see CrLua.lock
+    ['Duha Menaimon'] = { faction = 'The Arborec' },
+    ['Arc Secundus'] = { faction = 'The Barony of Letnev', bombardment = 5 },
+    ['Son of Ragh'] = { faction = 'The Clan of Saar' },
+    ['The Inferno'] = { faction = 'The Embers of Muaat' },
+    ['Wrath of Kenara'] = { faction = 'The Emirates of Hacan' },
+    ['Genesis'] = { faction = 'The Federation of Sol' },
+    ['Hil Colish'] = { faction = 'The Ghosts of Creuss', wormhole = 'delta' },
+    ['[0.0.1]'] = { faction = 'The L1Z1X Mindnet' },
+    ['Fourth Moon'] = { faction = 'The Mentak Coalition' },
+    ['Matriarch'] = { faction = 'The Naalu Collective', fighersOnGround = true },
+    ['The Alastor'] = { faction = 'The Nekro Virus', infantryInSpace = true },
+    ["C'morran N'orr"] = { faction = "The Sardakk N'orr" },
+    ['J.N.S. Hylarim'] = { faction = 'The Universities of Jol-Nar' },
+    ['Salai Sai Corian'] = { faction = 'The Winnu', nonFighterDice = true },
+    ['Loncara Ssodu'] = { faction = 'The Xxcha Kingdom', spaceCannon = 5 },
+    ['Van Hauge'] = { faction = 'The Yin Brotherhood' },
+    ["Y'sia Y'ssrila"] = { faction = 'The Yssaril Tribes' }
+}
+
+-------------------------------------------------------------------------------
+--- Identify the unit from the game object.
+-- @param object : game Object.
+-- @return table or nil : { color, unitName, object } keys.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Unit.fromObject(object)
+    local name = object.getName()
+
+    local flagship = CrLua.TI4.Unit.FLAGSHIP[name]
+    if flagship then
+
+        -- Could get the color from Zone, but for now use the tint color.
+        -- local zone = CrLua.TI4.Zone.fromFaction(flagship.faction)
+        -- local color = CrLua.TI4.Zone.color(zone)
+        local color = colorFromObjectColorTint(object.getColorTint())
+        return {
+            color = color,
+            unitName = 'Flagship',
+            object = object
+        }
+    end
+
+    local startPos, endPos = string.find(name, ' ')
+    if startPos then
+        local color = string.sub(name, 1, startPos - 1)
+        local unitName = string.sub(name, startPos + 1)
+        if CrLua.TI4.Unit.UNIT[unitName] then
+            return {
+                color = CrLua.TI4.Zone.color(zone),
+                unitName = unitName,
+                object = object
+            }
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
+--- Get unit attributes.
+-- @param unitTable table : a Unit.fromObject result.
+-- @return table : attribute table
+-------------------------------------------------------------------------------
+function CrLua.TI4.Unit.attributes(unitTable)
+    assert(type(unitTable) == 'table' and unitTable.unitName)
+
+    local unit = CrLua.TI4.Unit.UNIT[unitTable.unitName]
+    local flagship
+
+    if unitTable.unitName == 'Flagship' then
+        local objectName = unitTable.object.getName()
+        local flagship = CrLua.TI4.Unit.FLAGSHIP(objectName)
+    end
+
+    -- Always return a new list, in case recipient wants to mutate it.
+    return CrLua.Table.join(unit, flagship or {})
+end
+
+-------------------------------------------------------------------------------
+--- Get the player color from a unit object's tint color.
+-- @param tintColor table : {r,g,b} keys or a list of three (r,g,b) numbers.
+-- @return string player color.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Unit.colorFromObjectColorTint(tintColor)
+    -- Unit object tint colors, hard coded from TI4 workshop objects.
+    local unitColors = {
+        White = { 204/255, 205/255, 204/255 },
+        Blue = { 7/255, 178/255, 255/255 },
+        Purple = { 118/255, 0, 183/255 },
+        Green = { 0, 117/255, 6/255 },
+        Red = { 203/255, 0, 0 },
+        Yellow = { 165/255, 163/255, 0 },
+    }
+    local r = tintColor.r or tintColor[1]
+    local g = tintColor.g or tintColor[2]
+    local b = tintColor.b or tintColor[3]
+    local function colorDistance(unitColor)
+        local dr = unitColor[1] - r
+        local dg = unitColor[2] - g
+        local db = unitColor[3] - b
+        local distanceSq = (dr * dr) + (dg * dg) + (db * db)
+        return distanceSq
+    end
+    local colorName, colorTable = CrLua.Util.min(unitColors, colorDistance)
+    return colorName
+end
+
+function CrLua.TI4.Unit._testColorFromObjectColorTint()
+    local tintColor = { 1, 1, 1 }
+    local color = CrLua.TI4.Unit.colorFromObjectColorTint(tintColor)
+    assert(color == 'White', tostring(color or '<nil>'))
+    local tintColor = { 1, 0, 0 }
+    local color = CrLua.TI4.Unit.colorFromObjectColorTint(tintColor)
+    assert(color == 'Red', tostring(color or '<nil>'))
+end

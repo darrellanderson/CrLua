@@ -3,13 +3,13 @@
 -- @author bonkersbgg on BoardGameGeek.com
 -------------------------------------------------------------------------------
 
-CrLua.require('List')
-CrLua.require('TTS.Object')
-
 local TAG = 'CrLua.TI4.Wormhole'
 
+CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
 CrLua.TI4 = CrLua.TI4 or {}
-CrLua.TI4.Wormhole = assert(not CrLua.TI4.Wormhole) and {}
+CrLua.TI4.Wormhole = assert(not CrLua.TI4.Wormhole) and {
+    _require = { 'List', 'TTS.Object' }
+}
 
 CrLua.TI4.Wormhole.TYPE = {
     ALPHA = 'alpha',

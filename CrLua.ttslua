@@ -23,30 +23,45 @@
 local TAG = 'CrLua'
 
 -- Create a GLOBAL CrLua table.
-assert(not CrLua)
-CrLua = {
-    _requireSet = { ['LockTable'] = true }
-}
-
--------------------------------------------------------------------------------
---- Add a CrLua.<package> requirement.
--- @param package string : package name.
--------------------------------------------------------------------------------
-function CrLua.require(package)
-    assert(type(package) == 'string')
-    CrLua._requireSet[package] = true
-end
+CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
+CrLua._require = { 'LockTable' }
 
 -------------------------------------------------------------------------------
 --- Assert all required packages exist.
+-- Modules add dependencies by having a _require item in their root table,
+-- with a list of module names.
+-- e.g. CrLua.MyModule = { _require = { 'OtherModule1', 'OtherModule2' } }.
 -------------------------------------------------------------------------------
 function CrLua.assertRequired()
+    CrLua.Log.d(TAG .. '.assertRequired')
+
+    local seen = {}
+    local requireSet = {}
+    local function addRequireEntries(table)
+        assert(type(table) == 'table')
+        if seen[table] then
+            return
+        end
+        seen[table] = true
+        if table._require then
+            for _, name in ipairs(table._require) do
+                requireSet[name] = true
+            end
+        end
+        for k, v in pairs(table) do
+            if type(v) == 'table' then
+                addRequireEntries(v)
+            end
+        end
+    end
+    addRequireEntries(CrLua)
+
     local message = false
-    for package, _ in pairs(CrLua._requireSet) do
+    for package, _ in pairs(requireSet) do
         assert(type(package) == 'string')
+        CrLua.Log.d(TAG .. '.assertRequired: checking ' .. package)
         -- Descend dot-delimited sub-package names.
         local entry = CrLua
-        CrLua.Log.d(TAG .. '.assertRequired: ' .. package)
         for subPackage in string.gmatch(package, '[^%.]+') do
             entry = entry and entry[subPackage]
         end
@@ -69,7 +84,7 @@ end
 --
 -- (2.) If the table starts with a capital letter, make it read-only and
 -- require keys exist.  These are packages or constants, attempting to access
--- a missing field is probably a typo.
+-- a missing field is probably a typo.  (Override _allowMissingKeys = true key)
 --
 -- (2.) Otherwise make it read-only but allow reads to missing keys (value nil).
 -- One can query membership by checking if a key exists.
@@ -78,22 +93,22 @@ end
 -- a constant value by mistake.
 -------------------------------------------------------------------------------
 function CrLua.lock()
-    local sawSet = {}
+    local seen = {}
 
     local function lockRecursive(tableName, table)
         -- Watch out for cycles!  This might happen if a script defines
         -- an enum table, then later uses one of them in a different table.
-        if sawSet[table] then
+        if seen[table] then
             return
         end
-        sawSet[table] = true
+        seen[table] = true
 
         local isData = tableName == '_data'
         local firstLetter = string.match(tableName, '%a')
         local isUpper = firstLetter and firstLetter == string.upper(firstLetter)
 
         if not isData then
-            if isUpper then
+            if isUpper and not table._allowMissingKeys then
                 CrLua.LockTable.readOnlyRequireKey(tableName, table)
             else
                 CrLua.LockTable.readOnly(tableName, table)

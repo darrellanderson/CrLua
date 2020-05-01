@@ -12,6 +12,7 @@
 
 local TAG = 'CrLua.LockTable'
 
+CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
 CrLua.LockTable = assert(not CrLua.LockTable) and {}
 
 CrLua.LockTable.ATTR = {
@@ -192,8 +193,7 @@ end
 -- @param table : the same table as the argument for convenience assignment.
 -------------------------------------------------------------------------------
 function CrLua.LockTable.readOnlyRequireKey(tableName, table)
-    assert(type(tableName) == 'string' and not string.find(tableName, ' '), 'table name must be a string without spaces')
-    assert(type(table) == 'table')
+    assert(type(tableName) == 'string' and type(table) == 'table')
 
     local attrs = { CrLua.LockTable.ATTR.READ_ONLY, CrLua.LockTable.ATTR.REQUIRE_KEY }
     return CrLua.LockTable._apply(tableName, attrs, table)

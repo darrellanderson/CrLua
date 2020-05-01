@@ -3,14 +3,13 @@
 -- @author bonkersbgg on BoardGameGeek.com
 -------------------------------------------------------------------------------
 
-CrLua.require('List')
-CrLua.require('Polygon')
-CrLua.require('Util')
-
 local TAG = 'CrLua.TI4.Zone'
 
+CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
 CrLua.TI4 = CrLua.TI4 or {}
-CrLua.TI4.Zone = assert(not CrLua.TI4.Zone) and {}
+CrLua.TI4.Zone = assert(not CrLua.TI4.Zone) and {
+    _require = { 'List', 'Polygon', 'Util' }
+}
 
 CrLua.TI4.Zone.TYPE = {
     PLAYER = 'player',
@@ -127,6 +126,39 @@ end
 function CrLua.TI4.Zone._testUpdateZones()
     local updatedZones = CrLua.TI4.Zone.updateZones()
     -- do not assert anything in case test is not running against TI4.
+end
+
+-------------------------------------------------------------------------------
+--- Get zone using faction.
+-- @param faction string : faction name.
+-- @return zone table.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Zone.fromFaction(faction)
+    local zones = CrLua.TI4.Zone.playerZones()
+    for _, zone in ipairs(zones) do
+        if zone._data.faction == faction then
+            return zone
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
+--- Get zone using color.
+-- @param color string : player color.
+-- @return zone table.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Zone.fromFaction(color)
+    local zones = CrLua.TI4.Zone.playerZones()
+    for _, zone in ipairs(zones) do
+        if zone._data.color == color then
+            return zone
+        end
+    end
+    for _, zone in ipairs(zones) do
+        if zone.defaultColor == color then
+            return zone
+        end
+    end
 end
 
 -------------------------------------------------------------------------------

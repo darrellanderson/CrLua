@@ -5,6 +5,7 @@
 
 local TAG = 'CrLua.Polygon'
 
+CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
 CrLua.Polygon = assert(not CrLua.Polygon) and {}
 
 -------------------------------------------------------------------------------
@@ -124,54 +125,51 @@ function CrLua.Polygon.inside(polygon, point, xIndex, yIndex)
     local x = xIndex or 1
     local y = yIndex or 2
 
-    local i, yflag0, yflag1, inside_flag
-	local vtx0, vtx1
-
-	local numverts = #polygon
+    local numverts = #polygon
     local tx = point[x]
     local ty = point[y]
 
-	vtx0 = polygon[numverts]
-	vtx1 = polygon[1]
+    local vtx0 = polygon[numverts]
+    local vtx1 = polygon[1]
 
-	-- get test bit for above/below X axis
-	yflag0 = vtx0[y] >= ty
-	inside_flag = false
+    -- get test bit for above/below X axis
+    local yflag0 = vtx0[y] >= ty
+    local inside_flag = false
 
-	for i = 2, numverts + 1 do
-		yflag1 = vtx1[y] >= ty
+    for i = 2, numverts + 1 do
+        local yflag1 = vtx1[y] >= ty
 
-		--[[ Check if endpoints straddle (are on opposite sides) of X axis
-		 * (i.e. the Y's differ); if so, +X ray could intersect this edge.
-		 * The old test also checked whether the endpoints are both to the
-		 * right or to the left of the test point.  However, given the faster
-		 * intersection point computation used below, this test was found to
-		 * be a break-even proposition for most polygons and a loser for
-		 * triangles (where 50% or more of the edges which survive this test
-		 * will cross quadrants and so have to have the X intersection computed
-		 * anyway).  I credit Joseph Samosky with inspiring me to try dropping
-		 * the "both left or both right" part of my code.
-		 --]]
-		if yflag0 ~= yflag1 then
-			--[[ Check intersection of pgon segment with +X ray.
-			 * Note if >= point's X; if so, the ray hits it.
-			 * The division operation is avoided for the ">=" test by checking
-			 * the sign of the first vertex wrto the test point; idea inspired
-			 * by Joseph Samosky's and Mark Haigh-Hutchinson's different
-			 * polygon inclusion tests.
-			 --]]
-			if ( ((vtx1[y] - ty) * (vtx0[x] - vtx1[x]) >= (vtx1[x] - tx) * (vtx0[y] - vtx1[y])) == yflag1 ) then
-				inside_flag = not inside_flag
-			end
-		end
+        --[[ Check if endpoints straddle (are on opposite sides) of X axis
+        * (i.e. the Y's differ); if so, +X ray could intersect this edge.
+        * The old test also checked whether the endpoints are both to the
+        * right or to the left of the test point.  However, given the faster
+        * intersection point computation used below, this test was found to
+        * be a break-even proposition for most polygons and a loser for
+        * triangles (where 50% or more of the edges which survive this test
+        * will cross quadrants and so have to have the X intersection computed
+        * anyway).  I credit Joseph Samosky with inspiring me to try dropping
+        * the "both left or both right" part of my code.
+        --]]
+        if yflag0 ~= yflag1 then
+            --[[ Check intersection of pgon segment with +X ray.
+            * Note if >= point's X; if so, the ray hits it.
+            * The division operation is avoided for the ">=" test by checking
+            * the sign of the first vertex wrto the test point; idea inspired
+            * by Joseph Samosky's and Mark Haigh-Hutchinson's different
+            * polygon inclusion tests.
+            --]]
+            if ( ((vtx1[y] - ty) * (vtx0[x] - vtx1[x]) >= (vtx1[x] - tx) * (vtx0[y] - vtx1[y])) == yflag1 ) then
+                inside_flag = not inside_flag
+            end
+        end
 
-		-- Move to the next pair of vertices, retaining info as possible.
-		yflag0 = yflag1
-		vtx0 = vtx1
-		vtx1 = polygon[i]
-	end
+        -- Move to the next pair of vertices, retaining info as possible.
+        yflag0 = yflag1
+        vtx0 = vtx1
+        vtx1 = polygon[i]
+    end
 
-	return inside_flag
+    return inside_flag
 end
 
 function CrLua.Polygon._testInside()

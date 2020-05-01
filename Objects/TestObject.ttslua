@@ -1,13 +1,13 @@
-
 function onLoad(save_state)
     print('onLoad')
-    CrLua.UnitTest.runTests('CrLua', CrLua, true)
+    Global.setVectorLines({})
+    --CrLua.UnitTest.runTests('CrLua', CrLua, true)
 end
 
 function onDrop(playerColor)
     print('onDrop')
 
-    -- Set color to zone color.
+    -- Set self color to zone color.
     CrLua.TI4.Zone.updateZones()
     local zone = CrLua.TI4.Zone.insideWhichPlayerZone(self.getPosition())
     local zoneColor = zone and CrLua.TI4.Zone.color(zone)
@@ -64,6 +64,15 @@ function onDrop(playerColor)
     end
 
     Global.setVectorLines(vectorLines)
+
+
+
+    for _, object in ipairs(getAllObjects()) do
+        local unit = CrLua.TI4.Unit.fromObject(object)
+        if unit then
+            print ('xxx color=' .. unit.color .. ' unitName=' .. unit.unitName)
+        end
+    end
 end
 
 -------------------------------------------------------------------------------
@@ -76,7 +85,9 @@ end
 #include <~/CrLua/Log>
 #include <~/CrLua/Polygon>
 #include <~/CrLua/RedBlobHex>
+#include <~/CrLua/Table>
 #include <~/CrLua/TI4/Hex>
+#include <~/CrLua/TI4/Unit>
 #include <~/CrLua/TI4/WormHole>
 #include <~/CrLua/TI4/Zone>
 #include <~/CrLua/TTS/Object>
@@ -84,7 +95,6 @@ end
 #include <~/CrLua/UnitTest>
 #include <~/CrLua/Util>
 
+CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
 CrLua.assertRequired() -- do this BEFORE lock
 CrLua.lock()
-
-CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)

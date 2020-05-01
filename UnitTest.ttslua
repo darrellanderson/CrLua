@@ -5,7 +5,7 @@
 
 local TAG = 'CrLua.UnitTest'
 
-local CrLua = CrLua or {}
+CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
 CrLua.UnitTest = assert(not CrLua.UnitTest) and {}
 
 -------------------------------------------------------------------------------

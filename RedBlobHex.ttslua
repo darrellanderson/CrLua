@@ -8,6 +8,7 @@
 
 local TAG = 'CrLua.RedBlobHex'
 
+CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
 CrLua.RedBlobHex = assert(not CrLua.RedBlobHex) and {}
 
 --- Standard hex orientations.

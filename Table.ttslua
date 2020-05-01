@@ -1,0 +1,61 @@
+-------------------------------------------------------------------------------
+--- Lua table utility functions
+-- @author bonkersbgg on BoardGameGeek.com
+-------------------------------------------------------------------------------
+
+local TAG = 'CrLua.Table'
+
+CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
+CrLua.Table = assert(not CrLua.Table) and {}
+
+-------------------------------------------------------------------------------
+--- Merge two tables.
+-- Make a new table, copying key->value from source table.
+-- @param table
+-- @return new table
+-------------------------------------------------------------------------------
+function CrLua.Table.copy(table)
+    assert(type(table) == 'table')
+
+    local result = {}
+    for k, v in pairs(table) do
+        result[k] = v
+    end
+    return result
+end
+
+function CrLua.Table._testCopy()
+    local table = { a = 1, b = 2 }
+    local copy = CrLua.Table.copy(table)
+    assert(copy ~= table)
+    assert(copy.a == 1 and copy.b == 2)
+end
+
+-------------------------------------------------------------------------------
+--- Merge two tables.
+-- If tables have any keys in common, result value is from b.
+-- @param a table
+-- @param b table
+-- @return table with both a and b key->value entries.
+-------------------------------------------------------------------------------
+function CrLua.Table.join(a, b)
+    assert(type(a) == 'table' and type(b) == 'table')
+
+    local result = {}
+    for k, v in pairs(a) do
+        result[k] = v
+    end
+    for k, v in pairs(b) do
+        result[k] = v
+    end
+    return result
+end
+
+function CrLua.Table._testJoin()
+    local a = { color = 'yellow', flavor = 'sour' }
+    local b = { color = 'red', scent = 'strawberry' }
+    local joined = CrLua.Table.join(a, b)
+    assert(joined.color == 'red')
+    assert(joined.flavor == 'sour')
+    assert(joined.scent == 'strawberry')
+end

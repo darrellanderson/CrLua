@@ -3,12 +3,13 @@
 -- @author bonkersbgg on BoardGameGeek.com
 -------------------------------------------------------------------------------
 
-CrLua.require('RedBlobHex')
-
 local TAG = 'CrLua.TI4.Hex'
 
+CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
 CrLua.TI4 = CrLua.TI4 or {}
-CrLua.TI4.Hex = assert(not CrLua.TI4.Hex) and {}
+CrLua.TI4.Hex = assert(not CrLua.TI4.Hex) and {
+    _require = { 'RedBlobHex' }
+}
 
 if true then -- "do" causes linter warnings, boo.
     local orientation = CrLua.RedBlobHex.ORIENTATION.FLAT_TOP

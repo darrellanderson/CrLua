@@ -1,5 +1,3 @@
-CrLua.require('Util')
-
 -------------------------------------------------------------------------------
 --- Tabletop Simulator helper functions.
 -- Unlike the other scripts, requires the Tabletop Simulator runtime
@@ -9,8 +7,11 @@ CrLua.require('Util')
 
 local TAG = 'CrLua.TTS.Player'
 
+CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
 CrLua.TTS = CrLua.TTS or {}
-CrLua.TTS.Player = assert(not CrLua.TTS.Player) and {}
+CrLua.TTS.Player = assert(not CrLua.TTS.Player) and {
+    _require = { 'Util' }
+}
 
 -------------------------------------------------------------------------------
 --- Get the closest player (hand)

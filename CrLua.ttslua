@@ -59,7 +59,6 @@ function CrLua.assertRequired()
     local message = false
     for package, _ in pairs(requireSet) do
         assert(type(package) == 'string')
-        CrLua.Log.d(TAG .. '.assertRequired: checking ' .. package)
         -- Descend dot-delimited sub-package names.
         local entry = CrLua
         for subPackage in string.gmatch(package, '[^%.]+') do
@@ -84,7 +83,8 @@ end
 --
 -- (2.) If the table starts with a capital letter, make it read-only and
 -- require keys exist.  These are packages or constants, attempting to access
--- a missing field is probably a typo.  (Override _allowMissingKeys = true key)
+-- a missing field is probably a typo.  (Override by adding an
+-- _allowMissingKeys = true entry, that key gets removed in the process.)
 --
 -- (2.) Otherwise make it read-only but allow reads to missing keys (value nil).
 -- One can query membership by checking if a key exists.
@@ -111,6 +111,7 @@ function CrLua.lock()
             if isUpper and not table._allowMissingKeys then
                 CrLua.LockTable.readOnlyRequireKey(tableName, table)
             else
+                table._allowMissingKeys = nil -- remove these
                 CrLua.LockTable.readOnly(tableName, table)
             end
             for k, v in pairs(table) do

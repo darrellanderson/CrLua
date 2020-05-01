@@ -85,6 +85,17 @@ CrLua.TI4.Unit.FLAGSHIP = {
     ["Y'sia Y'ssrila"] = { faction = 'The Yssaril Tribes' }
 }
 
+-- Unit object tint colors, hard coded from TTS/TI4 workshop objects.
+CrLua.TI4.Unit.UNIT_COLORS = {
+    _allowMissingKeys = true,  -- see CrLua.lock
+    White = { 204/255, 205/255, 204/255 },
+    Blue = { 7/255, 178/255, 255/255 },
+    Purple = { 118/255, 0, 183/255 },
+    Green = { 0, 117/255, 6/255 },
+    Red = { 203/255, 0, 0 },
+    Yellow = { 165/255, 163/255, 0 }
+}
+
 -------------------------------------------------------------------------------
 --- Identify the unit from the game object.
 -- @param object : game Object.
@@ -99,7 +110,7 @@ function CrLua.TI4.Unit.fromObject(object)
         -- Could get the color from Zone, but for now use the tint color.
         -- local zone = CrLua.TI4.Zone.fromFaction(flagship.faction)
         -- local color = CrLua.TI4.Zone.color(zone)
-        local color = colorFromObjectColorTint(object.getColorTint())
+        local color = CrLua.TI4.Unit.colorFromObjectColorTint(object.getColorTint())
         return {
             color = color,
             unitName = 'Flagship',
@@ -111,14 +122,36 @@ function CrLua.TI4.Unit.fromObject(object)
     if startPos then
         local color = string.sub(name, 1, startPos - 1)
         local unitName = string.sub(name, startPos + 1)
-        if CrLua.TI4.Unit.UNIT[unitName] then
+        if CrLua.TI4.Unit.UNIT_COLORS[color] and CrLua.TI4.Unit.UNIT[unitName] then
             return {
-                color = CrLua.TI4.Zone.color(zone),
+                color = color,
                 unitName = unitName,
                 object = object
             }
         end
     end
+end
+
+function CrLua.TI4.Unit._testFromObject()
+    local function fakeObject(name, color)
+        local colorTint = CrLua.Table.copy(CrLua.TI4.Unit.UNIT_COLORS[color])
+        local result = {}
+        function result.getName() return name end
+        function result.getColorTint() return colorTint end
+        return result
+    end
+
+    local object = fakeObject('Red Infantry', 'Red')
+    local unit = CrLua.TI4.Unit.fromObject(object)
+    assert(unit.color == 'Red' and unit.unitName == 'Infantry')
+
+    local object = fakeObject('Hil Colish', 'Green')
+    local unit = CrLua.TI4.Unit.fromObject(object)
+    assert(unit.color == 'Green' and unit.unitName == 'Flagship')
+
+    local object = fakeObject('Not a unit', 'Blue')
+    local unit = CrLua.TI4.Unit.fromObject(object)
+    assert(not unit)
 end
 
 -------------------------------------------------------------------------------
@@ -147,15 +180,6 @@ end
 -- @return string player color.
 -------------------------------------------------------------------------------
 function CrLua.TI4.Unit.colorFromObjectColorTint(tintColor)
-    -- Unit object tint colors, hard coded from TI4 workshop objects.
-    local unitColors = {
-        White = { 204/255, 205/255, 204/255 },
-        Blue = { 7/255, 178/255, 255/255 },
-        Purple = { 118/255, 0, 183/255 },
-        Green = { 0, 117/255, 6/255 },
-        Red = { 203/255, 0, 0 },
-        Yellow = { 165/255, 163/255, 0 },
-    }
     local r = tintColor.r or tintColor[1]
     local g = tintColor.g or tintColor[2]
     local b = tintColor.b or tintColor[3]
@@ -166,7 +190,7 @@ function CrLua.TI4.Unit.colorFromObjectColorTint(tintColor)
         local distanceSq = (dr * dr) + (dg * dg) + (db * db)
         return distanceSq
     end
-    local colorName, colorTable = CrLua.Util.min(unitColors, colorDistance)
+    local colorName, colorTable = CrLua.Util.min(CrLua.TI4.Unit.UNIT_COLORS, colorDistance)
     return colorName
 end
 

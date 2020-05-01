@@ -1,7 +1,7 @@
 function onLoad(save_state)
     print('onLoad')
     Global.setVectorLines({})
-    --CrLua.UnitTest.runTests('CrLua', CrLua, true)
+    CrLua.UnitTest.runTests('CrLua', CrLua, true)
 end
 
 function onDrop(playerColor)

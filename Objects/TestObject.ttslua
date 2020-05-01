@@ -33,26 +33,30 @@ function onDrop(playerColor)
         table.insert(vectorLines, lines)
     end
 
-    local wormholes = CrLua.TI4.Wormhole.findWormholes()
-    CrLua.Log.d('wormholes', wormholes)
-    local selfWormholeSet = {}
-    for _, wormhole in ipairs(wormholes) do
-        CrLua.Log.d('wormhole ' .. wormhole.wormhole)
-        local wormholeHex = CrLua.TI4.Hex.fromPosition(wormhole.object.getPosition())
-        if wormholeHex == selfHex then
-            selfWormholeSet[wormhole.wormhole] = true
+    -- Get all wormholes, add new 'hex' field.
+    local allWormholes = CrLua.TI4.Wormhole.findWormholes()
+    for _, wormhole in ipairs(allWormholes) do
+        local position = wormhole.object.getPosition()
+        wormhole.hex = CrLua.TI4.Hex.fromPosition(position)
+    end
+
+    local selfWormholeTypeSet = {}
+    for _, wormhole in ipairs(allWormholes) do
+        if wormhole.hex == selfHex then
+            selfWormholeTypeSet[wormhole.type] = true
         end
     end
-    CrLua.Log.d('selfWormholeSet', selfWormholeSet)
-    local wormholeNeighborHexSet = {}
-    for _, wormhole in ipairs(wormholes) do
-        if selfWormholeSet[wormhole.wormhole] then
-            local wormholeHex = CrLua.TI4.Hex.fromPosition(wormhole.object.getPosition())
-            wormholeNeighborHexSet[wormholeHex] = true
+    CrLua.Log.d('selfWormholeTypeSet', selfWormholeTypeSet)
+
+    local wormholeNeighbors = {}
+    for _, wormhole in ipairs(allWormholes) do
+        if selfWormholeTypeSet[wormhole.type] and wormhole.hex ~= selfHex then
+            table.insert(wormholeNeighbors, wormhole)
         end
     end
-    for wormholeNeighborHex, _ in pairs(wormholeNeighborHexSet) do
-        local lines = CrLua.TI4.Hex.vectorLines(wormholeNeighborHex, {
+
+    for _, wormhole in ipairs(wormholeNeighbors) do
+        local lines = CrLua.TI4.Hex.vectorLines(wormhole.hex, {
             color = { 0, 0, 1 },
             thickness = 0.2
         })

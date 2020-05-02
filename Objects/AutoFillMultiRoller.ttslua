@@ -14,10 +14,11 @@ local AutoFillMultiRoller = {
 }
 
 function onDrop(player_color)
-    CrLua.Log.d(TAG .. '.onDrop')
+    CrLua.Log.d(TAG, 'onDrop')
     local position = self.getPosition()
-    local units = AutoFillMultiRoller.getUnits(position)
-    CrLua.Log.d('units', units)
+    local unitsInHex, unitsInAdjacent = AutoFillMultiRoller.getUnits(position)
+    CrLua.Log.d(TAG, 'unitsInHex', unitsInHex)
+    CrLua.Log.d(TAG, 'unitsInAdjacent', unitsInAdjacent)
 end
 
 -------------------------------------------------------------------------------
@@ -58,7 +59,7 @@ end
 
 function AutoFillMultiRoller.getUnits(position)
     local hex, adjacentHexes = AutoFillMultiRoller.getHexes(position)
-    CrLua.Log.d(TAG .. '.getUnits: hex = ' .. hex .. ', adjacentHexes', adjacentHexes)
+    CrLua.Log.d(TAG, 'getUnits: hex = ' .. hex .. ', adjacentHexes', adjacentHexes)
 
     -- Get units in this hex and adjacent hexes.
     -- As a side-effect, filter adds 'hex' to each unit.
@@ -70,7 +71,22 @@ function AutoFillMultiRoller.getUnits(position)
     end
     local units = CrLua.TI4.Unit.getAllUnits(isInSelfOrAdjacentHex)
 
-    return units
+    -- Split into in-hex and in-adjacent hex lists.
+    local unitsInHex = {}
+    local unitsInAdjacent = {}
+    for _, unit in ipairs(units) do
+        if unit.hex == hex then
+            table.insert(unitsInHex, unit)
+        else
+            table.insert(unitsInAdjacent, unit)
+        end
+    end
+
+    -- Fill in any missing colors (anonymous 'x3 Infantry' tokens, etc).
+    -- Only do this for the hex in question.
+    CrLua.TI4.Unit.assignUnitTokenColors(unitsInHex)
+
+    return unitsInHex, unitsInAdjacent
 end
 
 -------------------------------------------------------------------------------

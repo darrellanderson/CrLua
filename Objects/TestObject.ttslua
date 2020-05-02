@@ -1,6 +1,6 @@
 function onLoad(save_state)
     print('onLoad')
-    --CrLua.UnitTest.runTests('CrLua', CrLua, true)
+    CrLua.UnitTest.runTests('CrLua', CrLua, true)
 
     Global.setVectorLines({})
     local vectorLines = CrLua.TI4.Zone.allVectorLines({})

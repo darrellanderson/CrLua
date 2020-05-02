@@ -65,17 +65,29 @@ end
 --- Find wormholes.
 -- Type is one of CrLua.TI4.Wormhole.TYPE values.
 -- @param filter function : if given, return nil/false to reject wormholes from result.
--- @return table : list of CrLua.TI4.Wormhole.wormhole tables.
+-- @return table, table : list of wormholes, list of adjacent wormholes.
+--
 -- The filter function gets the same wormhole table that gets added to the result.
 -- In addition to filtering, it could inject new unit fields.
+--
+-- The second return value has meaning when using a filter function.  The first
+-- result is the list of wormholes passing the filter, the second is other
+-- wormholes reachable through the wormholes in the first.
+--
+-- That is, the filter function could select only the wormholes in a given hex.
+-- The first result would be those wormholes.  The second result would be other
+-- wormholes that may or may not have passed the filter function, but are
+-- wormhole-adjacent to one that did.
 -------------------------------------------------------------------------------
 function CrLua.TI4.Wormhole.getAllWormholes(filterFunction)
+    local all = {}
     local result = {}
 
     for guid, wormholeType in pairs(CrLua.TI4.Wormhole.GUIDS) do
         local object = getObjectFromGUID(guid)
         if object then
             local wormhole = CrLua.TI4.Wormhole.wormhole(wormholeType, object)
+            table.insert(all, wormhole)
             if not filterFunction or filterFunction(wormhole) then
                 table.insert(result, wormhole)
             end
@@ -88,11 +100,25 @@ function CrLua.TI4.Wormhole.getAllWormholes(filterFunction)
         local wormholeType = CrLua.TI4.Wormhole.OBJECT_NAMES[name]
         for _, object in ipairs(objects) do
             local wormhole = CrLua.TI4.Wormhole.wormhole(wormholeType, object)
+            table.insert(all, wormhole)
             if not filterFunction or filterFunction(wormhole) then
                 table.insert(result, wormhole)
             end
         end
     end
 
-    return result
+    local resultSet = {}
+    local resultWormholeTypeSet = {}
+    for _, wormhole in ipairs(result) do
+        resultSet[wormhole] = true
+        resultWormholeTypeSet[wormhole.type] = true
+    end
+    local adjacent = {}
+    for _, wormhole in ipairs(all) do
+        if resultWormholeTypeSet[wormhole.type] and not resultSet[wormhole] then
+            table.insert(adjacent, wormhole)
+        end
+    end
+
+    return result, adjacent
 end

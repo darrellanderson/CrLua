@@ -28,13 +28,13 @@ CrLua._require = { 'LockTable' }
 
 -------------------------------------------------------------------------------
 --- Assert all required packages exist.
+-- @param table : table to search for _require entries, or CrLua if nil.
+--
 -- Modules add dependencies by having a _require item in their root table,
 -- with a list of module names.
 -- e.g. CrLua.MyModule = { _require = { 'OtherModule1', 'OtherModule2' } }.
 -------------------------------------------------------------------------------
-function CrLua.assertRequired()
-    CrLua.Log.d(TAG .. '.assertRequired')
-
+function CrLua.assertRequired(table)
     local seen = {}
     local requireSet = {}
     local function addRequireEntries(table)
@@ -54,7 +54,7 @@ function CrLua.assertRequired()
             end
         end
     end
-    addRequireEntries(CrLua)
+    addRequireEntries(table or CrLua)
 
     local message = false
     for package, _ in pairs(requireSet) do
@@ -75,6 +75,10 @@ end
 
 -------------------------------------------------------------------------------
 --- Lock CrLua packages.
+--
+-- @param tableName string : name of table being locked, or nil for CrLua.
+-- @param table : table being locked, or nil for CrLua.
+--
 -- Make CrLua and nested packages read-only, with access requiring keys exist.
 --
 -- Locking rules:
@@ -94,7 +98,7 @@ end
 -- This helps catch typos calling non-existent functions, or overwriting
 -- a constant value by mistake.
 -------------------------------------------------------------------------------
-function CrLua.lock()
+function CrLua.lock(tableName, table)
     local seen = {}
 
     local function lockRecursive(tableName, table, allowMissingKeys)
@@ -139,5 +143,5 @@ function CrLua.lock()
         end
     end
 
-    lockRecursive('CrLua', CrLua, false)
+    lockRecursive(tableName or 'CrLua', table or CrLua, false)
 end

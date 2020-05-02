@@ -125,35 +125,61 @@ end
 
 function CrLua.TI4.Zone._testUpdateZones()
     local updatedZones = CrLua.TI4.Zone.updateZones()
-    -- do not assert anything in case test is not running against TI4.
+
+    -- Some objects only exist when running alongside TI4.
+    -- Check if a Globals.ttslua value from the TI4 mod exists before
+    -- verifying any TI4-is-required state.
+    assert(Global.getTable('bagGUIDx3'), 'Missing TI4 global, is TI4 loaded?')
+
+    assert(updatedZones)
 end
 
 -------------------------------------------------------------------------------
 --- Get zone using faction.
 -- @param faction string : faction name.
+-- @param updateIfMissing boolean : if not found, update zones and try again.
 -- @return zone table.
 -------------------------------------------------------------------------------
-function CrLua.TI4.Zone.fromFaction(faction)
+function CrLua.TI4.Zone.fromFaction(faction, updateIfMissing)
+    assert(type(faction) == 'string')
+
     local zones = CrLua.TI4.Zone.playerZones()
     for _, zone in ipairs(zones) do
         if zone._data.faction == faction then
             return zone
         end
     end
+
+    -- Not found.  Update and try again?
+    if updateIfMissing then
+        CrLua.TI4.Zone.updateZones()
+        return CrLua.TI4.Zone.fromFaction(faction, false)
+    end
 end
 
 -------------------------------------------------------------------------------
 --- Get zone using color.
 -- @param color string : player color.
+-- @param updateIfMissing boolean : if not found, update zones and try again.
 -- @return zone table.
 -------------------------------------------------------------------------------
-function CrLua.TI4.Zone.fromFaction(color)
+function CrLua.TI4.Zone.fromColor(color, updateIfMissing)
+    assert(type(color) == 'string')
+
     local zones = CrLua.TI4.Zone.playerZones()
     for _, zone in ipairs(zones) do
         if zone._data.color == color then
             return zone
         end
     end
+
+    -- Did not find based on command sheet in zone.  Update and try again?
+    -- Otherwise will check against the default colors.
+    if updateIfMissing then
+        CrLua.TI4.Zone.updateZones()
+        return CrLua.TI4.Zone.fromColor(color, false)
+    end
+
     for _, zone in ipairs(zones) do
         if zone.defaultColor == color then
             return zone
@@ -166,10 +192,17 @@ end
 -- Zones have a default color for a "normal" TI4 mod setup, or call
 -- "updateZones" to assign colors based on command sheet in zone.
 -- @param zone table
+-- @param updateIfMissing boolean : if not found, update zones and try again.
 -- @return string : color name.
 -------------------------------------------------------------------------------
-function CrLua.TI4.Zone.color(zone)
+function CrLua.TI4.Zone.color(zone, updateIfMissing)
     assert(zone and type(zone) == 'table' and zone.polygon)
+
+    if not zone._data.color and updateIfMissing then
+        CrLua.TI4.Zone.updateZones()
+        return CrLua.TI4.Zone.color(zone, false)
+    end
+
     return zone._data.color or zone.defaultColor
 end
 
@@ -177,10 +210,17 @@ end
 --- Get zone faction.
 -- Call "updateZones" to assign factions based on faction sheet in zone.
 -- @param zone table
+-- @param updateIfMissing boolean : if not found, update zones and try again.
 -- @return string : faction name, or nil if unknown
 -------------------------------------------------------------------------------
-function CrLua.TI4.Zone.faction(zone)
+function CrLua.TI4.Zone.faction(zone, updateIfMissing)
     assert(zone and type(zone) == 'table' and zone.polygon)
+
+    if not zone._data.faction and updateIfMissing then
+        CrLua.TI4.Zone.updateZones()
+        return CrLua.TI4.Zone.faction(zone, false)
+    end
+
     return zone._data.faction
 end
 
@@ -297,7 +337,7 @@ function CrLua.TI4.Zone.vectorLines(zone, parameters)
 
     local result = {
         points = points,
-        color = zone._data.color or zone.defaultColor,
+        color = CrLua.TI4.Zone.color(zone),
         thickness = defaultThickness,
         rotation = { 0, 0, 0 },
         loop = true,

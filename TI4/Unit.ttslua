@@ -105,12 +105,16 @@ CrLua.TI4.Unit.UNIT_COLORS = {
 function CrLua.TI4.Unit.unit(unitName, color, count, object)
     assert(type(count) == 'number' and count > 0 and object)
     if not CrLua.TI4.Unit.UNIT[unitName] then
-        error(TAG .. '.unit: unknown unit name "' .. unitName .. '"')
+        error(TAG .. '.unit: unknown unit name "' .. tostring(unitName or '<nil>') .. '"')
     end
     if unitName == 'Flagship' then
         local objectName = object.getName() or '<nil>'
         if not CrLua.TI4.Unit.FLAGSHIP[objectName] then
-            error(TAG .. '.unit: unknown Flagship "' .. objectName .. '"')
+            -- Unpacking a faction renames the flagship, but allow generic too.
+            local genericFlagshipObjectName = tostring(color) .. ' Flagship'
+            if objectName ~= genericFlagshipObjectName then
+                error(TAG .. '.unit: unknown Flagship "' .. objectName .. '"')
+            end
         end
     end
     if color and not CrLua.TI4.Unit.UNIT_COLORS[color] then
@@ -226,6 +230,11 @@ function CrLua.TI4.Unit._testFromObject()
     local unit = CrLua.TI4.Unit.fromObject(object)
     assert(unit.color == 'Green' and unit.unitName == 'Flagship' and unit.count == 1)
 
+    -- Generic flagship.
+    local object = CrLua.TI4.Unit._fakeObject{name='Green Flagship'}
+    local unit = CrLua.TI4.Unit.fromObject(object)
+    assert(unit.color == 'Green' and unit.unitName == 'Flagship' and unit.count == 1)
+
     -- Anonymous token.
     local object = CrLua.TI4.Unit._fakeObject{name='x3 Infantry'}
     local unit = CrLua.TI4.Unit.fromObject(object)
@@ -250,15 +259,15 @@ end
 function CrLua.TI4.Unit.attributes(unit)
     assert(type(unit) == 'table' and unit.unitName)
 
-    local unitAttributes = CrLua.TI4.Unit.UNIT[unit.unitName]
+    local attributes = CrLua.TI4.Unit.UNIT[unit.unitName]
 
     if unit.unitName == 'Flagship' then
-        local objectName = unit.object.getName() or '<nil>'
-        local flagshipAttributes = CrLua.TI4.Unit.FLAGSHIP[objectName]
-        return CrLua.Table.join(unitAttributes, flagshipAttributes)
+        local objectName = unit.object.getName()
+        local flagshipAttributes = CrLua.TI4.Unit.FLAGSHIP[objectName] or {}
+        attributes = CrLua.Table.join(attributes, flagshipAttributes)
     end
 
-    return unitAttributes
+    return attributes
 end
 
 function CrLua.TI4.Unit._testAttributes()
@@ -539,4 +548,118 @@ function CrLua.TI4.Unit._testfilterToNonFighterShips()
         Blue = { Flagship = 1 },
         Green = { Flagship = 1 }
     }))
+end
+
+-------------------------------------------------------------------------------
+--- Given a player color and a collection of units (in the activated hex),
+-- deduce the enemy color(s).
+--
+-- The enemy can change over the course of a turn, for instance there might be
+-- space combat against one enemy, the ground combat against another.  When
+-- there are non-self ships, enemy is for space combat (or space cannon
+-- offense).  Otherwise enemy is non-self ground force.
+--
+-- Ground combat does not attempt to assign units to planets.  Planets in a
+-- multi-planet system by be controlled by different players.  (There is a
+-- right answer depending on how units are placed, but that is not handled here.)
+-- (On a related note, bombardment and space cannon defense should be split.)
+--
+-- It is possible for there to be multiple non-self ground force colors in
+-- multi-planet systems when planets are controlled by different players.
+--
+-- @param selfColor string : who are we?
+-- @param activatingColor string : who activated the system?
+-- @param units table : list of units in the system.
+-- @return table : list of enemy colors.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Unit.getEnemyColors(selfColor, activatingColor, units)
+    assert(type(selfColor) == 'string' and type(activatingColor) == 'string' and type(units) == 'table')
+    assert(CrLua.TI4.Unit.UNIT_COLORS[selfColor])
+    assert(CrLua.TI4.Unit.UNIT_COLORS[activatingColor])
+
+    -- If self is not the activating player, then activating player is enemy.
+    if selfColor ~= activatingColor then
+        return { activatingColor }
+    end
+
+    local resultSet = false
+
+    -- If there are any non-self ships, those are the enemies.
+    local shipUnits = CrLua.TI4.Unit.filterToShips(units)
+    for _, unit in ipairs(shipUnits) do
+        if unit.color ~= selfColor then
+            resultSet = resultSet or {}
+            resultSet[unit.color] = true
+        end
+    end
+    if resultSet then
+        local result = CrLua.List.fromKeys(resultSet)
+        if #result > 1 then
+            error(TAG .. '.getEnemyColors: too many ship colors in system')
+        end
+        return result
+    end
+
+    -- If there are any non-self ground forces, those are the enemies.
+    local groundUnits = CrLua.TI4.Unit.filterToGround(units)
+    for _, unit in ipairs(groundUnits) do
+        if unit.color ~= selfColor then
+            resultSet = resultSet or {}
+            resultSet[unit.color] = true
+        end
+    end
+    if resultSet then
+        return CrLua.List.fromKeys(resultSet)
+    end
+
+    -- Not non-self units, there is no enemy.
+    return false
+end
+
+function CrLua.TI4.Unit._testGetEnemyColors()
+    -- Red activated and moved in a carrier with one infantry.  Blue has a ship
+    -- in that system.  Green and yellow control different planets.
+    -- Purple has a PDS2 in an adjacent system.
+    local units = {
+        CrLua.TI4.Unit.unit('Carrier', 'Red', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Infantry', 'Red', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Cruiser', 'Blue', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('PDS', 'Green', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Infantry', 'Yellow', 1, CrLua.TI4.Unit._fakeObject{})
+    }
+    local expectEnemies = {
+        Purple = { 'Red' },
+        Red = { 'Blue' },
+        Blue = { 'Red' },
+        Green = { 'Red' },
+        Yellow = { 'Red' }
+    }
+    for selfColor, expected in pairs(expectEnemies) do
+        local observed = CrLua.TI4.Unit.getEnemyColors(selfColor, 'Red', units)
+        if not CrLua.Table.deepEquals(expected, observed) then
+            error('mismatch for selfColor ' .. selfColor)
+        end
+    end
+
+    -- Space combat is over, Red won.
+    -- Space cannon from an adjacent Purple PDS2.
+    local units = {
+        CrLua.TI4.Unit.unit('Carrier', 'Red', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Infantry', 'Red', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('PDS', 'Green', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Infantry', 'Yellow', 1, CrLua.TI4.Unit._fakeObject{})
+    }
+    local expectEnemies = {
+        Purple = { 'Red' }, -- N/A really, only PDS on invaded planet do SC Defense
+        Red = { 'Green', 'Yellow' },
+        Blue = { 'Red' },
+        Green = { 'Red' },
+        Yellow = { 'Red' }
+    }
+    for selfColor, expected in pairs(expectEnemies) do
+        local observed = CrLua.TI4.Unit.getEnemyColors(selfColor, 'Red', units)
+        if not CrLua.Table.deepEquals(expected, observed) then
+            error('mismatch for selfColor ' .. selfColor)
+        end
+    end
 end

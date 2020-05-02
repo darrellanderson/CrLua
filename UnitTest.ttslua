@@ -28,14 +28,15 @@ function CrLua.UnitTest.runTests(prefix, table, recurse, isRecurse)
         local startPos, endPos = string.find(tostring(k), '_test')
         if startPos == 1 then
             assert(type(v) == 'function')
-            print(TAG .. ': running "' .. prefix .. '.' .. k .. '"')
+            local testName = prefix .. '.' .. k
+            print(TAG .. ': running "' .. testName .. '"')
             local success, err = pcall(function() v() end)
             if success then
                 passed = passed + 1
             else
                 failed = failed + 1
                 print(TAG .. ': "' .. prefix .. '.' .. k .. '" FAILED: ' .. err)
-                firstFailure = firstFailure or v
+                firstFailure = firstFailure or { testName, v }
             end
         elseif type(v) == 'table' and recurse then
             local p, f, ff = CrLua.UnitTest.runTests(prefix .. '.' .. k, v, recurse, true)
@@ -49,7 +50,8 @@ function CrLua.UnitTest.runTests(prefix, table, recurse, isRecurse)
         print(TAG .. ': finished #passed=' .. passed .. ' #failed=' .. failed)
         if firstFailure then
             print(TAG .. ': re-running first failure without pcall to get normal error handling')
-            firstFailure()
+            print(TAG .. ': running "' .. firstFailure[1] .. '"')
+            firstFailure[2]()
         end
     end
 

@@ -31,8 +31,7 @@ end
 
 -------------------------------------------------------------------------------
 --- Set the log level, only log messagees at this level and above.
--- @param message string.
--- @table optional table, logging contents if given.
+-- @param level table : CrLua.Log.LOG_LEVEL value.
 -------------------------------------------------------------------------------
 function CrLua.Log.setLogLevel(level)
     assert(level and type(level.level) == 'number' and type(level.shortString) == 'string')
@@ -41,6 +40,7 @@ end
 
 function CrLua.Log._logTable(message, table, depth)
     assert(type(message) == 'string' and type(table) == 'table' and type(depth) == 'number')
+
     local indent = '   '
     local prefix = ''
     if depth > 1 then
@@ -66,10 +66,24 @@ function CrLua.Log._logTable(message, table, depth)
     print(prefix .. '}')
 end
 
-function CrLua.Log._log(logLevel, message, table)
+function CrLua.Log._log(logLevel, tag, message, table)
+    -- Be verbose about bad arguments here, easy to pass the wrong item.
+    -- ALWAYS verify arguments even if log level will suppress logging,
+    -- otherwise bugs can creep in that only tickle when logging is enabled.
+    if type(tag) ~= 'string' then
+        error(TAG .. '_log: tag is not a string', 2)
+    elseif type(message) ~= 'string' then
+        error(TAG .. '_log: message is not a string', 2)
+    elseif table and type(table) ~= 'table' then
+        error(TAG .. '_log: table is not a table', 2)
+    end
+
     if logLevel.level < CrLua.Log._data.level.level then
         return
     end
+
+    -- Insert the tag as message prefix.
+    message = tag .. ' ' .. message
 
     -- Inject a [timestamp/level] prefix.
     local timestamp = os.date('%I:%M.%S')
@@ -85,46 +99,46 @@ end
 function CrLua.Log._testLog()
     local originalLogLevel = CrLua.Log.getLogLevel()
     CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
-    CrLua.Log._log(CrLua.Log.LOG_LEVEL.DEBUG, 'test message', { foo = 1, bar = { a = 1, b = 2 } })
+    CrLua.Log._log(CrLua.Log.LOG_LEVEL.DEBUG, 'TAG', 'test message', { foo = 1, bar = { a = 1, b = 2 } })
     CrLua.Log.setLogLevel(originalLogLevel)
 end
 
 -------------------------------------------------------------------------------
 --- Log a debug message.
+-- @param tag string.
 -- @param message string.
 -- @table optional table, logging contents if given.
 -------------------------------------------------------------------------------
-function CrLua.Log.d(message, table)
-    assert(type(message) == 'string' and (not table or type(table) == 'table'))
-    CrLua.Log._log(CrLua.Log.LOG_LEVEL.DEBUG, message, table)
+function CrLua.Log.d(tag, message, table)
+    CrLua.Log._log(CrLua.Log.LOG_LEVEL.DEBUG, tag, message, table)
 end
 
 -------------------------------------------------------------------------------
 --- Log an info message.
+-- @param tag string.
 -- @param message string.
 -- @table optional table, logging contents if given.
 -------------------------------------------------------------------------------
-function CrLua.Log.i(message, table)
-    assert(type(message) == 'string' and (not table or type(table) == 'table'))
-    CrLua.Log._log(CrLua.Log.LOG_LEVEL.INFO, message, table)
+function CrLua.Log.i(tag, message, table)
+    CrLua.Log._log(CrLua.Log.LOG_LEVEL.INFO, tag, message, table)
 end
 
 -------------------------------------------------------------------------------
 --- Log a warning message.
+-- @param tag string.
 -- @param message string.
 -- @table optional table, logging contents if given.
 -------------------------------------------------------------------------------
-function CrLua.Log.w(message, table)
-    assert(type(message) == 'string' and (not table or type(table) == 'table'))
-    CrLua.Log._log(CrLua.Log.LOG_LEVEL.WARNING, message, table)
+function CrLua.Log.w(tag, message, table)
+    CrLua.Log._log(CrLua.Log.LOG_LEVEL.WARNING, tag, message, table)
 end
 
 -------------------------------------------------------------------------------
 --- Log an error message.
+-- @param tag string.
 -- @param message string.
 -- @table optional table, logging contents if given.
 -------------------------------------------------------------------------------
-function CrLua.Log.e(message, table)
-    assert(type(message) == 'string' and (not table or type(table) == 'table'))
-    CrLua.Log._log(CrLua.Log.LOG_LEVEL.ERROR, message, table)
+function CrLua.Log.e(tag, message, table)
+    CrLua.Log._log(CrLua.Log.LOG_LEVEL.ERROR, tag, message, table)
 end

@@ -61,7 +61,7 @@ CrLua.TI4.Unit.UNIT = {
 --     - faction string : owning faction name.
 --     - wormhole string : if set, flagship is this wormhole type.
 --     - bombardment number : if set, hit value for bombardment.
---     - fighersOnGround boolean : do in-system fighters participate in ground combat?
+--     - fightersOnGround boolean : do in-system fighters participate in ground combat?
 --     - infantryInSpace boolean : do in-system infantry participate in space combat?
 --     - nonFighterDice boolean : dice count is equal to the number of non-fighter enemy ships?
 CrLua.TI4.Unit.FLAGSHIP = {
@@ -74,7 +74,7 @@ CrLua.TI4.Unit.FLAGSHIP = {
     ['Hil Colish'] = { faction = 'The Ghosts of Creuss', wormhole = 'delta' },
     ['[0.0.1]'] = { faction = 'The L1Z1X Mindnet' },
     ['Fourth Moon'] = { faction = 'The Mentak Coalition' },
-    ['Matriarch'] = { faction = 'The Naalu Collective', fighersOnGround = true },
+    ['Matriarch'] = { faction = 'The Naalu Collective', fightersOnGround = true },
     ['The Alastor'] = { faction = 'The Nekro Virus', infantryInSpace = true },
     ["C'morran N'orr"] = { faction = "The Sardakk N'orr" },
     ['J.N.S. Hylarim'] = { faction = 'The Universities of Jol-Nar' },
@@ -103,9 +103,19 @@ CrLua.TI4.Unit.UNIT_COLORS = {
 -- @return unit table.
 -------------------------------------------------------------------------------
 function CrLua.TI4.Unit.unit(unitName, color, count, object)
-    assert(CrLua.TI4.Unit.UNIT[unitName])
-    assert(not color or CrLua.TI4.Unit.UNIT_COLORS[color])
     assert(type(count) == 'number' and count > 0 and object)
+    if not CrLua.TI4.Unit.UNIT[unitName] then
+        error(TAG .. '.unit: unknown unit name "' .. unitName .. '"')
+    end
+    if unitName == 'Flagship' then
+        local objectName = object.getName() or '<nil>'
+        if not CrLua.TI4.Unit.FLAGSHIP[objectName] then
+            error(TAG .. '.unit: unknown Flagship "' .. objectName .. '"')
+        end
+    end
+    if color and not CrLua.TI4.Unit.UNIT_COLORS[color] then
+        error(TAG .. '.unit: invalid color "' .. color .. '"')
+    end
 
     return {
         unitName = unitName,
@@ -126,7 +136,7 @@ end
 function CrLua.TI4.Unit._fakeObject(args)
     local result = {}
     function result.getName()
-        return args.name or '<objectName>'
+        return args.name or '<fakeObjectName>'
     end
     function result.getColorTint()
         return args.color and CrLua.TI4.Unit.UNIT_COLORS[color] or { 0, 0, 0 }
@@ -234,22 +244,28 @@ end
 
 -------------------------------------------------------------------------------
 --- Get unit attributes.
--- @param unitTable table : a Unit.fromObject result.
+-- @param unit table : a Unit.unit table.
 -- @return table : attribute table
 -------------------------------------------------------------------------------
-function CrLua.TI4.Unit.attributes(unitTable)
-    assert(type(unitTable) == 'table' and unitTable.unitName)
+function CrLua.TI4.Unit.attributes(unit)
+    assert(type(unit) == 'table' and unit.unitName)
 
-    local unit = CrLua.TI4.Unit.UNIT[unitTable.unitName]
-    local flagship
+    local unitAttributes = CrLua.TI4.Unit.UNIT[unit.unitName]
 
-    if unitTable.unitName == 'Flagship' then
-        local objectName = unitTable.object.getName()
-        local flagship = CrLua.TI4.Unit.FLAGSHIP(objectName)
+    if unit.unitName == 'Flagship' then
+        local objectName = unit.object.getName() or '<nil>'
+        local flagshipAttributes = CrLua.TI4.Unit.FLAGSHIP[objectName]
+        return CrLua.Table.join(unitAttributes, flagshipAttributes)
     end
 
-    -- Always return a new list, in case recipient wants to mutate it.
-    return CrLua.Table.join(unit, flagship or {})
+    return unitAttributes
+end
+
+function CrLua.TI4.Unit._testAttributes()
+    local unit = CrLua.TI4.Unit.unit('Flagship', false, 1, CrLua.TI4.Unit._fakeObject{name='Hil Colish'})
+    local attributes = CrLua.TI4.Unit.attributes(unit)
+    assert(attributes.ship)
+    assert(attributes.wormhole == 'delta')
 end
 
 -------------------------------------------------------------------------------
@@ -294,6 +310,10 @@ function CrLua.TI4.Unit.assignUnitTokenColors(units)
     local needColorShipUnits = {}
     local needColorGroundUnits = {}
 
+    -- When splitting into ship vs ground, do not consider Flagship attributes
+    -- that let infantry participate in space combat or fighters on ground.
+    -- Be consistent with "real" ships vs "real" ground so assignment behaves
+    -- the same independent of faction.
     for _, unit in ipairs(units) do
         local attributes = CrLua.TI4.Unit.UNIT[unit.unitName]
         if unit.color then
@@ -311,6 +331,8 @@ function CrLua.TI4.Unit.assignUnitTokenColors(units)
         end
     end
 
+    -- For each need-color unit, find the closest same {ship/ground} type
+    -- and copy its color.
     local function fillColors(needColorUnits, haveColorUnits)
         for _, needColorUnit in ipairs(needColorUnits) do
             local needColorPosition = needColorUnit.object.getPosition()
@@ -334,10 +356,187 @@ function CrLua.TI4.Unit._testAssignUnitTokenColors()
     local units = {
         CrLua.TI4.Unit.unit('Infantry', false, 1, CrLua.TI4.Unit._fakeObject{position={ x = 1 }}),
         CrLua.TI4.Unit.unit('Fighter', false, 1, CrLua.TI4.Unit._fakeObject{position={ x = 4 }}),
-        CrLua.TI4.Unit.unit('Flagship', 'White', 1, CrLua.TI4.Unit._fakeObject{position={ x = 2 }}),
+        CrLua.TI4.Unit.unit('Flagship', 'White', 1, CrLua.TI4.Unit._fakeObject{position={ x = 2 }, name = 'Matriarch' }),
         CrLua.TI4.Unit.unit('Infantry', 'Green', 1, CrLua.TI4.Unit._fakeObject{position={ x = 3 }})
     }
     CrLua.TI4.Unit.assignUnitTokenColors(units)
     assert(units[1].color == 'Green')
     assert(units[2].color == 'White')
+end
+
+-------------------------------------------------------------------------------
+--- Count units, group by color, unit name.
+-- @param units table : list of units.
+-- @return table : map from color to map from unit name to count.
+-- Double index, e.g. result['Blue']['Infantry'] to get blue infantry count.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Unit.count(units)
+    local result = {}
+    for _, unit in ipairs(units) do
+        local byColor = result[unit.color or 'Anonymous']
+        if not byColor then
+            byColor = {}
+            result[unit.color or 'Anonymous'] = byColor
+        end
+        byColor[unit.unitName] = (byColor[unit.unitName] or 0) + unit.count
+    end
+    return result
+end
+
+function CrLua.TI4.Unit._testCountUnits()
+    local units = {
+        CrLua.TI4.Unit.unit('PDS', 'Red', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Fighter', 'Blue', 3, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Fighter', 'Blue', 1, CrLua.TI4.Unit._fakeObject{})
+    }
+    local count = CrLua.TI4.Unit.count(units)
+    assert(CrLua.Table.deepEquals(count, {
+        Red = { PDS = 1 },
+        Blue = { Fighter = 4 }
+    }))
+end
+
+-------------------------------------------------------------------------------
+--- Get space-combat participants.
+-- If Flagship with "infantry in space" attribute, include Infantry of that color.
+-- @param units table : list of units.
+-- @return table : list filtered to only ship units.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Unit.filterToShips(units)
+    local infantryInSpaceColorSet = {}
+    for _, unit in ipairs(units) do
+        if unit.unitName == 'Flagship' then
+            local attributes = CrLua.TI4.Unit.attributes(unit)
+            if attributes.infantryInSpace then
+                infantryInSpaceColorSet[unit.color] = true
+            end
+        end
+    end
+    local function isShip(unit)
+        local attributes = CrLua.TI4.Unit.attributes(unit)
+        return attributes.ship or (unit.unitName == 'Infantry' and infantryInSpaceColorSet[unit.color])
+    end
+    return CrLua.List.filter(units, isShip)
+end
+
+function CrLua.TI4.Unit._testFilterToShips()
+    local units = CrLua.TI4.Unit._getTestFilterUnits()
+    local filtered = CrLua.TI4.Unit.filterToShips(units)
+    local count = CrLua.TI4.Unit.count(filtered)
+    assert(CrLua.Table.deepEquals(count, {
+        Red = { Fighter = 1, Flagship = 1, Infantry = 1 },
+        Blue = { Fighter = 1, Flagship = 1 },
+        Green = { Fighter = 1, Flagship = 1 }
+    }))
+end
+
+function CrLua.TI4.Unit._getTestFilterUnits()
+    -- Red infantry in space, blue fighters on ground, green Flagship space cannon.
+    return {
+        CrLua.TI4.Unit.unit('PDS', 'Red', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Fighter', 'Red', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Infantry', 'Red', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Flagship', 'Red', 1, CrLua.TI4.Unit._fakeObject{ name = 'The Alastor' }),
+
+        CrLua.TI4.Unit.unit('PDS', 'Blue', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Fighter', 'Blue', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Infantry', 'Blue', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Flagship', 'Blue', 1, CrLua.TI4.Unit._fakeObject{ name = 'Matriarch' }),
+
+        CrLua.TI4.Unit.unit('PDS', 'Green', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Fighter', 'Green', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Infantry', 'Green', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Flagship', 'Green', 1, CrLua.TI4.Unit._fakeObject{ name = 'Loncara Ssodu' })
+    }
+end
+
+-------------------------------------------------------------------------------
+--- Get ground-combat participants.
+-- If Flagship with "fighters on ground" attribute, include Fighters of that color.
+-- @param units table : list of units.
+-- @return table : list filtered to only ground units.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Unit.filterToGround(units)
+    local fightersOnGroundColorSet = {}
+    for _, unit in ipairs(units) do
+        if unit.unitName == 'Flagship' then
+            local attributes = CrLua.TI4.Unit.attributes(unit)
+            if attributes.fightersOnGround then
+                if not unit.color then
+                    local objectName = unit.object.getName() or '<nil>'
+                    error(TAG .. '.filterToGround: no color for Flagship "' .. objectName .. '"')
+                end
+                fightersOnGroundColorSet[unit.color] = true
+            end
+        end
+    end
+    local function isGround(unit)
+        local attributes = CrLua.TI4.Unit.attributes(unit)
+        return (not attributes.ship) or ((unit.unitName == 'Fighter') and fightersOnGroundColorSet[unit.color])
+    end
+    return CrLua.List.filter(units, isGround)
+end
+
+function CrLua.TI4.Unit._testFilterToGround()
+    local units = CrLua.TI4.Unit._getTestFilterUnits()
+    local filtered = CrLua.TI4.Unit.filterToGround(units)
+    local count = CrLua.TI4.Unit.count(filtered)
+    assert(CrLua.Table.deepEquals(count, {
+        Red = { PDS = 1, Infantry = 1 },
+        Blue = { PDS = 1, Infantry = 1, Fighter = 1 },
+        Green = { PDS = 1, Infantry = 1 }
+    }))
+end
+
+-------------------------------------------------------------------------------
+--- Get scace cannon participants.
+-- Include Flagship with the "space cannon" attribute.
+-- @param units table : list of units.
+-- @return table : list filtered to only space cannon units.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Unit.filterToSpaceCannon(units)
+    local function isSpaceCannon(unit)
+        local attributes = CrLua.TI4.Unit.attributes(unit)
+        return attributes.spaceCannon
+    end
+    return CrLua.List.filter(units, isSpaceCannon)
+end
+
+function CrLua.TI4.Unit._testFilterToSpaceCannon()
+    local units = CrLua.TI4.Unit._getTestFilterUnits()
+    local filtered = CrLua.TI4.Unit.filterToSpaceCannon(units)
+    local count = CrLua.TI4.Unit.count(filtered)
+    assert(CrLua.Table.deepEquals(count, {
+        Red = { PDS = 1 },
+        Blue = { PDS = 1 },
+        Green = { PDS = 1, Flagship = 1 }
+    }))
+end
+
+-------------------------------------------------------------------------------
+--- Get non-fighter ships.
+-- Flagship "infantry in space" do not count Infantry as ships.
+-- @param units table : list of units.
+-- @return table : list filtered to only non-fighter ships.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Unit.filterToNonFighterShips(units)
+    -- The "infrantyInSpace" Flagship attribute lets infantry participate in
+    -- space combat "as if they were ships."  The BGG ruling is that "as if"
+    -- does not mean "they are" and do not count as non-fighter ships.
+    local function isNonFighterShip(unit)
+        local attributes = CrLua.TI4.Unit.attributes(unit)
+        return attributes.ship and unit.unitName ~= 'Fighter'
+    end
+    return CrLua.List.filter(units, isNonFighterShip)
+end
+
+function CrLua.TI4.Unit._testfilterToNonFighterShips()
+    local units = CrLua.TI4.Unit._getTestFilterUnits()
+    local filtered = CrLua.TI4.Unit.filterToNonFighterShips(units)
+    local count = CrLua.TI4.Unit.count(filtered)
+    assert(CrLua.Table.deepEquals(count, {
+        Red = { Flagship = 1 },
+        Blue = { Flagship = 1 },
+        Green = { Flagship = 1 }
+    }))
 end

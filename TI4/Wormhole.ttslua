@@ -12,9 +12,9 @@ CrLua.TI4.Wormhole = assert(not CrLua.TI4.Wormhole) and {
 }
 
 CrLua.TI4.Wormhole.TYPE = {
-    ALPHA = 'ALPHA',
-    BETA = 'BETA',
-    DELTA = 'DELTA',
+    ALPHA = 'alpha',
+    BETA = 'beta',
+    DELTA = 'delta',
 }
 
 CrLua.TI4.Wormhole.GUIDS = {
@@ -45,7 +45,10 @@ CrLua.TI4.Wormhole.OBJECT_NAMES = {
 -- @return table : {type->CrLua.TI4.Wormhole.TYPE value, object->Object}
 -------------------------------------------------------------------------------
 function CrLua.TI4.Wormhole.wormhole(type, object)
-    assert(CrLua.TI4.Wormhole.TYPE[type] and object)
+    if not CrLua.TI4.Wormhole.TYPE[string.upper(type)] then
+        error(TAG .. '.wormhole: bad type "' .. tostring(type or '') .. '"')
+    end
+    assert(object)
 
     return {
         type = type,

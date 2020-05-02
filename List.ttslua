@@ -42,7 +42,7 @@ end
 --- Filter list.
 -- @param list : table with number indices.
 -- @param filterFunction function : called with list items, return true to keep.
--- @return list : list items accepted by filter function.
+-- @return table : list items accepted by filter function.
 -------------------------------------------------------------------------------
 function CrLua.List.filter(list, filterFunction)
     assert(type(list) == 'table' and type(filterFunction) == 'function')

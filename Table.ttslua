@@ -59,3 +59,60 @@ function CrLua.Table._testJoin()
     assert(joined.flavor == 'sour')
     assert(joined.scent == 'strawberry')
 end
+
+-------------------------------------------------------------------------------
+--- Do the two tables contatain identical key/value pairs, including subtables?
+-- @param a table.
+-- @param b table.
+-- @param path string : omit for first call, otherwise string path to depth.
+-- @return boolean : true if equal, otherwise (false, path-to-mismatch) pair.
+-- WARNING: cycles in a table cause infinite loops!
+-------------------------------------------------------------------------------
+function CrLua.Table.deepEquals(a, b, path)
+    assert(type(a) == 'table' and type(b) == 'table')
+
+    if a == b then
+        return true
+    end
+
+    local function appendToPath(k)
+        return (path and (path .. '.') or '') .. tostring(k)
+    end
+
+    local function errorMessage(k)
+        local pathPlusK = appendToPath(k)
+        local av = tostring(a[k] or '<nil>')
+        local bv = tostring(b[k] or '<nil>')
+        return TAG .. '.deepEquals: ' .. pathPlusK .. ' <' .. av .. '> ~= <' .. bv .. '>'
+    end
+
+    for k, _ in pairs(b) do
+        if type(a[k]) == 'nil' then
+            return false, errorMessage(k)
+        end
+    end
+    for k, av in pairs(a) do
+        local bv = b[k]
+        if type(av) == 'table' and type(bv) == 'table' then
+            local equals, message = CrLua.Table.deepEquals(av, bv, appendToPath(k))
+            if not equals then
+                return false, message
+            end
+        elseif (type(av) ~= type(bv)) or (av ~= bv) then
+            return false, errorMessage(k)
+        end
+    end
+    return true
+end
+
+function CrLua.Table._testDeepEquals()
+    local a = { one = 1, two = { alpha = 2 }}
+    local b = { one = 1, two = { alpha = 2 }}
+    assert(CrLua.Table.deepEquals(a, b))
+
+    local b = { one = 2, two = { alpha = 2 }}
+    assert(not CrLua.Table.deepEquals(a, b))
+
+    local b = { one = 1, two = { alpha = 3 }}
+    assert(not CrLua.Table.deepEquals(a, b))
+end

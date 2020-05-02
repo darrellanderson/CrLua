@@ -48,15 +48,15 @@ function onDrop(playerColor)
     end
     CrLua.Log.d('selfWormholeTypeSet', selfWormholeTypeSet)
 
-    local wormholeNeighbors = {}
+    local wormholeNeighborHexes = {}
     for _, wormhole in ipairs(allWormholes) do
         if selfWormholeTypeSet[wormhole.type] and wormhole.hex ~= selfHex then
-            table.insert(wormholeNeighbors, wormhole)
+            table.insert(wormholeNeighborHexes, wormhole.hex)
         end
     end
 
-    for _, wormhole in ipairs(wormholeNeighbors) do
-        local lines = CrLua.TI4.Hex.vectorLines(wormhole.hex, {
+    for _, hex in ipairs(wormholeNeighborHexes) do
+        local lines = CrLua.TI4.Hex.vectorLines(hex, {
             color = { 0, 0, 1 },
             thickness = 0.2
         })
@@ -65,13 +65,24 @@ function onDrop(playerColor)
 
     Global.setVectorLines(vectorLines)
 
+    local allHexes = { selfHex }
+    local allHexes = CrLua.List.join( allHexes, neighborHexes, wormholeNeighborHexes)
+    local allHexes = CrLua.List.join( allHexes, wormholeNeighborHexes)
+    local allHexesSet = CrLua.List.toSet(allHexes)
 
+    CrLua.Log.d('allHexesSet', allHexesSet)
 
-    for _, object in ipairs(getAllObjects()) do
-        local unit = CrLua.TI4.Unit.fromObject(object)
-        if unit then
-            print ('xxx color=' .. unit.color .. ' unitName=' .. unit.unitName)
+    local function filterToHexes(unit)
+        local hex = CrLua.TI4.Hex.fromPosition(unit.object.getPosition())
+        if allHexesSet[hex] then
+            unit.hex = hex
+            return true
         end
+        return false
+    end
+    local units = CrLua.TI4.Unit.getAllUnits(filterToHexes)
+    for _, unit in ipairs(units) do
+        print ('xxx color=' .. unit.color .. ' unitName=' .. unit.unitName)
     end
 end
 

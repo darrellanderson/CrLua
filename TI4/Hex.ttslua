@@ -81,16 +81,25 @@ end
 -------------------------------------------------------------------------------
 --- Generate a vector lines entry for Global.setVectorLines.
 -- @param hexString string : string-encoded hex
+-- @param parameters : table key->value override parameters for vector lines result.
 -- @return table : vector lines entry.
 -------------------------------------------------------------------------------
-function CrLua.TI4.Hex.vectorLines(hexString, override)
-    assert(type(hexString) == 'string' and type(override) == 'table' and not override.points)
+function CrLua.TI4.Hex.vectorLines(hexString, parameters)
+    assert(type(hexString) == 'string' and type(parameters) == 'table' and not parameters.points)
     local hex = CrLua.RedBlobHex.fromString(hexString)
     local corners = CrLua.RedBlobHex.corners(CrLua.TI4.Hex._layout, hex)
+
+    -- Inset by the line thickness.
+    local defaultThickness = 0.2
+    local inset = parameters.thickness or defaultThickness
+    local insetCorners = CrLua.Polygon.inset(corners, inset, 'x', 'y')
+
+    -- Convert to {x,y,z} positions.
     local points = {}
-    for _, corner in ipairs(corners) do
+    for _, corner in ipairs(insetCorners) do
         table.insert(points, { x = corner.x, y = 1.2, z = corner.y })
     end
+
     local result = {
         points = points,
         color = {1, 1, 1},
@@ -99,7 +108,7 @@ function CrLua.TI4.Hex.vectorLines(hexString, override)
         loop = true,
         square = false,
     }
-    for k, v in pairs(override) do
+    for k, v in pairs(parameters) do
         result[k] = v
     end
     return result

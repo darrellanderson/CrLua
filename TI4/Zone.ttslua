@@ -284,14 +284,21 @@ end
 function CrLua.TI4.Zone.vectorLines(zone, parameters)
     assert(type(zone) == 'table' and zone.polygon and type(parameters) == 'table' and not parameters.points)
 
+    -- Inset by the line thickness.
+    local defaultThickness = 0.2
+    local inset = parameters.thickness or defaultThickness
+    local insetPolygon = CrLua.Polygon.inset(zone.polygon, inset)
+
+    -- Convert points to {x,y,z} positions.
     local function addY(point)
         return { x = point[1], y = 1, z = point[2] }
     end
-    local points = CrLua.List.map(zone.polygon, addY)
+    local points = CrLua.List.map(insetPolygon, addY)
+
     local result = {
         points = points,
         color = zone._data.color or zone.defaultColor,
-        thickness = 0.1,
+        thickness = defaultThickness,
         rotation = { 0, 0, 0 },
         loop = true,
         square = false
@@ -307,7 +314,7 @@ end
 -- This result can be used directly, 'Global.setVectorLines(allZonesVectorLines())'.
 -- @param parameters table : override setVectorLines parameters.
 -------------------------------------------------------------------------------
-function CrLua.TI4.Zone.allZonesVectorLines(parameters)
+function CrLua.TI4.Zone.allVectorLines(parameters)
     assert(type(parameters) == 'table' and not parameters.points)
 
     local lines = {}

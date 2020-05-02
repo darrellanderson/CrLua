@@ -109,6 +109,66 @@ function CrLua.Polygon._testCorners()
 end
 
 -------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+function CrLua.Polygon.inset(polygon, inset, xIndex, yIndex)
+    assert(type(polygon) == 'table' and type(inset) == 'number')
+
+    local x = xIndex or 1
+    local y = yIndex or 2
+
+    local insetPolygon = {}
+
+    local numVertices = #polygon
+    for i = 1, #polygon do
+        local prevPt = polygon[((i - 2) % numVertices) + 1]
+        local curPt = polygon[i]
+        local nextPt = polygon[(i % numVertices) + 1]
+
+        -- Inset direction is reverse of sum of the two incoming segments.
+        local dirPrevToCur = {
+            [x] = curPt[x] - prevPt[x],
+            [y] = curPt[y] - prevPt[y]
+        }
+        local dirNextToCur = {
+            [x] = curPt[x] - nextPt[x],
+            [y] = curPt[y] - nextPt[y]
+        }
+        local insetDir = {
+            [x] = -(dirPrevToCur[x] + dirNextToCur[x]),
+            [y] = -(dirPrevToCur[y] + dirNextToCur[y])
+        }
+
+        -- Normalize.
+        local d = math.sqrt(insetDir[x] * insetDir[x] + insetDir[y] * insetDir[y])
+        if d > 0 then
+            insetDir[x] = insetDir[x] / d
+            insetDir[y] = insetDir[y] / d
+        end
+
+        local insetPt = {
+            [x] = curPt[x] + (insetDir[x] * inset),
+            [y] = curPt[y] + (insetDir[y] * inset)
+        }
+
+        table.insert(insetPolygon, insetPt)
+    end
+
+    return insetPolygon
+end
+
+function CrLua.Polygon._testInset()
+    local polygon = { {0, 0}, {1, 1}, {2, 0} }
+    local inset = CrLua.Polygon.inset(polygon, 0.1)
+    assert(#inset == 3)
+    local function almost(point, x, y)
+        return math.abs(point[1] - x) < 0.01 and math.abs(point[2] - y) < 0.01
+    end
+    assert(almost(inset[1], 0.09, 0.03), '1: ' .. inset[1][1] .. ', ' .. inset[1][2])
+    assert(almost(inset[2], 1, 0.9), '2: ' .. inset[2][1] .. ', ' .. inset[2][2])
+    assert(almost(inset[3], 1.91, 0.03), '2: ' .. inset[3][1] .. ', ' .. inset[3][2])
+end
+
+-------------------------------------------------------------------------------
 --- Is the point inside the polygon (2D)?
 -- Uses the "ray casting method".
 -- @see https://love2d.org/wiki/PointWithinShape

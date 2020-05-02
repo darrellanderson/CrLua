@@ -12,9 +12,9 @@ CrLua.TI4.Wormhole = assert(not CrLua.TI4.Wormhole) and {
 }
 
 CrLua.TI4.Wormhole.TYPE = {
-    ALPHA = 'alpha',
-    BETA = 'beta',
-    DELTA = 'delta',
+    ALPHA = 'ALPHA',
+    BETA = 'BETA',
+    DELTA = 'DELTA',
 }
 
 CrLua.TI4.Wormhole.GUIDS = {
@@ -39,22 +39,46 @@ CrLua.TI4.Wormhole.OBJECT_NAMES = {
 }
 
 -------------------------------------------------------------------------------
+--- Create a wormhole table.
+-- @param wormholeType string, CrLua.TI4.Wormhole.TYPE value.
+-- @param object : game Object.
+-- @return table : {type->CrLua.TI4.Wormhole.TYPE value, object->Object}
+-------------------------------------------------------------------------------
+function CrLua.TI4.Wormhole.wormhole(type, object)
+    assert(CrLua.TI4.Wormhole.TYPE[type] and object)
+
+    return {
+        type = type,
+        object = object
+    }
+end
+
+function CrLua.TI4.Wormhole._testWormhole()
+    local wormholeType = CrLua.TI4.Wormhole.TYPE.DELTA
+    local fakeObject = {}
+    local wormhole = CrLua.TI4.Wormhole.wormhole(wormholeType, fakeObject)
+    assert(wormhole.type == wormholeType)
+    assert(wormhole.object == fakeObject)
+end
+
+-------------------------------------------------------------------------------
 --- Find wormholes.
 -- Type is one of CrLua.TI4.Wormhole.TYPE values.
--- @return table : list of tables with {type->string, object->Object}.
+-- @param filter function : if given, return nil/false to reject wormholes from result.
+-- @return table : list of CrLua.TI4.Wormhole.wormhole tables.
+-- The filter function gets the same wormhole table that gets added to the result.
+-- In addition to filtering, it could inject new unit fields.
 -------------------------------------------------------------------------------
-function CrLua.TI4.Wormhole.findWormholes()
+function CrLua.TI4.Wormhole.getAllWormholes(filterFunction)
     local result = {}
-
-    local function addResult(object, wormholeType)
-        assert(type(wormholeType) == 'string')
-        table.insert(result, { object = object, type = wormholeType })
-    end
 
     for guid, wormholeType in pairs(CrLua.TI4.Wormhole.GUIDS) do
         local object = getObjectFromGUID(guid)
         if object then
-            addResult(object, wormholeType)
+            local wormhole = CrLua.TI4.Wormhole.wormhole(wormholeType, object)
+            if not filterFunction or filterFunction(wormhole) then
+                table.insert(result, wormhole)
+            end
         end
     end
 
@@ -63,7 +87,10 @@ function CrLua.TI4.Wormhole.findWormholes()
     for name, objects in pairs(objectsByName) do
         local wormholeType = CrLua.TI4.Wormhole.OBJECT_NAMES[name]
         for _, object in ipairs(objects) do
-            addResult(object, wormholeType)
+            local wormhole = CrLua.TI4.Wormhole.wormhole(wormholeType, object)
+            if not filterFunction or filterFunction(wormhole) then
+                table.insert(result, wormhole)
+            end
         end
     end
 

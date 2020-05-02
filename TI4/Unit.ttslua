@@ -105,7 +105,7 @@ CrLua.TI4.Unit.UNIT_COLORS = {
 function CrLua.TI4.Unit.unit(unitName, color, count, object)
     assert(CrLua.TI4.Unit.UNIT[unitName])
     assert(not color or CrLua.TI4.Unit.UNIT_COLORS[color])
-    assert(type(count) == 'number')
+    assert(type(count) == 'number' and count > 0 and object)
 
     return {
         unitName = unitName,

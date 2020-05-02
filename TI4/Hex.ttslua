@@ -8,14 +8,23 @@ local TAG = 'CrLua.TI4.Hex'
 CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
 CrLua.TI4 = CrLua.TI4 or {}
 CrLua.TI4.Hex = assert(not CrLua.TI4.Hex) and {
-    _require = { 'RedBlobHex' }
+    _require = { 'Polygon', 'RedBlobHex' },
+    _data = { layout = false }
 }
 
-if true then -- "do" causes linter warnings, boo.
-    local orientation = CrLua.RedBlobHex.ORIENTATION.FLAT_TOP
-    local hexSize = CrLua.RedBlobHex.point(3.5, 3.5)
-    local origin = CrLua.RedBlobHex.point(0, 0)
-    CrLua.TI4.Hex._layout = CrLua.RedBlobHex.layout(orientation, hexSize, origin)
+-------------------------------------------------------------------------------
+--- Get the RedBlobHex layout for the TI4 grid.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Hex._layout()
+    local result = CrLua.TI4.Hex._data.layout
+    if not result then
+        local orientation = CrLua.RedBlobHex.ORIENTATION.FLAT_TOP
+        local hexSize = CrLua.RedBlobHex.point(3.5, 3.5)
+        local origin = CrLua.RedBlobHex.point(0, 0)
+        result = CrLua.RedBlobHex.layout(orientation, hexSize, origin)
+        CrLua.TI4.Hex._data.layout = result
+    end
+    return result
 end
 
 -------------------------------------------------------------------------------
@@ -25,8 +34,9 @@ end
 -------------------------------------------------------------------------------
 function CrLua.TI4.Hex.fromPosition(position)
     assert(type(position.x) == 'number')
+    local layout = CrLua.TI4.Hex._layout()
     local point = CrLua.RedBlobHex.point(position.x, position.z)
-    local hex = CrLua.RedBlobHex.fromPoint(CrLua.TI4.Hex._layout, point)
+    local hex = CrLua.RedBlobHex.fromPoint(layout, point)
     local roundedHex = CrLua.RedBlobHex.round(hex)
     return CrLua.RedBlobHex.toString(roundedHex)
 end
@@ -44,8 +54,9 @@ end
 -------------------------------------------------------------------------------
 function CrLua.TI4.Hex.toPosition(hexString)
     assert(type(hexString) == 'string')
+    local layout = CrLua.TI4.Hex._layout()
     local hex = CrLua.RedBlobHex.fromString(hexString)
-    local point = CrLua.RedBlobHex.toPoint(CrLua.TI4.Hex._layout, hex)
+    local point = CrLua.RedBlobHex.toPoint(layout, hex)
     return { x = point.x, y = 1, z = point.y }
 end
 
@@ -86,8 +97,9 @@ end
 -------------------------------------------------------------------------------
 function CrLua.TI4.Hex.vectorLines(hexString, parameters)
     assert(type(hexString) == 'string' and type(parameters) == 'table' and not parameters.points)
+    local layout = CrLua.TI4.Hex._layout()
     local hex = CrLua.RedBlobHex.fromString(hexString)
-    local corners = CrLua.RedBlobHex.corners(CrLua.TI4.Hex._layout, hex)
+    local corners = CrLua.RedBlobHex.corners(layout, hex)
 
     -- Inset by the line thickness.
     local defaultThickness = 0.2

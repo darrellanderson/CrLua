@@ -1,1 +1,101 @@
--- GarnetBear created the "Tile Rollers"
+-------------------------------------------------------------------------------
+--- Auto-fill the TTS/TI4 MultiRoller
+-- TTS/TI4 by Darth Batman and Raptor1210.
+-- MultiRoller by GarnetBear
+-- @author bonkersbgg on BoardGameGeek.com
+-------------------------------------------------------------------------------
+
+local TAG = 'AutoFillMultiRoller'
+local AutoFillMultiRoller = {
+    _data = {
+        visualizeHexes = true,
+    },
+    _require = { 'TI4.Hex', 'TI4.Unit', 'TI4.Wormhole', 'List', 'Log' }
+}
+
+function onDrop(player_color)
+    CrLua.Log.d(TAG .. '.onDrop')
+    local position = self.getPosition()
+    local units = AutoFillMultiRoller.getUnits(position)
+    CrLua.Log.d('units', units)
+end
+
+-------------------------------------------------------------------------------
+
+function AutoFillMultiRoller.getHexes(position)
+    assert(type(position) == 'table' and type(position.x) == 'number')
+
+    -- Get this hex, and adjacent hexes.
+    local hex = CrLua.TI4.Hex.fromPosition(position)
+    local adjacentHexes = CrLua.TI4.Hex.neighbors(hex)
+
+    -- Get the wormholes in this hex, plus other wormhole-adjacent hexes.
+    -- As a side-effect, the filter function adds 'hex' to each wormhole.
+    local function isWormholeInSelfHex(wormhole)
+        local position = wormhole.object.getPosition()
+        wormhole.hex = CrLua.TI4.Hex.fromPosition(position)
+        return wormhole.hex == hex
+    end
+    local wormholes, adjacentWormholes = CrLua.TI4.Wormhole.getAllWormholes(isWormholeInSelfHex)
+    for _, wormhole in ipairs(adjacentWormholes) do
+        table.insert(adjacentHexes, wormhole.hex)
+    end
+
+    -- Remove any duplicates.
+    adjacentHexes = CrLua.List.unique(adjacentHexes)
+
+    if AutoFillMultiRoller._data.visualizeHexes then
+        local lines = {}
+        table.insert(lines, CrLua.TI4.Hex.vectorLines(hex, { color = {1,0,0} }))
+        for _, adjacentHex in ipairs(adjacentHexes) do
+            table.insert(lines, CrLua.TI4.Hex.vectorLines(adjacentHex, { color = {0,1,0} }))
+        end
+        Global.setVectorLines(lines)
+    end
+
+    return hex, adjacentHexes
+end
+
+function AutoFillMultiRoller.getUnits(position)
+    local hex, adjacentHexes = AutoFillMultiRoller.getHexes(position)
+    CrLua.Log.d(TAG .. '.getUnits: hex = ' .. hex .. ', adjacentHexes', adjacentHexes)
+
+    -- Get units in this hex and adjacent hexes.
+    -- As a side-effect, filter adds 'hex' to each unit.
+    local adjacentHexesSet = CrLua.List.toSet(adjacentHexes)
+    local function isInSelfOrAdjacentHex(unit)
+        local position = unit.object.getPosition()
+        unit.hex = CrLua.TI4.Hex.fromPosition(position)
+        return unit.hex == hex or adjacentHexesSet[unit.hex]
+    end
+    local units = CrLua.TI4.Unit.getAllUnits(isInSelfOrAdjacentHex)
+
+    return units
+end
+
+-------------------------------------------------------------------------------
+
+#include <~/CrLua/CrLua>
+#include <~/CrLua/LockGlobals>
+
+#include <~/CrLua/TI4/Hex>
+#include <~/CrLua/TI4/Unit>
+#include <~/CrLua/TI4/Wormhole>
+
+#include <~/CrLua/TTS/Object>
+
+#include <~/CrLua/List>
+#include <~/CrLua/LockTable>
+#include <~/CrLua/Log>
+#include <~/CrLua/Polygon>
+#include <~/CrLua/RedBlobHex>
+#include <~/CrLua/Table>
+#include <~/CrLua/Util>
+
+CrLua.assertRequired()
+CrLua.lock()
+
+CrLua.assertRequired(AutoFillMultiRoller)
+CrLua.lock('AutoFillMultiRoller', AutoFillMultiRoller)
+
+CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)

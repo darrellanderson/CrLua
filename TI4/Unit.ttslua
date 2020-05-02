@@ -145,6 +145,7 @@ end
 --- Get units on the table.
 -- @param filter function : if given, return nil/false to reject units from result.
 -- @return table : list of CrLua.TI4.Unit.unit tables.
+--
 -- The filter function gets the same unit table that gets added to the result.
 -- In addition to filtering, it could inject new unit fields.
 -------------------------------------------------------------------------------

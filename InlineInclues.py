@@ -7,36 +7,51 @@
 # This quick hack reads a ttslua script, injecting #include content.
 # At the time of this writing this is a one-way transformation.
 
-from os.path import expanduser
+import os
 import re
 import sys
 
 includePattern = re.compile('^#include <(~/.*)>$')
 delim = '-- ############################################################################\n'
 
-def process(src):
+included = set()
+
+def process(filename, wrapInDoEnd):
+    absoluteFilename = os.path.expanduser(filename) + '.ttslua'
+    if absoluteFilename in included:
+        return
+    included.add(absoluteFilename)
+
+    sys.stdout.write(delim)
+    sys.stdout.write('-- #### START #include <' + filename + '>\n')
+    sys.stdout.write(delim)
+
+    if wrapInDoEnd:
+        sys.stdout.write('do\n')
+        sys.stdout.write('\n')
+
     insideComment = False
-    for line in src:
+    file = open(absoluteFilename)
+    for line in file:
         if line.find('--[[') != -1:
             insideComment = True
         if line.find(']]') != -1:
             insideComment = False
         if line.startswith('#include') and not insideComment:
             m = includePattern.search(line)
-            filename = m.group(1) + '.ttslua'
-            sys.stdout.write(delim)
-            sys.stdout.write('-- #### #include <' + filename + '>\n')
-            sys.stdout.write(delim)
-            sys.stdout.write('do\n')
-            sys.stdout.write('\n')
-            filename = expanduser(filename)
-            include = open(filename)
-            process(include)
-            include.close()
-            sys.stdout.write('\n')
-            sys.stdout.write('end\n')
+            filename = m.group(1)
+            process(filename, True)
         else:
             sys.stdout.write(line)
+    file.close()
 
-process(sys.stdin)
+    if wrapInDoEnd:
+        sys.stdout.write('\n')
+        sys.stdout.write('end\n')
+
+    sys.stdout.write(delim)
+    sys.stdout.write('-- #### END #include <' + filename + '>\n')
+    sys.stdout.write(delim)
+
+process(sys.argv[1], False)
 sys.stdout.flush()

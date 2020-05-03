@@ -40,7 +40,12 @@ end
 
 function CrLua.TTS.Player._testClosest()
     local color = CrLua.TTS.Player.closest({x = 0, y = 0, z = 0})
-    assert(color and type(color) == 'string')
+    local seated = getSeatedPlayers()
+    if #seated > 0 then
+        assert(color and type(color) == 'string', tostring(color or '<nil>'))
+    else
+        assert(not color)
+    end
 end
 
 -------------------------------------------------------------------------------
@@ -59,7 +64,10 @@ function CrLua.TTS.Player.isSeated(color)
 end
 
 function CrLua.TTS.Player._testIsSeated()
-    local color = getSeatedPlayers()[1]
-    assert(CrLua.TTS.Player.isSeated(color))
+    local seated = getSeatedPlayers()
+    if #seated > 0 then
+        local color = getSeatedPlayers()[1]
+        assert(CrLua.TTS.Player.isSeated(color))
+    end
     assert(not CrLua.TTS.Player.isSeated('does_not_exist'))
 end

@@ -2,39 +2,78 @@
 --- Patch existing TTS objects.
 -- @author bonkersbgg on BoardGameGeek.com
 --
--- Create a 'patch config' table with functions to control the patch.
--- Most functions get an 'objectData' argument, which is a standard
--- Object.getObjects() result with { name, description, guid, ... } plus
--- an additional _container field with the Object the ObjectData is inside
--- (such as a Bag or Deck).
+-- Patch a running TTS game, modifying or replacing objects in-place.  Can
+-- patch objects inside containers / decks.  To use, call Patch.patch() with a
+-- 'patch config' table with functions defined below.
+--
+-- The 'objectData' tables are standard Object.getObjects() results with
+-- { index, name, description, guid, lua_script, lua_script_state } plus an
+-- additional _container field with the container the object was inside,
+-- or nil for root objects.
+--
+-- Patch runs four phases: (1) scanning to find objects, (2) querying which
+-- objects should be patched, (3) patching, and (4) cleanup / finish.
+--
+-- PHASE 1: SCANNING FOR CONTAINERS
+--
+-- This phase is about figuring out where later phases should look for objects.
+-- Scan the root objects, calling your PatchConfig.shouldScanContainer to ask if
+-- it should scan in those too.  If yes, repeat with that container's contents.
+--
+-- Note that when looking for containers inside other containers, we only have
+-- the ObjectData and not the object.  If shouldScanContainer returns true for
+-- what turns out not to be a container, it is not scanned.
+--
+-- If shouldScanContainer wants to scan a nested container, that container must
+-- be unpacked before looking inside (don't worry, will put back when done).
 --
 --    --- Look inside this container?
 --    -- @param objectData table : see above.
---    -- @param parent : container this object lives in, may be nil.
 --    -- @return boolean : true if should inspect contents.
 --    shouldScanContainer(containerObjectData)
 --
+-- PHASE 2: SCANNING FOR OBJECTS
+--
+-- Now that phase 1 found all the places we want to look, scan the root and
+-- all phase 1 containers for objects.  Ask your PatchConfig.shouldPatch if
+-- an object should be patched.
+--
 --    --- Patch this object?
 --    -- @param objectData table : see above.
---    -- @param parent : container this object lives in, may be nil.
 --    -- @return boolean : true if should patch this object.
 --    shouldPatch(objectData)
 --
+-- PHASE 3: PATCHING
+--
+-- Patch each object found in phase 2.  In order to patch, unpack the object
+-- from its container if needed, then ask your PatchConfig.patch to update or
+-- replace the object.  This happens one object at a time, both to prevent a
+-- Deck from running out of Cards (and disappearing as a container), as well
+-- as to make it easier to identify which object patch is having problems when
+-- testing/debugging a PatchConfig.
+--
 --    --- Patch an object.
---    -- This function MUST return an object, either the given object
---    -- (either as-is or mutated somehow), or a new object which replaces
---    -- the original.  If replacing, the original object is deleted.
+--    --
+--    -- Given an object, mutate it in place or spawn a replacement then return
+--    -- the (new or mutated) object.  If this returns a new object, the old one
+--    -- gets deleted and replaced by the new.
+--    --
+--    -- Oh, and if the object is a Card from a Deck, the replacement MUST
+--    -- be a Card (or a Deck) in order to go back into the containing Deck.
+--    --
 --    -- @param object : the object being patched.
 --    -- @param objectData table : see above.
---    -- @return object : Object to use in place of the original.
+--    -- @return object : Object to use in place of the original, or nil/false.
 --    patch(object, objectData)
+--
+-- PHASE 4: CLEAN-UP AND FINISH
+--
+-- Now that patching is done, return any unpacked nested containers to their
+-- original homes, then call your PatchConfig.onFinish.
 --
 --    --- Notify when patch finishes.
 --    -- Perhaps the patch still needs to create some new objects, etc.
 --    onFinish()
---
--- Scan all objects, asking shouldPatchContainer() if it should scan inside.
--- Ask shouldPatchObject() if it should replace that object via patch().
 --
 -------------------------------------------------------------------------------
 
@@ -153,16 +192,9 @@ function CrLua.TTS.Patch._getObjectDataList(container)
     elseif container.tag == 'Checker' then
 
         -- A stack of checkers has a quantiy, but cannot getObjects into it.
-        -- Get each one via take with index.
-        result = {}
-        for i = container.getQuantity(), 1, -1 do
-            local object = container.takeObject({index = i})
-            assert(type(object) == 'userdata')
-            local objectData = CrLua.TTS.Patch._getObjectDataFromObject(object, 1)
-            objectData._container = container
-            CrLua.TTS.Patch._putObjectHelper(objectData)
-            result.append(objectData)
-        end
+        -- Container.takeObject also fails... require the patchConfig understand
+        -- that checker objects may have a quantity!
+        result = false
 
     elseif container.tag == 'Infinite' then
 
@@ -255,6 +287,13 @@ function CrLua.TTS.Patch._putObjectHelper(objectData)
     local container = objectData._container
     assert(type(object) == 'userdata')
     assert(type(container) == 'userdata')
+
+    -- If this was taken via _unpackAsync the object was temporarily locked
+    -- to keep it from falling (potentially into a bag or other container).
+    -- Restore locked state before put.
+    if type(objectData._originalLocked) == 'boolean' then
+        object.setLock(objectData._originalLocked)
+    end
 
     -- Object is going away, remove reference.
     objectData._object = nil
@@ -356,6 +395,7 @@ function CrLua.TTS.Patch._unpackContainers(containerObjectData, onFinishedFuncti
 
             end
         end
+
     end
 
     -- Remove the container we just scaned from the pending set (use special
@@ -427,8 +467,14 @@ function CrLua.TTS.Patch._patchAndReplaceObject(objectData)
 
     local object = objectData._object
     local newObject = data.patchConfig.patch(object, objectData)
+    newObject = newObject or object
     assert(newObject and type(newObject) == 'userdata')
     if newObject ~= object then
+        if objectData._container and objectData._container.tag == 'Deck' then
+            if newObject.tag ~= 'Card' and newObject.tag ~= 'Deck' then
+                error(TAG .. ': cannot replace a card in a deck with a non-card')
+            end
+        end
         destroyObject(object)
         object = newObject
         objectData._object = newObject
@@ -436,13 +482,20 @@ function CrLua.TTS.Patch._patchAndReplaceObject(objectData)
     end
     if objectData._container then
         assert(type(objectData._container) == 'userdata')
-        assert(type(objectData._originalLocked) == 'boolean')
-        objectData._object.setLock(objectData._originalLocked)
         CrLua.TTS.Patch._putObjectHelper(objectData)
     end
 end
 
+-------------------------------------------------------------------------------
+--- Patch!
+-- Scans all existing objects, asking patchConfig.shouldScanContainer if it
+-- should also scan that container.  If yes, repeat for its contents.
+-- After scanning is finished, ask patchPatchConfig.shouldPatchObject if each
+-- object should be patched (using ObjectData, in-container objects do not
+-- exist in the game yet).  If yes, spawn those objects and
+-------------------------------------------------------------------------------
 function CrLua.TTS.Patch.patch(patchConfig)
+    print(TAG .. '.patch: starting')
     CrLua.TTS.Patch._init(patchConfig)
 
     local function onPatchFinished()
@@ -481,6 +534,8 @@ function CrLua.TTS.Patch.patch(patchConfig)
     end
 
     local function onUnpackFinished()
+        print(TAG .. '.patch: scan finished, getting candidate objects')
+
         -- Get objectData for objects to patch.
         data.patchList = CrLua.TTS.Patch._getShouldPatch()
         local message = ''
@@ -491,6 +546,7 @@ function CrLua.TTS.Patch.patch(patchConfig)
             message = message .. '"' .. entry.name .. '"'
         end
         print(TAG .. '.patch: ' .. #data.patchList .. ' patch objects ' .. message)
+        print(TAG .. '.patch: starting patch!')
 
         -- Patch time!  Patch items one at a time, both to help debugging
         -- identify which object(s) are having trouble, as well as making

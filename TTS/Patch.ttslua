@@ -153,18 +153,28 @@ function CrLua.TTS.Patch._getObjectDataList(container)
     elseif container.tag == 'Checker' then
 
         -- A stack of checkers has a quantiy, but cannot getObjects into it.
-        result = false
+        -- Get each one via take with index.
+        result = {}
+        for i = container.getQuantity(), 1, -1 do
+            local object = container.takeObject({index = i})
+            assert(type(object) == 'userdata')
+            local objectData = CrLua.TTS.Patch._getObjectDataFromObject(object, 1)
+            objectData._container = container
+            CrLua.TTS.Patch._putObjectHelper(objectData)
+            result.append(objectData)
+        end
 
     elseif container.tag == 'Infinite' then
 
         -- Infinite containers are tricky.  They have a quantity but do not
         -- support getAllObjects().  Retrieve one object to create an
-        -- objectData from that live object, then put it back.
-        local object = container.takeObject({ index = 1 })
-        local objectData = CrLua.TTS.Patch._getObjectDataFromObject(object)
-        data.putGuidSet[object.getGUID()] = true
-        container.putObject(object)
-        objectData._object = nil  -- the associated object is back in container!
+        -- objectData from that live object, then delete it.
+        local function takeCallback(takeObject)
+            destroyObject(takeObject)
+        end
+        local object = container.takeObject({ index = 1, callback_function = takeCallback })
+        local objectData = CrLua.TTS.Patch._getObjectDataFromObject(object, 1)
+        objectData._object = nil
         result = { objectData }
 
     else
@@ -235,6 +245,30 @@ function CrLua.TTS.Patch._takeObjectAsync(objectData, callbackFunction, position
 end
 
 -------------------------------------------------------------------------------
+--- Object.putObject but also keep track of in-progress puts.
+-- @param container : game Object.
+-- @param object : game Object to put into container.
+-------------------------------------------------------------------------------
+function CrLua.TTS.Patch._putObjectHelper(objectData)
+    assert(type(objectData) == 'table')
+    local object = objectData._object
+    local container = objectData._container
+    assert(type(object) == 'userdata')
+    assert(type(container) == 'userdata')
+
+    -- Object is going away, remove reference.
+    objectData._object = nil
+
+    -- Keep track of outstanding puts.
+    data.putGuidSet[object.getGUID()] = true
+
+    if container.tag == 'Infinite' then
+        container.reset()
+    end
+    container.putObject(object)
+end
+
+-------------------------------------------------------------------------------
 --- Look for any "should unpack" containers inside this container, unpack them.
 -- Recurse and look inside those for nested containers that should also unpack.
 -- Because the recursive calls are async, this may still be working when the
@@ -272,9 +306,13 @@ function CrLua.TTS.Patch._unpackContainers(containerObjectData, onFinishedFuncti
 
         -- If non-root, put back.
         if containerObjectData._container then
-            data.putGuidSet[containerObjectData._object.getGUID()] = true
-            containerObjectData._container.putObject(containerObjectData._object)
-            containerObjectData._object = nil
+            -- If it came from an infinite container just delete it.
+            -- Otherwise put it back where it came from.
+            if containerObjectData._container.tag == 'Infinite' then
+                destroyObject(containerObjectData._object)
+            else
+                CrLua.TTS.Patch._putObjectHelper(containerObjectData)
+            end
         end
 
     elseif container and container.tag == 'Deck' then
@@ -341,8 +379,7 @@ function CrLua.TTS.Patch._repackContainers()
             assert(objectData._object and objectData._container)
             assert(type(objectData._originalLocked) == 'boolean')
             objectData._object.setLock(objectData._originalLocked)
-            objectData._container.putObject(objectData._object)
-            objectData._object = nil
+            CrLua.TTS.Patch._putObjectHelper(objectData)
         end
     end
 end
@@ -401,8 +438,7 @@ function CrLua.TTS.Patch._patchAndReplaceObject(objectData)
         assert(type(objectData._container) == 'userdata')
         assert(type(objectData._originalLocked) == 'boolean')
         objectData._object.setLock(objectData._originalLocked)
-        objectData._container.putObject(object)
-        objectData._object = nil
+        CrLua.TTS.Patch._putObjectHelper(objectData)
     end
 end
 

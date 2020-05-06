@@ -509,6 +509,8 @@ function CrLua.TTS.Patch.patch(patchConfig)
         end
     end
 
+    -- Unpack and patch the next should-patch entry.  Only patch one at a
+    -- time, call self again when each patch completes.
     local function patchNext()
         while #data.patchList > 0 do
             local objectData = table.remove(data.patchList)
@@ -556,6 +558,9 @@ function CrLua.TTS.Patch.patch(patchConfig)
         patchNext()
     end
 
+    -- If unpacking containers accidentally unpacks any non-containers it puts
+    -- them back where they came from.  Wait for those puts to finish before
+    -- moving on (otherwise getAllObjects might find them).
     local function waitForOutstandingPuts()
         for guid, _ in pairs(data.putGuidSet) do
             if not getObjectFromGUID(guid) then
@@ -568,4 +573,45 @@ function CrLua.TTS.Patch.patch(patchConfig)
     end
 
     CrLua.TTS.Patch._unpackContainers(nil, waitForOutstandingPuts)
+end
+
+-------------------------------------------------------------------------------
+--- Given an object, destroy it and return a new object with the given sript.
+-- Helper function for use by PatchConfig scripts.
+-- Note: it is safe to call destroyObject on the same object multiple times.
+-------------------------------------------------------------------------------
+function CrLua.TTS.Patch.patchReplaceLuaScript(object, newLuaScript)
+    -- There is an Object.setLuaScript method, but it seems dangerous to apply
+    -- it to an active object.  Instead, update the lua script in the JSON
+    -- representation of the object and instantiate a new one.
+    local savedState = object.onSave()
+
+    local json = object.getJSON()
+    json = JSON.decode(json)
+    json.LuaScript = newLuaScript
+    json.LuaState = savedState
+    json = JSON.encode_pretty(json)
+    local spawnParameters = {
+        json = json,
+        position = object.getPosition(),
+        rotation = object.getRotation(),
+        scale = object.getScale(),
+        callback_function = nil,
+        sound = false,
+        params = {},
+        snap_to_grid = object.use_grid
+    }
+    destroyObject(object)
+    return spawnObjectJSON(spawnParameters)
+end
+
+-------------------------------------------------------------------------------
+--- Given a lua script and start/end strings, strip out anything between them.
+-- Does not work with nested start/end tags.
+-- Helper function for use by PatchConfig scripts.
+-------------------------------------------------------------------------------
+function CrLua.TTS.Patch.removeFromLuaScript(luaScript, startClip, endClip)
+    local pattern = startClip .. '.+' .. endClip
+    local replaceWith = startClip .. ' ... ' .. endClip
+    return string.gsub(luaScript, pattern, replaceWith)
 end

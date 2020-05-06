@@ -1,0 +1,142 @@
+local TAG = 'TestPatch'
+
+-------------------------------------------------------------------------------
+
+local patchConfig = {}
+
+--- Look inside this container?
+-- @param objectData table : Object data.
+-- @return boolean : true if should inspect contents.
+function patchConfig.shouldScanContainer(containerObjectData)
+    -- Look inside all containers.
+    return true
+end
+
+--- Patch this object?
+-- @param objectData table : Object data.
+-- @return boolean : true if should patch this object.
+function patchConfig.shouldPatch(objectData)
+    -- This is only the ObjectData which does not have a tag.
+    -- For this demo go ahead and ask to patch everything, then in the patch
+    -- function only patch appropriately tagged objects.  In a game with named
+    -- objects this function could filter to objects with certain names.
+    return true
+end
+
+--- Patch an object.
+-- @param object : The game object being patched.
+-- @param objectData table : Object data.
+-- @return object : Original, mutated original, or replacement game Object.
+function patchConfig.patch(object, objectData)
+
+    local function chip3()
+
+        -- JSON needs to be fully filled in to spawn an object.  Could hard
+        -- code everything, but keep our footprint smaller by reading JSON
+        -- from another object and just tweaking the relevant fields.
+        --
+        -- Could get JSON from the to-be-replaced object for a typical patch,
+        -- but in this case spawn a different object, get its JSON, and destroy
+        -- it.  We will create the "real" new object afterward.
+        local v1 = spawnObject({
+            type              = 'Chip_10',
+            sound             = false,
+        })
+        local json = v1.getJSON()
+        destroyObject(v1)
+
+        json = JSON.decode(json)
+        json.Nickname = 'My Patched Object'
+        json.LuaScript = 'function onLoad() print("whoa") end'
+        json = JSON.encode(json)
+
+        local position = object.getPosition()
+        position.y = position.y + 2
+        return spawnObjectJSON({
+            json              = json,
+            position          = position,
+            rotation          = object.getRotation(),
+            scale             = object.getScale(),
+            callback_function = nil,
+            sound             = false,
+            params            = {},
+            snap_to_grid      = object.use_grid,
+        })
+    end
+
+    local container = objectData._container
+    local isInsideDeck = container and container.tag == 'Deck'
+
+    if object.tag == 'Card' and not isInsideDeck then
+        object = chip3(object)
+    elseif object.tag == 'Checker' then
+        local luaScript = 'function onLoad() print("I am a checker") end'
+        object = CrLua.TTS.Patch.patchReplaceLuaScript(object, luaScript)
+    end
+
+    return object
+end
+
+--- Do additional work?
+-- Perhaps create new objects and/or place them in containers?
+function patchConfig.doExtraPatchWork()
+    error("doExtraPatchWork called")
+end
+
+------------------------------------------------------------------------------
+
+function doTestPatch()
+    CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
+    CrLua.TTS.Patch.patch(patchConfig)
+end
+
+function onLoad(save_state)
+    local scale = { x = 10, y = 0.1, z = 10 }
+    local invScale = { x = 1 / scale.x, y = 1 / scale.y, z = 1 / scale.z }
+
+    self.setScale(scale)
+    self.clearButtons()
+
+    self.createButton({
+        click_function = 'doTestPatch',
+        function_owner = self,
+        label = 'TEST\nPATCH',
+        scale = invScale,
+        font_size = 400,
+        position = { x = 0, y = 1, z = 0 },
+        width = 2000,
+        height = 1000,
+        tooltip = 'start patch'
+    })
+end
+
+function onDrop()
+    CrLua.Log.d(TAG, 'onDrop')
+end
+
+function onObjectPickUp(color, object)
+    CrLua.Log.d(TAG, 'onObjectPickUp tag=' .. object.tag .. ' guid=' .. object.guid)
+end
+
+function onObjectHover(playerColor, hoverObject)
+    if hoverObject then
+        CrLua.Log.d(TAG, 'onObjectHover tag=' .. hoverObject.tag)
+    end
+end
+-------------------------------------------------------------------------------
+
+#include <~/CrLua/CrLua>
+#include <~/CrLua/LockGlobals>
+
+#include <~/CrLua/LockTable>
+#include <~/CrLua/Log>
+#include <~/CrLua/Kruft/Spiral>
+#include <~/CrLua/TTS/Patch>
+#include <~/CrLua/TTS/Throttle>
+
+#include <~/CrLua/UnitTest>
+CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
+CrLua.UnitTest.runTests('CrLua', CrLua, true)
+
+CrLua.assertRequired() -- do this BEFORE lock
+CrLua.lock()

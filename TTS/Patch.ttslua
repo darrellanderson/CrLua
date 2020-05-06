@@ -1,0 +1,479 @@
+-------------------------------------------------------------------------------
+--- Patch existing TTS objects.
+-- @author bonkersbgg on BoardGameGeek.com
+--
+-- Create a 'patch config' table with functions to control the patch.
+-- Most functions get an 'objectData' argument, which is a standard
+-- Object.getObjects() result with { name, description, guid, ... } plus
+-- an additional _container field with the Object the ObjectData is inside
+-- (such as a Bag or Deck).
+--
+--    --- Look inside this container?
+--    -- @param objectData table : see above.
+--    -- @param parent : container this object lives in, may be nil.
+--    -- @return boolean : true if should inspect contents.
+--    shouldScanContainer(containerObjectData)
+--
+--    --- Patch this object?
+--    -- @param objectData table : see above.
+--    -- @param parent : container this object lives in, may be nil.
+--    -- @return boolean : true if should patch this object.
+--    shouldPatch(objectData)
+--
+--    --- Patch an object.
+--    -- This function MUST return an object, either the given object
+--    -- (either as-is or mutated somehow), or a new object which replaces
+--    -- the original.  If replacing, the original object is deleted.
+--    -- @param object : the object being patched.
+--    -- @param objectData table : see above.
+--    -- @return object : Object to use in place of the original.
+--    patch(object, objectData)
+--
+--    --- Notify when patch finishes.
+--    -- Perhaps the patch still needs to create some new objects, etc.
+--    onFinish()
+--
+-- Scan all objects, asking shouldPatchContainer() if it should scan inside.
+-- Ask shouldPatchObject() if it should replace that object via patch().
+--
+-------------------------------------------------------------------------------
+
+local TAG = 'CrLua.TTS.Patch'
+
+CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
+CrLua.TTS = CrLua.TTS or {}
+CrLua.TTS.Patch = assert(not CrLua.TTS.Patch) and {
+    _require = { 'Log', 'Kruft.Spiral' }
+}
+
+-- Keep track of {
+-- - patchConfig table : see top-most comment for description.
+-- - unpackPendingSet table : ObjectData waiting for or currently being unpacked.
+-- - unpackedContainers table : list of containers unpacked from other containers.
+-- - putGuidSet table : GUIDs of objects put into containers.
+-- - sprial : place objects in a spiral pattern so they don't pile up.
+-- - patchList : list of ObjectData for items to patch.
+-- }
+local data = false
+
+-------------------------------------------------------------------------------
+--- Prepare for a fresh scan.
+-- @param patchConfig table : functions to control what gets scanned/patched.
+-------------------------------------------------------------------------------
+function CrLua.TTS.Patch._init(patchConfig)
+    assert(type(patchConfig) == 'table')
+    assert(type(patchConfig.shouldScanContainer) == 'function')
+    assert(type(patchConfig.shouldPatch) == 'function')
+
+    if CrLua.TTS.Patch._isWorking() then
+        error(TAG .. ' patch in progress, wait for it to finish before re-init')
+    end
+
+    data = {
+        patchConfig = patchConfig,
+        unpackPendingSet = {},
+        unpackedContainers = {},
+        putGuidSet = {},
+        spiral = CrLua.Kruft.Spiral.new(3, 3, 5),
+        patchPosition = { x = 0, y = 10, z = 0 },
+        patchList = {}
+    }
+end
+
+-------------------------------------------------------------------------------
+--- Clear any local data.
+-------------------------------------------------------------------------------
+function CrLua.TTS.Patch._clear()
+    data = false
+end
+
+-------------------------------------------------------------------------------
+--- Is an async operation still in progress?
+-- @return boolean : true if still working.
+-------------------------------------------------------------------------------
+function CrLua.TTS.Patch._isWorking()
+    if not data then
+        return false
+    end
+    for _, _ in pairs(data.unpackPendingSet) do
+        return true
+    end
+    return false
+end
+
+-------------------------------------------------------------------------------
+--- Get an Object.getObjects() like entry for an existing object.
+-- Store the object itself in an extra _object field.
+-- @param object : game Object.
+-- @param index : optional index, fills result.index.
+-- @return ObjectData table.
+-------------------------------------------------------------------------------
+function CrLua.TTS.Patch._getObjectDataFromObject(object, index)
+    assert(type(object) == 'userdata')
+    assert(index == nil or type(index) == 'number' and index > 0)
+    return {
+        index = index,
+        name = object.getName(),
+        description = object.getDescription(),
+        guid = object.getGUID(),
+        lua_script = object.script_code,
+        lua_script_state = object.script_state,
+
+        -- Add the object to the object data.
+        _object = object,
+    }
+end
+
+-------------------------------------------------------------------------------
+--- Get Object.getObjects() entries from container, or all live objects if nil.
+-- Store the container in a new _container field.
+-- @param container : game Object or nil.
+-- @return table : {name, guid, ...} table, or false if not a container.
+-------------------------------------------------------------------------------
+function CrLua.TTS.Patch._getObjectDataList(container)
+    assert(not container or type(container) == 'userdata')
+    local result = false
+
+    if not container then
+
+        -- If no container then get all objects.
+        result = {}
+        for i, object in ipairs(getAllObjects()) do
+            -- Ignore live objects currently being put into a container.
+            if not data.putGuidSet[object.getGUID()] then
+                table.insert(result, CrLua.TTS.Patch._getObjectDataFromObject(object, i))
+            end
+        end
+
+    elseif container.getQuantity() < 0 then
+
+        -- Not a container.
+        result = false
+
+    elseif container.tag == 'Checker' then
+
+        -- A stack of checkers has a quantiy, but cannot getObjects into it.
+        result = false
+
+    elseif container.tag == 'Infinite' then
+
+        -- Infinite containers are tricky.  They have a quantity but do not
+        -- support getAllObjects().  Retrieve one object to create an
+        -- objectData from that live object, then put it back.
+        local object = container.takeObject({ index = 1 })
+        local objectData = CrLua.TTS.Patch._getObjectDataFromObject(object)
+        data.putGuidSet[object.getGUID()] = true
+        container.putObject(object)
+        objectData._object = nil  -- the associated object is back in container!
+        result = { objectData }
+
+    else
+
+        -- Otherwise this is a normal container.  Well, it might not be.
+        -- If getObjects fails it will print an error message and return nil,
+        -- in that case act as if this was an empty container and continue.
+        result = container.getObjects()
+        if not result then
+            print('Unable to get object in "' .. container.getName() .. '" (tag=' .. container.tag .. ')')
+        end
+
+    end
+
+    -- Add the container to each object data entry.
+    if result then
+        for _, objectData in ipairs(result) do
+            objectData._container = container
+        end
+    end
+
+    return result
+end
+
+-------------------------------------------------------------------------------
+--- Remove an object from its container.
+-- Container game Object is objectData._container.
+-- @param objectData table : object data, _object field is set when available.
+-- @param callbackFunction function : called with objectData as lone argument.
+-- @param position table : optional position, otherwise place in a spiral.
+-- @return object : game Object being taken, may still be loading.
+-------------------------------------------------------------------------------
+function CrLua.TTS.Patch._takeObjectAsync(objectData, callbackFunction, position)
+    assert(type(objectData) == 'table')
+    assert(objectData.guid)
+    assert(not objectData._object, 'already has object!')
+    assert(type(objectData._container) == 'userdata')
+    assert(type(callbackFunction) == 'function')
+
+    local function takeFinishedCallback(takeObject)
+        assert(type(takeObject) == 'userdata')
+        assert(objectData._object == takeObject)
+
+        -- Update objectData.guid in case unpack changed it.
+        objectData.guid = takeObject.getGUID()
+
+        -- Lock it in place (to keep it from falling into a bag).
+        objectData._originalLocked = takeObject.getLock() or false
+        takeObject.setLock(true)
+
+        if callbackFunction then
+            callbackFunction(objectData)
+        end
+    end
+
+    -- Taking the last object from a deck is problematic.  After the second-last
+    -- item is removed the deck gets replaced by its last entry.  Avoid this by
+    -- using a get-patch-put cycle so this does not happen.
+    local object = objectData._container.takeObject({
+        guid = objectData.guid,
+        position = position or CrLua.Kruft.Spiral.nextPosition(data.spiral),
+        callback_function = takeFinishedCallback
+    })
+
+    -- Store the loading object in a new _object field, also return to caller.
+    objectData._object = object
+    return object
+end
+
+-------------------------------------------------------------------------------
+--- Look for any "should unpack" containers inside this container, unpack them.
+-- Recurse and look inside those for nested containers that should also unpack.
+-- Because the recursive calls are async, this may still be working when the
+-- function returns.
+-- As a side effect, unpacked containers get added to the _unpackedContainers
+-- list in unpack order.
+-- @param container : game Object.
+-------------------------------------------------------------------------------
+function CrLua.TTS.Patch._unpackContainers(containerObjectData, onFinishedFunction)
+    local container = containerObjectData and containerObjectData._object
+    assert(not container or type(container) == 'userdata')
+    assert(type(onFinishedFunction) == 'function')
+
+    local name = container and container.getName() or '<nil>'
+
+    assert(data.patchConfig, 'need to init first')
+
+    -- Store a special 'true' key for the root container.
+    if not containerObjectData then
+        data.unpackPendingSet[true] = true
+    end
+
+    -- Get objects in the container, or "get all objects" if no container.
+    -- ("get all objects" does not look inside containers.)  This will be
+    -- 'false' if the object is not actually a container.
+    local objectDataList = CrLua.TTS.Patch._getObjectDataList(container)
+
+    -- We did not have an object when asking shouldScanContainer, only the
+    -- ObjectData fields.  It is possible it decided to scan a non-container
+    -- (a simple PatchConfig might be lazy and just say yes scan everything).
+    -- If the container is not actually a container put it back now.
+    if not objectDataList then
+
+        assert(containerObjectData and containerObjectData._object)
+
+        -- If non-root, put back.
+        if containerObjectData._container then
+            data.putGuidSet[containerObjectData._object.getGUID()] = true
+            containerObjectData._container.putObject(containerObjectData._object)
+            containerObjectData._object = nil
+        end
+
+    elseif container and container.tag == 'Deck' then
+
+        -- Decks cannot contain other containers.  Remember we have it, but no
+        -- need to inspect contents here (do so when looking for patch items).
+        table.insert(data.unpackedContainers, containerObjectData)
+
+    else
+
+        -- This is a normal container.
+        table.insert(data.unpackedContainers, containerObjectData)
+
+        -- Ask patchConfig if the scan should descend into nested containers.
+        -- Scan in reverse order, because unpacking an item invalidates any
+        -- later "index" in the objectDataList entries.  The internal takeObject
+        -- does so by guid, but who knows what the patchConfig.shouldScanContainer
+        -- is up to.  Be paranoid and have valid index values when calling.
+        for i = #objectDataList, 1, -1 do
+            local objectData = objectDataList[i]
+
+            -- Should we scan inside this (potentially a) container?  If yes,
+            -- unpack it and when ready call unpackContainer on it.
+            if data.patchConfig.shouldScanContainer(objectData) then
+                data.unpackPendingSet[objectData] = true
+
+                if not objectData._container then
+                    -- Root objects are already unpacked.  No need to add them
+                    -- to the unpacked containers list as they do not need to
+                    -- be put back.  Scan them without unpacking.
+                    assert(objectData._object)
+                    CrLua.TTS.Patch._unpackContainers(objectData, onFinishedFunction)
+                else
+                    -- After takeObject instantates the object, try to unpack it.
+                    local function callBackFunction(unpackedObjectData)
+                        assert(unpackedObjectData == objectData)
+                        CrLua.TTS.Patch._unpackContainers(unpackedObjectData, onFinishedFunction)
+                    end
+                    CrLua.TTS.Patch._takeObjectAsync(objectData, callBackFunction)
+                end
+
+            end
+        end
+    end
+
+    -- Remove the container we just scaned from the pending set (use special
+    -- 'true' key for the root container).
+    data.unpackPendingSet[containerObjectData or true] = nil
+
+    -- If no longer working then all (should-scan) objects have been unpacked.
+    -- Proceed to the patch stage.
+    if not CrLua.TTS.Patch._isWorking() then
+        onFinishedFunction()
+    end
+end
+
+-------------------------------------------------------------------------------
+--- Return unpacked containers to their parent containers.
+-------------------------------------------------------------------------------
+function CrLua.TTS.Patch._repackContainers()
+    for i = #data.unpackedContainers, 1, -1 do
+        local objectData = data.unpackedContainers[i]
+        if objectData._container then
+            assert(objectData._object and objectData._container)
+            assert(type(objectData._originalLocked) == 'boolean')
+            objectData._object.setLock(objectData._originalLocked)
+            objectData._container.putObject(objectData._object)
+            objectData._object = nil
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
+--- After all containers are unpacked, get the list of ObjectData items that
+-- the PatchConfig wants to patch.
+-- @return table : list of ObjectData tables.
+-------------------------------------------------------------------------------
+function CrLua.TTS.Patch._getShouldPatch()
+    local result = {}
+
+    -- Scan all live objects, including any nested containers we unpacked.
+    for i, object in ipairs(getAllObjects()) do
+        local childObjectDataList = CrLua.TTS.Patch._getObjectDataList(object)
+
+        -- If this object is a container, check its contents.  Otherwise
+        -- is is not a container, check the object.  (Do not check container
+        -- objects themselves, only their non-container children.)
+        if childObjectDataList then
+            -- Check contents.
+            for _, childObjectData in ipairs(childObjectDataList) do
+                if data.patchConfig.shouldPatch(childObjectData) then
+                    table.insert(result, childObjectData)
+                end
+            end
+        else
+            -- Check the object itself.
+            local objectData = CrLua.TTS.Patch._getObjectDataFromObject(object, i)
+            if data.patchConfig.shouldPatch(objectData) then
+                table.insert(result, objectData)
+            end
+        end
+    end
+
+    return result
+end
+
+-------------------------------------------------------------------------------
+--- Patch this object, then put it back where it came from.
+-- @param objectData table.
+-------------------------------------------------------------------------------
+function CrLua.TTS.Patch._patchAndReplaceObject(objectData)
+    assert(type(objectData) == 'table' and type(objectData._object) == 'userdata')
+
+    local object = objectData._object
+    local newObject = data.patchConfig.patch(object, objectData)
+    assert(newObject and type(newObject) == 'userdata')
+    if newObject ~= object then
+        destroyObject(object)
+        object = newObject
+        objectData._object = newObject
+        objectData.guid = newObject.getGUID()
+    end
+    if objectData._container then
+        assert(type(objectData._container) == 'userdata')
+        assert(type(objectData._originalLocked) == 'boolean')
+        objectData._object.setLock(objectData._originalLocked)
+        objectData._container.putObject(object)
+        objectData._object = nil
+    end
+end
+
+function CrLua.TTS.Patch.patch(patchConfig)
+    CrLua.TTS.Patch._init(patchConfig)
+
+    local function onPatchFinished()
+        CrLua.TTS.Patch._repackContainers()
+        CrLua.TTS.Patch._clear()
+
+        print(TAG .. '.patch: finished')
+
+        if patchConfig.onFinish then
+            patchConfig.onFinish()
+        end
+    end
+
+    local function patchNext()
+        while #data.patchList > 0 do
+            local objectData = table.remove(data.patchList)
+            if objectData._object then
+                -- The object is already live.  Patch it now.
+                CrLua.TTS.Patch._patchAndReplaceObject(objectData)
+            else
+                -- The object is still inside a container.  Unpack it, patch,
+                -- then call this function again to keep going.  Exit this
+                -- function, it will get called again when unpack is ready.
+                local function takeCallback(unpackedObjectData)
+                    assert(unpackedObjectData == objectData)
+                    CrLua.TTS.Patch._patchAndReplaceObject(objectData)
+                    patchNext()
+                end
+                CrLua.TTS.Patch._takeObjectAsync(objectData, takeCallback, data.patchPosition)
+                return
+            end
+        end
+
+        -- If we got here, patch is done!
+        onPatchFinished()
+    end
+
+    local function onUnpackFinished()
+        -- Get objectData for objects to patch.
+        data.patchList = CrLua.TTS.Patch._getShouldPatch()
+        local message = ''
+        for i, entry in ipairs(data.patchList) do
+            if i > 1 then
+                message = message .. ', '
+            end
+            message = message .. '"' .. entry.name .. '"'
+        end
+        print(TAG .. '.patch: ' .. #data.patchList .. ' patch objects ' .. message)
+
+        -- Patch time!  Patch items one at a time, both to help debugging
+        -- identify which object(s) are having trouble, as well as making
+        -- sure a deck is never fully exhausted and thus replaced with the
+        -- last card.  That could probably be addressed by cloning one card
+        -- and inserting it as a kind of sentinel, but keep it simple...ish.
+        patchNext()
+    end
+
+    local function waitForOutstandingPuts()
+        for guid, _ in pairs(data.putGuidSet) do
+            if not getObjectFromGUID(guid) then
+                data.putGuidSet[guid] = nil
+                Wait.frames(waitForOutstandingPuts, 10)
+                return
+            end
+        end
+        onUnpackFinished()
+    end
+
+    CrLua.TTS.Patch._unpackContainers(nil, waitForOutstandingPuts)
+end

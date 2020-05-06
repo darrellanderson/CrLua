@@ -1,0 +1,175 @@
+-------------------------------------------------------------------------------
+--- Use TTS 'Wait' to throttle queued functions.
+-- @author bonkersbgg on BoardGameGeek.com
+-------------------------------------------------------------------------------
+
+local TAG = 'CrLua.TTS.Throttle'
+
+CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
+CrLua.TTS = CrLua.TTS or {}
+CrLua.TTS.Throttle = assert(not CrLua.TTS.Throttle) and {
+    _require = {},
+    _data = { first = false, last = false, waitId = false }
+}
+
+function CrLua.TTS.Throttle.hasPending(tag)
+    assert(not tag or type(tag) == 'string')
+
+    local data = CrLua.TTS.Throttle._data
+    local entry = data.first
+    while entry do
+        if (not tag) or entry.tag == tag then
+            return true
+        end
+        entry = entry.next
+    end
+    return false
+end
+
+function CrLua.TTS.Throttle.removePending(tag)
+    assert(not tag or type(tag) == 'string')
+
+    local data = CrLua.TTS.Throttle._data
+    local entry = data.first
+    local prev = false
+    while entry do
+        if (not tag) or entry.tag == tag then
+            if prev then
+                assert(data.first ~= entry)
+                prev.next = entry.next
+            else
+                assert(data.first == entry)
+                data.first = entry.next
+            end
+            if entry == data.last then
+                data.last = prev
+            end
+        else
+            prev = entry
+        end
+        entry = entry.next
+    end
+end
+
+function CrLua.TTS.Throttle.throttle(tag, runFunction, parameters)
+    assert(type(tag) == 'string' and type(runFunction) == 'function')
+
+    local wasPending = CrLua.TTS.Throttle.hasPending()
+    CrLua.TTS.Throttle._enqueue(tag, runFunction, parameters)
+
+    -- If there was something pending before we added an item the service
+    -- "thread" is already active.  Otherwise start it now.
+    if not wasPending then
+        CrLua.TTS.Throttle._scheduleServiceQueue()
+    end
+end
+
+function CrLua.TTS.Throttle._enqueue(tag, runFunction, parameters)
+    assert(type(tag) == 'string' and type(runFunction) == 'function')
+
+    local entry = {
+        tag = tag,
+        runFunction = runFunction,
+        parameters = parameters,
+        next = false
+    }
+
+    local data = CrLua.TTS.Throttle._data
+    if data.last then
+        data.last.next = entry
+    else
+        assert(not data.first)
+        data.first = entry
+    end
+    data.last = entry
+end
+
+function CrLua.TTS.Throttle._dequeue()
+    local data = CrLua.TTS.Throttle._data
+    if not data.first then
+        assert(not data.last)
+        return false
+    end
+    local result = data.first
+    if result == data.last then
+        assert(data.first == data.last)
+        data.first = false
+        data.last = false
+    else
+        data.first = result.next
+    end
+    result.next = nil
+    return result
+end
+
+function CrLua.TTS.Throttle._scheduleServiceQueue()
+    local data = CrLua.TTS.Throttle._data
+    assert(not data.waitId)
+    data.waitId = Wait.frames(CrLua.TTS.Throttle._serviceQueue, 2)
+end
+
+function CrLua.TTS.Throttle._serviceQueue()
+    local data = CrLua.TTS.Throttle._data
+    assert(data.waitId)
+    data.waitId = false
+
+    -- Run functions in FIFO order.
+    local entry = CrLua.TTS.Throttle._dequeue()
+    if entry then
+        entry.runFunction(entry.parameters)
+    end
+
+    -- If there are more, schedule self to run again soon.
+    if CrLua.TTS.Throttle.hasPending() then
+        CrLua.TTS.Throttle._scheduleServiceQueue()
+    end
+end
+
+function CrLua.TTS.Throttle._testQueue()
+    local function dummy() end
+
+    CrLua.TTS.Throttle.removePending()
+    local data = CrLua.TTS.Throttle._data
+    assert(not data.first, 'data.first? ' .. tostring(data.first and data.first.tag))
+    assert(not data.last, 'data.last? ' .. tostring(data.last and data.last.tag))
+
+    assert(not CrLua.TTS.Throttle._dequeue())
+
+    -- Enqueue, dequeue.
+    CrLua.TTS.Throttle._enqueue('a', dummy)
+    CrLua.TTS.Throttle._enqueue('b', dummy)
+    assert(CrLua.TTS.Throttle._dequeue().tag == 'a')
+    assert(CrLua.TTS.Throttle._dequeue().tag == 'b')
+    assert(not CrLua.TTS.Throttle._dequeue())
+
+    -- IsPending, removePending.
+    CrLua.TTS.Throttle._enqueue('a', dummy)
+    CrLua.TTS.Throttle._enqueue('b', dummy)
+    assert(CrLua.TTS.Throttle.hasPending())
+    assert(CrLua.TTS.Throttle.hasPending('a'))
+    assert(CrLua.TTS.Throttle.hasPending('b'))
+
+    CrLua.TTS.Throttle.removePending('a')
+    assert(CrLua.TTS.Throttle.hasPending())
+    assert(not CrLua.TTS.Throttle.hasPending('a'), 'a')
+    assert(CrLua.TTS.Throttle.hasPending('b'), 'b')
+
+    assert(CrLua.TTS.Throttle._dequeue().tag == 'b')
+    assert(not CrLua.TTS.Throttle.hasPending())
+    assert(not CrLua.TTS.Throttle.hasPending('a'))
+    assert(not CrLua.TTS.Throttle.hasPending('b'))
+    assert(not CrLua.TTS.Throttle._dequeue())
+
+    -- Again, but remove second instead of first.
+    CrLua.TTS.Throttle._enqueue('a', dummy)
+    CrLua.TTS.Throttle._enqueue('b', dummy)
+    CrLua.TTS.Throttle.removePending('b')
+    assert(CrLua.TTS.Throttle._dequeue().tag == 'a')
+    assert(not CrLua.TTS.Throttle._dequeue())
+
+    -- Again, but remove all.
+    CrLua.TTS.Throttle._enqueue('a', dummy)
+    CrLua.TTS.Throttle._enqueue('b', dummy)
+    CrLua.TTS.Throttle.removePending()
+    assert(not CrLua.TTS.Throttle._dequeue())
+end

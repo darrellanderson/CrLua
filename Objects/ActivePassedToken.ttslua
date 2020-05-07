@@ -344,19 +344,13 @@ function onLoad(save_state)
             CrLua.Log.setLogLevel(originalLogLevel)
         end
 
+        -- Replace event functions so this object by itself is ONLY used for patching.
+        -- This chunk of code (between the 'strip' tags) gets removed in patch version.
+        function onPlayerTurnStart(playerColorStart, playerColorPrevious) end
+
     end
 end
 originalOnLoad = nil
-
--- Replace event functions so this object by itself is ONLY used for patching.
--- This chunk of code (between the 'strip' tags) gets removed in patch version.
-if true then
-    local mt = getmetatable(_G)
-    setmetatable(_G)
-    function onPlayerChangeColor(playerColor) end
-    function onPlayerTurnStart(playerColorStart, playerColorPrevious) end
-    setmetatable(_G, mt)
-end
 
 --</strip>--
 

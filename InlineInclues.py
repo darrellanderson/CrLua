@@ -25,6 +25,7 @@ def process(filename, wrapInDoEnd):
     sys.stdout.write(delim)
     sys.stdout.write('-- #### START #include <' + filename + '>\n')
     sys.stdout.write(delim)
+    sys.stdout.write('\n')
 
     if wrapInDoEnd:
         sys.stdout.write('do\n')
@@ -49,6 +50,7 @@ def process(filename, wrapInDoEnd):
         sys.stdout.write('\n')
         sys.stdout.write('end\n')
 
+    sys.stdout.write('\n')
     sys.stdout.write(delim)
     sys.stdout.write('-- #### END #include <' + filename + '>\n')
     sys.stdout.write(delim)

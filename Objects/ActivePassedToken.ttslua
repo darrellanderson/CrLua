@@ -12,38 +12,20 @@
 
 local TAG = 'ActivePassedToken'
 
-local data = {
-    -- This token belongs to which seated player (string).
-    ownerPlayerColor = nil,
-
-    -- Reset when turns get enabled again (boolean).
-    needsReset = false,
-
-    -- Use TI4 zone, or seated player locations to assign color?
-    -- (Initially nil, set to true or false to choose TI4 zone or seat location.)
-    useTI4Zones = nil,
-}
-
 -------------------------------------------------------------------------------
 -- OBJECT EVENT METHODS
 
 function onLoad()
-    CrLua.Log.d(TAG, 'onLoad')
-end
-
-function onDrop(playerColor)
-    resetTokenForNewOwner()
-end
-
-function onPlayerChangeColor(playerColor)
-    resetTokenForNewOwner()
+    -- If this is a copy/paste, reset name on new object.
+    self.setName(defaultObjectName())
+    CrLua.Log.d(TAG, 'onLoad "' .. (self.getName() or '') .. '"')
 end
 
 function onPlayerTurnStart(playerColorStart, playerColorPrevious)
     CrLua.Log.d(TAG, 'onPlayerTurnStart ' .. playerColorStart)
 
-    -- If not yet assigned to a player, do so now.
-    if not data.ownerPlayerColor then
+    -- If not yet assigned to a player, attempt to do so now.
+    if not myColor() then
         resetTokenForNewOwner()
     end
 
@@ -56,10 +38,44 @@ end
 
 -------------------------------------------------------------------------------
 
+--- Get the color from an Active/Passed token object name.
+-- @param name string : game Object name.
+-- @return color string : color, or nil if not valid.
+function objectNameToColor(name)
+    -- All possible player colors (including "spectators").
+    local validColorNames = {
+        White = true, Brown = true, Red = true, Orange = true, Yellow = true,
+        Green = true, Teal = true, Blue = true, Purple = true, Pink = true,
+        Grey = true, Black = true
+    }
+    local color = string.match(name, '^Active/Passed %((%a+)%)$')
+    return validColorNames[color] and color
+end
+
+--- Get an Active/Passed token object name for the given color.
+function colorToObjectName(color)
+    return string.format('Active/Passed (%s)', color or 'unassigned')
+end
+
+function defaultObjectName()
+    return colorToObjectName()
+end
+
+function myColor()
+    return objectNameToColor(self.getName())
+end
+
+-------------------------------------------------------------------------------
+
 --- Is this object an Active/Passed token?
+-- @param name string : peer game Object name.
 -- @return boolean true if peer.
-function isPeer(object)
-    return object.getName() == self.getName()
+function isPeerName(name)
+    local color = objectNameToColor(name)
+    if color then
+        CrLua.Log.d(TAG, 'isPeer found ' .. color)
+    end
+    return color and true
 end
 
 --- Get all Active/Passed tokens on the board.
@@ -68,7 +84,7 @@ end
 function getPeers(includeSelf)
     local result = {}
     for _, object in ipairs(getAllObjects()) do
-        if isPeer(object) and (object ~= self or includeSelf) then
+        if isPeerName(object.getName()) and (object ~= self or includeSelf) then
             table.insert(result, object)
         end
     end
@@ -82,7 +98,7 @@ function sanityCheckPeersWithIncludeSelf(peers)
     local result = true
     local colorCount = {}
     for _, peer in ipairs(peers) do
-        local color = playerColorAtPosition(peer.getPosition())
+        local color = objectNameToColor(peer.getName())
         if color then
             colorCount[color] = (colorCount[color] or 0) + 1
         end
@@ -139,7 +155,7 @@ end
 --- Is the current turn the player who owns this token?
 -- @return boolean true if my turn.
 function isMyTurn()
-    local result = Turns.enable and Turns.turn_color == data.ownerPlayerColor
+    local result = Turns.enable and Turns.turn_color == myColor()
     CrLua.Log.d(TAG, 'isMyTurn -> ' .. tostring(result))
     return result
 end
@@ -149,15 +165,19 @@ end
 --- Assign this to the closest seated player.
 -- Also tints the side of the token for a visual confirmation.
 function resetTokenForNewOwner()
-    local playerColor = playerColorAtPosition(self.getPosition())
-
-    if playerColor == data.ownerPlayerColor then
+    local oldColor = myColor()
+    local newColor = playerColorAtPosition(self.getPosition())
+    if newColor == oldColor then
         return
     end
 
-    CrLua.Log.d(TAG, 'resetTokenForNewOwner ' .. (playerColor or '<nil>'))
-    data.ownerPlayerColor = playerColor
-    self.setColorTint(data.ownerPlayerColor or 'Grey')
+    -- Tint this object to indicate color.
+    CrLua.Log.d(TAG, 'resetTokenForNewOwner ' .. (oldColor or '<nil>') .. ' -> ' .. (newColor or '<nil>'))
+    self.setColorTint(newColor or 'Grey')
+
+    -- Also rename self.
+    local name = colorToObjectName(newColor)
+    self.setName(name)
 end
 
 --- Pass turn if this token is set to "passed".  If all tokens are set to
@@ -189,15 +209,16 @@ function maybePassTurn()
     -- (Requires external event to re-enable turns.)
     -- Note: if the sanity check failed then there is not one token per player.
     -- In that case, continue to pass turns but do not consider "all" passed.
+    local myColor = myColor()
     if anyPeerIsActive(peers) or not sanityCheck then
         CrLua.Log.d(TAG, 'maybePassTurn: at least one active peer, passing turn')
-        local player = Player[data.ownerPlayerColor]
-        local name = (player and player.steam_name) or data.ownerPlayerColor
-        broadcastToAll('Player ' .. name .. ' passed.', data.ownerPlayerColor)
+        local player = Player[myColor]
+        local name = (player and player.steam_name) or myColor or '?'
+        broadcastToAll('Player ' .. name .. ' passed.', myColor)
         Turns.turn_color = Turns.getNextTurnColor()
     else
         CrLua.Log.d(TAG, 'maybePassTurn: no active peers, disabling turns')
-        broadcastToAll('All players have passed.', data.ownerPlayerColor)
+        broadcastToAll('All players have passed.', myColor)
         resetPeersWithIncludeSelf(peers)
         Turns.enable = false
     end
@@ -210,27 +231,22 @@ end
 -- @param position table : {x,y,z} table.
 -- @return color string : player at postition, or nil if none.
 function playerColorAtPosition(position)
-    -- Detect and apply TI4 zones (cache for later use).
-    if data.useTI4Zones == nil then
-        local updatedZones = CrLua.TI4.Zone.updateZones()
-        data.useTI4Zones = (updatedZones and true) or false
-        CrLua.Log.d(TAG, 'useTI4Zones=' .. tostring(data.useTI4Zones))
-    end
-
-    -- If we have TI4 zones, use them.  Otherwise use closest seated player.
-    -- With TI4 zones, it is possible a token is not in any player's zone!
-    local playerColor
-    if data.useTI4Zones then
-        local zone = CrLua.TI4.Zone.insideWhichPlayerZone(position)
-        playerColor = zone and CrLua.TI4.Zone.color(zone)
-    else
-        playerColor = CrLua.TTS.Player.closest(position)
-    end
+    local playerColor = CrLua.TTS.Player.closest(position)
     CrLua.Log.d(TAG, 'playerColorAtPosition -> ' .. (playerColor or '<nil>'))
     return playerColor
 end
 
 -------------------------------------------------------------------------------
+
+local patchConfig = {}
+function doPatch()
+    if not patchConfig then
+        error(TAG .. ': already patched')
+    end
+    local originalPatchConfig = patchConfig
+    patchConfig = false
+    CrLua.TTS.Patch.patch(originalPatchConfig)
+end
 
 #include <~/CrLua/CrLua>
 #include <~/CrLua/LockGlobals>
@@ -241,12 +257,108 @@ end
 #include <~/CrLua/Polygon>
 #include <~/CrLua/Util>
 #include <~/CrLua/TTS/Player>
-#include <~/CrLua/TI4/Zone>
 
 --[[
 #include <~/CrLua/UnitTest>
 CrLua.UnitTest.runTests('CrLua', CrLua, true)
 --]]
+
+--<strip>--
+
+#include <~/CrLua/Kruft/Spiral>
+#include <~/CrLua/TTS/Patch>
+
+-- Interpose on top of any onLoad function to do addional setup.
+local originalOnLoad = onLoad
+function onLoad(save_state)
+    if originalOnLoad then
+        originalOnLoad()
+    end
+
+    if true or self.getName() == 'Active/Passed Patcher' then
+
+        local originalLogLevel = CrLua.Log.getLogLevel()
+        --CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
+
+        CrLua.Log.d(TAG, 'adding patch button')
+        self.createButton({
+            click_function = 'doPatch',
+            function_owner = self,
+            label          = 'PATCH\nACTIVE/PASSED\nTOKENS',
+            position       = { x = 0, y = 0.2, z = 0 },
+            rotation       = nil, -- Vector,
+            scale          = nil, -- Vector,
+            width          = 1100, -- int,
+            height         = 600, -- int,
+            font_size      = 150, -- int,
+            color          = nil, -- Color,
+            font_color     = nil, -- Color,
+            tooltip        = 'Locate and patch Active/Passed tokens to this version'
+        })
+
+        -- Replace the lua script in patched objects with this object's script,
+        -- but first removing the between-strip-tags content.
+        local patchedLua = self.getLuaScript()
+        patchedLua = CrLua.TTS.Patch.stripFromLuaScript(patchedLua, 'strip')
+
+        function patchConfig.shouldScanContainer(containerObjectData)
+            local name = containerObjectData.name
+            CrLua.Log.d(TAG, 'shouldScan: "' .. name .. '"')
+
+            -- This config is specific to the standard TI4 module!
+            if name == 'Variant Pieces (Searching Recommended)' then
+                return true
+            end
+            if name == 'Frankenstein Bags' then
+                return true
+            end
+            if string.match(name, '.+ Box$') then
+                return true
+            end
+            return false
+        end
+        function patchConfig.shouldPatch(objectData)
+            local name = objectData.name
+            CrLua.Log.d(TAG, 'shouldPatch: "' .. name .. '"')
+            if name == 'Active/Passed token' then
+                return true -- name used by original version of this token
+            end
+            return isPeerName(name) or name == defaultObjectName()
+        end
+        function patchConfig.patch(object, objectData)
+            local name = objectData.name
+            CrLua.Log.d(TAG, 'patch: "' .. name .. '"')
+
+            local newObject = CrLua.TTS.Patch.replaceLuaScript(object, patchedLua)
+
+            -- Update any custom assets to match ours.
+            local custom = self.getCustomObject()
+            newObject.setCustomObject(custom)
+
+            -- Use the new "Active/Passed (color)" naming scheme.
+            newObject.setName(defaultObjectName())
+
+            return newObject
+        end
+        function patchConfig.onFinish()
+            CrLua.Log.setLogLevel(originalLogLevel)
+        end
+
+    end
+end
+originalOnLoad = nil
+
+-- Replace event functions so this object by itself is ONLY used for patching.
+-- This chunk of code (between the 'strip' tags) gets removed in patch version.
+if true then
+    local mt = getmetatable(_G)
+    setmetatable(_G)
+    function onPlayerChangeColor(playerColor) end
+    function onPlayerTurnStart(playerColorStart, playerColorPrevious) end
+    setmetatable(_G, mt)
+end
+
+--</strip>--
 
 CrLua.assertRequired() -- do this BEFORE lock
 CrLua.lock()

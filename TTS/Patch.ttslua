@@ -103,6 +103,7 @@ function CrLua.TTS.Patch._init(patchConfig)
     assert(type(patchConfig) == 'table')
     assert(type(patchConfig.shouldScanContainer) == 'function')
     assert(type(patchConfig.shouldPatch) == 'function')
+    assert(type(patchConfig.patch) == 'function')
 
     if CrLua.TTS.Patch._isWorking() then
         error(TAG .. ' patch in progress, wait for it to finish before re-init')
@@ -562,13 +563,18 @@ function CrLua.TTS.Patch.patch(patchConfig)
     -- them back where they came from.  Wait for those puts to finish before
     -- moving on (otherwise getAllObjects might find them).
     local function waitForOutstandingPuts()
-        for guid, _ in pairs(data.putGuidSet) do
-            if not getObjectFromGUID(guid) then
-                data.putGuidSet[guid] = nil
-                Wait.frames(waitForOutstandingPuts, 10)
+        -- Originally this checked invidual objects looking up by guid and
+        -- assuming the put had completed when that failed, however it seems
+        -- getAllObjects can still find them for a moment.  Do a slightly
+        -- less efficient but safer test, keep waiting if any getAllObjects
+        -- guid is in the put set.
+        for _, object in ipairs(getAllObjects()) do
+            if data.putGuidSet[object.getGUID()] then
+                Wait.frames(waitForOutstandingPuts, 5)
                 return
             end
         end
+        data.putGuidSet = {}
         onUnpackFinished()
     end
 
@@ -580,7 +586,7 @@ end
 -- Helper function for use by PatchConfig scripts.
 -- Note: it is safe to call destroyObject on the same object multiple times.
 -------------------------------------------------------------------------------
-function CrLua.TTS.Patch.patchReplaceLuaScript(object, newLuaScript)
+function CrLua.TTS.Patch.replaceLuaScript(object, newLuaScript)
     -- There is an Object.setLuaScript method, but it seems dangerous to apply
     -- it to an active object.  Instead, update the lua script in the JSON
     -- representation of the object and instantiate a new one.
@@ -597,7 +603,7 @@ function CrLua.TTS.Patch.patchReplaceLuaScript(object, newLuaScript)
         rotation = object.getRotation(),
         scale = object.getScale(),
         callback_function = nil,
-        sound = false,
+        sound = true,
         params = {},
         snap_to_grid = object.use_grid
     }
@@ -606,12 +612,25 @@ function CrLua.TTS.Patch.patchReplaceLuaScript(object, newLuaScript)
 end
 
 -------------------------------------------------------------------------------
---- Given a lua script and start/end strings, strip out anything between them.
--- Does not work with nested start/end tags.
+--- Given a lua script and start/end tag, strip out anything between them.
+-- Only strips one, and does not support nested tags.
 -- Helper function for use by PatchConfig scripts.
 -------------------------------------------------------------------------------
-function CrLua.TTS.Patch.removeFromLuaScript(luaScript, startClip, endClip)
-    local pattern = startClip .. '.+' .. endClip
-    local replaceWith = startClip .. ' ... ' .. endClip
-    return string.gsub(luaScript, pattern, replaceWith)
+function CrLua.TTS.Patch.stripFromLuaScript(luaScript, stripTagName)
+    -- There is a known bug in string.gsub that reports "pattern too complex".
+    -- Do not try to be clever, just only strip one block.
+    local startTag = '<' .. stripTagName .. '>'
+    local endTag = '</' .. stripTagName .. '>'
+    local start1, start2 = string.find(luaScript, startTag)
+    if not start1 then
+        return luaScript
+    end
+    local end1, end2 = string.find(luaScript, endTag, start2)
+    if not end1 then
+        return luaScript
+    end
+
+    local before = string.sub(luaScript, 1, start2)
+    local after = string.sub(luaScript, end1)
+    return before .. ' ... ' .. after
 end

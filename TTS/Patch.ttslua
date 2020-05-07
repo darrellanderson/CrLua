@@ -610,27 +610,3 @@ function CrLua.TTS.Patch.replaceLuaScript(object, newLuaScript)
     destroyObject(object)
     return spawnObjectJSON(spawnParameters)
 end
-
--------------------------------------------------------------------------------
---- Given a lua script and start/end tag, strip out anything between them.
--- Only strips one, and does not support nested tags.
--- Helper function for use by PatchConfig scripts.
--------------------------------------------------------------------------------
-function CrLua.TTS.Patch.stripFromLuaScript(luaScript, stripTagName)
-    -- There is a known bug in string.gsub that reports "pattern too complex".
-    -- Do not try to be clever, just only strip one block.
-    local startTag = '<' .. stripTagName .. '>'
-    local endTag = '</' .. stripTagName .. '>'
-    local start1, start2 = string.find(luaScript, startTag)
-    if not start1 then
-        return luaScript
-    end
-    local end1, end2 = string.find(luaScript, endTag, start2)
-    if not end1 then
-        return luaScript
-    end
-
-    local before = string.sub(luaScript, 1, start2)
-    local after = string.sub(luaScript, end1)
-    return before .. ' ... ' .. after
-end

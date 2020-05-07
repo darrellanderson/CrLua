@@ -238,121 +238,14 @@ end
 
 -------------------------------------------------------------------------------
 
-local patchConfig = {}
-function doPatch()
-    if not patchConfig then
-        error(TAG .. ': already patched')
-    end
-    local originalPatchConfig = patchConfig
-    patchConfig = false
-    CrLua.TTS.Patch.patch(originalPatchConfig)
-end
-
 #include <~/CrLua/CrLua>
 #include <~/CrLua/LockGlobals>
 
 #include <~/CrLua/List>
 #include <~/CrLua/LockTable>
 #include <~/CrLua/Log>
-#include <~/CrLua/Polygon>
 #include <~/CrLua/Util>
 #include <~/CrLua/TTS/Player>
-
---[[
-#include <~/CrLua/UnitTest>
-CrLua.UnitTest.runTests('CrLua', CrLua, true)
---]]
-
---<strip>--
-
-#include <~/CrLua/Kruft/Spiral>
-#include <~/CrLua/TTS/Patch>
-
--- Interpose on top of any onLoad function to do addional setup.
-local originalOnLoad = onLoad
-function onLoad(save_state)
-    if originalOnLoad then
-        originalOnLoad()
-    end
-
-    if true or self.getName() == 'Active/Passed Patcher' then
-
-        local originalLogLevel = CrLua.Log.getLogLevel()
-        --CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
-
-        CrLua.Log.d(TAG, 'adding patch button')
-        self.createButton({
-            click_function = 'doPatch',
-            function_owner = self,
-            label          = 'PATCH\nACTIVE/PASSED\nTOKENS',
-            position       = { x = 0, y = 0.2, z = 0 },
-            rotation       = nil, -- Vector,
-            scale          = nil, -- Vector,
-            width          = 1100, -- int,
-            height         = 600, -- int,
-            font_size      = 150, -- int,
-            color          = nil, -- Color,
-            font_color     = nil, -- Color,
-            tooltip        = 'Locate and patch Active/Passed tokens to this version'
-        })
-
-        -- Replace the lua script in patched objects with this object's script,
-        -- but first removing the between-strip-tags content.
-        local patchedLua = self.getLuaScript()
-        patchedLua = CrLua.TTS.Patch.stripFromLuaScript(patchedLua, 'strip')
-
-        function patchConfig.shouldScanContainer(containerObjectData)
-            local name = containerObjectData.name
-            CrLua.Log.d(TAG, 'shouldScan: "' .. name .. '"')
-
-            -- This config is specific to the standard TI4 module!
-            if name == 'Variant Pieces (Searching Recommended)' then
-                return true
-            end
-            if name == 'Frankenstein Bags' then
-                return true
-            end
-            if string.match(name, '.+ Box$') then
-                return true
-            end
-            return false
-        end
-        function patchConfig.shouldPatch(objectData)
-            local name = objectData.name
-            CrLua.Log.d(TAG, 'shouldPatch: "' .. name .. '"')
-            if name == 'Active/Passed token' then
-                return true -- name used by original version of this token
-            end
-            return isPeerName(name) or name == defaultObjectName()
-        end
-        function patchConfig.patch(object, objectData)
-            local name = objectData.name
-            CrLua.Log.d(TAG, 'patch: "' .. name .. '"')
-
-            local newObject = CrLua.TTS.Patch.replaceLuaScript(object, patchedLua)
-
-            -- Update any custom assets to match ours.
-            local custom = self.getCustomObject()
-            newObject.setCustomObject(custom)
-
-            -- Use the new "Active/Passed (color)" naming scheme.
-            newObject.setName(defaultObjectName())
-
-            return newObject
-        end
-        function patchConfig.onFinish()
-            CrLua.Log.setLogLevel(originalLogLevel)
-        end
-
-        -- Replace event functions so this object by itself is ONLY used for patching.
-        -- This chunk of code (between the 'strip' tags) gets removed in patch version.
-        function onPlayerTurnStart(playerColorStart, playerColorPrevious) end
-
-    end
-end
-originalOnLoad = nil
-
---</strip>--
 
 CrLua.assertRequired() -- do this BEFORE lock
 CrLua.lock()

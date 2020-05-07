@@ -1,0 +1,75 @@
+local patchConfig = {}
+
+function patchConfig.shouldScanContainer(containerObjectData)
+    local name = containerObjectData.name
+
+    -- This config is specific to the standard TI4 module!
+    if name == 'Variant Pieces (Searching Recommended)' then
+        return true
+    end
+    if name == 'Frankenstein Bags' then
+        return true
+    end
+    if string.match(name, '.+ Box$') then
+        return true
+    end
+    return false
+end
+
+function patchConfig.shouldPatch(objectData)
+    local name = objectData.name
+    if name == 'Active/Passed token' then
+        return true -- name used by original version of this token
+    end
+    local color = string.match(name, '^Active/Passed %((%a+)%)$')
+    return color and true
+end
+
+function patchConfig.patch(object, objectData)
+    local newObject = CrLua.TTS.Patch.replaceLuaScript(object, patchConfig._luaScript)
+
+    -- Update any custom assets to match ours.
+    local custom = self.getCustomObject()
+    newObject.setCustomObject(custom)
+
+    return newObject
+end
+
+function patchConfig.onFinish()
+    --destroyObject(self)
+end
+
+-------------------------------------------------------------------------------
+
+function doPatch()
+    if patchConfig._inProgress then
+        error(TAG .. ': already patched')
+    end
+    patchConfig._inProgress = true
+    CrLua.TTS.Patch.patch(patchConfig)
+end
+
+function onLoad(save_state)
+    self.createButton({
+        click_function = 'doPatch',
+        function_owner = self,
+        label          = 'PATCH\nACTIVE/PASSED\nTOKENS',
+        position       = { x = 0, y = 0.2, z = 0 },
+        rotation       = nil, -- Vector,
+        scale          = nil, -- Vector,
+        width          = 1100, -- int,
+        height         = 600, -- int,
+        font_size      = 150, -- int,
+        color          = nil, -- Color,
+        font_color     = nil, -- Color,
+        tooltip        = 'Locate and patch Active/Passed tokens to this version'
+    })
+end
+
+#include <~/CrLua/CrLua>
+#include <~/CrLua/Kruft/Spiral>
+#include <~/CrLua/TTS/Patch>
+
+patchConfig._luaScript = [==========[
+#include <~/CrLua/Objects/ActivePassedToken>
+]==========]

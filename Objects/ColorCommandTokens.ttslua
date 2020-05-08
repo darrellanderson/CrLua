@@ -1,0 +1,186 @@
+-------------------------------------------------------------------------------
+--- Draw a colored border around command and flag tokens.
+-- Erase lines when this object is destroyed (or put into a container)
+-- @author bonkersbgg at boardgamegeek.com
+-------------------------------------------------------------------------------
+
+local _config = {
+    y = {
+        top = 0.1,
+        bottom = 0.1
+    },
+    thickness = 0.2,
+
+    -- Borders are in "local" coordinates relative to object.
+    commandTokenBorder = {
+        { -1.0, 1.1 },
+        { -0.65, 1.3 },
+        { 1.3, 0.2 },
+        { 1.3, -0.18 },
+        { -0.65, -1.3 },
+        { -1.0, -1.1 }
+    },
+    ownerTokenBorder = {
+        { -1.85, -0.91 },
+        { -1.97, 1.49 },
+        { -1.65, 1.85 },
+        { -0.55, 1.88 },
+        { -0.22, 1.58 },
+        { -0.05, -0.80 },
+        { -0.42, -1.22 },
+        { -1.46, -1.3 }
+    },
+}
+
+local _factionColors = false
+
+-------------------------------------------------------------------------------
+
+function onLoad()
+    for _, object in ipairs(getAllObjects()) do
+        local type, faction = parseTokenName(object.getName())
+        local color = faction and getColor(faction)
+        if type and color then
+            colorToken(object, type, color)
+        end
+    end
+end
+
+function onDestroy()
+    for _, object in ipairs(getAllObjects()) do
+        local type, faction = parseTokenName(object.getName())
+        if type then
+            object.setVectorLines({})
+        end
+    end
+end
+
+function onObjectSpawn(object)
+    local type, faction = parseTokenName(object.getName())
+    if type then
+        colorToken(object, type, faction)
+    end
+end
+
+function onObjectHover(player_color, hover_object)
+    local player = Player['White']
+    if hover_object and player and parseTokenName(hover_object.getName()) then
+        local pos = player.getPointerPosition()
+        pos = hover_object.positionToLocal(pos)
+        print('pos ' .. pos.x .. ', ' .. pos.z)
+    end
+end
+
+-------------------------------------------------------------------------------
+
+function parseTokenName(name)
+    local startPos, endPos = string.find(name, ' Token')
+    if startPos then
+        local faction, type = string.match(name, '^(.*) (%u%a+) Token$')
+        if type == 'Command' or type == 'Owner' then
+            return type, faction
+        end
+    end
+end
+
+function getColor(faction)
+    local color = _factionColors and _factionColors[faction]
+    if not color then
+        updateFactionColors()
+        color = _factionColors and _factionColors[faction]
+    end
+    return color
+end
+
+function getBorder(type, y)
+    local pointsXZ
+    if type == 'Command' then
+        pointsXZ = _config.commandTokenBorder
+    elseif type == 'Owner' then
+        pointsXZ = _config.ownerTokenBorder
+    else
+        error('bad type "' .. type .. '"')
+    end
+
+    local result = {}
+    for _, pointXZ in ipairs(pointsXZ) do
+        table.insert(result, { x = pointXZ[1], y = y, z = pointXZ[2] })
+    end
+    return result
+end
+
+function colorToken(object, type, color)
+    local up = object.getTransformUp()
+    local down = { x = -up.x, y = -up.y, z = -up.z }
+    object.setVectorLines({
+        {
+            points = getBorder(type, _config.y.top),
+            color = color,
+            thickness = _config.thickness,
+            rotation = up,
+            loop = true,
+            square = false
+        },
+        {
+            points = getBorder(type, _config.y.bottom),
+            color = color,
+            thickness = _config.thickness,
+            rotation = down,
+            loop = true,
+            square = false
+        }
+    })
+end
+
+function updateFactionColors()
+    -- Do not attempt to update too often (perhaps a token from a missing
+    -- faction is on the table?)
+    local frameCount = Time.frame_count
+    if _factionColors and _factionColors._frameCount == frameCount then
+        return
+    end
+    _factionColors = {
+        _frameCount = frameCount
+    }
+
+    -- Look for 'Command Sheet (COLOR)' and 'FACTION Command Tokens Bag' objects.
+    -- DO NOT LOOK FOR THE FACTION SHEET, IT MAY USE A DIFFERENT STRING!!
+    local commandSheetPositions = {}
+    local commandTokenBagPositions = {}
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+
+        -- First use the cheap string find to test if 'Command' is in the name.
+        -- Only then do more expensive pattern matching to extract values.
+        if string.find(name, 'Command') then
+
+            -- "Command Sheet (COLOR)"
+            local color = string.match(name, '^Command Sheet %((%a+)%)$')
+            if color then
+                commandSheetPositions[color] = object.getPosition()
+            end
+
+            -- "FACTION Command Tokens Bag"
+            local faction = string.match(name, '^(.+) Command Tokens Bag$')
+            if faction then
+                commandTokenBagPositions[faction] = object.getPosition()
+            end
+        end
+    end
+
+    -- Map faction to color.
+    for faction, p1 in pairs(commandTokenBagPositions) do
+        local bestDistanceSq = false
+        local bestColor = false
+        for color, p2 in pairs(commandSheetPositions) do
+            local dx = p1.x - p2.x
+            local dy = p1.y - p2.y
+            local dz = p1.z - p2.z
+            local distanceSq = (dx * dx) + (dy * dy) + (dz * dz)
+            if not bestDistanceSq or distanceSq < bestDistanceSq then
+                bestColor = color
+            end
+        end
+        _factionColors[faction] = bestColor
+    end
+end

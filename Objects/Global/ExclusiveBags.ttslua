@@ -1,0 +1,51 @@
+-- Exclusive bags are bags where all entries share the bag name, such as units.
+-- Use 'filter' to prevent other objects from entering those bags.
+-- @author Darrell
+local exclusiveBagSet = {}
+
+local function rememeberIfIsExclusiveBag(bagName, entryName)
+    if string.len(bagName) > 0 and bagName == entryName then
+        exclusiveBagSet[bagName] = true
+    end
+end
+
+function updateExclusiveBags()
+    exclusiveBagSet = {}
+    for _, bag in ipairs(getAllObjects()) do
+        -- 'Infinite' bags already filter puts, just need the unit bags.
+        if bag.tag == 'Bag' then
+            local first = bag.getObjects()[1]
+            if first then
+                rememeberIfIsExclusiveBag(bag.getName(), first.name)
+            end
+        end
+    end
+end
+
+local originalFilterObjectEnterContainer = filterObjectEnterContainer
+function filterObjectEnterContainer(container, enterObject)
+    local result = originalFilterObjectEnterContainer and originalFilterObjectEnterContainer(container, enterObject)
+
+    local bagName = container.getName()
+    local entryName = enterObject.getName()
+    local exclusiveBag = exclusiveBagSet[bagName]
+    result = result or (exclusiveBag and bagName == entryName)
+
+    -- Cheekiness to detect renamed flagship bags: unpack renames the bag,
+    -- removes and renames the flagship inside, then puts it back.  Filter
+    -- gets asked about that final put, use it to notice the new exclusive bag.
+    -- Alternatively could Global.call('updateExclusiveBags') from unpack.
+    if container.tag == 'Bag' and not requireBagName then
+        rememeberIfIsExclusiveBag(bagName, entryName)
+    end
+
+    return result
+end
+
+local originalOnLoad = onLoad
+function onLoad(save_state)
+    if originalOnLoad then
+        originalOnLoad()
+    end
+    updateExclusiveBags()
+end

@@ -28,16 +28,25 @@ CrLua._require = { 'LockTable' }
 
 -------------------------------------------------------------------------------
 --- Assert all required packages exist.
+-- @param extraRequires table : list of additional require entries.
 -- @param table : table to search for _require entries, or CrLua if nil.
 --
 -- Modules add dependencies by having a _require item in their root table,
 -- with a list of module names.
 -- e.g. CrLua.MyModule = { _require = { 'OtherModule1', 'OtherModule2' } }.
 -------------------------------------------------------------------------------
-function CrLua.assertRequired(table)
+function CrLua.assertRequired(extraRequires, table)
     local seen = {}
     local requireSet = {}
-    local function addRequireEntries(table)
+    local haveSet = {}
+
+    if extraRequires then
+        for _, name in ipairs(extraRequires) do
+            requireSet[name] = true
+        end
+    end
+
+    local function addRequireEntries(table, packagePath)
         assert(type(table) == 'table')
         if seen[table] then
             return
@@ -50,12 +59,20 @@ function CrLua.assertRequired(table)
         end
         for k, v in pairs(table) do
             if type(v) == 'table' then
-                addRequireEntries(v)
+                local isCamelCase = type(k) == 'string' and string.match(k, '^%u%l')
+                if type(packagePath) ~= 'boolean' and isCamelCase then
+                    packagePath = (packagePath and (packagePath .. '.') or '') .. k
+                    haveSet[packagePath] = true
+                else
+                    packagePath = false
+                end
+                addRequireEntries(v, packagePath)
             end
         end
     end
     addRequireEntries(table or CrLua)
 
+    -- Make sure all required packages are present.
     local message = false
     for package, _ in pairs(requireSet) do
         assert(type(package) == 'string')
@@ -71,6 +88,18 @@ function CrLua.assertRequired(table)
     if message then
         error(TAG .. ': assertRequired missing ' .. message)
     end
+
+    -- Make sure all present packages are required.
+    local message = false
+    for package, _ in pairs(haveSet) do
+        if not requireSet[package] then
+            message = (message and message .. ', ' or '') .. package
+        end
+    end
+    if message then
+        error(TAG .. ': assertRequired have not-required ' .. message)
+    end
+
 end
 
 -------------------------------------------------------------------------------

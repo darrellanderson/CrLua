@@ -24,18 +24,27 @@ end
 
 local originalFilterObjectEnterContainer = filterObjectEnterContainer
 function filterObjectEnterContainer(container, enterObject)
-    local result = originalFilterObjectEnterContainer and originalFilterObjectEnterContainer(container, enterObject)
+    local result = true
+
+    if originalFilterObjectEnterContainer then
+        result = result and originalFilterObjectEnterContainer(container, enterObject)
+    end
 
     local bagName = container.getName()
     local entryName = enterObject.getName()
-    local exclusiveBag = exclusiveBagSet[bagName]
-    result = result or (exclusiveBag and bagName == entryName)
+    local exclusiveBag = string.len(bagName) > 0 and exclusiveBagSet[bagName]
+    result = result and (not exclusiveBag or bagName == entryName)
+
+    -- Also reject wrong items into the command tokens bags.
+    if string.find(bagName, 'Command Tokens Bag') then
+        result = result and string.find(bagName, entryName)
+    end
 
     -- Cheekiness to detect renamed flagship bags: unpack renames the bag,
     -- removes and renames the flagship inside, then puts it back.  Filter
     -- gets asked about that final put, use it to notice the new exclusive bag.
     -- Alternatively could Global.call('updateExclusiveBags') from unpack.
-    if container.tag == 'Bag' and not requireBagName then
+    if container.tag == 'Bag' and not exclusiveBag then
         rememeberIfIsExclusiveBag(bagName, entryName)
     end
 

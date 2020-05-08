@@ -247,5 +247,5 @@ end
 #include <~/CrLua/Util>
 #include <~/CrLua/TTS/Player>
 
-CrLua.assertRequired() -- do this BEFORE lock
+CrLua.assertRequired({'CrLua.Log'}) -- do this BEFORE lock
 CrLua.lock()

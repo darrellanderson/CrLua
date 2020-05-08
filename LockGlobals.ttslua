@@ -31,7 +31,9 @@ setmetatable(_G, _lockGlobalsMetaTable)
 
 -- Add a test function to the CrLua "namespace".
 CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
-CrLua.LockGlobals = assert(not CrLua.LockGlobals) and {}
+CrLua.LockGlobals = assert(not CrLua.LockGlobals) and {
+    _require = { 'LockGlobals' }  -- require self to avoid missing require error
+}
 function CrLua.LockGlobals._testLockGlobals()
     -- Can read existing global.
     assert(_VERSION)

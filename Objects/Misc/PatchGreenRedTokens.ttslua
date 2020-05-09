@@ -1,0 +1,123 @@
+local patchConfig = {}
+
+function patchConfig.shouldScanContainer(containerObjectData)
+    local name = containerObjectData.name
+
+    -- This config is specific to the standard TI4 module!
+    if name == 'Variant Pieces (Searching Recommended)' then
+        return true
+    end
+    if name == 'Frankenstein Bags' then
+        return true
+    end
+    if string.match(name, '.+ Box$') then
+        return true
+    end
+    return false
+end
+
+function patchConfig.shouldPatch(objectData)
+    local name = objectData.name
+    if string.match(name, '^Active/Passed %((%a+)%)$') then
+        return true
+    elseif name == 'AFK-HERE card' then
+        return true
+    elseif name == 'Any Whens?' then
+        return true
+    elseif name == 'Any Afters?' then
+        return true
+    end
+    return false
+end
+
+function patchConfig.patch(object, objectData)
+    local name = object.getName()
+
+    local custom = object.getCustomObject()
+
+    if string.match(name, '^Active/Passed %((%a+)%)$') then
+        custom.image = 'http://cloud-3.steamusercontent.com/ugc/1016069633958575093/5D235DCA1C890AAD3C8A6C39FB9D6C527429AA45/'
+        custom.image_bottom = 'http://cloud-3.steamusercontent.com/ugc/1016069633958575816/3BBEA288EB01CBCB36BB6D68BD06897DEACBE573/'
+        custom.image_secondary = custom.image_bottom
+    elseif name == 'Any Whens?' then
+        custom.image = 'http://cloud-3.steamusercontent.com/ugc/1016069633958579615/CE61AD5F1499CB731F74118AAF5EA684296AE808/'
+        custom.image_bottom = 'http://cloud-3.steamusercontent.com/ugc/1016069633958580046/3742AC92DCFB087DC9DD86DDE0FC37A46D44C52A/'
+        custom.image_secondary = custom.image_bottom
+    elseif name == 'Any Afters?' then
+        custom.image = 'http://cloud-3.steamusercontent.com/ugc/1016069633958581127/24722973F729D10555CF0A59379578F852A1DEE7/'
+        custom.image_bottom = 'http://cloud-3.steamusercontent.com/ugc/1016069633958581705/1B115C8A17E54067B07552935EDFC571286BB17C/'
+        custom.image_secondary = custom.image_bottom
+    elseif name == 'AFK-HERE card' then
+        -- Replace card with token.
+        local spawnParameters = {
+            type              = 'Custom_Tile',
+            position          = object.getPosition(),
+            rotation          = object.getRotation(),
+            scale             = { 1.334, 1, 1.334 },  -- same as active/passed
+            callback_function = nil,
+            sound             = false,
+            params            = {
+                type = 2,  -- circle
+                image = 'http://cloud-3.steamusercontent.com/ugc/1025076776919421978/0965CCE4DE138512265FEE1DBC0A4B3183088E0A/',
+                image_bottom = 'http://cloud-3.steamusercontent.com/ugc/1025076776919423633/BB07AEB8198D9DCB68C50C55C66D7FADE48EA780/',
+                thickness = 0.15,
+                stackable = false
+            },
+            snap_to_grid      = object.use_grid
+        }
+        destroyObject(object)
+        object = spawnObject(spawnParameters)
+        -- Hmm, 'params' is not being used as documented.  Do it manually.
+        object.setCustomObject(spawnParameters.params)
+        return object
+    else
+        return false
+    end
+
+    object.setCustomObject(custom)
+    if not objectData._container then
+        object.reload()
+    end
+    return object
+
+end
+
+function patchConfig.onFinish()
+    --destroyObject(self)
+end
+
+-------------------------------------------------------------------------------
+
+function doPatch()
+    if patchConfig._inProgress then
+        error('already patched')
+    end
+    patchConfig._inProgress = true
+    CrLua.TTS.Patch.patch(patchConfig)
+end
+
+function onLoad(save_state)
+    local scale = { x = 5, y = 0.1, z = 3 }
+    local invScale = { x = 1 / scale.x, y = 1 / scale.y, z = 1 / scale.z }
+
+    self.setScale(scale)
+
+    self.createButton({
+        click_function = 'doPatch',
+        function_owner = self,
+        label          = 'PATCH\nGREEN/RED\nTOKENS',
+        position       = { x = 0, y = 1, z = 0 },
+        rotation       = nil, -- Vector,
+        scale          = invScale, -- Vector,
+        width          = 1400, -- int,
+        height         = 800, -- int,
+        font_size      = 200, -- int,
+        color          = nil, -- Color,
+        font_color     = nil, -- Color,
+        tooltip        = 'Locate and patch Active/Passed tokens to this version'
+    })
+end
+
+#include <~/CrLua/CrLua>
+#include <~/CrLua/Kruft/Spiral>
+#include <~/CrLua/TTS/Patch>

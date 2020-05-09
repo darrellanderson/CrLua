@@ -48,6 +48,13 @@ function patchConfig.patch(object, objectData)
         custom.image_bottom = 'http://cloud-3.steamusercontent.com/ugc/1016069633958581705/1B115C8A17E54067B07552935EDFC571286BB17C/'
         custom.image_secondary = custom.image_bottom
     elseif name == 'AFK-HERE card' then
+        custom = {
+            type = 2,  -- circle
+            image = 'http://cloud-3.steamusercontent.com/ugc/1025076776919421978/0965CCE4DE138512265FEE1DBC0A4B3183088E0A/',
+            image_bottom = 'http://cloud-3.steamusercontent.com/ugc/1025076776919423633/BB07AEB8198D9DCB68C50C55C66D7FADE48EA780/',
+            thickness = 0.15,
+            stackable = false
+        }
         -- Replace card with token.
         local spawnParameters = {
             type              = 'Custom_Tile',
@@ -56,20 +63,13 @@ function patchConfig.patch(object, objectData)
             scale             = { 1.334, 1, 1.334 },  -- same as active/passed
             callback_function = nil,
             sound             = false,
-            params            = {
-                type = 2,  -- circle
-                image = 'http://cloud-3.steamusercontent.com/ugc/1025076776919421978/0965CCE4DE138512265FEE1DBC0A4B3183088E0A/',
-                image_bottom = 'http://cloud-3.steamusercontent.com/ugc/1025076776919423633/BB07AEB8198D9DCB68C50C55C66D7FADE48EA780/',
-                thickness = 0.15,
-                stackable = false
-            },
+            params            = custom,  -- spawn does not seem to use, but will setCustomObject later to apply
             snap_to_grid      = object.use_grid
         }
         destroyObject(object)
         object = spawnObject(spawnParameters)
-        -- Hmm, 'params' is not being used as documented.  Do it manually.
-        object.setCustomObject(spawnParameters.params)
-        return object
+        object.setName('Here/AFK')
+        object.setDescription('Flip to indicate you are Away From Keyboard.')
     else
         return false
     end

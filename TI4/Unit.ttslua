@@ -14,6 +14,9 @@ CrLua.TI4.Unit = assert(not CrLua.TI4.Unit) and {
 
 CrLua.TI4.Unit.ATTR = {
 
+    -- Number, production cost.
+    COST = 'cost',
+
     -- Boolean, is this unit a ship?
     SHIP = 'ship',
 
@@ -22,6 +25,9 @@ CrLua.TI4.Unit.ATTR = {
 
     -- Number, bombardment hit value.
     BOMBARDMENT = 'bombardment',
+
+    -- String faction name (if flagship).
+    FACTION = 'faction',
 
     -- String wormhole type (e.g. "delta").
     WORMHOLE = 'wormhole',
@@ -34,27 +40,20 @@ CrLua.TI4.Unit.ATTR = {
 
     -- Boolean, unit dice count is equal to the number of non-fighter enemy ships?
     NON_FIGHTER_DICE = 'nonFighterDice',
-
-    -- String name of the associated Plasma Sccoring button in the MultiRoller.
-    MULTIROLLER_PS = 'multirollerPS'
 }
 
 -- Unit attributes:
---     - ship boolean : is a ship?
---     - spaceCannon number : if set, hit value for space cannon.
---     - bombardment number : if set, hit value for bombardment.
---     - plasmaScoringButton string : if set, MultiRoller button name for plasma scoring.
 CrLua.TI4.Unit.UNIT = {
-    ['Infantry'] = {},
-    ['Fighter'] = { ship = true },
-    ['Cruiser'] = { ship = true },
-    ['Destroyer'] = { ship = true },
-    ['Carrier'] = { ship = true },
+    ['Infantry'] = { cost = 0.5 },
+    ['Fighter'] = { ship = true, cost = 0.5 },
+    ['Cruiser'] = { ship = true, cost = 2 },
+    ['Destroyer'] = { ship = true, cost = 1 },
+    ['Carrier'] = { ship = true, cost = 3 },
     ['Space Dock'] = {},
-    ['PDS'] = { spaceCannon = 5, multirollerPS = 'PS9' },
-    ['Dreadnought'] = { ship = true, bombardment = 5, multirollerPS = 'PS4' },
-    ['War Sun'] = { ship = true, bombardment = 3, multirollerPS = 'PS2' },
-    ['Flagship'] = { ship = true, multirollerPS = 'PS1' }
+    ['PDS'] = { spaceCannon = 5 },
+    ['Dreadnought'] = { ship = true, bombardment = 5, cost = 4 },
+    ['War Sun'] = { ship = true, bombardment = 3, cost = 12 },
+    ['Flagship'] = { ship = true, cost = 8 }
 }
 
 -- Flagship attributes:

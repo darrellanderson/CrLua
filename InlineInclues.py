@@ -40,8 +40,8 @@ def process(filename, wrapInDoEnd):
             insideComment = False
         if line.startswith('#include') and not insideComment:
             m = includePattern.search(line)
-            filename = m.group(1)
-            process(filename, False)
+            includeFilename = m.group(1)
+            process(includeFilename, False)
         else:
             sys.stdout.write(line)
     file.close()

@@ -57,17 +57,9 @@ end
 
 function onObjectSpawn(object)
     local type, faction = parseTokenName(object.getName())
-    if type then
-        colorToken(object, type, faction)
-    end
-end
-
-function onObjectHover(player_color, hover_object)
-    local player = Player['White']
-    if hover_object and player and parseTokenName(hover_object.getName()) then
-        local pos = player.getPointerPosition()
-        pos = hover_object.positionToLocal(pos)
-        print('pos ' .. pos.x .. ', ' .. pos.z)
+    local color = faction and getColor(faction)
+    if type and color then
+        colorToken(object, type, color)
     end
 end
 
@@ -178,6 +170,7 @@ function updateFactionColors()
             local dz = p1.z - p2.z
             local distanceSq = (dx * dx) + (dy * dy) + (dz * dz)
             if not bestDistanceSq or distanceSq < bestDistanceSq then
+                bestDistanceSq = distanceSq
                 bestColor = color
             end
         end

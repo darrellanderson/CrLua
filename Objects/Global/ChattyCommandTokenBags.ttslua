@@ -1,0 +1,62 @@
+-- Report when taking or putting command tokens.
+-- @author Darrell
+
+local _ctTransactions = assert(_ctTransactions == nil) and {}
+local _ctWaitId = assert(_ctWaitId == nil) and false
+
+local function reportCommandTokenTransaction(container, object, quantity)
+    local isCommandTokenBag = string.match(container.getName(), 'Command Tokens Bag$')
+    local isCommandToken = string.match(object.getName(), 'Command Token$')
+    if not isCommandToken or not isCommandTokenBag then
+        return
+    end
+
+    -- Keep deposit and withdrawl transactions separate.  During clean up
+    -- a player will deposit tokens from the map, AND withdraw 2 (or 3).
+    local name = object.getName()
+    local type = (quantity > 0) and 'Deposited' or 'Withdrew'
+    local transactions = _ctTransactions[name]
+    if not transactions then
+        transactions = {}
+        _ctTransactions[name] = transactions
+    end
+    transactions[type] = (transactions[type] or 0) + math.abs(quantity)
+
+    -- Wait before reporting in case withdrawing or depositing several.
+    -- Restart the clock on each transaction.
+    local function delayedReport()
+        _ctWaitId = false
+        for name, transactions in pairs(_ctTransactions) do
+            local message = false
+            for type, quantity in pairs(transactions) do
+                message = (message and message .. ', ' or '')
+                message = message .. type .. ' ' .. quantity .. ' ' .. name
+                if quantity > 1 then
+                     message = message .. 's'
+                end
+            end
+            printToAll(message)
+        end
+        _ctTransactions = {}
+    end
+    if _ctWaitId then
+        Wait.stop(_ctWaitId)
+    end
+    _ctWaitId = Wait.frames(delayedReport, 10)
+end
+
+local originalOnObjectLeaveContainer = onObjectLeaveContainer
+function onObjectLeaveContainer(container, leaveObject)
+    if originalOnObjectLeaveContainer then
+        originalOnObjectLeaveContainer(container, leaveObject)
+    end
+    reportCommandTokenTransaction(container, leaveObject, -1)
+end
+
+local originalOnObjectEnterContainer = onObjectEnterContainer
+function onObjectEnterContainer(container, enterObject)
+    if originalOnObjectEnterContainer then
+        originalOnObjectEnterContainer(container, enterObject)
+    end
+    reportCommandTokenTransaction(container, enterObject, 1)
+end

@@ -27,11 +27,6 @@ end
 
 function patchConfig.patch(object, objectData)
     local newObject = CrLua.TTS.Patch.replaceLuaScript(object, patchConfig._luaScript)
-
-    -- Update any custom assets to match ours.
-    local custom = self.getCustomObject()
-    newObject.setCustomObject(custom)
-
     return newObject
 end
 
@@ -43,23 +38,28 @@ end
 
 function doPatch()
     if patchConfig._inProgress then
-        error(TAG .. ': already patched')
+        error('already patched')
     end
     patchConfig._inProgress = true
     CrLua.TTS.Patch.patch(patchConfig)
 end
 
 function onLoad(save_state)
+    local scale = { x = 5, y = 0.1, z = 3 }
+    local invScale = { x = 1 / scale.x, y = 1 / scale.y, z = 1 / scale.z }
+
+    self.setScale(scale)
+
     self.createButton({
         click_function = 'doPatch',
         function_owner = self,
-        label          = 'PATCH\nACTIVE/PASSED\nTOKENS',
-        position       = { x = 0, y = 0.2, z = 0 },
+        label          = 'PATCH\nGREEN/RED\nTOKENS',
+        position       = { x = 0, y = 1, z = 0 },
         rotation       = nil, -- Vector,
-        scale          = nil, -- Vector,
-        width          = 1100, -- int,
-        height         = 600, -- int,
-        font_size      = 150, -- int,
+        scale          = invScale, -- Vector,
+        width          = 1400, -- int,
+        height         = 800, -- int,
+        font_size      = 200, -- int,
         color          = nil, -- Color,
         font_color     = nil, -- Color,
         tooltip        = 'Locate and patch Active/Passed tokens to this version'
@@ -67,8 +67,15 @@ function onLoad(save_state)
 end
 
 #include <~/CrLua/CrLua>
+#include <~/CrLua/LockGlobals>
+
+#include <~/CrLua/LockTable>
 #include <~/CrLua/Kruft/Spiral>
 #include <~/CrLua/TTS/Patch>
+
+CrLua.assertRequired() -- do this BEFORE lock
+CrLua.lock()
+
 
 patchConfig._luaScript = [==========[
 #include <~/CrLua/Objects/ActivePassedToken>

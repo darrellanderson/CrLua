@@ -16,13 +16,29 @@ local TAG = 'ActivePassedToken'
 -- OBJECT EVENT METHODS
 
 function onLoad()
-    -- If this is a copy/paste, reset name on new object.
-    self.setName(defaultObjectName())
+    -- Wait to be at rest (might be flying from a container to intended
+    -- destination), then attempt to assign to closest player's hand.  If there
+    -- already exists a peer token for that color leave self unassigned.
+    local function delayedResetTokenForNewOwner()
+        if self.resting then
+            resetTokenForNewOwner()
+        else
+            Wait.frames(delayedResetTokenForNewOwner, 2)
+        end
+    end
+    Wait.frames(delayedResetTokenForNewOwner, 5)
     CrLua.Log.d(TAG, 'onLoad "' .. (self.getName() or '') .. '"')
 end
 
+function onDrop(player_color)
+    -- If not yet assigned to a player, attempt to do so now.
+    if not myColor() then
+        resetTokenForNewOwner()
+    end
+end
+
 function onPlayerTurnStart(playerColorStart, playerColorPrevious)
-    CrLua.Log.d(TAG, 'onPlayerTurnStart ' .. playerColorStart)
+    CrLua.Log.d(TAG, 'onPlayerTurnStart ' .. (playerColorStart or 'nil'))
 
     -- If not yet assigned to a player, attempt to do so now.
     if not myColor() then
@@ -49,6 +65,8 @@ function objectNameToColor(name)
         Grey = true, Black = true
     }
     local color = string.match(name, '^Active/Passed %((%a+)%)$')
+    -- Accept "Red", "red", "RED", and I suppose even "rED".
+    color = color and (string.upper(string.sub(color, 1, 1)) .. string.lower(string.sub(color, 2)))
     return validColorNames[color] and color
 end
 
@@ -146,9 +164,11 @@ function anyPeerIsActive(peers)
     return result
 end
 
-function resetPeersWithIncludeSelf(peers)
+function setActivePeersWithIncludeSelf(peers)
     for _, peer in ipairs(peers) do
-        peer.flip()
+        if peer.is_face_down then
+            peer.flip()
+        end
     end
 end
 
@@ -167,8 +187,15 @@ end
 function resetTokenForNewOwner()
     local oldColor = myColor()
     local newColor = playerColorAtPosition(self.getPosition())
-    if newColor == oldColor then
-        return
+
+    -- If another token is already assigned to that color, do not claim it.
+    local peers = getPeers(false)
+    for _, peer in ipairs(peers) do
+        local peerColor = objectNameToColor(peer.getName())
+        if peerColor == newColor then
+            newColor = nil
+            break
+        end
     end
 
     -- Tint this object to indicate color.
@@ -219,7 +246,7 @@ function maybePassTurn()
     else
         CrLua.Log.d(TAG, 'maybePassTurn: no active peers, disabling turns')
         broadcastToAll('All players have passed.', myColor)
-        resetPeersWithIncludeSelf(peers)
+        setActivePeersWithIncludeSelf(peers)
         Turns.enable = false
     end
     return true
@@ -247,5 +274,5 @@ end
 #include <~/CrLua/Util>
 #include <~/CrLua/TTS/Player>
 
-CrLua.assertRequired({'CrLua.Log'}) -- do this BEFORE lock
+CrLua.assertRequired({'Log'}) -- do this BEFORE lock
 CrLua.lock()

@@ -14,13 +14,13 @@ import sys
 includePattern = re.compile('^#include <(~/.*)>$')
 delim = '-- ############################################################################\n'
 
-#included = set()
+included = set()
 
 def process(filename, wrapInDoEnd):
     absoluteFilename = os.path.expanduser(filename) + '.ttslua'
-    #if absoluteFilename in included:
-    #    return
-    #included.add(absoluteFilename)
+    if absoluteFilename in included:
+        return
+    included.add(absoluteFilename)
 
     sys.stdout.write(delim)
     sys.stdout.write('-- #### START #include <' + filename + '>\n')
@@ -34,16 +34,21 @@ def process(filename, wrapInDoEnd):
     insideComment = False
     file = open(absoluteFilename)
     for line in file:
+
         if line.find('--[[') != -1:
             insideComment = True
         if line.find(']]') != -1:
             insideComment = False
+        if line.find('-- #RESET_INCLUDED --'):
+            included.clear()
+
         if line.startswith('#include') and not insideComment:
             m = includePattern.search(line)
             includeFilename = m.group(1)
             process(includeFilename, False)
         else:
             sys.stdout.write(line)
+
     file.close()
 
     if wrapInDoEnd:

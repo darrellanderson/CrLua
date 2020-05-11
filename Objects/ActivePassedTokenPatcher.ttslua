@@ -76,7 +76,7 @@ end
 CrLua.assertRequired() -- do this BEFORE lock
 CrLua.lock()
 
-
+-- #RESET_INCLUDED --
 patchConfig._luaScript = [==========[
 #include <~/CrLua/Objects/ActivePassedToken>
 ]==========]

@@ -23,10 +23,10 @@ function onLoad()
         if self.resting then
             resetTokenForNewOwner()
         else
-            Wait.frames(delayedResetTokenForNewOwner, 2)
+            Wait.time(delayedResetTokenForNewOwner, 2)
         end
     end
-    Wait.frames(delayedResetTokenForNewOwner, 5)
+    Wait.time(delayedResetTokenForNewOwner, 4)
     CrLua.Log.d(TAG, 'onLoad "' .. (self.getName() or '') .. '"')
 end
 

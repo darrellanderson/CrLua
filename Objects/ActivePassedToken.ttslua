@@ -16,17 +16,28 @@ local TAG = 'ActivePassedToken'
 -- OBJECT EVENT METHODS
 
 function onLoad()
+    -- If already assigned to a color and there exists a different token also
+    -- assigned to that color, unassign self (e.g., copy/paste).
+    local color = myColor()
+    if color and anyPeerIsColor(color) then
+        self.setName(defaultObjectName())
+    end
+
     -- Wait to be at rest (might be flying from a container to intended
     -- destination), then attempt to assign to closest player's hand.  If there
     -- already exists a peer token for that color leave self unassigned.
     local function delayedResetTokenForNewOwner()
-        if self.resting then
-            resetTokenForNewOwner()
-        else
-            Wait.time(delayedResetTokenForNewOwner, 2)
+        if not myColor() then
+            if self.resting then
+                resetTokenForNewOwner()
+            else
+                Wait.time(delayedResetTokenForNewOwner, 2)
+            end
         end
     end
-    Wait.time(delayedResetTokenForNewOwner, 4)
+    if not myColor() then
+        Wait.time(delayedResetTokenForNewOwner, 4)
+    end
     CrLua.Log.d(TAG, 'onLoad "' .. (self.getName() or '') .. '"')
 end
 
@@ -164,6 +175,17 @@ function anyPeerIsActive(peers)
     return result
 end
 
+function anyPeerIsColor(color)
+    local peers = getPeers(false)
+    for _, peer in ipairs(peers) do
+        local peerColor = objectNameToColor(peer.getName())
+        if peerColor == color then
+            return true
+        end
+    end
+    return false
+end
+
 function setActivePeersWithIncludeSelf(peers)
     for _, peer in ipairs(peers) do
         if peer.is_face_down then
@@ -189,13 +211,8 @@ function resetTokenForNewOwner()
     local newColor = playerColorAtPosition(self.getPosition())
 
     -- If another token is already assigned to that color, do not claim it.
-    local peers = getPeers(false)
-    for _, peer in ipairs(peers) do
-        local peerColor = objectNameToColor(peer.getName())
-        if peerColor == newColor then
-            newColor = nil
-            break
-        end
+    if anyPeerIsColor(newColor) then
+        newColor = nil
     end
 
     -- Tint this object to indicate color.

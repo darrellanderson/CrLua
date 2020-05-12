@@ -1,5 +1,8 @@
 -------------------------------------------------------------------------------
---- Manage "zones" in a TTS/TI4 table, using the command and faction sheets as
+--- Player zones.
+-- @author bonkersbgg on BoardGameGeek.com
+--
+-- Manage "zones" in a TTS/TI4 table, using the command and faction sheets as
 -- a guide for where a "zone" is.  For standard 6 or 8 player tables uses
 -- hard-coded zone polygons.
 --
@@ -23,7 +26,11 @@
 -- really only should be used for a non-standard table when a hard-coded
 -- polygon is not available.
 --
--- @author bonkersbgg on BoardGameGeek.com
+-- There are a few events that warrant calling update():
+-- - onLoad : duh.
+-- - onPlayer{Connect|Disconnect|ChangeColor} : sure.
+-- - onObjectSpawn when object is a faction sheet : wait ~4 seconds for it to land.
+--
 -------------------------------------------------------------------------------
 
 local TAG = 'CrLua.TI4.Zone'
@@ -83,22 +90,8 @@ CrLua.TI4.Zone = assert(not CrLua.TI4.Zone) and {
     }
 }
 
-function CrLua.TI4.Zone.zones()
+function CrLua.TI4.Zone.all()
     return CrLua.TI4.Zone._data.zones
-end
-
-function CrLua.TI4.Zone.closest(position)
-    assert(type(position) == 'table' and position.x)
-    local function distance(zone)
-        local bb = zone.bb
-        local d1 = CrUtil.distanceSq(position, { x = bb.min.x, y = 1, z = bb.min.z })
-        local d2 = CrUtil.distanceSq(position, { x = bb.min.x, y = 1, z = bb.max.z })
-        local d3 = CrUtil.distanceSq(position, { x = bb.max.x, y = 1, z = bb.max.z })
-        local d4 = CrUtil.distanceSq(position, { x = bb.max.x, y = 1, z = bb.min.z })
-        return math.min(d1, d2, d3, d4)
-    end
-    local _, zone = CrUtil.min(CrLua.TI4.Zone._data.zones, distance)
-    return zone
 end
 
 function CrLua.TI4.Zone.fromColor(color)
@@ -128,8 +121,17 @@ function CrLua.TI4.Zone.inside(zone, position)
     end
 end
 
+function CrLua.TI4.Zone.insideWhich(position)
+    assert(type(position) == 'table' and position.x)
+    for _, zone in ipairs(CrLua.TI4.Zone._data.zones) do
+        if CrLua.TI4.Zone.inside(zone, position) then
+            return zone
+        end
+    end
+end
+
 function CrLua.TI4.Zone.vectorLines(zone, override)
-    assert(type(zone) == 'table' and zone.faction and type(override) == 'table')
+    assert(type(zone) == 'table' and zone.color and type(override) == 'table')
     local result = {
         points = {},
         color = zone.color,
@@ -156,7 +158,7 @@ function CrLua.TI4.Zone.allVectorLines(override)
 end
 
 function CrLua.TI4.Zone.boundingBoxVectorLines(zone, override)
-    assert(type(zone) == 'table' and zone.faction and type(override) == 'table')
+    assert(type(zone) == 'table' and zone.color and type(override) == 'table')
     local result = {
         points = {},
         color = zone.color,
@@ -240,9 +242,8 @@ function CrLua.TI4.Zone.update()
 
     -- Map faction to closest command sheet and command token bags.  Note this
     -- is from faction sheet to command sheet, not the other way around.  This
-    -- way ignores empty seats with a command sheet but no faction sheet.
-    local factionToColor = {}
-    local factionToCommandSheet = {}
+    -- way command sheets without a nearby faction sheet have no faction.
+    local colorToFaction = {}
     local factionToTokenFaction = {}
     for faction, factionSheet in pairs(factionToFactionSheet) do
         local function distance(object)
@@ -250,52 +251,54 @@ function CrLua.TI4.Zone.update()
         end
 
         local color, commandSheet = CrLua.Util.min(colorToCommandSheet, distance)
-        factionToColor[faction] = assert(color)
-        factionToCommandSheet[faction] = assert(commandSheet)
+        assert(color)
+        colorToFaction[color] = faction
 
         local tokenFaction, _ = CrLua.Util.min(tokenFactionToCommandCounterBag, distance)
         factionToTokenFaction[faction] = assert(tokenFaction)
     end
 
-    -- Find the closest faction for each seated player.  If a player disconnects
-    -- (or some other non-typical event/set) there may be faction sheets on the
-    -- table without any player seated near them.
-    local factionList = CrLua.List.fromKeys(factionToFactionSheet)
-    local factionToSeatedPlayerColor = {}
-    for _, color in ipairs(getSeatedPlayers()) do
-        local function factionDistance(faction)
-            local factionPosition = factionToFactionSheet[faction].getPosition()
-            local player = Player[color]
+    -- Find the closest command sheet for each seated player.  If a player
+    -- disconnects (or some other non-typical event/set) there may be command
+    -- sheets on the table without any player seated near them.
+    local commandSheetColorToSeatedPlayerColor = {}
+    for _, seatedColor in ipairs(getSeatedPlayers()) do
+        local function commandSheetDistance(commandSheet)
+            local commandSheetPosition = commandSheet.getPosition()
+            local player = Player[seatedColor]
             local best = false
             for i = 1, player.getHandCount() do
                 local handPosition = player.getHandTransform(i).position
-                local distanceSq = CrLua.Util.distanceSq(factionPosition, handPosition)
+                local distanceSq = CrLua.Util.distanceSq(commandSheetPosition, handPosition)
                 best = not best and distanceSq or math.min(best, distanceSq)
             end
             return best
         end
-        local _, faction = CrLua.Util.min(factionList, factionDistance)
-        factionToSeatedPlayerColor[faction] = color
+        local commandSheetColor, _ = CrLua.Util.min(colorToCommandSheet, commandSheetDistance)
+        commandSheetColorToSeatedPlayerColor[commandSheetColor] = seatedColor
     end
 
     -- Generate a bounding box for the faction + command sheet pair.  Store the
     -- bounding box min/max points as { 1=x, 2=z } lists.
-    for faction, factionSheet in pairs(factionToFactionSheet) do
-        local p = factionSheet.getPosition()
+    for color, commandSheet in pairs(colorToCommandSheet) do
+        local p = commandSheet.getPosition()
         local bb = { min = { p.x, p.z }, max = { p.x, p.z } }
 
-        local bounds = factionSheet.getBounds()
-        bb.min[1] = math.min(bb.min[1], bounds.center.x - (bounds.size.x / 2))
-        bb.min[2] = math.min(bb.min[2], bounds.center.z - (bounds.size.z / 2))
-        bb.max[1] = math.max(bb.max[1], bounds.center.x + (bounds.size.x / 2))
-        bb.max[2] = math.max(bb.max[2], bounds.center.z + (bounds.size.z / 2))
-
-        local commandSheet = factionToCommandSheet[faction]
         local bounds = commandSheet.getBounds()
         bb.min[1] = math.min(bb.min[1], bounds.center.x - (bounds.size.x / 2))
         bb.min[2] = math.min(bb.min[2], bounds.center.z - (bounds.size.z / 2))
         bb.max[1] = math.max(bb.max[1], bounds.center.x + (bounds.size.x / 2))
         bb.max[2] = math.max(bb.max[2], bounds.center.z + (bounds.size.z / 2))
+
+        local faction = colorToFaction[color]
+        if faction then
+            local factionSheet = factionToFactionSheet[faction]
+            local bounds = factionSheet.getBounds()
+            bb.min[1] = math.min(bb.min[1], bounds.center.x - (bounds.size.x / 2))
+            bb.min[2] = math.min(bb.min[2], bounds.center.z - (bounds.size.z / 2))
+            bb.max[1] = math.max(bb.max[1], bounds.center.x + (bounds.size.x / 2))
+            bb.max[2] = math.max(bb.max[2], bounds.center.z + (bounds.size.z / 2))
+        end
 
         -- Get 'official' zone polygon, hard-coded from 6 and 8 player tables.
         local polygons = false
@@ -309,9 +312,8 @@ function CrLua.TI4.Zone.update()
         end
         local polygon = false
         if polygons then
-            local position = factionSheet.getPosition()
+            local position = commandSheet.getPosition()
             local pointXZ = { position.x, position.z }
-            local color = factionToColor[faction]
 
             -- First check the default zone for this color.
             polygon = polygons[color] or false
@@ -331,16 +333,31 @@ function CrLua.TI4.Zone.update()
 
         end
 
-        local color = assert(factionToColor[faction])
+        local faction = colorToFaction[faction] or false
         local tableName = TAG .. '._data.zones[color=' .. color .. ']'
         table.insert(CrLua.TI4.Zone._data.zones, CrLua.LockTable.readOnlyRequireKey(tableName, {
             color = assert(color),  -- command sheet color
-            playerColor = factionToSeatedPlayerColor[faction] or false,
-            faction = assert(faction),
-            tokenFaction = assert(factionToTokenFaction[faction]),
+            playerColor = commandSheetColorToSeatedPlayerColor[color] or false,
+            faction = faction,
+            tokenFaction = factionToTokenFaction[faction] or false,
             boundingBox = assert(bb),
             polygon = polygon or false,
             y = y
         }))
     end
+end
+
+local origOnLoad = onLoad
+function onLoad(save_state)
+    if origOnLoad then
+        origOnLoad(save_state)
+    end
+
+    print('xxx onLoad')
+    CrLua.TI4.Zone.update()
+    local lines = {}
+    for _, zone in ipairs(CrLua.TI4.Zone.all()) do
+        table.insert(lines, CrLua.TI4.Zone.vectorLines(zone, { thickness = 1 }))
+    end
+    Global.setVectorLines(lines)
 end

@@ -432,7 +432,7 @@ function CrLua.TI4.Unit._testFilterToShips()
     local filtered = CrLua.TI4.Unit.filterToShips(units)
     local count = CrLua.TI4.Unit.count(filtered)
     assert(CrLua.Table.deepEquals(count, {
-        Red = { Fighter = 1, Flagship = 1, Infantry = 1 },
+        Red = { Fighter = 1, Dreadnought = 1, Flagship = 1, Infantry = 1 },
         Blue = { Fighter = 1, Flagship = 1 },
         Green = { Fighter = 1, Flagship = 1 }
     }))
@@ -443,6 +443,7 @@ function CrLua.TI4.Unit._getTestFilterUnits()
     return {
         CrLua.TI4.Unit.unit('PDS', 'Red', 1, CrLua.TI4.Unit._fakeObject{}),
         CrLua.TI4.Unit.unit('Fighter', 'Red', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Dreadnought', 'Red', 1, CrLua.TI4.Unit._fakeObject{}),
         CrLua.TI4.Unit.unit('Infantry', 'Red', 1, CrLua.TI4.Unit._fakeObject{}),
         CrLua.TI4.Unit.unit('Flagship', 'Red', 1, CrLua.TI4.Unit._fakeObject{ name = 'The Alastor' }),
 
@@ -522,6 +523,28 @@ function CrLua.TI4.Unit._testFilterToSpaceCannon()
 end
 
 -------------------------------------------------------------------------------
+--- Get bombardment participants.
+-- @param units table : list of units.
+-- @return table : list filtered to only space cannon units.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Unit.filterToBombardment(units)
+    local function isBombardment(unit)
+        local attributes = CrLua.TI4.Unit.attributes(unit)
+        return attributes.bombardment
+    end
+    return CrLua.List.filter(units, isBombardment)
+end
+
+function CrLua.TI4.Unit._testFilterToBombardment()
+    local units = CrLua.TI4.Unit._getTestFilterUnits()
+    local filtered = CrLua.TI4.Unit.filterToBombardment(units)
+    local count = CrLua.TI4.Unit.count(filtered)
+    assert(CrLua.Table.deepEquals(count, {
+        Red = { Dreadnought = 1 }
+    }))
+end
+
+-------------------------------------------------------------------------------
 --- Get non-fighter ships.
 -- Flagship "infantry in space" do not count Infantry as ships.
 -- @param units table : list of units.
@@ -543,7 +566,7 @@ function CrLua.TI4.Unit._testfilterToNonFighterShips()
     local filtered = CrLua.TI4.Unit.filterToNonFighterShips(units)
     local count = CrLua.TI4.Unit.count(filtered)
     assert(CrLua.Table.deepEquals(count, {
-        Red = { Flagship = 1 },
+        Red = { Dreadnought = 1, Flagship = 1 },
         Blue = { Flagship = 1 },
         Green = { Flagship = 1 }
     }))

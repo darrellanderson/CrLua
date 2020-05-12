@@ -105,10 +105,6 @@ CrLua.TI4.Zone = assert(not CrLua.TI4.Zone) and {
     }
 }
 
-function onLoad(save_state)
-    -- body...
-end
-
 -------------------------------------------------------------------------------
 --- Get all zones.
 -- @return table : list of zone tables.
@@ -159,6 +155,20 @@ function CrLua.TI4.Zone.fromFaction(faction)
         if string.lower(zone.tokenFaction) == faction then
             return zone
         end
+    end
+end
+
+-------------------------------------------------------------------------------
+--- Is position inside 'tiles' area?
+-- @param position table : {x,y,z} table.
+-- @return boolean : true if inside tiles.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Zone.insideTiles(position)
+    assert(type(position) == 'table' and position.x)
+    local tilesPolygon = CrLua.TI4.Zone._data.tiles
+    if tilesPolygon then
+        local pointXZ = { position.x, position.z }
+        return CrLua.Polygon.inside(tilesPolygon, pointXZ)
     end
 end
 
@@ -460,13 +470,4 @@ function CrLua.TI4.Zone.update()
             polygon = polygon(color) or false,
         }))
     end
-end
-
-function onLoad()
-    CrLua.TI4.Zone.update()
-    local lines = CrLua.TI4.Zone.allVectorLines(1)
-    for _, line in ipairs(CrLua.TI4.Zone.allBoundingBoxVectorLines(0.5)) do
-        table.insert(lines, line)
-    end
-    Global.setVectorLines(lines)
 end

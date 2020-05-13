@@ -23,16 +23,18 @@ local TYPE = {
 }
 
 local PLASMA_SCORING_BUTTON = {
-    ['PDS'] = 'PS9',
-    ['Dreadnought'] = 'PS4',
+    ['Flagship'] = 'PS1',
     ['War Sun'] = 'PS2',
-    ['Flagship'] = 'PS1'
+    ['Dreadnought'] = 'PS4',
+    ['PDS'] = 'PS9',
+    ['Space Dock'] = 'PS10'
 }
 
 local CARDS = {
     ['PDS II'] = { owner = 'us' },
     ['Antimass Deflectors'] = { owner = 'them' },
-    ['Plasma Scoring'] = { owner = 'us' }
+    ['Plasma Scoring'] = { owner = 'us' },
+    ['Experimental Battlestation'] = { owner = 'us' }
 }
 
 -- Create functions for each TYPE, function is named for the TYPE key.
@@ -174,11 +176,13 @@ function getCards(selfColor, enemyColor)
     local result = {}
     for cardName, cardObjects in pairs(objectsByName) do
         for _, cardObject in ipairs(cardObjects) do
-            local owner = CARDS[cardName].owner
-            local zone = owner == 'us' and selfZone or enemyZone
-            if zone and CrLua.TI4.Zone.inside(zone, cardObject.getPosition()) then
-                table.insert(result, cardName)
-                break
+            if not cardObject.is_face_down then
+                local owner = CARDS[cardName].owner
+                local zone = owner == 'us' and selfZone or enemyZone
+                if zone and CrLua.TI4.Zone.inside(zone, cardObject.getPosition()) then
+                    table.insert(result, cardName)
+                    break
+                end
             end
         end
     end
@@ -203,66 +207,53 @@ function autoFill(multiRoller, playerColor, typeKey, altClick)
     local hex, adjacent = getHexes(data.lastActivatedPosition)
     local unitsInHex, unitsInAdjacent = getUnits(hex, adjacent)
     local enemyColors = CrLua.TI4.Unit.getEnemyColors(selfColor, activatingColor, unitsInHex)
-
     local enemyColor = enemyColors and #enemyColors == 1 and enemyColors[1]
+    local selfUnitsInHex = CrLua.TI4.Unit.filterToColor(unitsInHex, selfColor)
+    local selfUnitsAdacent = CrLua.TI4.Unit.filterToColor(unitsInAdjacent, selfColor)
+    local emenyUnitsInHex = enemyColor and CrLua.TI4.Unit.filterToColor(unitsInHex, enemyColor) or {}
+
     local cards = getCards(selfColor, enemyColor)
     local cardSet = CrLua.List.toSet(cards)
 
     -- Get the number of enemy non-fighter ships in hex.
     local numEnemyNonFighterShips = false
     if enemyColor then
-        local enemyUnitsInHex = CrLua.TI4.Unit.filterToColor(unitsInHex, enemyColor)
-        local enemyNonFighterShips = CrLua.TI4.Unit.filterToNonFighterShips(enemyUnitsInHex)
-        numEnemyNonFighterShips = #enemyNonFighterShips
+        local units = CrLua.TI4.Unit.filterToNonFighterShips(emenyUnitsInHex)
+        numEnemyNonFighterShips = #units
     end
 
-    local enemyHasPlanetaryShield = false
+    local enemyPlanetaryShield = false
     if enemyColor then
-        local enemyUnitsInHex = CrLua.TI4.Unit.filterToColor(unitsInHex, enemyColor)
-        -- XXX TODO
+        local units = CrLua.TI4.Unit.filterToPlanetaryShield(emenyUnitsInHex)
+        enemyHasPlanetaryShield = #units > 0
     end
 
-    -- Now that we've inspected all units, get just ours.
-    unitsInHex = CrLua.TI4.Unit.filterToColor(unitsInHex, selfColor)
-    unitsInAdjacent = CrLua.TI4.Unit.filterToColor(unitsInAdjacent, selfColor)
+    local selfIgnorePlanetaryShield = false
+    if selfColor then
+        local units = CrLua.TI4.Unit.filterToIgnorePlanetaryShield(selfUnitsInHex)
+        selfIgnorePlanetaryShield = #units > 0
+    end
 
     -- Now get just the units that matter for the combat type.
     local fillUnits = false
-    local suggestPsUnitName = false
+    local psUnit = false
     if type == TYPE.SPACE_CANNON_OFFENSE then
-        fillUnits = CrLua.TI4.Unit.filterToSpaceCannon(unitsInHex)
-        local adjacentSpaceCannons = CrLua.TI4.Unit.filterToSpaceCannon(unitsInAdjacent)
+        fillUnits = CrLua.TI4.Unit.filterToSpaceCannon(selfUnitsInHex)
+        local adjacentSpaceCannons = CrLua.TI4.Unit.filterToSpaceCannon(selfUnitsAdacent)
         for _, unit in ipairs(adjacentSpaceCannons) do
             if unit.unitName == 'Flagship' or cardSet['PDS II'] then
                 table.insert(fillUnits, unit)
             end
         end
-        local function spaceCannonValue(unit)
-            local attrs = CrLua.TI4.Unit.attributes(unit)
-            return attrs[CrLua.TI4.Unit.ATTR.SPACE_CANNON]
-        end
-        local _, suggestPs = CrLua.Util.min(fillUnits, spaceCannonValue)
-        suggestPsUnitName = suggestPs and suggestPs.unitName
+        fillUnits, psUnit = CrLua.TI4.Unit.filterToSpaceCannon(fillUnits)
     elseif type == TYPE.SPACE_COMBAT then
-        fillUnits = CrLua.TI4.Unit.filterToShips(unitsInHex)
+        fillUnits = CrLua.TI4.Unit.filterToShips(selfUnitsInHex)
     elseif type == TYPE.BOMBARDMENT then
         -- TODO XXX FILTER TO PLANET, NOT SYSTEM!
-        fillUnits = CrLua.TI4.Unit.filterToBombardment(unitsInHex)
-        local function bombardmentValue(unit)
-            local attrs = CrLua.TI4.Unit.attributes(unit)
-            return attrs[CrLua.TI4.Unit.ATTR.BOMBARDMENT]
-        end
-        local _, suggestPs = CrLua.Util.min(fillUnits, bombardmentValue)
-        suggestPsUnitName = suggestPs and suggestPs.unitName
+        fillUnits, psUnit = CrLua.TI4.Unit.filterToBombardment(selfUnitsInHex)
     elseif type == TYPE.SPACE_CANNON_DEFENSE then
         -- TODO XXX FILTER TO PLANET, NOT SYSTEM!
-        fillUnits = CrLua.TI4.Unit.filterToSpaceCannon(unitsInHex)
-        local function spaceCannonValue(unit)
-            local attrs = CrLua.TI4.Unit.attributes(unit)
-            return attrs[CrLua.TI4.Unit.ATTR.SPACE_CANNON]
-        end
-        local _, suggestPs = CrLua.Util.min(fillUnits, spaceCannonValue)
-        suggestPsUnitName = suggestPs and suggestPs.unitName
+        fillUnits, psUnit = CrLua.TI4.Unit.filterToSpaceCannon(selfUnitsInHex)
     elseif type == TYPE.GROUND_COMBAT then
         -- TODO XXX FILTER TO PLANET, NOT SYSTEM!
         fillUnits = CrLua.TI4.Unit.filterToGround(unitsInHex)
@@ -273,8 +264,19 @@ function autoFill(multiRoller, playerColor, typeKey, altClick)
     local enemyColor = enemyColors and table.concat(enemyColors, '/') or 'none'
     CrLua.Log.d(TAG, 'autoFill ' .. type .. ', ' .. selfColor .. ' vs ' .. enemyColor)
 
+    -- Employ experimental battlestation?
+    if not suggestPsUnitName and type == TYPE.SPACE_CANNON_OFFENSE and cardSet['Experimental Battlestation'] then
+        for _, unit in ipairs(CrLua.List.join(selfUnitsInHex, selfUnitsAdacent)) do
+            if unit.unitName == 'Space Dock' then
+                suggestPsUnitName = 'Space Dock'
+                break
+            end
+        end
+    end
+
     if fillUnits then
         local hasAnitmassDeflectors = cardSet['Antimass Deflectors']
+        local suggestPsUnitName = psUnit and psUnit.unitName
         injectValues(multiRoller, fillUnits, hasAnitmassDeflectors, suggestPsUnitName, numEnemyNonFighterShips)
     end
 end

@@ -411,6 +411,49 @@ function CrLua.TI4.Unit._testCountUnits()
 end
 
 -------------------------------------------------------------------------------
+--- Get units of a particular color.
+-- @param units table : list of units.
+-- @return table : list filtered to only color units.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Unit.filterToColor(units, color)
+    local function isColor(unit)
+        return unit.color == color
+    end
+    return CrLua.List.filter(units, isColor)
+end
+
+function CrLua.TI4.Unit._testFilterToColor()
+    local units = CrLua.TI4.Unit._getTestFilterUnits()
+    local filtered = CrLua.TI4.Unit.filterToColor(units, 'Red')
+    local count = CrLua.TI4.Unit.count(filtered)
+    assert(CrLua.Table.deepEquals(count, {
+        Red = { ['War Sun'] = 1, Flagship = 1, PDS = 1, Infantry = 1, Fighter = 1 }
+    }))
+end
+
+
+function CrLua.TI4.Unit._getTestFilterUnits()
+    -- Red infantry in space, blue fighters on ground, green Flagship space cannon.
+    return {
+        CrLua.TI4.Unit.unit('PDS', 'Red', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Fighter', 'Red', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Infantry', 'Red', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Flagship', 'Red', 1, CrLua.TI4.Unit._fakeObject{ name = 'The Alastor' }),
+        CrLua.TI4.Unit.unit('War Sun', 'Red', 1, CrLua.TI4.Unit._fakeObject{}),
+
+        CrLua.TI4.Unit.unit('PDS', 'Blue', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Fighter', 'Blue', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Infantry', 'Blue', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Flagship', 'Blue', 1, CrLua.TI4.Unit._fakeObject{ name = 'Matriarch' }),
+
+        CrLua.TI4.Unit.unit('PDS', 'Green', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Fighter', 'Green', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Infantry', 'Green', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Flagship', 'Green', 1, CrLua.TI4.Unit._fakeObject{ name = 'Loncara Ssodu' })
+    }
+end
+
+-------------------------------------------------------------------------------
 --- Get space-combat participants.
 -- If Flagship with "infantry in space" attribute, include Infantry of that color.
 -- @param units table : list of units.
@@ -438,31 +481,10 @@ function CrLua.TI4.Unit._testFilterToShips()
     local filtered = CrLua.TI4.Unit.filterToShips(units)
     local count = CrLua.TI4.Unit.count(filtered)
     assert(CrLua.Table.deepEquals(count, {
-        Red = { Fighter = 1, Dreadnought = 1, Flagship = 1, Infantry = 1 },
+        Red = { Fighter = 1, ['War Sun'] = 1, Flagship = 1, Infantry = 1 },
         Blue = { Fighter = 1, Flagship = 1 },
         Green = { Fighter = 1, Flagship = 1 }
     }))
-end
-
-function CrLua.TI4.Unit._getTestFilterUnits()
-    -- Red infantry in space, blue fighters on ground, green Flagship space cannon.
-    return {
-        CrLua.TI4.Unit.unit('PDS', 'Red', 1, CrLua.TI4.Unit._fakeObject{}),
-        CrLua.TI4.Unit.unit('Fighter', 'Red', 1, CrLua.TI4.Unit._fakeObject{}),
-        CrLua.TI4.Unit.unit('Dreadnought', 'Red', 1, CrLua.TI4.Unit._fakeObject{}),
-        CrLua.TI4.Unit.unit('Infantry', 'Red', 1, CrLua.TI4.Unit._fakeObject{}),
-        CrLua.TI4.Unit.unit('Flagship', 'Red', 1, CrLua.TI4.Unit._fakeObject{ name = 'The Alastor' }),
-
-        CrLua.TI4.Unit.unit('PDS', 'Blue', 1, CrLua.TI4.Unit._fakeObject{}),
-        CrLua.TI4.Unit.unit('Fighter', 'Blue', 1, CrLua.TI4.Unit._fakeObject{}),
-        CrLua.TI4.Unit.unit('Infantry', 'Blue', 1, CrLua.TI4.Unit._fakeObject{}),
-        CrLua.TI4.Unit.unit('Flagship', 'Blue', 1, CrLua.TI4.Unit._fakeObject{ name = 'Matriarch' }),
-
-        CrLua.TI4.Unit.unit('PDS', 'Green', 1, CrLua.TI4.Unit._fakeObject{}),
-        CrLua.TI4.Unit.unit('Fighter', 'Green', 1, CrLua.TI4.Unit._fakeObject{}),
-        CrLua.TI4.Unit.unit('Infantry', 'Green', 1, CrLua.TI4.Unit._fakeObject{}),
-        CrLua.TI4.Unit.unit('Flagship', 'Green', 1, CrLua.TI4.Unit._fakeObject{ name = 'Loncara Ssodu' })
-    }
 end
 
 -------------------------------------------------------------------------------
@@ -507,25 +529,33 @@ end
 --- Get scace cannon participants.
 -- Include Flagship with the "space cannon" attribute.
 -- @param units table : list of units.
--- @return table : list filtered to only space cannon units.
+-- @return table, table : list of space cannon units, best plasma scoring unit.
 -------------------------------------------------------------------------------
 function CrLua.TI4.Unit.filterToSpaceCannon(units)
+    local bestPsUnit = false
+    local bestPsValue = false
     local function isSpaceCannon(unit)
         local attributes = CrLua.TI4.Unit.attributes(unit)
-        return attributes.spaceCannon
+        local value = attributes.spaceCannon
+        if value and (not bestPsValue or value < bestPsValue) then
+            bestPsUnit = unit
+            bestPsValue = value
+        end
+        return value
     end
-    return CrLua.List.filter(units, isSpaceCannon)
+    return CrLua.List.filter(units, isSpaceCannon), bestPsUnit
 end
 
 function CrLua.TI4.Unit._testFilterToSpaceCannon()
     local units = CrLua.TI4.Unit._getTestFilterUnits()
-    local filtered = CrLua.TI4.Unit.filterToSpaceCannon(units)
+    local filtered, psUnit = CrLua.TI4.Unit.filterToSpaceCannon(units)
     local count = CrLua.TI4.Unit.count(filtered)
     assert(CrLua.Table.deepEquals(count, {
         Red = { PDS = 1 },
         Blue = { PDS = 1 },
         Green = { PDS = 1, Flagship = 1 }
     }))
+    assert(psUnit and psUnit.unitName == 'PDS')
 end
 
 -------------------------------------------------------------------------------
@@ -534,20 +564,28 @@ end
 -- @return table : list filtered to only space cannon units.
 -------------------------------------------------------------------------------
 function CrLua.TI4.Unit.filterToBombardment(units)
+    local bestPsUnit = false
+    local bestPsValue = false
     local function isBombardment(unit)
         local attributes = CrLua.TI4.Unit.attributes(unit)
-        return attributes.bombardment
+        local value = attributes.bombardment
+        if value and (not bestPsValue or value < bestPsValue) then
+            bestPsUnit = unit
+            bestPsValue = value
+        end
+        return value
     end
-    return CrLua.List.filter(units, isBombardment)
+    return CrLua.List.filter(units, isBombardment), bestPsUnit
 end
 
 function CrLua.TI4.Unit._testFilterToBombardment()
     local units = CrLua.TI4.Unit._getTestFilterUnits()
-    local filtered = CrLua.TI4.Unit.filterToBombardment(units)
+    local filtered, psUnit = CrLua.TI4.Unit.filterToBombardment(units)
     local count = CrLua.TI4.Unit.count(filtered)
     assert(CrLua.Table.deepEquals(count, {
-        Red = { Dreadnought = 1 }
+        Red = { ['War Sun'] = 1 }
     }))
+    assert(psUnit and psUnit.unitName == 'War Sun')
 end
 
 -------------------------------------------------------------------------------
@@ -572,30 +610,9 @@ function CrLua.TI4.Unit._testfilterToNonFighterShips()
     local filtered = CrLua.TI4.Unit.filterToNonFighterShips(units)
     local count = CrLua.TI4.Unit.count(filtered)
     assert(CrLua.Table.deepEquals(count, {
-        Red = { Dreadnought = 1, Flagship = 1 },
+        Red = { ['War Sun'] = 1, Flagship = 1 },
         Blue = { Flagship = 1 },
         Green = { Flagship = 1 }
-    }))
-end
-
--------------------------------------------------------------------------------
---- Get units of a particular color.
--- @param units table : list of units.
--- @return table : list filtered to only color units.
--------------------------------------------------------------------------------
-function CrLua.TI4.Unit.filterToColor(units, color)
-    local function isColor(unit)
-        return unit.color == color
-    end
-    return CrLua.List.filter(units, isColor)
-end
-
-function CrLua.TI4.Unit._testFilterToColor()
-    local units = CrLua.TI4.Unit._getTestFilterUnits()
-    local filtered = CrLua.TI4.Unit.filterToColor(units, 'Red')
-    local count = CrLua.TI4.Unit.count(filtered)
-    assert(CrLua.Table.deepEquals(count, {
-        Red = { Dreadnought = 1, Flagship = 1, PDS = 1, Infantry = 1, Fighter = 1 }
     }))
 end
 
@@ -631,6 +648,7 @@ function CrLua.TI4.Unit._testFilterToIgnorePlanetaryShield()
     local filtered = CrLua.TI4.Unit.filterToIgnorePlanetaryShield(units)
     local count = CrLua.TI4.Unit.count(filtered)
     assert(CrLua.Table.deepEquals(count, {
+        Red = { ['War Sun'] = 1 }
     }))
 end
 

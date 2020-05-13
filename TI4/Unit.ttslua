@@ -26,6 +26,12 @@ CrLua.TI4.Unit.ATTR = {
     -- Number, bombardment hit value.
     BOMBARDMENT = 'bombardment',
 
+    -- Boolean, unit has planetary shield.
+    PLANETARY_SHIELD = 'planetaryShield',
+
+    -- Boolean, unit bombardment ignores planetary shield.
+    IGNORE_PLANETARY_SHIELD = 'ignorePlanetaryShield',
+
     -- String faction name (if flagship).
     FACTION = 'faction',
 
@@ -50,9 +56,9 @@ CrLua.TI4.Unit.UNIT = {
     ['Destroyer'] = { ship = true, cost = 1 },
     ['Carrier'] = { ship = true, cost = 3 },
     ['Space Dock'] = {},
-    ['PDS'] = { spaceCannon = 5 },
+    ['PDS'] = { spaceCannon = 5, planetaryShield = true },
     ['Dreadnought'] = { ship = true, bombardment = 5, cost = 4 },
-    ['War Sun'] = { ship = true, bombardment = 3, cost = 12 },
+    ['War Sun'] = { ship = true, bombardment = 3, cost = 12, ignorePlanetaryShield = true },
     ['Flagship'] = { ship = true, cost = 8 }
 }
 
@@ -65,7 +71,7 @@ CrLua.TI4.Unit.UNIT = {
 --     - nonFighterDice boolean : dice count is equal to the number of non-fighter enemy ships?
 CrLua.TI4.Unit.FLAGSHIP = {
     ['Duha Menaimon'] = { faction = 'The Arborec' },
-    ['Arc Secundus'] = { faction = 'The Barony of Letnev', bombardment = 5 },
+    ['Arc Secundus'] = { faction = 'The Barony of Letnev', bombardment = 5, ignorePlanetaryShield = true },
     ['Son of Ragh'] = { faction = 'The Clan of Saar' },
     ['The Inferno'] = { faction = 'The Embers of Muaat' },
     ['Wrath of Kenara'] = { faction = 'The Emirates of Hacan' },
@@ -571,6 +577,63 @@ function CrLua.TI4.Unit._testfilterToNonFighterShips()
         Green = { Flagship = 1 }
     }))
 end
+
+-------------------------------------------------------------------------------
+--- Get units of a particular color.
+-- @param units table : list of units.
+-- @return table : list filtered to only color units.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Unit.filterToColor(units, color)
+    local function isColor(unit)
+        return unit.color == color
+    end
+    return CrLua.List.filter(units, isColor)
+end
+
+function CrLua.TI4.Unit._testFilterToColor()
+    local units = CrLua.TI4.Unit._getTestFilterUnits()
+    local filtered = CrLua.TI4.Unit.filterToColor(units, 'Red')
+    local count = CrLua.TI4.Unit.count(filtered)
+    assert(CrLua.Table.deepEquals(count, {
+        Red = { Dreadnought = 1, Flagship = 1, PDS = 1, Infantry = 1, Fighter = 1 }
+    }))
+end
+
+function CrLua.TI4.Unit.filterToPlanetaryShield(units)
+    local function isPlanetryShield(unit)
+        local attributes = CrLua.TI4.Unit.attributes(unit)
+        return attributes.planetaryShield
+    end
+    return CrLua.List.filter(units, isPlanetryShield)
+end
+
+function CrLua.TI4.Unit._testFilterToPlanetaryShield()
+    local units = CrLua.TI4.Unit._getTestFilterUnits()
+    local filtered = CrLua.TI4.Unit.filterToPlanetaryShield(units)
+    local count = CrLua.TI4.Unit.count(filtered)
+    assert(CrLua.Table.deepEquals(count, {
+        Red = { PDS = 1 },
+        Blue = { PDS = 1 },
+        Green = { PDS = 1 }
+    }))
+end
+
+function CrLua.TI4.Unit.filterToIgnorePlanetaryShield(units)
+    local function isIgnorePlanetryShield(unit)
+        local attributes = CrLua.TI4.Unit.attributes(unit)
+        return attributes.ignorePlanetaryShield
+    end
+    return CrLua.List.filter(units, isIgnorePlanetryShield)
+end
+
+function CrLua.TI4.Unit._testFilterToIgnorePlanetaryShield()
+    local units = CrLua.TI4.Unit._getTestFilterUnits()
+    local filtered = CrLua.TI4.Unit.filterToIgnorePlanetaryShield(units)
+    local count = CrLua.TI4.Unit.count(filtered)
+    assert(CrLua.Table.deepEquals(count, {
+    }))
+end
+
 
 -------------------------------------------------------------------------------
 --- Given a player color and a collection of units (in the activated hex),

@@ -125,63 +125,72 @@ function CrLua.TI4.System.planet(system, position)
 end
 
 -------------------------------------------------------------------------------
---- Get vector lines for merged zones containing any of the positions.
+--- Get vector lines for planet.
 -- @param system table : CrLua.TI4.System.SYSTEMS value.
--- @param positions table : list of {x,y,z} position in world coordinates.
+-- @param planet string : planet name.
 -- @param override table : vector lines parameters such as thickness, color.
--- @return table : list of vector lines.
+-- @return table : vector lines entry wrapping planet.
 -------------------------------------------------------------------------------
-function CrLua.TI4.System.positionsVectorLines(system, positions, override)
-    assert(type(system) == 'table' and system.tile and type(positions) == 'table' and type(override) == 'table')
+function CrLua.TI4.System.planetVectorLine(system, planet, override)
+    assert(type(system) == 'table' and system.tile and type(planet) == 'string' and type(override) == 'table')
     assert(system.object)
 
-    local zoneBorders = CrLua.TI4.System._getZoneBorders(system)
-    if #zoneBorders <= 2 then
-        return {}
-    end
-
-    -- Get zones from positions.
-    local wantZoneSet = {}
-    for _, position in ipairs(positions) do
-        local zoneIndex = CrLua.TI4.System._getZone(system, position)
-        wantZoneSet[zoneIndex] = true
-    end
-
-    local wantBorders = {}
-    for borderIndex = 1, #zoneBorders - 1 do
-        local prev = borderIndex > 1 and (borderIndex - 1) or (#zoneBorders - 1)
-        if wantZoneSet[borderIndex] and not wantZoneSet[prev] then
-            table.insert(wantBorders, borderIndex)
-        end
-        if not wantZoneSet[borderIndex] and wantZoneSet[prev] then
-            table.insert(wantBorders, borderIndex)
+    local planetIndex = false
+    for i, entry in ipairs(system.planets or {}) do
+        if entry == planet then
+            planetIndex = i
+            break
         end
     end
+    assert(planetIndex)
 
-    local centerPosition = system.object.positionToWorld({x = 0, y = CrLua.TI4.System.LOCAL_TO_WORLD_Y, z = 0})
-    local result = {}
-    for _, borderIndex in ipairs(wantBorders) do
-        local bearing = zoneBorders[borderIndex]
-        local edgePosition = CrLua.TI4.System._bearingToPosition(system, bearing, CrLua.TI4.System.LOCAL_TO_WORLD_RADIUS)
-        table.insert(result, {
-            points = { centerPosition, edgePosition },
-            color = override.color or 'Red',
-            thickness = override.thickness or CrLua.TI4.System.DEFAULT_LINE_THICKNESS,
-            rotation = { x = 0, y = 0, z = 0 },
-            loop = false,
-            square = true
-        })
+    local distanceToPlanet = 0
+    local bearingToPlanet = 0
+
+    local zoneBoundaries = CrLua.TI4.System._getZoneBorders(system)
+    if #zoneBoundaries > 2 then
+        local a = zoneBoundaries[planetIndex]
+        local b = zoneBoundaries[planetIndex + 1]
+        if a < b then
+            bearingToPlanet = (a + b) / 2
+        else
+            bearingToPlanet = ((a + 360 + b) / 2) % 360
+        end
+        distanceToPlanet = CrLua.TI4.System.LOCAL_TO_WORLD_RADIUS / 2.0
     end
-    return result
+
+    -- Do not specify system to get a local position.
+    local planetOrigin = CrLua.TI4.System._bearingToPosition(false, bearingToPlanet, distanceToPlanet)
+    local planetRadius = (CrLua.TI4.System.LOCAL_TO_WORLD_RADIUS / 2.0) * 0.9
+
+    local points = {}
+    for i = 1, 15 do
+        local theta = math.pi * 2.0 * i / 16.0
+        local position = {
+            x = planetOrigin.x + math.cos(theta) * planetRadius,
+            y = CrLua.TI4.System.LOCAL_TO_WORLD_Y,
+            z = planetOrigin.z + math.sin(theta) * planetRadius
+        }
+        table.insert(points, system.object.positionToWorld(position))
+    end
+
+    return {
+        points = points,
+        color = override.color or 'Red',
+        thickness = override.thickness or CrLua.TI4.System.DEFAULT_LINE_THICKNESS,
+        rotation = { x = 0, y = 0, z = 0 },
+        loop = true,
+        square = true
+    }
 end
 
 -------------------------------------------------------------------------------
 --- Get vector lines separating all zones.
 -- @param system table : CrLua.TI4.System.SYSTEMS value.
 -- @param override table : vector lines parameters such as thickness, color.
--- @return table : list of vector lines.
+-- @return table : vector lines entry.
 -------------------------------------------------------------------------------
-function CrLua.TI4.System.vectorLines(system, override)
+function CrLua.TI4.System.vectorLine(system, override)
     assert(type(system) == 'table' and system.tile and type(override) == 'table')
     assert(system.object)
 
@@ -190,21 +199,34 @@ function CrLua.TI4.System.vectorLines(system, override)
         return {}
     end
 
-    local centerPosition = system.object.positionToWorld({x = 0, y = CrLua.TI4.System.LOCAL_TO_WORLD_Y, z = 0})
-    local result = {}
+    local y = CrLua.TI4.System.LOCAL_TO_WORLD_Y
+    local center = system.object.positionToWorld({x = 0, y = y, z = 0})
+    local r = CrLua.TI4.System.LOCAL_TO_WORLD_RADIUS
+    local outer = {}
     for i = 1, #zoneBorders - 1 do
         local bearing = zoneBorders[i]
-        local edgePosition = CrLua.TI4.System._bearingToPosition(system, bearing, CrLua.TI4.System.LOCAL_TO_WORLD_RADIUS)
-        table.insert(result, {
-            points = { centerPosition, edgePosition },
-            color = override.color or 'Red',
-            thickness = override.thickness or 0.2,
-            rotation = { x = 0, y = 0, z = 0 },
-            loop = false,
-            square = true
-        })
+        table.insert(outer, CrLua.TI4.System._bearingToPosition(system, bearing, r))
     end
-    return result
+
+    local points = false
+    if #outer < 2 then
+        points = {}
+    elseif #outer == 2 then
+        points = { outer[1], center, outer[2] }
+    elseif #outer == 3 then
+        points = { outer[1], center, outer[2], center, outer[3] }
+    else
+        error(TAG .. ': too many zones')
+    end
+
+    return {
+        points = points,
+        color = override.color or 'Red',
+        thickness = override.thickness or CrLua.TI4.System.DEFAULT_LINE_THICKNESS,
+        rotation = { x = 0, y = 0, z = 0 },
+        loop = false,
+        square = true
+    }
 end
 
 -------------------------------------------------------------------------------
@@ -213,11 +235,12 @@ end
 -- @return table : list of bearings, last should equal first (wrapped).
 -------------------------------------------------------------------------------
 function CrLua.TI4.System._getZoneBorders(system)
+    assert(type(system) == 'table' and system.tile)
     if not system._zoneBorders then
         local numZones = (system.planets and #system.planets or 0) + (system.anomalies and #system.anomalies or 0)
 
         -- The local coordinate space for a tile shows {x=1,z=1} to be lower left.
-        --
+        -- Set zone borders to track planets starting left going clockwise.
         if numZones <= 1 then
             rawset(system, '_zoneBorders', { 0, 360 })
         elseif numZones == 2 then
@@ -239,6 +262,7 @@ end
 -- @return index number : zone index, planets first then wormholes (if both).
 -------------------------------------------------------------------------------
 function CrLua.TI4.System._getZone(system, position)
+    assert(type(system) == 'table' and system.tile and type(position) == 'table' and position.x)
     local bearing = CrLua.TI4.System._positionToBearing(system, position)
     local zoneBorders = CrLua.TI4.System._getZoneBorders(system)
     for i = 1, #zoneBorders - 1 do
@@ -266,8 +290,9 @@ end
 -- @return bearing number : 0 <= bearing < 360.
 -------------------------------------------------------------------------------
 function CrLua.TI4.System._positionToBearing(system, position)
+    assert(type(position) == 'table' and position.x)
     if system then
-        assert(system.object)
+        assert(type(system) == 'table' and system.tile and system.object)
         position = system.object.positionToLocal(position)
     end
 
@@ -307,10 +332,11 @@ end
 -- @return position table : position in world coordinates.
 -------------------------------------------------------------------------------
 function CrLua.TI4.System._bearingToPosition(system, bearing, r)
-    assert(type(bearing) == 'number' and 0 <= bearing and bearing < 360)
+    assert(type(bearing) == 'number' and 0 <= bearing and bearing < 360 and type(r) == 'number')
     local bearing = -bearing * math.pi / 180.0
     local result = { x = r * math.sin(bearing), y = 0, z = -r * math.cos(bearing) }
     if system then
+        assert(type(system) == 'table' and system.tile and system.object)
         result.y = CrLua.TI4.System.LOCAL_TO_WORLD_Y
         assert(system.object)
         result = system.object.positionToWorld(result)

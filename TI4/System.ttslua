@@ -1,0 +1,333 @@
+-------------------------------------------------------------------------------
+--- System utils for Darth Batman and Raptor1210's "Twilight Imperium IV" TTS mod.
+-- Inspired by Garnet Bear's Tile Rollers
+-- @author bonkersbgg on BoardGameGeek.com
+-------------------------------------------------------------------------------
+
+local TAG = 'CrLua.TI4.System'
+
+CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
+CrLua.TI4 = CrLua.TI4 or {}
+CrLua.TI4.System = assert(not CrLua.TI4.System) and {
+    _require = {},
+    _allowMissingKeys = { 'SYSTEMS' },
+
+    DEFAULT_LINE_THICKNESS = 0.2,
+    LOCAL_TO_WORLD_RADIUS = 2.26,
+    LOCAL_TO_WORLD_Y = 0.318
+}
+
+CrLua.TI4.System.SYSTEMS = {
+    ['86e50a'] = { tile = 1, planets = { 'Jord' } },
+    ['ac3193'] = { tile = 2, planets = { 'Moll Primus' } },
+    ['db8aac'] = { tile = 3, planets = { 'Darien' } },
+    ['da7879'] = { tile = 4, planets = { 'Muaat' } },
+    ['fc6f7a'] = { tile = 5, planets = { 'Nestphar' } },
+    ['420355'] = { tile = 6, planets = { '[0.0.0]' } },
+    ['087347'] = { tile = 7, planets = { 'Winnu' } },
+    ['ea676a'] = { tile = 8, planets = { 'Mordai II' } },
+    ['0122f9'] = { tile = 9, planets = { 'Maaluuk', 'Druaa' } },
+    ['e001b4'] = { tile = 10, planets = { 'Arc Prime', 'Wren Terra' } },
+    ['d39876'] = { tile = 11, planets = { 'Lisis II', 'Ragh' } },
+    ['11598c'] = { tile = 12, planets = { 'Nar', 'Jol' } },
+    ['6176bf'] = { tile = 13, planets = { "Tren'lak", 'Quinarra' } },
+    ['c2509e'] = { tile = 14, planets = { 'Archon Ren', 'Archon Tau' } },
+    ['9c373a'] = { tile = 15, planets = { 'Retillion', 'Shalloq' } },
+    ['6a4247'] = { tile = 16, planets = { 'Arretze', 'Kamdorn', 'Hercant' } },
+    ['c56a8a'] = { tile = 17, anomalies = { 'delta' } },
+    ['04df02'] = { tile = 18, planets = { 'Mecatol Rex' } },
+    ['4216fd'] = { tile = 19, planets = { 'Wellon' } },
+    ['bc4bcc'] = { tile = 20, planets = { 'Vefut II' } },
+    ['f2798a'] = { tile = 21, planets = { 'Thibah' } },
+    ['0ea77f'] = { tile = 22, planets = { "Tar'mann" } },
+    ['7975f7'] = { tile = 23, planets = { 'Saudor' } },
+    ['48cc9f'] = { tile = 24, planets = { 'Mehar Xull' } },
+    ['71e1bf'] = { tile = 25, planets = { 'Quann' }, anomalies = { 'beta' } },
+    ['f11ef5'] = { tile = 26, planets = { 'Lodor' }, anomalies = { 'alpha' } },
+    ['fc239f'] = { tile = 27, planets = { 'New Albion', 'Starpoint' } },
+    ['f8caf6'] = { tile = 28, planets = { "Tequ'ran", 'Torkan' } },
+    ['0ac98b'] = { tile = 29, planets = { "Qucen'n", 'Rarron' } },
+    ['aaae9f'] = { tile = 30, planets = { 'Mellon', 'Zohbat' } },
+    ['d5ed63'] = { tile = 31, planets = { 'Lazar', 'Sakulag' } },
+    ['48ac87'] = { tile = 32, planets = { 'Dal Bootha', 'Xxehan' } },
+    ['87a5a2'] = { tile = 33, planets = { 'Corneeq', 'Resculon' } },
+    ['eb99c0'] = { tile = 34, planets = { 'Centauri', 'Gral' } },
+    ['dd2ca7'] = { tile = 35, planets = { 'Bereg', 'Lirta IV' } },
+    ['a284d1'] = { tile = 36, planets = { 'Arnor', 'Lor' } },
+    ['e0ff33'] = { tile = 37, planets = { 'Arinam', 'Meer' } },
+    ['b958aa'] = { tile = 38, planets = { 'Abyz', 'Fria' } },
+    ['0378a4'] = { tile = 39, anomalies = { 'alpha' } },
+    ['ccd7ac'] = { tile = 40, anomalies = { 'beta' } },
+    ['47a55d'] = { tile = 41, anomalies = { 'gravity rift' } },
+    ['d13aa2'] = { tile = 42, anomalies = { 'nebula'} },
+    ['dca098'] = { tile = 43, anomalies = { 'supernova' } },
+    ['cd58c7'] = { tile = 44, anomalies = { 'asteroid field' } },
+    ['7db8d8'] = { tile = 45, anomalies = { 'asteroid field' } },
+    ['9dce5a'] = { tile = 46 },
+    ['437f06'] = { tile = 47 },
+    ['ff8f60'] = { tile = 48 },
+    ['0216be'] = { tile = 49 },
+    ['97ee53'] = { tile = 50 },
+    ['f38182'] = { tile = 51, planets = { 'Creuss' }, anomalies = { 'delta' } }
+}
+
+-------------------------------------------------------------------------------
+--- Get all systems.
+-- @return table : list of CrLua.TI4.System.SYSTEMS values, with new object field.
+-------------------------------------------------------------------------------
+function CrLua.TI4.System.getAllSystems()
+    local result = {}
+    local systems = CrLua.TI4.System.SYSTEMS
+    for _, object in ipairs(getAllObjects()) do
+        local system = systems[object.getGUID()]
+        if system then
+            rawset(system, 'object', object)  -- rawset in case locked
+            table.insert(result, system)
+        end
+    end
+    return result
+end
+
+-------------------------------------------------------------------------------
+--- Find system at position.
+-- @param position table : {x,y,z} position in world coordinates.
+-- @return system table : CrLua.TI4.System.SYSTEMS value with new object field.
+-------------------------------------------------------------------------------
+function CrLua.TI4.System.fromPosition(position)
+    assert(type(position) == 'table' and position.x)
+    local hits = Physics.cast({
+        origin = { x = position.x, y = position.y - 1, z = position.z },
+        direction = { x = 0, y = 1, z = 0 },
+        type = 1, -- ray
+        max_distance = 2,
+    })
+    local systems = CrLua.TI4.System.SYSTEMS
+    for _, hit in ipairs(hits) do
+        local object = hit.hit_object
+        local system = systems[object.getGUID()]
+        if system then
+            rawset(system, 'object', object)  -- rawset in case locked
+            return system
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
+-- Get planet at position.
+-- @param system table : CrLua.TI4.System.SYSTEMS value.
+-- @param position table : {x,y,z} position in world coordinates.
+-- @return planet string : or nil if no planet in that zone.
+-------------------------------------------------------------------------------
+function CrLua.TI4.System.planet(system, position)
+    assert(type(system) == 'table' and system.tile and type(position) == 'table' and position.x)
+    local i, _ = CrLua.TI4.System._getZone(system, position)
+    return system.planets and #system.planets >= i and system.planets[i]
+end
+
+-------------------------------------------------------------------------------
+--- Get vector lines for merged zones containing any of the positions.
+-- @param system table : CrLua.TI4.System.SYSTEMS value.
+-- @param positions table : list of {x,y,z} position in world coordinates.
+-- @param override table : vector lines parameters such as thickness, color.
+-- @return table : list of vector lines.
+-------------------------------------------------------------------------------
+function CrLua.TI4.System.positionsVectorLines(system, positions, override)
+    assert(type(system) == 'table' and system.tile and type(positions) == 'table' and type(override) == 'table')
+    assert(system.object)
+
+    local zoneBorders = CrLua.TI4.System._getZoneBorders(system)
+    if #zoneBorders <= 2 then
+        return {}
+    end
+
+    -- Get zones from positions.
+    local wantZoneSet = {}
+    for _, position in ipairs(positions) do
+        local zoneIndex = CrLua.TI4.System._getZone(system, position)
+        wantZoneSet[zoneIndex] = true
+    end
+
+    local wantBorders = {}
+    for borderIndex = 1, #zoneBorders - 1 do
+        local prev = borderIndex > 1 and (borderIndex - 1) or (#zoneBorders - 1)
+        if wantZoneSet[borderIndex] and not wantZoneSet[prev] then
+            table.insert(wantBorders, borderIndex)
+        end
+        if not wantZoneSet[borderIndex] and wantZoneSet[prev] then
+            table.insert(wantBorders, borderIndex)
+        end
+    end
+
+    local centerPosition = system.object.positionToWorld({x = 0, y = CrLua.TI4.System.LOCAL_TO_WORLD_Y, z = 0})
+    local result = {}
+    for _, borderIndex in ipairs(wantBorders) do
+        local bearing = zoneBorders[borderIndex]
+        local edgePosition = CrLua.TI4.System._bearingToPosition(system, bearing, CrLua.TI4.System.LOCAL_TO_WORLD_RADIUS)
+        table.insert(result, {
+            points = { centerPosition, edgePosition },
+            color = override.color or 'Red',
+            thickness = override.thickness or CrLua.TI4.System.DEFAULT_LINE_THICKNESS,
+            rotation = { x = 0, y = 0, z = 0 },
+            loop = false,
+            square = true
+        })
+    end
+    return result
+end
+
+-------------------------------------------------------------------------------
+--- Get vector lines separating all zones.
+-- @param system table : CrLua.TI4.System.SYSTEMS value.
+-- @param override table : vector lines parameters such as thickness, color.
+-- @return table : list of vector lines.
+-------------------------------------------------------------------------------
+function CrLua.TI4.System.vectorLines(system, override)
+    assert(type(system) == 'table' and system.tile and type(override) == 'table')
+    assert(system.object)
+
+    local zoneBorders = CrLua.TI4.System._getZoneBorders(system)
+    if #zoneBorders <= 2 then
+        return {}
+    end
+
+    local centerPosition = system.object.positionToWorld({x = 0, y = CrLua.TI4.System.LOCAL_TO_WORLD_Y, z = 0})
+    local result = {}
+    for i = 1, #zoneBorders - 1 do
+        local bearing = zoneBorders[i]
+        local edgePosition = CrLua.TI4.System._bearingToPosition(system, bearing, CrLua.TI4.System.LOCAL_TO_WORLD_RADIUS)
+        table.insert(result, {
+            points = { centerPosition, edgePosition },
+            color = override.color or 'Red',
+            thickness = override.thickness or 0.2,
+            rotation = { x = 0, y = 0, z = 0 },
+            loop = false,
+            square = true
+        })
+    end
+    return result
+end
+
+-------------------------------------------------------------------------------
+--- Get bearings separating zones.
+-- @param system table : CrLua.TI4.System.SYSTEMS value.
+-- @return table : list of bearings, last should equal first (wrapped).
+-------------------------------------------------------------------------------
+function CrLua.TI4.System._getZoneBorders(system)
+    if not system._zoneBorders then
+        local numZones = (system.planets and #system.planets or 0) + (system.anomalies and #system.anomalies or 0)
+
+        -- The local coordinate space for a tile shows {x=1,z=1} to be lower left.
+        --
+        if numZones <= 1 then
+            rawset(system, '_zoneBorders', { 0, 360 })
+        elseif numZones == 2 then
+            rawset(system, '_zoneBorders', { 240, 60, 240 })
+        elseif numZones == 3 then
+            rawset(system, '_zoneBorders', { 330, 90, 210, 330 })
+        else
+            error(TAG .. ': too many zones (' .. numZones .. ')')
+        end
+
+    end
+    return assert(system._zoneBorders)
+end
+
+-------------------------------------------------------------------------------
+--- Which zone contains position?
+-- @param system table : CrLua.TI4.System.SYSTEMS value.
+-- @param position table : {x,y,z} position in local coordinates.
+-- @return index number : zone index, planets first then wormholes (if both).
+-------------------------------------------------------------------------------
+function CrLua.TI4.System._getZone(system, position)
+    local bearing = CrLua.TI4.System._positionToBearing(system, position)
+    local zoneBorders = CrLua.TI4.System._getZoneBorders(system)
+    for i = 1, #zoneBorders - 1 do
+        local a = zoneBorders[i]
+        local b = zoneBorders[i + 1]
+        if a < b then
+            if bearing >= a and bearing <= b then
+                return i
+            end
+        else
+            -- Zone wraps across zero.
+            if bearing >= a or bearing <= b then
+                return i
+            end
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
+--- Compute the bearing from the system center to the world position.
+-- Bearing is the angle, measured clockwise about the Y axis from the
+-- "north" direction.
+-- @param system table : CrLua.TI4.System.SYSTEMS value.
+-- @param position table : {x,y,z} position in world coordinates.
+-- @return bearing number : 0 <= bearing < 360.
+-------------------------------------------------------------------------------
+function CrLua.TI4.System._positionToBearing(system, position)
+    if system then
+        assert(system.object)
+        position = system.object.positionToLocal(position)
+    end
+
+    -- Compute bearing in radians.
+    local bearing = math.atan2(position.z, -position.x) + (math.pi / 2)
+
+    -- Convert to degrees between 0 and 360.
+    bearing = (bearing * 180.0 / math.pi) % 360.0
+    if bearing < 0 then
+        bearing = bearing + 360.0
+    end
+
+    assert(0 <= bearing and bearing < 360)
+    return bearing
+end
+
+function CrLua.TI4.System._testPositionToBearing()
+    local positionsToBearings = {
+        [{ x = 0, z = -1 }] = 0,
+        [{ x = -1, z = -1 }] = 45,
+        [{ x = -1, z = 0 }] = 90,
+        [{ x = 0, z = 1 }] = 180,
+        [{ x = 1, z = 0 }] = 270
+    }
+    for position, expected in pairs(positionsToBearings) do
+        local observed = CrLua.TI4.System._positionToBearing(false, position)
+        assert(expected == observed, expected .. ' saw ' .. observed)
+    end
+end
+
+-------------------------------------------------------------------------------
+--- Compute the world position at the given bearing (relative to system tile
+-- orientation) at distance r from the system center.
+-- @param system table : CrLua.TI4.System.SYSTEMS value.
+-- @param bearing number : angle in degrees, clockwise from "north".
+-- @param r number : distance from center of tile to result point (in local space!).
+-- @return position table : position in world coordinates.
+-------------------------------------------------------------------------------
+function CrLua.TI4.System._bearingToPosition(system, bearing, r)
+    assert(type(bearing) == 'number' and 0 <= bearing and bearing < 360)
+    local bearing = -bearing * math.pi / 180.0
+    local result = { x = r * math.sin(bearing), y = 0, z = -r * math.cos(bearing) }
+    if system then
+        result.y = CrLua.TI4.System.LOCAL_TO_WORLD_Y
+        assert(system.object)
+        result = system.object.positionToWorld(result)
+    end
+    return result
+end
+
+function CrLua.TI4.System._testBearingToPosition()
+    local positionsToBearings = {
+        [{ x = 0, z = -1 }] = 0,
+        [{ x = -1, z = 0 }] = 90,
+        [{ x = 0, z = 1 }] = 180,
+        [{ x = 1, z = 0 }] = 270
+    }
+    for position, bearing in pairs(positionsToBearings) do
+        local observed = CrLua.TI4.System._bearingToPosition(false, bearing, 1)
+        assert(math.abs(observed.x - position.x) < 0.001, 'x ' .. observed.x .. ' vs ' .. position.x)
+        assert(math.abs(observed.z - position.z) < 0.001, 'z ' .. observed.z .. ' vs ' .. position.z)
+    end
+end

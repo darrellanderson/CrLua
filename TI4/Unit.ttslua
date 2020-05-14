@@ -23,6 +23,9 @@ CrLua.TI4.Unit.ATTR = {
     -- Number, space cannon hit value.
     SPACE_CANNON = 'spaceCannon',
 
+    -- Boolean, has AFB.
+    ANTI_FIGHTER_BARRAGE = 'antiFighterBarrage',
+
     -- Number, bombardment hit value.
     BOMBARDMENT = 'bombardment',
 
@@ -53,7 +56,7 @@ CrLua.TI4.Unit.UNIT = {
     ['Infantry'] = { cost = 0.5 },
     ['Fighter'] = { ship = true, cost = 0.5 },
     ['Cruiser'] = { ship = true, cost = 2 },
-    ['Destroyer'] = { ship = true, cost = 1 },
+    ['Destroyer'] = { ship = true, antiFighterBarrage = true, cost = 1 },
     ['Carrier'] = { ship = true, cost = 3 },
     ['Space Dock'] = {},
     ['PDS'] = { spaceCannon = 5, planetaryShield = true },
@@ -72,7 +75,7 @@ CrLua.TI4.Unit.UNIT = {
 CrLua.TI4.Unit.FLAGSHIP = {
     ['Duha Menaimon'] = { faction = 'The Arborec' },
     ['Arc Secundus'] = { faction = 'The Barony of Letnev', bombardment = 5, ignorePlanetaryShield = true },
-    ['Son of Ragh'] = { faction = 'The Clan of Saar' },
+    ['Son of Ragh'] = { faction = 'The Clan of Saar', antiFighterBarrage = true },
     ['The Inferno'] = { faction = 'The Embers of Muaat' },
     ['Wrath of Kenara'] = { faction = 'The Emirates of Hacan' },
     ['Genesis'] = { faction = 'The Federation of Sol' },
@@ -427,7 +430,7 @@ function CrLua.TI4.Unit._testFilterToColor()
     local filtered = CrLua.TI4.Unit.filterToColor(units, 'Red')
     local count = CrLua.TI4.Unit.count(filtered)
     assert(CrLua.Table.deepEquals(count, {
-        Red = { ['War Sun'] = 1, Flagship = 1, PDS = 1, Infantry = 1, Fighter = 1 }
+        Red = { ['War Sun'] = 1, Flagship = 1, PDS = 1, Infantry = 1, Fighter = 1, Destroyer = 1 }
     }))
 end
 
@@ -440,6 +443,7 @@ function CrLua.TI4.Unit._getTestFilterUnits()
         CrLua.TI4.Unit.unit('Infantry', 'Red', 1, CrLua.TI4.Unit._fakeObject{}),
         CrLua.TI4.Unit.unit('Flagship', 'Red', 1, CrLua.TI4.Unit._fakeObject{ name = 'The Alastor' }),
         CrLua.TI4.Unit.unit('War Sun', 'Red', 1, CrLua.TI4.Unit._fakeObject{}),
+        CrLua.TI4.Unit.unit('Destroyer', 'Red', 1, CrLua.TI4.Unit._fakeObject{}),
 
         CrLua.TI4.Unit.unit('PDS', 'Blue', 1, CrLua.TI4.Unit._fakeObject{}),
         CrLua.TI4.Unit.unit('Fighter', 'Blue', 1, CrLua.TI4.Unit._fakeObject{}),
@@ -481,7 +485,7 @@ function CrLua.TI4.Unit._testFilterToShips()
     local filtered = CrLua.TI4.Unit.filterToShips(units)
     local count = CrLua.TI4.Unit.count(filtered)
     assert(CrLua.Table.deepEquals(count, {
-        Red = { Fighter = 1, ['War Sun'] = 1, Flagship = 1, Infantry = 1 },
+        Red = { Fighter = 1, ['War Sun'] = 1, Destroyer = 1, Flagship = 1, Infantry = 1 },
         Blue = { Fighter = 1, Flagship = 1 },
         Green = { Fighter = 1, Flagship = 1 }
     }))
@@ -559,6 +563,28 @@ function CrLua.TI4.Unit._testFilterToSpaceCannon()
 end
 
 -------------------------------------------------------------------------------
+--- Get anti-fighter barrage participants.
+-- @param units table : list of units.
+-- @return table : list filtered to only anti-fighter barrage units.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Unit.filterToAntiFighterBarrage(units)
+    local function isAntiFighterBarrage(unit)
+        local attributes = CrLua.TI4.Unit.attributes(unit)
+        return attributes.antiFighterBarrage
+    end
+    return CrLua.List.filter(units, isAntiFighterBarrage)
+end
+
+function CrLua.TI4.Unit._testFilterToAntiFighterBarrage()
+    local units = CrLua.TI4.Unit._getTestFilterUnits()
+    local filtered = CrLua.TI4.Unit.filterToAntiFighterBarrage(units)
+    local count = CrLua.TI4.Unit.count(filtered)
+    assert(CrLua.Table.deepEquals(count, {
+        Red = { Destroyer = 1 }
+    }))
+end
+
+-------------------------------------------------------------------------------
 --- Get bombardment participants.
 -- @param units table : list of units.
 -- @return table : list filtered to only space cannon units.
@@ -610,7 +636,7 @@ function CrLua.TI4.Unit._testfilterToNonFighterShips()
     local filtered = CrLua.TI4.Unit.filterToNonFighterShips(units)
     local count = CrLua.TI4.Unit.count(filtered)
     assert(CrLua.Table.deepEquals(count, {
-        Red = { ['War Sun'] = 1, Flagship = 1 },
+        Red = { ['War Sun'] = 1, Flagship = 1, Destroyer = 1 },
         Blue = { Flagship = 1 },
         Green = { Flagship = 1 }
     }))

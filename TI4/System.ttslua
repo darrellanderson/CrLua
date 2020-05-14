@@ -33,7 +33,7 @@ CrLua.TI4.System.SYSTEMS = {
     ['6176bf'] = { tile = 13, planets = { "Tren'lak", 'Quinarra' } },
     ['c2509e'] = { tile = 14, planets = { 'Archon Ren', 'Archon Tau' } },
     ['9c373a'] = { tile = 15, planets = { 'Retillion', 'Shalloq' } },
-    ['6a4247'] = { tile = 16, planets = { 'Arretze', 'Kamdorn', 'Hercant' } },
+    ['6a4247'] = { tile = 16, planets = { 'Hercant', 'Arretze', 'Kamdorn' } },
     ['c56a8a'] = { tile = 17, anomalies = { 'delta' } },
     ['04df02'] = { tile = 18, planets = { 'Mecatol Rex' } },
     ['4216fd'] = { tile = 19, planets = { 'Wellon' } },
@@ -223,7 +223,7 @@ function CrLua.TI4.System._getZoneBorders(system)
         elseif numZones == 2 then
             rawset(system, '_zoneBorders', { 240, 60, 240 })
         elseif numZones == 3 then
-            rawset(system, '_zoneBorders', { 330, 90, 210, 330 })
+            rawset(system, '_zoneBorders', { 210, 330, 90, 210 })
         else
             error(TAG .. ': too many zones (' .. numZones .. ')')
         end

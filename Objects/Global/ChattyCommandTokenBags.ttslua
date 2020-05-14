@@ -47,7 +47,7 @@ local function reportCommandTokenTransaction(container, object, quantity)
     if _ctWaitId then
         Wait.stop(_ctWaitId)
     end
-    _ctWaitId = Wait.frames(delayedReport, 10)
+    _ctWaitId = Wait.time(delayedReport, 5)
 end
 
 local originalOnObjectLeaveContainer = onObjectLeaveContainer

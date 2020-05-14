@@ -11,15 +11,17 @@ local data = {
     visualizeHexes = true,
     panelToMultiRoller = false,
     multiRollerToColor = false,
-    lastActivatedPosition = false
+    lastActivatedPosition = false,
+    perPlanetButtons = {}  -- map from function name to button index
 }
 
 local TYPE = {
-    SPACE_CANNON_OFFENSE = 'Space Cannon Offense',
-    SPACE_COMBAT = 'Space Combat',
-    BOMBARDMENT = 'Bombardment',
-    SPACE_CANNON_DEFENSE = 'Space Cannon Defense',
-    GROUND_COMBAT = 'Ground Combat'
+    SPACE_CANNON_OFFENSE = { name = 'Space Cannon Offense' },
+    ANTI_FIGHTER_BARRAGE = { name = 'Anti-Fighter Barrage' },
+    SPACE_COMBAT = { name = 'Space Combat' },
+    BOMBARDMENT = { name = 'Bombardment', perPlanet = true },
+    SPACE_CANNON_DEFENSE = { name = 'Space Cannon Defense', perPlanet = true },
+    GROUND_COMBAT = { name = 'Ground Combat', perPlanet = true }
 }
 
 local PLASMA_SCORING_BUTTON = {
@@ -37,16 +39,26 @@ local CARDS = {
     ['Experimental Battlestation'] = { owner = 'us' }
 }
 
+function getAutoFillFunctionName(type, planetIndex)
+    return type .. (planetIndex and '_' .. planetIndex or '')
+end
+
 -- Create functions for each TYPE, function is named for the TYPE key.
-for k, v in pairs(TYPE) do
-    local function redirectOnClick(buttonContainer, playerClickColor, altClick)
-        -- Get the MultiRoller associate with this auto-fill panel.
-        local multiRoller = data.panelToMultiRoller[buttonContainer]
-        local playerColor = data.multiRollerToColor[multiRoller]
-        autoFill(multiRoller, playerColor, k, altClick)
+-- Create _1, _2, and _3 variants for multi-planet systems.
+for type, _ in pairs(TYPE) do
+    local attributes = TYPE[type]
+    local max = attributes.perPlanet and 3 or 1
+    for i = 1, max do
+        local function redirectOnClick(buttonContainer, playerClickColor, altClick)
+            -- Get the MultiRoller associate with this auto-fill panel.
+            local multiRoller = data.panelToMultiRoller[buttonContainer]
+            local playerColor = data.multiRollerToColor[multiRoller]
+            autoFill(multiRoller, playerColor, type, max > 1 and i, altClick)
+        end
+        local functionName = getAutoFillFunctionName(type, max > 1 and i)
+        assert(not self.getVar(functionName))
+        self.setVar(functionName, redirectOnClick)
     end
-    assert(not _G[k])
-    _G[k] = redirectOnClick
 end
 
 -------------------------------------------------------------------------------
@@ -59,17 +71,6 @@ function onLoad(save_state)
 
     removeAutoFillButtonsFromMultiRollers()
     Wait.frames(addAutoFillButtonsToMultiRollers, 20)
-
-    Global.setVectorLines(CrLua.TI4.Zone.allVectorLines(1))
-end
-
-function onDrop(playerColor)
-    CrLua.Log.d(TAG, 'onDrop')
-    local position = self.getPosition()
-    local hex, adjacent = getHexes(position)
-    local unitsInHex, unitsInAdjacent = getUnits(hex, adjacent)
-    CrLua.Log.d(TAG, 'unitsInHex', unitsInHex)
-    CrLua.Log.d(TAG, 'unitsInAdjacent', unitsInAdjacent)
 end
 
 function onPlayerTurnStart(playerColorStart, playerColorPrevious)
@@ -93,6 +94,8 @@ function onObjectDrop(playerColor, droppedObject)
 
     CrLua.Log.d(TAG, 'onObjectDrop: activated by ' .. playerColor)
     data.lastActivatedPosition = droppedObject.getPosition()
+
+    updateAutoFillButtonsForActivatedSystem()
 end
 
 -------------------------------------------------------------------------------
@@ -135,7 +138,6 @@ end
 --- Get units in the position's hex, as well as units in adjacent hexes.
 function getUnits(hex, adjacentHexes)
     assert(type(hex) == 'string' and not adjacentHexes or type(adjacentHexes) == 'table')
-    CrLua.Log.d(TAG, 'getUnits: hex = ' .. hex .. ', adjacentHexes=', adjacentHexes)
 
     -- Get units in this hex and adjacent hexes.
     -- As a side-effect, filter adds 'hex' to each unit.
@@ -191,51 +193,65 @@ end
 
 -------------------------------------------------------------------------------
 
-function autoFill(multiRoller, playerColor, typeKey, altClick)
+function autoFill(multiRoller, selfColor, typeKey, planetIndex, altClick)
     local type = assert(TYPE[typeKey])
 
     if not data.lastActivatedPosition then
         error(TAG .. ': no activated system')
     end
 
-    local selfColor = data.multiRollerToColor and data.multiRollerToColor[multiRoller]
-    if not selfColor then
-        error(TAG .. ': MultiRoller does not have an associated color?')
-    end
-    local activatingColor = Turns.turn_color
-
+    -- Get units in hex and adjacent (including wormholes) systems.
     local hex, adjacent = getHexes(data.lastActivatedPosition)
     local unitsInHex, unitsInAdjacent = getUnits(hex, adjacent)
+
+    -- If per-planet, restrict to units in hex to those on the given planet.
+    if planetIndex then
+        local system = CrLua.TI4.System.fromPosition(data.lastActivatedPosition)
+        if system and system.planets and #system.planets >= planetIndex then
+            local planet = system.planets[planetIndex]
+            local onPlanet = {}
+            for _, unit in ipairs(unitsInHex) do
+                if CrLua.TI4.System.planet(system, unit.object.getPosition()) == planet then
+                    table.insert(onPlanet, unit)
+                end
+            end
+            unitsInHex = onPlanet
+            unitsInAdjacent = {}
+        end
+    end
+
+    -- Deduce enemy color as the only non-self in the system.
+    local activatingColor = Turns.turn_color
     local enemyColors = CrLua.TI4.Unit.getEnemyColors(selfColor, activatingColor, unitsInHex)
-    local enemyColor = enemyColors and #enemyColors == 1 and enemyColors[1]
+    if enemyColors and #enemyColors > 1 then
+        error(TAG .. ': multiple enemies? (' .. table.concat(enemyColors, ', ') .. ')')
+    end
+    local enemyColor = enemyColors and enemyColors[1]
+
+    -- Split into self and enemy units.
     local selfUnitsInHex = CrLua.TI4.Unit.filterToColor(unitsInHex, selfColor)
     local selfUnitsAdacent = CrLua.TI4.Unit.filterToColor(unitsInAdjacent, selfColor)
     local emenyUnitsInHex = enemyColor and CrLua.TI4.Unit.filterToColor(unitsInHex, enemyColor) or {}
+    unitsInHex = nil
+    unitsInAdjacent = nil
 
+    -- Get cards.
     local cards = getCards(selfColor, enemyColor)
     local cardSet = CrLua.List.toSet(cards)
 
-    -- Get the number of enemy non-fighter ships in hex.
-    local numEnemyNonFighterShips = false
-    if enemyColor then
-        local units = CrLua.TI4.Unit.filterToNonFighterShips(emenyUnitsInHex)
-        numEnemyNonFighterShips = #units
-    end
-
-    local enemyPlanetaryShield = false
+    -- Is bombardment allowed?
+    local planetaryShield = false
     if enemyColor then
         local units = CrLua.TI4.Unit.filterToPlanetaryShield(emenyUnitsInHex)
-        enemyHasPlanetaryShield = #units > 0
+        planetaryShield = planetaryShield or #units > 0
     end
-
-    local selfIgnorePlanetaryShield = false
     if selfColor then
         local units = CrLua.TI4.Unit.filterToIgnorePlanetaryShield(selfUnitsInHex)
-        selfIgnorePlanetaryShield = #units > 0
+        planetaryShield = planetaryShield and #units == 0
     end
 
     -- Now get just the units that matter for the combat type.
-    local fillUnits = false
+    local fillUnits = {}
     local psUnit = false
     if type == TYPE.SPACE_CANNON_OFFENSE then
         fillUnits = CrLua.TI4.Unit.filterToSpaceCannon(selfUnitsInHex)
@@ -246,48 +262,56 @@ function autoFill(multiRoller, playerColor, typeKey, altClick)
             end
         end
         fillUnits, psUnit = CrLua.TI4.Unit.filterToSpaceCannon(fillUnits)
+    elseif type == TYPE.ANTI_FIGHTER_BARRAGE then
+        fillUnits = CrLua.TI4.Unit.filterToAntiFighterBarrage(selfUnitsInHex)
     elseif type == TYPE.SPACE_COMBAT then
         fillUnits = CrLua.TI4.Unit.filterToShips(selfUnitsInHex)
     elseif type == TYPE.BOMBARDMENT then
-        -- TODO XXX FILTER TO PLANET, NOT SYSTEM!
         fillUnits, psUnit = CrLua.TI4.Unit.filterToBombardment(selfUnitsInHex)
+        if planetaryShield then
+            fillUnits = {}
+        end
     elseif type == TYPE.SPACE_CANNON_DEFENSE then
-        -- TODO XXX FILTER TO PLANET, NOT SYSTEM!
         fillUnits, psUnit = CrLua.TI4.Unit.filterToSpaceCannon(selfUnitsInHex)
     elseif type == TYPE.GROUND_COMBAT then
-        -- TODO XXX FILTER TO PLANET, NOT SYSTEM!
-        fillUnits = CrLua.TI4.Unit.filterToGround(unitsInHex)
+        fillUnits = CrLua.TI4.Unit.filterToGround(selfUnitsInHex)
     else
-        error(TAG .. ' unknown type "' .. type .. "'")
+        error(TAG .. ' unknown type "' .. type.name .. "'")
     end
 
     local enemyColor = enemyColors and table.concat(enemyColors, '/') or 'none'
-    CrLua.Log.d(TAG, 'autoFill ' .. type .. ', ' .. selfColor .. ' vs ' .. enemyColor)
+    CrLua.Log.d(TAG, 'autoFill ' .. type.name .. ', ' .. selfColor .. ' vs ' .. enemyColor)
 
     -- Employ experimental battlestation?
-    if not suggestPsUnitName and type == TYPE.SPACE_CANNON_OFFENSE and cardSet['Experimental Battlestation'] then
+    if not psUnit and type == TYPE.SPACE_CANNON_OFFENSE and cardSet['Experimental Battlestation'] then
         for _, unit in ipairs(CrLua.List.join(selfUnitsInHex, selfUnitsAdacent)) do
             if unit.unitName == 'Space Dock' then
-                suggestPsUnitName = 'Space Dock'
+                psUnit = unit
                 break
             end
         end
     end
 
     if fillUnits then
-        local hasAnitmassDeflectors = cardSet['Antimass Deflectors']
-        local suggestPsUnitName = psUnit and psUnit.unitName
-        injectValues(multiRoller, fillUnits, hasAnitmassDeflectors, suggestPsUnitName, numEnemyNonFighterShips)
+        injectValues{
+            multiRoller = assert(multiRoller),
+            units = assert(fillUnits),
+            hasAntimassDeflectors = cardSet['Antimass Deflectors'],
+            suggestPdsUnitName = psUnit and psUnit.unitName,
+            numEnemyNonFighterShips = #CrLua.TI4.Unit.filterToNonFighterShips(emenyUnitsInHex),
+            selfColor = assert(selfColor)
+        }
     end
 end
 
 -------------------------------------------------------------------------------
 
-function injectValues(multiRoller, units, hasAntimassDeflectors, suggestPdsUnitName, numEnemyNonFighterShips)
-    multiRoller.call('resetCounters')
+function injectValues(parameters)
+    assert(parameters.multiRoller and parameters.units)
+    parameters.multiRoller.call('resetCounters')
 
     local unitCount = {}
-    for _, unit in ipairs(units) do
+    for _, unit in ipairs(parameters.units) do
         local unitName = assert(unit.unitName)
         local count = assert(unit.count)
 
@@ -295,21 +319,21 @@ function injectValues(multiRoller, units, hasAntimassDeflectors, suggestPdsUnitN
         if unitName == 'Flagship' then
             local attrs = CrLua.TI4.Unit.attributes(unit)
             if attrs[CrLua.TI4.Unit.ATTR.NON_FIGHTER_DICE] then
-                count = numEnemyNonFighterShips
+                count = parameters.numEnemyNonFighterShips or 0
             end
         end
 
         unitCount[unitName] = (unitCount[unitName] or 0) + count
     end
 
-    local inputs = multiRoller.getInputs()
+    local inputs = parameters.multiRoller.getInputs()
     for unitName, count in pairs(unitCount) do
         local inputLabel = 'UNIT:' .. unitName
         local found = false
         for _, input in ipairs(inputs) do
             if input.label == inputLabel then
                 found = true
-                multiRoller.editInput({ index = input.index, value = count })
+                parameters.multiRoller.editInput({ index = input.index, value = count })
                 break
             end
         end
@@ -318,17 +342,61 @@ function injectValues(multiRoller, units, hasAntimassDeflectors, suggestPdsUnitN
         end
     end
 
-    if hasAntimassDeflectors then
-        multiRoller.call('clickAMD')
+    if parameters.hasAntimassDeflectors then
+        parameters.multiRoller.call('clickAMD')
     end
 
-    if suggestPdsUnitName then
-        local button = assert(PLASMA_SCORING_BUTTON[suggestPdsUnitName])
-        multiRoller.call(button)
+    if parameters.suggestPdsUnitName then
+        local button = assert(PLASMA_SCORING_BUTTON[parameters.suggestPdsUnitName])
+        parameters.multiRoller.call(button)
+    end
+
+    -- Click the "update button" by calling the associated downstream function.
+    -- Technically calling "shipPlus" above also does this, but do it again in
+    -- case that changes in the future.
+    parameters.multiRoller.call('detectCards', parameters.selfColor)
+end
+
+-------------------------------------------------------------------------------
+
+function updateAutoFillButtonsForActivatedSystem()
+    local planets = {}
+    if data.lastActivatedPosition then
+        local system = CrLua.TI4.System.fromPosition(data.lastActivatedPosition)
+        planets = system and system.planets or {}
+    end
+    CrLua.Log.d(TAG, 'planets', planets)
+
+    local function getButton(panel, buttonIndex)
+        local buttons = panel.getButtons()
+        for _, button in ipairs(buttons) do
+            if button.index == buttonIndex then
+                return button
+            end
+        end
+    end
+
+    local panels = getAutoFillPanels()
+    for _, panel in ipairs(panels) do
+        for planetIndex, buttonIndices in pairs(data.perPlanetButtons) do
+            for buttonIndex, clickFunction in pairs(buttonIndices) do
+                local button = assert(getButton(panel, buttonIndex))
+                if planetIndex <= #planets then
+                    button.click_function = clickFunction
+                    button.label = 'AUTO-FILL\n' .. string.upper(planets[planetIndex])
+                else
+                    button.click_function = '_doNothing'
+                    button.label = 'N/A'
+                end
+                panel.editButton(button)
+            end
+        end
     end
 end
 
 -------------------------------------------------------------------------------
+
+function _doNothing() end
 
 function spawnAutoFillPanelForMultiRoller(multiRoller)
     -- Create a new panel for the buttons.
@@ -336,7 +404,7 @@ function spawnAutoFillPanelForMultiRoller(multiRoller)
     local panelPos = multiRoller.positionToWorld({
         x = 0,
         y = 0,
-        z = 1.15
+        z = 1.4 --1.15
     })
     local panel = spawnObject({
         type = 'Custom_Tile',
@@ -344,7 +412,7 @@ function spawnAutoFillPanelForMultiRoller(multiRoller)
         scale = {
             x = 9.95,
             y = 1,
-            z = 1.3
+            z = 3.4
         },
         rotation = multiRoller.getRotation(),
         snap_to_grid = false,
@@ -365,14 +433,14 @@ function spawnAutoFillPanelForMultiRoller(multiRoller)
     panel.setPosition(panelPos)
     panel.setLock(true)
 
-    local fontSize = 300
-    local width = 2800
+    local fontSize = 220
+    local width = 1400
     local height = 600
-    local x0 = -0.7
-    local dx = 0.7
+    local x0 = -0.8
+    local dx = 0.32
     local y = 0.201
-    local z0 = 0
-    local dz = 0
+    local z0 = -0.7
+    local dz = 0.46
 
     local invScale = panel.getScale()
     local buttonScale = { x = 1.0 / invScale.x, y = 1.0 / invScale.y, z = 1.0 / invScale.z }
@@ -380,37 +448,46 @@ function spawnAutoFillPanelForMultiRoller(multiRoller)
     -- Note: the function_owner is used to locate the function, and must be
     -- "self".  When the function gets called, the first parameter "obj"
     -- will be the object the button is connected to via createButton.
+    local typeIndex = 0
+    local buttonIndex = 0
+    for type, attributes in pairs(TYPE) do
+        panel.createButton({
+            click_function = '_doNothing',
+            function_owner = self,
+            label = string.gsub(string.upper(attributes.name), ' ', '\n'),
+            font_size = fontSize,
+            width = 0,
+            height = 0,
+            position = { x = x0 + typeIndex * dx, y = y, z = z0 + 0 * dz },
+            scale = buttonScale,
+        })
+        buttonIndex = buttonIndex + 1
 
-    panel.createButton({
-        click_function = 'SPACE_CANNON_OFFENSE',
-        function_owner = self,
-        label = 'AUTO-FILL PDS',
-        font_size = fontSize,
-        width = width,
-        height = height,
-        position = { x = x0 + dx * 0, y = y, z = z0 + dz * 0 },
-        scale = buttonScale,
-    })
-    panel.createButton({
-        click_function = 'SPACE_COMBAT',
-        function_owner = self,
-        label = 'AUTO-FILL SHIPS',
-        font_size = fontSize,
-        width = width,
-        height = height,
-        position = { x = x0 + dx * 1, y = y, z = z0 + dz * 1 },
-        scale = buttonScale,
-    })
-    panel.createButton({
-        click_function = 'GROUND_COMBAT',
-        function_owner = self,
-        label = 'AUTO-FILL GROUND',
-        font_size = fontSize,
-        width = width,
-        height = height,
-        position = { x = x0 + dx * 2, y = y, z = z0 + dz * 2 },
-        scale = buttonScale,
-    })
+        local max = attributes and attributes.perPlanet and 3 or 1
+        for i = 1, max do
+            local click_function = getAutoFillFunctionName(type, max > 1 and i)
+            panel.createButton({
+                click_function = click_function,
+                function_owner = self,
+                label = 'AUTO-FILL' .. (max > 1 and '\nPLANET ' .. i or ''),
+                font_size = fontSize,
+                width = width,
+                height = height,
+                position = { x = x0 + typeIndex * dx, y = y, z = z0 + i * dz },
+                scale = buttonScale,
+            })
+            if max > 1 then
+                local perPlanetButtons = data.perPlanetButtons[i]
+                if not perPlanetButtons then
+                    perPlanetButtons = {}
+                    data.perPlanetButtons[i] = perPlanetButtons
+                end
+                perPlanetButtons[buttonIndex] = click_function
+            end
+            buttonIndex = buttonIndex + 1
+        end
+        typeIndex = typeIndex + 1
+    end
 
     return panel
 end
@@ -497,6 +574,7 @@ end
 #include <~/CrLua/LockGlobals>
 
 #include <~/CrLua/TI4/Hex>
+#include <~/CrLua/TI4/System>
 #include <~/CrLua/TI4/Unit>
 #include <~/CrLua/TI4/Wormhole>
 #include <~/CrLua/TI4/Zone>

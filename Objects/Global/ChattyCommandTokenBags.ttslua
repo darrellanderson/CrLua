@@ -28,14 +28,19 @@ local function reportCommandTokenTransaction(container, object, quantity)
         _ctWaitId = false
         for name, transactions in pairs(_ctTransactions) do
             local message = false
+            local total = 0
             for type, quantity in pairs(transactions) do
-                message = (message and message .. ', ' or '')
-                message = message .. type .. ' ' .. quantity .. ' ' .. name
-                if quantity > 1 then
-                     message = message .. 's'
+                if not message then
+                    message = type .. ' ' .. quantity
+                else
+                    message = message .. ', ' .. string.lower(type) .. ' ' .. quantity
                 end
+                total = total + quantity
             end
-            printToAll(message)
+            if total > 0 then
+                message = message .. ' ' .. name .. (total > 1 and 's' or '')
+                printToAll(message)
+            end
         end
         _ctTransactions = {}
     end

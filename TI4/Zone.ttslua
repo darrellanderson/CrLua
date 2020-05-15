@@ -110,6 +110,7 @@ CrLua.TI4.Zone = assert(not CrLua.TI4.Zone) and {
 -- @return table : list of zone tables.
 -------------------------------------------------------------------------------
 function CrLua.TI4.Zone.all()
+    CrLua.TI4.Zone.updateIfNeeded()
     return CrLua.TI4.Zone._data.zones
 end
 
@@ -121,6 +122,7 @@ end
 -------------------------------------------------------------------------------
 function CrLua.TI4.Zone.fromColor(color)
     assert(type(color) == 'string')
+    CrLua.TI4.Zone.updateIfNeeded()
     for _, zone in ipairs(CrLua.TI4.Zone._data.zones) do
         if zone.color == color then
             return zone
@@ -142,17 +144,18 @@ end
 -------------------------------------------------------------------------------
 function CrLua.TI4.Zone.fromFaction(faction)
     assert(type(faction) == 'string')
+    CrLua.TI4.Zone.updateIfNeeded()
 
     -- Compare lower case versions, see both "of" and "Of" used for same faction.
     local faction = string.lower(faction)
 
     for _, zone in ipairs(CrLua.TI4.Zone._data.zones) do
         -- Faction sheet.
-        if string.lower(zone.faction) == faction then
+        if zone.faction and string.lower(zone.faction) == faction then
             return zone
         end
         -- Token faction (from owner, command tokens).
-        if string.lower(zone.tokenFaction) == faction then
+        if zone.tokenFaction and string.lower(zone.tokenFaction) == faction then
             return zone
         end
     end
@@ -166,6 +169,7 @@ end
 -------------------------------------------------------------------------------
 function CrLua.TI4.Zone.insideTiles(position)
     assert(type(position) == 'table' and position.x)
+    CrLua.TI4.Zone.updateIfNeeded()
     local tilesPolygon = CrLua.TI4.Zone._data.tiles
     if tilesPolygon then
         local pointXZ = { position.x, position.z }
@@ -180,6 +184,7 @@ end
 -------------------------------------------------------------------------------
 function CrLua.TI4.Zone.insideWhich(position)
     assert(type(position) == 'table' and position.x)
+    CrLua.TI4.Zone.updateIfNeeded()
     for _, zone in ipairs(CrLua.TI4.Zone._data.zones) do
         if CrLua.TI4.Zone.inside(zone, position) then
             return zone
@@ -196,6 +201,7 @@ end
 -------------------------------------------------------------------------------
 function CrLua.TI4.Zone.inside(zone, position)
     assert(type(zone) == 'table' and zone.color and type(position) == 'table' and position.x)
+    CrLua.TI4.Zone.updateIfNeeded()
     local pointXZ = { position.x, position.z }
     if zone.polygon then
         return CrLua.Polygon.inside(zone.polygon, pointXZ)
@@ -213,6 +219,7 @@ end
 -------------------------------------------------------------------------------
 function CrLua.TI4.Zone.vectorLine(zone, thickness)
     assert(type(zone) == 'table' and zone.color and not thickness or type(thickness) == 'number')
+    CrLua.TI4.Zone.updateIfNeeded()
     local thickness = thickness or CrLua.TI4.Zone.DEFAULT_VECTOR_LINE_THICKNESS
     local polygon = zone.polygon
     if not polygon then
@@ -236,6 +243,7 @@ end
 -- @return lines table : setVectorLines list.
 -------------------------------------------------------------------------------
 function CrLua.TI4.Zone.allVectorLines(thickness)
+    CrLua.TI4.Zone.updateIfNeeded()
     local thickness = thickness or CrLua.TI4.Zone.DEFAULT_VECTOR_LINE_THICKNESS
     local result = {}
     for _, zone in ipairs(CrLua.TI4.Zone._data.zones) do
@@ -266,6 +274,7 @@ end
 -------------------------------------------------------------------------------
 function CrLua.TI4.Zone.boundingBoxVectorLine(zone, thickness)
     assert(type(zone) == 'table' and zone.color and not thickness or type(thickness) == 'number')
+    CrLua.TI4.Zone.updateIfNeeded()
     local thickness = thickness or CrLua.TI4.Zone.DEFAULT_VECTOR_LINE_THICKNESS
     local polygon = CrLua.Polygon.boundingBoxCorners(zone.boundingBox)
     local inset = CrLua.Polygon.inset(polygon, thickness / 2.0)
@@ -287,10 +296,20 @@ end
 -------------------------------------------------------------------------------
 function CrLua.TI4.Zone.allBoundingBoxVectorLines(thickness)
     local result = {}
+    CrLua.TI4.Zone.updateIfNeeded()
     for _, zone in ipairs(CrLua.TI4.Zone._data.zones) do
         table.insert(result, CrLua.TI4.Zone.boundingBoxVectorLine(zone, thickness))
     end
     return result
+end
+
+-------------------------------------------------------------------------------
+--- Update if have not done so yet.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Zone.updateIfNeeded()
+    if not CrLua.TI4.Zone._data.lastUpdateFrameCount then
+        CrLua.TI4.Zone.update()
+    end
 end
 
 -------------------------------------------------------------------------------

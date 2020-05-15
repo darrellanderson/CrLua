@@ -37,6 +37,7 @@ function filterObjectEnterContainer(container, enterObject)
 
     -- Also reject wrong items into the command tokens bags.
     if string.find(bagName, 'Command Tokens Bag') then
+        entryName = string.gsub(entryName, '-', '%%-')
         result = result and string.find(bagName, entryName)
     end
 

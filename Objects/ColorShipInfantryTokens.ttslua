@@ -21,6 +21,7 @@ local _colorObjectNames = {
     ['x1 Infantry'] = true
 }
 
+--[[
 local function _getPoints(y)
     local result = {}
     for i = 1, _config.numPoints do
@@ -44,26 +45,38 @@ local function _getVectorLine(color, y, rotation)
         square = false,
     }
 end
+--]]
 
-function onObjectDrop(playerColor, droppedObject)
-    local name = droppedObject.getName()
+function onObjectDrop(playerColor, object)
+    local name = object.getName()
     if not _colorObjectNames[name] then
         return
     end
 
-    local up = droppedObject.getTransformUp()
-    local down = { x = -up.x, y = -up.y, z = -up.z }
+    -- Vector lines are more pronounced, but infinite bags reject deposits
+    -- because the original does not have them.  The TI4 mod detects "R"
+    -- (onRandomizeObject) and replaces tokens for plastic .. if available.
+    -- We cannot guarantee we run before that, nor that even if we see
+    -- onRandomize that the token was actually replaced.  Do not try to be
+    -- fancy and use (@Moar's suggested) highlight instead.  Not as visible,
+    -- but it works.
+    object.highlightOn(playerColor)
 
-    droppedObject.setVectorLines({
+    --[[
+    local up = object.getTransformUp()
+    local down = { x = -up.x, y = -up.y, z = -up.z }
+    object.setVectorLines({
         _getVectorLine(playerColor, _config.y.top, up),
         _getVectorLine(playerColor, _config.y.bottom, down)
     })
+    --]]
 end
 
 function onDestroy()
     for _, object in ipairs(getAllObjects()) do
         if _colorObjectNames[object.getName()] then
-            object.setVectorLines({})
+            -- object.setVectorLines()
+            object.highlightOff()
         end
     end
 end

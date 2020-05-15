@@ -58,7 +58,7 @@ function CrLua.assertRequired(extraRequires, table)
             end
         end
         for k, v in pairs(table) do
-            if type(v) == 'table' then
+            if type(v) == 'table' and not string.match(k, '^[_%l]') then
                 local isCamelCase = type(k) == 'string' and string.match(k, '^%u%l')
                 if type(packagePath) ~= 'boolean' and isCamelCase then
                     packagePath = (packagePath and (packagePath .. '.') or '') .. k

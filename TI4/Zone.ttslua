@@ -395,12 +395,14 @@ function CrLua.TI4.Zone.update()
                 return CrLua.Util.distanceSq(objectPosition, commandSheetPosition)
             end
             local color, _ = CrLua.Util.min(colorToCommandSheet, distance)
-            local entry = colorToKeys[color]
-            if not entry then
-                entry = {}
-                colorToKeys[color] = entry
+            if color then
+                local entry = colorToKeys[color]
+                if not entry then
+                    entry = {}
+                    colorToKeys[color] = entry
+                end
+                table.insert(entry, key)
             end
-            table.insert(entry, key)
         end
         -- For each color, get the closest candidate object.
         for color, keys in pairs(colorToKeys) do

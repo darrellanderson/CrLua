@@ -20,11 +20,12 @@ function onLoad(saveState)
     local toShuffle = {}
     for _, object in ipairs(getAllObjects()) do
         local name = object.getName()
-        if string.match(name, ' Command Tokens Bag') then
+        local tag = object.tag
+        if tag == 'Bag' and string.match(name, ' Command Tokens Bag$') then
             return  -- loaded a game in progress, abort!
         end
-        local tag = shuffleSet[name]
-        if tag and object.tag == tag then
+        local expectTag = shuffleSet[name]
+        if expectTag and tag == expectTag then
             table.insert(toShuffle, object)
         end
     end

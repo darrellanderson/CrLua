@@ -55,7 +55,7 @@ end
 local originalOnLoad = onLoad
 function onLoad(save_state)
     if originalOnLoad then
-        originalOnLoad()
+        originalOnLoad(save_state)
     end
     updateExclusiveBags()
 end

@@ -3,6 +3,43 @@
 -- TTS/TI4 by Darth Batman and Raptor1210.
 -- MultiRoller by GarnetBear
 -- @author bonkersbgg on BoardGameGeek.com
+--[[
+
+This script keeps track of the last activated system (command token dropped
+by the active player this turn), and scans the board to fill in the_Mantis's
+excellent TI4 MultiRoller.
+
+The active fleet takes into account if the MultiRoller belongs to the attacker,
+defender, or third party who happens to have range with an adjacent PDS2.
+Per-planet combats assign units to the closest planet.
+
+It scans for Antimass Deflector on the other party, and selects the best unit
+for Plasma Scoring.
+
+PDS2 targets adjacent and through-wormhole, including the Creuss flagship's
+mobile delta wormhole.  The Winnu flagship sets its count to the number of
+non-fighter opponents.  The Xxcha flagship has an adjacent-reaching PDS.
+
+Creuss players might want to enable "grid" on their homeworld so it aligns well
+with the table grid, making sure units on the planet are counted.
+
+This requires Turns be enabed to ignore when a non-active player touches a
+command token.  (Turns are automatically enabled via the "place trade goods and
+set turns" button.)  For a hot-seat like environment, a player must change color
+to the current active turn in order to recognize system activation.
+
+HOW TO USE:
+
+Right click this object and select "Save Object".  Start a TI4 game, then
+click "Objects" at the top, then "Saved Objects", then this saved object to
+spawn one in the game.  Clicking the "add auto-fill buttons" adds an "auto-fill"
+button to each MultiRoller sheet.
+
+During a game, clicking the "auto-fill" button fills in the combat MultiRoller.
+The script prints console messages to the clicking player, or right click to
+broadcast them to the entire table.
+
+]]
 -------------------------------------------------------------------------------
 
 local TAG = 'AutoFillMultiRoller'
@@ -66,15 +103,31 @@ end
 function onLoad(save_state)
     CrLua.Log.d(TAG, 'onLoad')
 
-    -- DO THIS FIRST, IT REPLACES THE MULTI-ROLLER OBJECTS!
-    --hackMultiRollers()
-
-    assignMultiRollerColors()
-
-    removeAutoFillButtonsFromMultiRollers()
-
-    Wait.frames(addAutoFillButtonsToMultiRollers, 20)
-    Wait.frames(updateAutoFillButtonsForActivatedSystem, 25)
+    -- Scale the block and attach a button with reversed scale.
+    local scale = { x = 3, y = 0.1, z = 1 }
+    local buttonScale = { x = 1.0 / scale.x, y = 1.0 / scale.y, z = 1.0 / scale.z }
+    self.setScale(scale)
+    self.createButton({
+        click_function = 'addAutoFillButtonsToMultiRollers',
+        function_owner = self,
+        label = 'ADD AUTO-FILL\nMULTIROLLER BUTTONS',
+        font_size = 100,
+        width = 1200,
+        height = 290,
+        position = { x = 0, y = 0.5, z = -0.15 },
+        scale = buttonScale,
+    })
+    self.createButton({
+        click_function = 'removeAutoFillButtonsFromMultiRollers',
+        function_owner = self,
+        label = 'REMOVE',
+        font_size = 100,
+        width = 1200,
+        height = 150,
+        position = { x = 0, y = 0.5, z = 0.3 },
+        scale = buttonScale,
+    })
+    self.interactable = true
 end
 
 function onPlayerTurnStart(playerColorStart, playerColorPrevious)
@@ -540,6 +593,8 @@ function addAutoFillButtonsToMultiRollers()
         end
     end
     CrLua.Log.d(TAG, 'added auto-fill buttons to ' .. count .. ' MultiRollers')
+
+    Wait.frames(updateAutoFillButtonsForActivatedSystem, 2)
 end
 
 function removeAutoFillButtonsFromMultiRollers()
@@ -583,47 +638,7 @@ function assignMultiRollerColors()
             return CrLua.Util.distanceSq(multiRollerPosition, colorPosition)
         end
         local color, _ = CrLua.Util.min(colorToPosition, distance)
-        data.multiRollerToColor[multiRoller] = assert(color)
-    end
-end
-
-function hackMultiRollers()
-    -- Inject a new function to work around Object.call only passing one value.
-    -- I HATE THIS.
-    local function hackMultiRoller(multiRoller)
-        if multiRoller.getVar('clickButtonHack') then
-            return
-        end
-
-        local hack =  '\nfunction clickButtonHack(args) print(args[1] .. " " .. args[2]) end'
-
-        local json = multiRoller.getJSON()
-        json = JSON.decode(json)
-        json.LuaScript = json.LuaScript .. hack
-        json = JSON.encode_pretty(json)
-        local spawnParameters = {
-            json = json,
-            position = multiRoller.getPosition(),
-            rotation = multiRoller.getRotation(),
-            scale = multiRoller.getScale(),
-            callback_function = nil,
-            sound = false,
-            params = {},
-            snap_to_grid = multiRoller.use_grid
-        }
-        destroyObject(multiRoller)
-        return spawnObjectJSON(spawnParameters)
-    end
-
-    local multiRollers = {}
-    for _, object in ipairs(getAllObjects()) do
-        local startPos, endPos = string.find(object.getName(), 'TI4 MultiRoller')
-        if startPos == 1 then
-            table.insert(multiRollers, object)
-        end
-    end
-    for _, multiRoller in ipairs(multiRollers) do
-        hackMultiRoller(multiRoller)
+        data.multiRollerToColor[multiRoller] = color
     end
 end
 
@@ -648,9 +663,9 @@ end
 #include <~/CrLua/Table>
 #include <~/CrLua/Util>
 
-#include <~/CrLua/UnitTest>
-CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
-CrLua.UnitTest.runTests(TAG, CrLua, true)
+--#include <~/CrLua/UnitTest>
+--CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
+--CrLua.UnitTest.runTests(TAG, CrLua, true)
 
 CrLua.assertRequired({ 'TI4.Hex', 'TI4.Unit', 'TI4.Wormhole', 'List', 'Log' })
 CrLua.lock()

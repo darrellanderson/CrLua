@@ -90,6 +90,70 @@ function CrLua.TI4.Hex._testNeighbors()
 end
 
 -------------------------------------------------------------------------------
+--- Find the common edge, if any.
+-- Common edge points in clockwise winding with respect to primary hex.
+-- @param hexString : hex.
+-- @param neighborHexString : neighbor.
+-- @return positions table : list of {1, 2 -> {x,y,z}} edge, or false.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Hex.commonEdge(hexString, neighborHexString)
+    assert(type(hexString) == 'string' and type(neighborHexString) == 'string')
+
+    local neighbors = CrLua.TI4.Hex.neighbors(hexString)
+    local which = false
+    for i, neighbor in ipairs(neighbors) do
+        if neighbor == neighborHexString then
+            which = i
+            break
+        end
+    end
+    if not which then
+        return false
+    end
+
+    local layout = CrLua.TI4.Hex._layout()
+    local hex = CrLua.RedBlobHex.fromString(hexString)
+    local corners = CrLua.RedBlobHex.corners(layout, hex)
+
+    -- First corner is at the END of first neighbor.
+    local prev = which > 1 and (which - 1) or 6
+    return {
+        {x = corners[prev].x, y = 1, z = corners[prev].y },
+        {x = corners[which].x, y = 1, z = corners[which].y }
+    }
+end
+
+function CrLua.TI4.Hex._testCommonEdge()
+    local hexString = '<0,0,0>'
+    local neighbors = CrLua.TI4.Hex.neighbors(hexString)
+    assert(#neighbors == 6)
+    for i = 1, 6 do
+        local neighbor = neighbors[i]
+        local neighborNeighbors = CrLua.TI4.Hex.neighbors(neighbor)
+
+        -- We are the opposite neighbor index in our neighbor
+        local backward = (((i - 1) + 3) % 6) + 1
+        local backwardNeighbor = neighborNeighbors[backward]
+        assert(hexString == backwardNeighbor)
+
+        -- Make sure we agree about the common corner-corner edge.
+        local edgeF = CrLua.TI4.Hex.commonEdge(hexString, neighbor)
+        local edgeB = CrLua.TI4.Hex.commonEdge(neighbor, hexString)
+        assert(edgeF, 'edge[1]')
+        assert(edgeB, 'edge[2]')
+
+        CrLua.Log.d(TAG, 'edgeF', edgeF)
+        CrLua.Log.d(TAG, 'edgeB', edgeB)
+
+        -- Edge winding means the reverse will be 'backward'.
+        assert(math.abs(edgeF[1].x - edgeB[2].x) < 0.01, 'edge[1].x')
+        assert(math.abs(edgeF[1].z - edgeB[2].z) < 0.01, 'edge[1].z')
+        assert(math.abs(edgeF[2].x - edgeB[1].x) < 0.01, 'edge[2].x')
+        assert(math.abs(edgeF[2].z - edgeB[1].z) < 0.01, 'edge[2].z')
+    end
+end
+
+-------------------------------------------------------------------------------
 --- Generate a vector lines entry for Global.setVectorLines.
 -- @param hexString string : string-encoded hex
 -- @param parameters : table key->value override parameters for vector lines result.

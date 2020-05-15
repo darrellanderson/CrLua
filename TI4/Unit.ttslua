@@ -8,8 +8,8 @@ local TAG = 'CrLua.TI4.Unit'
 CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
 CrLua.TI4 = CrLua.TI4 or {}
 CrLua.TI4.Unit = assert(not CrLua.TI4.Unit) and {
-    _require = { 'List', 'Table', 'Util' },
-    _allowMissingKeys = { 'UNIT', 'FLAGSHIP', 'UNIT_COLORS' }
+    _require = { 'List', 'Table', 'Util', 'TI4.Zone' },
+    _allowMissingKeys = { 'UNIT', 'FLAGSHIP' }
 }
 
 CrLua.TI4.Unit.ATTR = {
@@ -92,26 +92,19 @@ CrLua.TI4.Unit.FLAGSHIP = {
     ["Y'sia Y'ssrila"] = { faction = 'The Yssaril Tribes' }
 }
 
--- Unit object tint colors, hard coded from TTS/TI4 workshop objects.
-CrLua.TI4.Unit.UNIT_COLORS = {
-    White = { 204/255, 205/255, 204/255 },
-    Blue = { 7/255, 178/255, 255/255 },
-    Purple = { 118/255, 0, 183/255 },
-    Green = { 0, 117/255, 6/255 },
-    Red = { 203/255, 0, 0 },
-    Yellow = { 165/255, 163/255, 0 }
-}
-
 -------------------------------------------------------------------------------
 --- Create a unit table.
 -- @param unitName string : unit name.
--- @param color string : unit player color.
+-- @param color string : unit player color (or nil/false if not known).
 -- @param count number : number of units (e.g. "x3 Infantry" token).
 -- @param object : game Object.
 -- @return unit table.
 -------------------------------------------------------------------------------
 function CrLua.TI4.Unit.unit(unitName, color, count, object)
-    assert(type(count) == 'number' and count > 0 and object)
+    assert(type(unitName) == 'string', 'unitName')
+    assert(not color or type(color) == 'string', 'color')
+    assert(type(count) == 'number' and count > 0, 'count')
+    assert(object, 'object')
     if not CrLua.TI4.Unit.UNIT[unitName] then
         error(TAG .. '.unit: unknown unit name "' .. tostring(unitName or '<nil>') .. '"')
     end
@@ -124,9 +117,6 @@ function CrLua.TI4.Unit.unit(unitName, color, count, object)
                 error(TAG .. '.unit: unknown Flagship "' .. objectName .. '"')
             end
         end
-    end
-    if color and not CrLua.TI4.Unit.UNIT_COLORS[color] then
-        error(TAG .. '.unit: invalid color "' .. color .. '"')
     end
 
     return {
@@ -149,9 +139,6 @@ function CrLua.TI4.Unit._fakeObject(args)
     local result = {}
     function result.getName()
         return args.name or '<fakeObjectName>'
-    end
-    function result.getColorTint()
-        return args.color and CrLua.TI4.Unit.UNIT_COLORS[color] or { 0, 0, 0 }
     end
     function result.getPosition()
         return {
@@ -193,10 +180,10 @@ function CrLua.TI4.Unit.fromObject(object)
 
     local flagship = CrLua.TI4.Unit.FLAGSHIP[name]
     if flagship then
-        -- Could get the color from Zone, but for now use the tint color.
-        -- zone = CrLua.TI4.Zone.fromFaction(flagship.faction)
-        -- color = CrLua.TI4.Zone.color(zone)
-        local color = CrLua.TI4.Unit.colorFromColorTint(object.getColorTint())
+        -- Flagships do not have color in their name.  Find their faction
+        -- sheet to get player color.  (Zone does this for us.)
+        local zone = CrLua.TI4.Zone.fromFaction(flagship.faction)
+        local color = zone and zone.color
         return CrLua.TI4.Unit.unit('Flagship', color, 1, object)
     end
 
@@ -223,7 +210,8 @@ function CrLua.TI4.Unit.fromObject(object)
     if startPos then
         local color = string.sub(name, 1, startPos - 1)
         local unitName = string.sub(name, startPos + 1)
-        if CrLua.TI4.Unit.UNIT_COLORS[color] and CrLua.TI4.Unit.UNIT[unitName] then
+        local legalColorSet = CrLua.List.toSet(Player.getColors())
+        if legalColorSet[color] and CrLua.TI4.Unit.UNIT[unitName] then
             return CrLua.TI4.Unit.unit(unitName, color, 1, object)
         end
     end
@@ -233,10 +221,10 @@ function CrLua.TI4.Unit.fromObject(object)
 end
 
 function CrLua.TI4.Unit._testFromObject()
-    -- Flagship.
-    local object = CrLua.TI4.Unit._fakeObject{name='Hil Colish', color='Green'}
+    -- Flagship (color requires the faction sheet, do not check it).
+    local object = CrLua.TI4.Unit._fakeObject{name='Hil Colish'}
     local unit = CrLua.TI4.Unit.fromObject(object)
-    assert(unit.color == 'Green' and unit.unitName == 'Flagship' and unit.count == 1)
+    assert(unit.unitName == 'Flagship' and unit.count == 1)
 
     -- Generic flagship.
     local object = CrLua.TI4.Unit._fakeObject{name='Green Flagship'}
@@ -283,35 +271,6 @@ function CrLua.TI4.Unit._testAttributes()
     local attributes = CrLua.TI4.Unit.attributes(unit)
     assert(attributes.ship)
     assert(attributes.wormhole == 'delta')
-end
-
--------------------------------------------------------------------------------
---- Get the player color from a unit object's tint color.
--- @param tintColor table : {r,g,b} keys or a list of three (r,g,b) numbers.
--- @return string player color.
--------------------------------------------------------------------------------
-function CrLua.TI4.Unit.colorFromColorTint(tintColor)
-    local r = tintColor.r or tintColor[1]
-    local g = tintColor.g or tintColor[2]
-    local b = tintColor.b or tintColor[3]
-    local function colorDistance(unitColor)
-        local dr = unitColor[1] - r
-        local dg = unitColor[2] - g
-        local db = unitColor[3] - b
-        local distanceSq = (dr * dr) + (dg * dg) + (db * db)
-        return distanceSq
-    end
-    local colorName, colorTable = CrLua.Util.min(CrLua.TI4.Unit.UNIT_COLORS, colorDistance)
-    return colorName
-end
-
-function CrLua.TI4.Unit._testColorFromColorTint()
-    local tintColor = { 1, 1, 1 }
-    local color = CrLua.TI4.Unit.colorFromColorTint(tintColor)
-    assert(color == 'White', tostring(color or '<nil>'))
-    local tintColor = { 1, 0, 0 }
-    local color = CrLua.TI4.Unit.colorFromColorTint(tintColor)
-    assert(color == 'Red', tostring(color or '<nil>'))
 end
 
 -------------------------------------------------------------------------------
@@ -703,8 +662,6 @@ end
 -------------------------------------------------------------------------------
 function CrLua.TI4.Unit.getEnemyColors(selfColor, activatingColor, units)
     assert(type(selfColor) == 'string' and type(activatingColor) == 'string' and type(units) == 'table')
-    assert(CrLua.TI4.Unit.UNIT_COLORS[selfColor])
-    assert(CrLua.TI4.Unit.UNIT_COLORS[activatingColor])
 
     -- If self is not the activating player, then activating player is enemy.
     if selfColor ~= activatingColor then

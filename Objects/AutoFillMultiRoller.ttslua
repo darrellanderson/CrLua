@@ -82,17 +82,16 @@ end
 
 -- Create functions for each TYPE, function is named for the TYPE key.
 -- Create _1, _2, and _3 variants for multi-planet systems.
-for type, _ in pairs(TYPE) do
-    local attributes = TYPE[type]
+for typeName, attributes in pairs(TYPE) do
     local max = attributes.perPlanet and 3 or 1
     for i = 1, max do
         local function redirectOnClick(buttonContainer, clickerColor, altClick)
             -- Get the MultiRoller associate with this auto-fill panel.
             local multiRoller = data.panelToMultiRoller[buttonContainer]
             local playerColor = data.multiRollerToColor[multiRoller]
-            autoFill(multiRoller, clickerColor, playerColor, type, max > 1 and i, altClick)
+            autoFill(multiRoller, clickerColor, playerColor, typeName, max > 1 and i, altClick)
         end
-        local functionName = getAutoFillFunctionName(type, max > 1 and i)
+        local functionName = getAutoFillFunctionName(typeName, max > 1 and i)
         assert(not self.getVar(functionName))
         self.setVar(functionName, redirectOnClick)
     end
@@ -108,7 +107,7 @@ function onLoad(save_state)
     local buttonScale = { x = 1.0 / scale.x, y = 1.0 / scale.y, z = 1.0 / scale.z }
     self.setScale(scale)
     self.createButton({
-        click_function = 'addAutoFillButtonsToMultiRollers',
+        click_function = 'addAutoFillPlusOtherSetup',
         function_owner = self,
         label = 'ADD AUTO-FILL\nMULTIROLLER BUTTONS',
         font_size = 100,
@@ -153,6 +152,12 @@ function onObjectDrop(playerColor, droppedObject)
     CrLua.Log.d(TAG, 'onObjectDrop: activated by ' .. playerColor)
     data.lastActivatedPosition = droppedObject.getPosition()
     updateAutoFillButtonsForActivatedSystem()
+end
+
+function addAutoFillPlusOtherSetup()
+    assignMultiRollerColors()
+    addAutoFillButtonsToMultiRollers()
+    Wait.frames(updateAutoFillButtonsForActivatedSystem, 2)
 end
 
 -------------------------------------------------------------------------------
@@ -593,8 +598,6 @@ function addAutoFillButtonsToMultiRollers()
         end
     end
     CrLua.Log.d(TAG, 'added auto-fill buttons to ' .. count .. ' MultiRollers')
-
-    Wait.frames(updateAutoFillButtonsForActivatedSystem, 2)
 end
 
 function removeAutoFillButtonsFromMultiRollers()

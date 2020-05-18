@@ -34,7 +34,7 @@ CrLua.TI4.System.SYSTEMS = {
     ['c2509e'] = { tile = 14, planets = { 'Archon Ren', 'Archon Tau' } },
     ['9c373a'] = { tile = 15, planets = { 'Retillion', 'Shalloq' } },
     ['6a4247'] = { tile = 16, planets = { 'Hercant', 'Arretze', 'Kamdorn' } },
-    ['c56a8a'] = { tile = 17, anomalies = { 'delta' } },
+    ['c56a8a'] = { tile = 17, wormholes = { 'delta' } },
     ['04df02'] = { tile = 18, planets = { 'Mecatol Rex' } },
     ['4216fd'] = { tile = 19, planets = { 'Wellon' } },
     ['bc4bcc'] = { tile = 20, planets = { 'Vefut II' } },
@@ -42,8 +42,8 @@ CrLua.TI4.System.SYSTEMS = {
     ['0ea77f'] = { tile = 22, planets = { "Tar'mann" } },
     ['7975f7'] = { tile = 23, planets = { 'Saudor' } },
     ['48cc9f'] = { tile = 24, planets = { 'Mehar Xull' } },
-    ['71e1bf'] = { tile = 25, planets = { 'Quann' }, anomalies = { 'beta' } },
-    ['f11ef5'] = { tile = 26, planets = { 'Lodor' }, anomalies = { 'alpha' } },
+    ['71e1bf'] = { tile = 25, planets = { 'Quann' }, wormholes = { 'beta' } },
+    ['f11ef5'] = { tile = 26, planets = { 'Lodor' }, wormholes = { 'alpha' } },
     ['fc239f'] = { tile = 27, planets = { 'New Albion', 'Starpoint' } },
     ['f8caf6'] = { tile = 28, planets = { "Tequ'ran", 'Torkan' } },
     ['0ac98b'] = { tile = 29, planets = { "Qucen'n", 'Rarron' } },
@@ -56,8 +56,8 @@ CrLua.TI4.System.SYSTEMS = {
     ['a284d1'] = { tile = 36, planets = { 'Arnor', 'Lor' } },
     ['e0ff33'] = { tile = 37, planets = { 'Arinam', 'Meer' } },
     ['b958aa'] = { tile = 38, planets = { 'Abyz', 'Fria' } },
-    ['0378a4'] = { tile = 39, anomalies = { 'alpha' } },
-    ['ccd7ac'] = { tile = 40, anomalies = { 'beta' } },
+    ['0378a4'] = { tile = 39, wormholes = { 'alpha' } },
+    ['ccd7ac'] = { tile = 40, wormholes = { 'beta' } },
     ['47a55d'] = { tile = 41, anomalies = { 'gravity rift' } },
     ['d13aa2'] = { tile = 42, anomalies = { 'nebula'} },
     ['dca098'] = { tile = 43, anomalies = { 'supernova' } },
@@ -68,7 +68,7 @@ CrLua.TI4.System.SYSTEMS = {
     ['ff8f60'] = { tile = 48 },
     ['0216be'] = { tile = 49 },
     ['97ee53'] = { tile = 50 },
-    ['f38182'] = { tile = 51, planets = { 'Creuss' }, anomalies = { 'delta' } }
+    ['f38182'] = { tile = 51, planets = { 'Creuss' }, wormholes = { 'delta' } }
 }
 
 -------------------------------------------------------------------------------
@@ -118,22 +118,20 @@ end
 -- @param position table : {x,y,z} position in world coordinates.
 -- @return planet string : or nil if no planet in that zone.
 -------------------------------------------------------------------------------
-function CrLua.TI4.System.planet(system, position)
+function CrLua.TI4.System.planetFromPosition(system, position)
     assert(type(system) == 'table' and system.tile and type(position) == 'table' and position.x)
     local i, _ = CrLua.TI4.System._getZone(system, position)
     return system.planets and #system.planets >= i and system.planets[i]
 end
 
 -------------------------------------------------------------------------------
---- Get vector lines for planet.
+-- Get planet position.
 -- @param system table : CrLua.TI4.System.SYSTEMS value.
 -- @param planet string : planet name.
--- @param override table : vector lines parameters such as thickness, color.
--- @return table : vector lines entry wrapping planet.
+-- @return planet string : or nil if no planet in that zone.
 -------------------------------------------------------------------------------
-function CrLua.TI4.System.planetVectorLine(system, planet, override)
-    assert(type(system) == 'table' and system.tile and type(planet) == 'string' and type(override) == 'table')
-    assert(system.object)
+function CrLua.TI4.System.planetToPosition(system, planet)
+    assert(type(system) == 'table' and system.tile and type(planet) == 'string')
 
     local planetIndex = false
     for i, entry in ipairs(system.planets or {}) do
@@ -159,8 +157,22 @@ function CrLua.TI4.System.planetVectorLine(system, planet, override)
         distanceToPlanet = CrLua.TI4.System.LOCAL_TO_WORLD_RADIUS / 2.0
     end
 
+    return CrLua.TI4.System._bearingToPosition(false, bearingToPlanet, distanceToPlanet)
+end
+
+-------------------------------------------------------------------------------
+--- Get vector lines for planet.
+-- @param system table : CrLua.TI4.System.SYSTEMS value.
+-- @param planet string : planet name.
+-- @param override table : vector lines parameters such as thickness, color.
+-- @return table : vector lines entry wrapping planet.
+-------------------------------------------------------------------------------
+function CrLua.TI4.System.planetVectorLine(system, planet, override)
+    assert(type(system) == 'table' and system.tile and type(planet) == 'string' and type(override) == 'table')
+    assert(system.object)
+
     -- Do not specify system to get a local position.
-    local planetOrigin = CrLua.TI4.System._bearingToPosition(false, bearingToPlanet, distanceToPlanet)
+    local planetOrigin = CrLua.TI4.System.planetToPosition(system, planet)
     local planetRadius = (CrLua.TI4.System.LOCAL_TO_WORLD_RADIUS / 2.0) * 0.9
 
     local points = {}
@@ -237,7 +249,7 @@ end
 function CrLua.TI4.System._getZoneBorders(system)
     assert(type(system) == 'table' and system.tile)
     if not system._zoneBorders then
-        local numZones = (system.planets and #system.planets or 0) + (system.anomalies and #system.anomalies or 0)
+        local numZones = (system.planets and #system.planets or 0) + (system.wormholes and #system.wormholes or 0)
 
         -- The local coordinate space for a tile shows {x=1,z=1} to be lower left.
         -- Set zone borders to track planets starting left going clockwise.
@@ -258,7 +270,7 @@ end
 -------------------------------------------------------------------------------
 --- Which zone contains position?
 -- @param system table : CrLua.TI4.System.SYSTEMS value.
--- @param position table : {x,y,z} position in local coordinates.
+-- @param position table : {x,y,z} position in world coordinates.
 -- @return index number : zone index, planets first then wormholes (if both).
 -------------------------------------------------------------------------------
 function CrLua.TI4.System._getZone(system, position)
@@ -286,7 +298,7 @@ end
 -- Bearing is the angle, measured clockwise about the Y axis from the
 -- "north" direction.
 -- @param system table : CrLua.TI4.System.SYSTEMS value.
--- @param position table : {x,y,z} position in world coordinates.
+-- @param position table : {x,y,z} position in world coordinates, unless no system then local.
 -- @return bearing number : 0 <= bearing < 360.
 -------------------------------------------------------------------------------
 function CrLua.TI4.System._positionToBearing(system, position)
@@ -329,7 +341,7 @@ end
 -- @param system table : CrLua.TI4.System.SYSTEMS value.
 -- @param bearing number : angle in degrees, clockwise from "north".
 -- @param r number : distance from center of tile to result point (in local space!).
--- @return position table : position in world coordinates.
+-- @return position table : position in world coordinates (or local if no system).
 -------------------------------------------------------------------------------
 function CrLua.TI4.System._bearingToPosition(system, bearing, r)
     assert(type(bearing) == 'number' and 0 <= bearing and bearing < 360 and type(r) == 'number')

@@ -401,12 +401,12 @@ function autoFill(multiRoller, clickerColor, selfColor, typeKey, planetIndex, al
         special[unitName] = special[unitName] or unit.special
     end
 
-    local prefix = { 'autoFill: ' .. typeAttributes.name }
+    local prefix = { 'AutoFill ' .. typeAttributes.name }
     if planet then
         table.insert(prefix, '(' .. planet .. ')')
     end
     table.insert(prefix, selfColor .. ' vs ' .. (enemyColor or '<unknown>'))
-    local message = table.concat(prefix, ' ') .. '.'
+    local message = table.concat(prefix, ' ') .. ': '
 
     local messages = {}
     for unitName, count in pairs(unitCount) do
@@ -431,9 +431,9 @@ function autoFill(multiRoller, clickerColor, selfColor, typeKey, planetIndex, al
     end
 
     if #messages > 0 then
-        message = message .. ' I see: ' .. table.concat(messages, ', ') .. '.'
-    else
-        message = message .. ' No units.'
+        message = message .. table.concat(messages, ', ') .. '.'
+    elseif typeAttributes == TYPE.BOMBARDMENT and planetaryShield then
+        message = message .. 'no units (Planetary Shield).'
     end
     if altClick then
         local toPlayer = CrLua.TTS.Player.isSeated(selfColor) and selfColor or clickerColor
@@ -728,9 +728,9 @@ end
 #include <~/CrLua/Table>
 #include <~/CrLua/Util>
 
-#include <~/CrLua/UnitTest>
-CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
-CrLua.UnitTest.runTests(TAG, CrLua, true)
+--#include <~/CrLua/UnitTest>
+--CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
+--CrLua.UnitTest.runTests(TAG, CrLua, true)
 
 CrLua.assertRequired({ 'TI4.Hex', 'TI4.Unit', 'TI4.Wormhole', 'TTS.Player', 'List', 'Log' })
 CrLua.lock()

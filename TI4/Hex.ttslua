@@ -159,7 +159,7 @@ end
 -- @param parameters : table key->value override parameters for vector lines result.
 -- @return table : vector lines entry.
 -------------------------------------------------------------------------------
-function CrLua.TI4.Hex.vectorLines(hexString, parameters)
+function CrLua.TI4.Hex.vectorLine(hexString, parameters)
     assert(type(hexString) == 'string' and type(parameters) == 'table' and not parameters.points)
     local layout = CrLua.TI4.Hex._layout()
     local hex = CrLua.RedBlobHex.fromString(hexString)

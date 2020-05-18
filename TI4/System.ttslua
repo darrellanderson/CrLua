@@ -13,7 +13,9 @@ CrLua.TI4.System = assert(not CrLua.TI4.System) and {
     _allowMissingKeys = { 'SYSTEMS' },
 
     DEFAULT_LINE_THICKNESS = 0.2,
-    LOCAL_TO_WORLD_RADIUS = 2.26,
+    LOCAL_TO_WORLD_TILE_RADIUS = 2.26,
+    LOCAL_TO_WORLD_PLANET_RADIUS = 1,
+    LOCAL_TO_WORLD_MECATOL_RADIUS = 1.9,
     LOCAL_TO_WORLD_Y = 0.318
 }
 
@@ -116,19 +118,33 @@ end
 -- Get planet at position.
 -- @param system table : CrLua.TI4.System.SYSTEMS value.
 -- @param position table : {x,y,z} position in world coordinates.
+-- @param exact boolean : if true, position must be on planet (vs closest planet).
 -- @return planet string : or nil if no planet in that zone.
 -------------------------------------------------------------------------------
-function CrLua.TI4.System.planetFromPosition(system, position)
+function CrLua.TI4.System.planetFromPosition(system, position, exact)
     assert(type(system) == 'table' and system.tile and type(position) == 'table' and position.x)
-    local i, _ = CrLua.TI4.System._getZone(system, position)
-    return system.planets and #system.planets >= i and system.planets[i]
+    local i = CrLua.TI4.System._getZone(system, position)
+    local planet = system.planets and #system.planets >= i and system.planets[i]
+    if planet and exact then
+        local planetPosition = CrLua.TI4.System.planetToPosition(system, planet)
+        local local1 = system.object.positionToLocal(position)
+        local local2 = system.object.positionToLocal(planetPosition)
+        local dx = local1.x - local2.x
+        local dz = local1.z - local2.z
+        local distance = math.sqrt((dx * dx) + (dz * dz))
+        local planetRadius = system.tile == 18 and CrLua.TI4.System.LOCAL_TO_WORLD_MECATOL_RADIUS or CrLua.TI4.System.LOCAL_TO_WORLD_PLANET_RADIUS
+        if distance > planetRadius then
+            planet = nil
+        end
+    end
+    return planet
 end
 
 -------------------------------------------------------------------------------
 -- Get planet position.
 -- @param system table : CrLua.TI4.System.SYSTEMS value.
 -- @param planet string : planet name.
--- @return planet string : or nil if no planet in that zone.
+-- @return table : {x,y,z} table.
 -------------------------------------------------------------------------------
 function CrLua.TI4.System.planetToPosition(system, planet)
     assert(type(system) == 'table' and system.tile and type(planet) == 'string')
@@ -154,10 +170,10 @@ function CrLua.TI4.System.planetToPosition(system, planet)
         else
             bearingToPlanet = ((a + 360 + b) / 2) % 360
         end
-        distanceToPlanet = CrLua.TI4.System.LOCAL_TO_WORLD_RADIUS / 2.0
+        distanceToPlanet = CrLua.TI4.System.LOCAL_TO_WORLD_TILE_RADIUS / 2.0
     end
 
-    return CrLua.TI4.System._bearingToPosition(false, bearingToPlanet, distanceToPlanet)
+    return CrLua.TI4.System._bearingToPosition(system, bearingToPlanet, distanceToPlanet)
 end
 
 -------------------------------------------------------------------------------
@@ -172,11 +188,12 @@ function CrLua.TI4.System.planetVectorLine(system, planet, override)
     assert(system.object)
 
     -- Do not specify system to get a local position.
-    local planetOrigin = CrLua.TI4.System.planetToPosition(system, planet)
-    local planetRadius = (CrLua.TI4.System.LOCAL_TO_WORLD_RADIUS / 2.0) * 0.9
+    local planetOriginWorld = CrLua.TI4.System.planetToPosition(system, planet)
+    local planetOrigin = system.object.positionToLocal(planetOriginWorld)
+    local planetRadius = system.tile == 18 and CrLua.TI4.System.LOCAL_TO_WORLD_MECATOL_RADIUS or CrLua.TI4.System.LOCAL_TO_WORLD_PLANET_RADIUS
 
     local points = {}
-    for i = 1, 15 do
+    for i = 1, 16 do
         local theta = math.pi * 2.0 * i / 16.0
         local position = {
             x = planetOrigin.x + math.cos(theta) * planetRadius,
@@ -213,7 +230,7 @@ function CrLua.TI4.System.vectorLine(system, override)
 
     local y = CrLua.TI4.System.LOCAL_TO_WORLD_Y
     local center = system.object.positionToWorld({x = 0, y = y, z = 0})
-    local r = CrLua.TI4.System.LOCAL_TO_WORLD_RADIUS
+    local r = CrLua.TI4.System.LOCAL_TO_WORLD_TILE_RADIUS
     local outer = {}
     for i = 1, #zoneBorders - 1 do
         local bearing = zoneBorders[i]
@@ -291,6 +308,7 @@ function CrLua.TI4.System._getZone(system, position)
             end
         end
     end
+    error('no zone')
 end
 
 -------------------------------------------------------------------------------

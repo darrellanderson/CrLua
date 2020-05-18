@@ -17,8 +17,14 @@ CrLua.TI4.Unit.ATTR = {
     -- Number, production cost.
     COST = 'cost',
 
-    -- Boolean, is this unit a ship?
+    -- Boolean, does this unit participate in space combat?
     SHIP = 'ship',
+
+    -- Boolean, does this unit participate in ground combat?
+    GROUND = 'ground',
+
+    -- Boolean, is this unit a structure?
+    STRUCTURE = 'structure',
 
     -- Number, space cannon hit value.
     SPACE_CANNON = 'spaceCannon',
@@ -53,13 +59,13 @@ CrLua.TI4.Unit.ATTR = {
 
 -- Unit attributes:
 CrLua.TI4.Unit.UNIT = {
-    ['Infantry'] = { cost = 0.5 },
+    ['Infantry'] = { ground = true, cost = 0.5 },
     ['Fighter'] = { ship = true, cost = 0.5 },
     ['Cruiser'] = { ship = true, cost = 2 },
     ['Destroyer'] = { ship = true, antiFighterBarrage = true, cost = 1 },
     ['Carrier'] = { ship = true, cost = 3 },
-    ['Space Dock'] = {},
-    ['PDS'] = { spaceCannon = 5, planetaryShield = true },
+    ['Space Dock'] = { structure = true },
+    ['PDS'] = { structure = true, spaceCannon = 5, planetaryShield = true },
     ['Dreadnought'] = { ship = true, bombardment = 5, cost = 4 },
     ['War Sun'] = { ship = true, bombardment = 3, cost = 12, ignorePlanetaryShield = true },
     ['Flagship'] = { ship = true, cost = 8 }
@@ -433,8 +439,12 @@ function CrLua.TI4.Unit.filterToShips(units)
         end
     end
     local function isShip(unit)
+        if unit.unitName == 'Infantry' and infantryInSpaceColorSet[unit.color] then
+            unit.special = 'Infantry in space'
+            return true
+        end
         local attributes = CrLua.TI4.Unit.attributes(unit)
-        return attributes.ship or (unit.unitName == 'Infantry' and infantryInSpaceColorSet[unit.color])
+        return attributes.ship
     end
     return CrLua.List.filter(units, isShip)
 end
@@ -471,8 +481,12 @@ function CrLua.TI4.Unit.filterToGround(units)
         end
     end
     local function isGround(unit)
+        if unit.unitName == 'Fighter' and fightersOnGroundColorSet[unit.color] then
+            unit.special = 'Fighters on ground'
+            return true
+        end
         local attributes = CrLua.TI4.Unit.attributes(unit)
-        return (not attributes.ship) or ((unit.unitName == 'Fighter') and fightersOnGroundColorSet[unit.color])
+        return attributes.ground
     end
     return CrLua.List.filter(units, isGround)
 end
@@ -482,9 +496,9 @@ function CrLua.TI4.Unit._testFilterToGround()
     local filtered = CrLua.TI4.Unit.filterToGround(units)
     local count = CrLua.TI4.Unit.count(filtered)
     assert(CrLua.Table.deepEquals(count, {
-        Red = { PDS = 1, Infantry = 1 },
-        Blue = { PDS = 1, Infantry = 1, Fighter = 1 },
-        Green = { PDS = 1, Infantry = 1 }
+        Red = { Infantry = 1 },
+        Blue = { Infantry = 1, Fighter = 1 },
+        Green = { Infantry = 1 }
     }))
 end
 
@@ -723,7 +737,7 @@ function CrLua.TI4.Unit._testGetEnemyColors()
     for selfColor, expected in pairs(expectEnemies) do
         local observed = CrLua.TI4.Unit.getEnemyColors(selfColor, 'Red', units)
         if not CrLua.Table.deepEquals(expected, observed) then
-            error('mismatch for selfColor ' .. selfColor)
+            error('mismatch for space selfColor ' .. selfColor .. ', saw ' .. observed)
         end
     end
 
@@ -737,7 +751,7 @@ function CrLua.TI4.Unit._testGetEnemyColors()
     }
     local expectEnemies = {
         Purple = { 'Red' }, -- N/A really, only PDS on invaded planet do SC Defense
-        Red = { 'Green', 'Yellow' },
+        Red = { 'Yellow' }, -- PDS does not count
         Blue = { 'Red' },
         Green = { 'Red' },
         Yellow = { 'Red' }
@@ -745,7 +759,7 @@ function CrLua.TI4.Unit._testGetEnemyColors()
     for selfColor, expected in pairs(expectEnemies) do
         local observed = CrLua.TI4.Unit.getEnemyColors(selfColor, 'Red', units)
         if not CrLua.Table.deepEquals(expected, observed) then
-            error('mismatch for selfColor ' .. selfColor)
+            error('mismatch for ground selfColor ' .. selfColor)
         end
     end
 end

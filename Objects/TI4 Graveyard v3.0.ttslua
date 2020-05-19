@@ -1,0 +1,384 @@
+--- TI4 Graveyard bag v3.0, move objects inserted into this bag to correct locations.
+-- @author original by Mantis
+-- @author card handling by GarnetBear
+-- @author May 2020 update by Darrell
+
+local DECKS = {
+    {
+        name = 'Secret Objectives',
+        shuffleOnDiscard = true,
+        discardTransforms = {
+            [6] = {
+                position = { x = -70.7, y = 1.8, z = 11.6 },
+                rotation = { x = 0, y = 90, z = 180 },
+            },
+            [8] = {
+                position = { x = 83.3, y = 5.8, z = -12.5 },
+                rotation = { x = 0, y = 90, z = 180 },
+            }
+        },
+        cards = {
+            'Adapt New Strategies',
+            'Become the Gatekeeper',
+            'Control the Region',
+            'Cut Supply Lines',
+            'Destroy Their Greatest Ship',
+            'Establish A Perimeter',
+            'Forge An Alliance',
+            'Form a Spy Network',
+            'Fuel the War Machine',
+            'Gather A Mighty Fleet',
+            'Learn Secrets of the Cosmos',
+            'Make an Example of Their World',
+            'Master the Laws of Physics',
+            'Mine Rare Metals',
+            'Monopolize Production',
+            'Occupy the Seat of the Empire',
+            'Spark a Rebellion',
+            'Threaten Enemies',
+            'Turn Their Fleets to Dust',
+            'Unveil Flagship',
+        },
+    },
+    {
+        name = 'Agenda',
+        discardTransforms = {
+            [6] = {
+                position = { x = -67.0, y = 1.7, z = 15.4 },
+                rotation = { x = 0, y = 90, z = 0 },
+            },
+            [8] = {
+                position = { x = 79.6, y = 5.7, z = -16.4 },
+                rotation = { x = 0, y = 270, z = 0 },
+            }
+        },
+        cards = {
+            'Anti-Intellectual Revolution',
+            'Archived Secret',
+            'Arms Reduction',
+            'Classified Document Leaks',
+            'Colonial Redistribution',
+            'Committee Formation',
+            'Compensated Disarmament',
+            'Conventions of War',
+            'Core Mining',
+            'Demilitarized Zone',
+            'Economic Equality',
+            'Enforced Travel Ban',
+            'Executive Sanctions',
+            'Fleet Regulations',
+            'Holy Planet of Ixth',
+            'Homeland Defense Act',
+            'Imperial Arbiter',
+            'Incentive Program',
+            'Ixthian Artifact',
+            'Judicial Abolishment',
+            'Minister of Commerce',
+            'Minister of Exploration',
+            'Minister of Industry',
+            'Minister of Peace',
+            'Minister of Policy',
+            'Minister of Sciences',
+            'Minister of War',
+            'Miscount Disclosed',
+            'Mutiny',
+            'New Constitution',
+            'Prophecy of Ixth',
+            'Public Execution',
+            'Publicize Weapon Schematics',
+            'Regulated Conscription',
+            'Representative Government',
+            'Research Team - Biotic',
+            'Research Team - Cybernetic',
+            'Research Team - Propulsion',
+            'Research Team - Warfare',
+            'Seed of an Empire',
+            'Senate Sanctuary',
+            'Shard of the Throne',
+            'Shared Research',
+            'Swords to Plowshares',
+            'Terraforming Initiative',
+            'The Crown of Emphidia',
+            'The Crown of Thanlos',
+            'Unconventional Measures',
+            'Wormhole Reconstruction',
+            'Wormhole Research',
+        },
+    },
+    {
+        name = 'Actions',
+        discardTransforms = {
+            [6] = {
+                position = { x = -67.0, y = 1.7, z = 19.3 },
+                rotation = { x = 0, y = 90, z = 0 },
+            },
+            [8] = {
+                position = { x = 79.7, y = 5.7, z = -20.2 },
+                rotation = { x = 0, y = 270, z = 0 },
+            }
+        },
+        cards = {
+            'Ancient Burial Sites',
+            'Assassinate Representative',
+            'Bribery',
+            'Bunker',
+            'Confusing Legal Text',
+            'Construction Rider',
+            'Courageous to the End',
+            'Cripple Defenses',
+            'Diplomacy Rider',
+            'Direct Hit (1)',
+            'Direct Hit (2)',
+            'Direct Hit (3)',
+            'Direct Hit (4)',
+            'Disable',
+            'Distinguished Councilor',
+            'Economic Initiative',
+            'Emergency Repairs',
+            'Experimental Battlestation',
+            'Fighter prototype',
+            'Fire Team',
+            'Flank Speed (1)',
+            'Flank Speed (2)',
+            'Flank Speed (3)',
+            'Flank Speed (4)',
+            'Focused Research',
+            'Frontline Deployment',
+            'Ghost Ship',
+            'Imperial Rider',
+            'In the Silence of Space',
+            'Industrial Initiative',
+            'Infiltrate',
+            'Insubordination',
+            'Intercept',
+            'Leadership Rider',
+            'Lost Star Chart',
+            'Lucky Shot',
+            'Maneuvering Jets (1)',
+            'Maneuvering Jets (2)',
+            'Maneuvering Jets (3)',
+            'Maneuvering Jets (4)',
+            'Mining Initiative',
+            'Morale Boost (1)',
+            'Morale Boost (2)',
+            'Morale Boost (3)',
+            'Morale Boost (4)',
+            'Parley',
+            'Plague',
+            'Political Stability',
+            'Politics Rider',
+            'Public Disgrace',
+            'Reactor Meltdown',
+            'Reparations',
+            'Repeal Law',
+            'Rise of a Messiah',
+            'Sabotage (1)',
+            'Sabotage (2)',
+            'Sabotage (3)',
+            'Sabotage (4)',
+            'Salvage',
+            'Shields Holding (1)',
+            'Shields Holding (2)',
+            'Shields Holding (3)',
+            'Shields Holding (4)',
+            'Signal Jamming',
+            'Skilled Retreat (1)',
+            'Skilled Retreat (2)',
+            'Skilled Retreat (3)',
+            'Skilled Retreat (4)',
+            'Spy',
+            'Summit',
+            'Tactical Bombardment',
+            'Technology Rider',
+            'Trade Rider',
+            'Unexpected Action',
+            'Unstable Planet',
+            'Upgrade',
+            'Uprising',
+            'Veto',
+            'War Effort',
+            'Warfare Rider',
+        },
+    }
+}
+
+-- No need to put back objects from infinite bags.
+local DELETE = {
+    'x1 Fighter Token',
+    'x3 Fighter Token',
+    'x1 Infantry',
+    'x3 Infantry',
+    'Commodities/Tradegoods x1',
+    'Commodities/Tradegoods x3',
+}
+
+-------------------------------------------------------------------------------
+
+local data = {
+    tableSize = false,
+    cardNameToDeckAttributes = false,
+    deleteSet = {},
+    objectNameToBagGuid = {},
+    pickFactionTokenBagGuid = nil,
+}
+
+-------------------------------------------------------------------------------
+
+local function getCardDestination(object)
+    assert(object.tag == 'Card')
+
+    -- The first time a card is discarded create a fast-lookup name->deck map.
+    if not data.cardNameToDeckAttributes then
+        data.cardNameToDeckAttributes = {}
+        for _, deckAttributes in ipairs(DECKS) do
+            for _, cardName in ipairs(deckAttributes.cards) do
+                data.cardNameToDeckAttributes[cardName] = deckAttributes
+            end
+        end
+    end
+
+    return data.cardNameToDeckAttributes[object.getName()]
+end
+
+local function getNonCardDestination(object)
+    assert(object.tag ~= 'Card')
+
+    local objectName = object.getName()
+    local bagGuid = data.objectNameToBagGuid[objectName]
+    local bag = bagGuid and getObjectFromGUID(bagGuid)
+
+    -- If we do not have a bag, look for one and remember it if found.
+    -- Remember via guid to prevent trying to access a deleted bag later.
+    -- Do not store "nacks" for objects with no bag, it could be unpacked!
+    if not bag and string.len(objectName) > 0 then
+        local acceptBag = {
+            [objectName] = true,
+            [objectName .. ' Bag'] = true,
+            [objectName .. 's Bag'] = true,
+        }
+        for _, candidate in ipairs(getAllObjects()) do
+            local tag = candidate.tag
+            local name = candidate.getName()
+            if (tag == 'Bag' or tag == 'Infinite') and acceptBag[name] then
+                bag = candidate
+                break
+            end
+        end
+        data.objectNameToBagGuid[objectName] = bag and bag.getGUID()
+    end
+
+    -- If "FACTION Owner Token" and no bag, put in the "Pick a Race to Play" bag
+    -- (scan again to make earlier, more common scan do less work).
+    if not bag and string.match(objectName, ' Owner Token$') then
+        local bagGuid = data.pickFactionTokenBagGuid
+        bag = bagGuid and getObjectFromGUID(bagGuid)
+        if not bag then
+            for _, candidate in ipairs(getAllObjects()) do
+                if candidate.getName() == 'Pick a Race to Play' then
+                    bag = candidate
+                    break
+                end
+            end
+        end
+        data.pickFactionTokenBagGuid = bag and bag.getGUID()
+    end
+
+    return bag
+end
+
+-------------------------------------------------------------------------------
+
+function onLoad(saveState)
+    -- Convert DELETE list to a set for faster checks.
+    for _, objectName in ipairs(DELETE) do
+        data.deleteSet[objectName] = true
+    end
+
+    -- Hard code deck positions for "normal" table as well as "8 player madness".
+    -- I started going down the road of finding the decks by name on first load,
+    -- then using onSave -> onLoad(saveState) to remember when loading games in
+    -- progress where the deck names might not be there... but be simple & safe.
+    local commandSheetCount = 0
+    for _, object in ipairs(getAllObjects()) do
+        if string.match(object.getName(), '^Command Sheet %(%a+%)$') then
+            commandSheetCount = commandSheetCount + 1
+        end
+    end
+    data.tableSize = commandSheetCount
+end
+
+function onObjectEnterContainer(container, enterObject)
+    if container ~= self then
+        return
+    end
+
+    if data.deleteSet[enterObject.getName()] then
+
+        -- Object is in DELETE, burninate!!
+        destroyObject(self.takeObject())
+
+    elseif enterObject.tag == 'Card' then
+
+        -- Object is a card.  If from a known deck discard.
+        local deckAttributes = getCardDestination(enterObject)
+        if deckAttributes then
+            local discardTransform = deckAttributes.discardTransforms[data.tableSize or 6]
+            local p = discardTransform.position
+            local castPosition = { x = p.x, y = p.y + 2, z = p.z }
+            local hits = Physics.cast({
+                origin       = castPosition,
+                direction    = { x = 0, y = -1, z = 0 },
+                type         = 1,  -- ray
+                max_distance = 4
+            })
+            local deck = false
+            for _, hit in ipairs(hits) do
+                if hit.hit_object.tag == 'Card' or hit.hit_object.tag == 'Deck' then
+                    deck = hit.hit_object
+                    break
+                end
+            end
+            if deck then
+                -- Insert directly into deck (or lone card to make it a deck).
+                -- Move high before put to make sure it goes on top.
+                deck.putObject(self.takeObject({
+                    position = castPosition,
+                    rotation = discardTransform.rotation
+                }))
+                if deckAttributes.shuffleOnDiscard then
+                    deck.shuffle()
+                end
+            else
+                -- Nothing there, drop it to start a new discard pile.
+                self.takeObject({
+                    position = castPosition,
+                    rotation = discardTransform.rotation
+                })
+            end
+        end
+
+    elseif enterObject.tag == 'Deck' then
+
+        -- If a deck, remove then place cards one at a time.
+        local function itemPosition(i)
+            local pos = self.getPosition()
+            return { position = { x = pos.x, y = pos.y + 2 + i, z = pos.z } }
+        end
+        local deckObject = self.takeObject(itemPosition(0))
+        for i, object in ipairs(deckObject.getObjects()) do
+            self.putObject(deckObject.takeObject(itemPosition(i)))
+        end
+
+    else
+
+        -- Otherwise try to find the proper bag.
+        local bag = getNonCardDestination(enterObject)
+        if bag then
+            bag.putObject(self.takeObject())
+        end
+
+    end
+end
+
+--#include <~/CrLua/CrLua>
+--#include <~/CrLua/LockGlobals>

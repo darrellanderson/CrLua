@@ -3,6 +3,17 @@
 -- @author card handling by GarnetBear
 -- @author May 2020 update by Darrell
 
+-- Token bags use inconsistent name to bag, hard code for simplicity.
+local TOKEN_BAGS = {
+    ['x1 Fighter Token'] = 'x1 Fighters Tokens Bag',
+    ['x3 Fighter Token'] = 'x3 Fighters Tokens Bag',
+    ['x1 Infantry'] = 'x1 Infantry Token Bag',
+    ['x3 Infantry'] = 'x3 Infantry Token Bag',
+    ['Commodities/Tradegoods x1'] = 'Commodities/Tradegoods x1 Bag',
+    ['Commodities/Tradegoods x3'] = 'Commodities/Tradegoods x3 Bag'
+}
+
+-- Decks with discard location and card names.
 local DECKS = {
     {
         name = 'Secret Objectives',
@@ -202,30 +213,20 @@ local DECKS = {
     }
 }
 
--- No need to put back objects from infinite bags.
-local DELETE = {
-    'x1 Fighter Token',
-    'x3 Fighter Token',
-    'x1 Infantry',
-    'x3 Infantry',
-    'Commodities/Tradegoods x1',
-    'Commodities/Tradegoods x3',
-}
-
 -------------------------------------------------------------------------------
 
 local data = {
     tableSize = false,
     cardNameToDeckAttributes = false,
-    deleteSet = {},
     objectNameToBagGuid = {},
     pickFactionTokenBagGuid = nil,
 }
 
 -------------------------------------------------------------------------------
 
-local function getCardDestination(object)
-    assert(object.tag == 'Card')
+--- Get discard pile transform (position, rotation) for given card.
+local function getCardDestination(cardName)
+    assert(type(cardName) == 'string')
 
     -- The first time a card is discarded create a fast-lookup name->deck map.
     if not data.cardNameToDeckAttributes then
@@ -237,31 +238,38 @@ local function getCardDestination(object)
         end
     end
 
-    return data.cardNameToDeckAttributes[object.getName()]
+    return data.cardNameToDeckAttributes[cardName]
 end
 
-local function getNonCardDestination(object)
-    assert(object.tag ~= 'Card')
+--- Get bag for object.
+local function getNonCardDestination(objectName)
+    assert(type(objectName) == 'string')
 
-    local objectName = object.getName()
     local bagGuid = data.objectNameToBagGuid[objectName]
     local bag = bagGuid and getObjectFromGUID(bagGuid)
 
-    -- If we do not have a bag, look for one and remember it if found.
+    -- If we do not have a bag, look for one and remember it if found.  If more
+    -- than one choose closest (reduces objects from flying over the table).
     -- Remember via guid to prevent trying to access a deleted bag later.
     -- Do not store "nacks" for objects with no bag, it could be unpacked!
     if not bag and string.len(objectName) > 0 then
         local acceptBag = {
             [objectName] = true,
-            [objectName .. ' Bag'] = true,
             [objectName .. 's Bag'] = true,
+            [TOKEN_BAGS[objectName] or false] = true
         }
+        local bestDistance = false
         for _, candidate in ipairs(getAllObjects()) do
             local tag = candidate.tag
             local name = candidate.getName()
             if (tag == 'Bag' or tag == 'Infinite') and acceptBag[name] then
-                bag = candidate
-                break
+                local p1 = self.getPosition()
+                local p2 = candidate.getPosition()
+                local dSq = ((p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2)
+                if not bestDistance or dSq < bestDistance then
+                    bag = candidate
+                    bestDistance = dSq
+                end
             end
         end
         data.objectNameToBagGuid[objectName] = bag and bag.getGUID()
@@ -288,12 +296,73 @@ end
 
 -------------------------------------------------------------------------------
 
-function onLoad(saveState)
-    -- Convert DELETE list to a set for faster checks.
-    for _, objectName in ipairs(DELETE) do
-        data.deleteSet[objectName] = true
+--- Put cards into the deck discard pile.
+local function putCard(cardObject, deckAttributes)
+    assert(cardObject.tag == 'Card' and deckAttributes.cards)
+
+    -- Find the discard pile.
+    local discardTransform = deckAttributes.discardTransforms[data.tableSize]
+    local p = discardTransform.position
+    local castPosition = { x = p.x, y = p.y + 2, z = p.z }
+    local hits = Physics.cast({
+        origin       = castPosition,
+        direction    = { x = 0, y = -1, z = 0 },
+        type         = 1,  -- ray
+        max_distance = 4
+    })
+    local firstPoint = false
+    local deck = false
+    for _, hit in ipairs(hits) do
+        firstPoint = firstPoint or hit.point
+        if hit.hit_object.tag == 'Card' or hit.hit_object.tag == 'Deck' then
+            deck = hit.hit_object
+            break
+        end
     end
 
+    -- Move card to be above the discard pile.  If there is a discard pile,
+    -- this ensures it goes on top.  If no pile, it drops to start a new one.
+    local cardPosition = firstPoint or castPosition
+    cardPosition.y = cardPosition.y + 0.1
+    cardObject.setPosition(cardPosition)
+    cardObject.setRotation(discardTransform.rotation)
+    if deck then
+        deck.putObject(cardObject)
+        if deckAttributes.shuffleOnDiscard then
+            deck.shuffle()
+        end
+    end
+end
+
+--- Given a deck, return guid list for cards that should be put elsewhere.
+-- Does not mutate the deck, ok to use the onObjectEnterContainer object.
+local function shouldPutCardsFromDeck(deckObject)
+    local cardGuids = false
+    for i, card in ipairs(deckObject.getObjects()) do
+        local deckAttributes = getCardDestination(card.name)
+        if deckAttributes then
+            cardGuids = cardGuids or {}
+            table.insert(cardGuids, card.guid)
+        end
+    end
+    return cardGuids
+end
+
+--- Put cards from a deck into their respective discard piles.
+-- Mutates the deck, must remove from graveyard bag first!
+local function putCardsFromDeck(deckObject, cardGuids)
+    for _, cardGuid in ipairs(cardGuids) do
+        if deckObject.getQuantity() > 0 then
+            local cardObject = deckObject.takeObject({ guid = cardGuid })
+            local deckAttributes = getCardDestination(cardObject.getName())
+            putCard(cardObject, deckAttributes)
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
+
+function onLoad(saveState)
     -- Hard code deck positions for "normal" table as well as "8 player madness".
     -- I started going down the road of finding the decks by name on first load,
     -- then using onSave -> onLoad(saveState) to remember when loading games in
@@ -304,7 +373,7 @@ function onLoad(saveState)
             commandSheetCount = commandSheetCount + 1
         end
     end
-    data.tableSize = commandSheetCount
+    data.tableSize = commandSheetCount == 8 and 8 or 6  -- only allow 8 or 6
 end
 
 function onObjectEnterContainer(container, enterObject)
@@ -312,73 +381,36 @@ function onObjectEnterContainer(container, enterObject)
         return
     end
 
-    if data.deleteSet[enterObject.getName()] then
+    -- Objects need to be removed from this graveyard bag before they can move
+    -- to their final location.  Take them from here to a position above the
+    -- graveyard bag (to prevent them from falling into a different bag).
+    local bounds = self.getBounds()
+    local takeParameters = {
+        position = {
+            x = bounds.center.x,
+            y = bounds.center.y + (bounds.size.y / 2) + 2,
+            z = bounds.center.z
+        }
+    }
 
-        -- Object is in DELETE, burninate!!
-        destroyObject(self.takeObject())
-
-    elseif enterObject.tag == 'Card' then
-
-        -- Object is a card.  If from a known deck discard.
-        local deckAttributes = getCardDestination(enterObject)
+    if enterObject.tag == 'Card' then
+        local deckAttributes = getCardDestination(enterObject.getName())
         if deckAttributes then
-            local discardTransform = deckAttributes.discardTransforms[data.tableSize or 6]
-            local p = discardTransform.position
-            local castPosition = { x = p.x, y = p.y + 2, z = p.z }
-            local hits = Physics.cast({
-                origin       = castPosition,
-                direction    = { x = 0, y = -1, z = 0 },
-                type         = 1,  -- ray
-                max_distance = 4
-            })
-            local deck = false
-            for _, hit in ipairs(hits) do
-                if hit.hit_object.tag == 'Card' or hit.hit_object.tag == 'Deck' then
-                    deck = hit.hit_object
-                    break
-                end
-            end
-            if deck then
-                -- Insert directly into deck (or lone card to make it a deck).
-                -- Move high before put to make sure it goes on top.
-                deck.putObject(self.takeObject({
-                    position = castPosition,
-                    rotation = discardTransform.rotation
-                }))
-                if deckAttributes.shuffleOnDiscard then
-                    deck.shuffle()
-                end
-            else
-                -- Nothing there, drop it to start a new discard pile.
-                self.takeObject({
-                    position = castPosition,
-                    rotation = discardTransform.rotation
-                })
-            end
+            putCard(self.takeObject(takeParameters), deckAttributes)
         end
-
     elseif enterObject.tag == 'Deck' then
-
-        -- If a deck, remove then place cards one at a time.
-        local function itemPosition(i)
-            local pos = self.getPosition()
-            return { position = { x = pos.x, y = pos.y + 2 + i, z = pos.z } }
+        local shouldPut = shouldPutCardsFromDeck(enterObject)
+        if shouldPut then
+            local deckObject = self.takeObject(takeParameters)
+            putCardsFromDeck(deckObject, shouldPut)
+            if deckObject.getQuantity() > 0 then
+                self.putObject(deckObject)
+            end
         end
-        local deckObject = self.takeObject(itemPosition(0))
-        for i, object in ipairs(deckObject.getObjects()) do
-            self.putObject(deckObject.takeObject(itemPosition(i)))
-        end
-
     else
-
-        -- Otherwise try to find the proper bag.
-        local bag = getNonCardDestination(enterObject)
+        local bag = getNonCardDestination(enterObject.getName())
         if bag then
-            bag.putObject(self.takeObject())
+            bag.putObject(self.takeObject(takeParameters))
         end
-
     end
 end
-
---#include <~/CrLua/CrLua>
---#include <~/CrLua/LockGlobals>

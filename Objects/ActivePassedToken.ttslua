@@ -162,17 +162,22 @@ end
 
 --- Is any active/passed token still active?
 -- @param peers list of active/passed token objects.
--- @return boolean true if any is active.
+-- @return color, color pair: any seated player active?  any missing players active?
 function anyPeerIsActive(peers)
-    local result = false
+    local activeSeated = false
+    local activeNotSeated = false
     for _, peer in ipairs(peers) do
         if not peer.is_face_down then
-            result = true
-            break
+            local peerColor = objectNameToColor(peer.getName())
+            if CrLua.TTS.Player.isSeated(peerColor) then
+                activeSeated = activeSeated or peerColor
+            else
+                activeNotSeated = activeNotSeated or peerColor
+            end
         end
     end
-    CrLua.Log.d(TAG, 'anyPeerActive -> ' .. tostring(result))
-    return result
+    CrLua.Log.d(TAG, 'anyPeerActive -> ' .. tostring(activeSeated) .. ', ' .. tostring(activeNotSeated))
+    return activeSeated, activeNotSeated
 end
 
 function anyPeerIsColor(color)
@@ -241,6 +246,10 @@ function maybePassTurn()
     -- Make sure everyone has exactly one active/passed token.
     local peers = getPeers(true)
     local sanityCheck = sanityCheckPeersWithIncludeSelf(peers)
+    if not sanityCheck then
+        CrLua.Log.d(TAG, 'maybePassTurn: sanity check failed, aborting')
+        return false
+    end
 
     -- Do nothing if still active (play normally).
     if isActive() then
@@ -254,12 +263,16 @@ function maybePassTurn()
     -- Note: if the sanity check failed then there is not one token per player.
     -- In that case, continue to pass turns but do not consider "all" passed.
     local myColor = myColor()
-    if anyPeerIsActive(peers) or not sanityCheck then
-        CrLua.Log.d(TAG, 'maybePassTurn: at least one active peer, passing turn')
+    local activeSeated, activeNotSeated = anyPeerIsActive(peers)
+    if activeSeated then
+        CrLua.Log.d(TAG, 'maybePassTurn: at least one active seated peer, passing turn')
         local player = Player[myColor]
         local name = (player and player.steam_name) or myColor or '?'
         broadcastToAll('Player ' .. name .. ' passed.', myColor)
         Turns.turn_color = Turns.getNextTurnColor()
+    elseif activeNotSeated then
+        CrLua.Log.d(TAG, 'maybePassTurn: at least one active unseated peer, aborting')
+        broadcastToAll('Player ' .. activeNotSeated .. ' still active but not at table')
     else
         CrLua.Log.d(TAG, 'maybePassTurn: no active peers, disabling turns')
         broadcastToAll('All players have passed.', myColor)
@@ -285,11 +298,10 @@ end
 #include <~/CrLua/CrLua>
 #include <~/CrLua/LockGlobals>
 
-#include <~/CrLua/List>
 #include <~/CrLua/LockTable>
 #include <~/CrLua/Log>
 #include <~/CrLua/Util>
 #include <~/CrLua/TTS/Player>
 
-CrLua.assertRequired({'Log'}) -- do this BEFORE lock
+CrLua.assertRequired({'Log', 'TTS.Player'}) -- do this BEFORE lock
 CrLua.lock()

@@ -73,7 +73,7 @@ end
 #include <~/CrLua/Kruft/Spiral>
 #include <~/CrLua/TTS/Patch>
 
-CrLua.assertRequired() -- do this BEFORE lock
+CrLua.assertRequired({ 'TTS.Patch' }) -- do this BEFORE lock
 CrLua.lock()
 
 -- #RESET_INCLUDED --

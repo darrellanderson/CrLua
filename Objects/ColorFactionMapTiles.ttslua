@@ -12,10 +12,8 @@ local _config = {
 }
 
 function onLoad(save_state)
-    print('xxx grid.type=' .. Grid.type)
-
     -- Get a world Y value from CrLua.TI4.System.
-    local y = CrLua.TI4.System.LOCAL_TO_WORLD_Y
+    local y = CrLua.TI4.System.LOCAL_Y
     local system = CrLua.TI4.System.fromPosition({ x = 0, y = 0, z = 0 })
     assert(system and system.object)
     local position = system.object.positionToWorld({ x = 0, y = y, z = 0 })
@@ -26,14 +24,20 @@ function onLoad(save_state)
     for hex, owners in pairs(hexToOwners) do
         if owners.ground then
             table.insert(lines, CrLua.TI4.Hex.vectorLine(hex, {
-                thickness = 0.5,
+                thickness = 0.4,
                 color = owners.ground
             }))
         end
         if owners.space then
             table.insert(lines, CrLua.TI4.Hex.vectorLine(hex, {
                 thickness = 0.2,
-                color = owners.ground
+                color = owners.space
+            }))
+        end
+        for planetName, color in pairs(owners.planetName) do
+            table.insert(lines, CrLua.TI4.System.planetVectorLine(owners.system, planetName, {
+                thickness = 0.2,
+                color = color
             }))
         end
     end
@@ -44,11 +48,11 @@ end
 function onDrop(playerColor)
     local position = self.getPosition()
     local system = CrLua.TI4.System.fromPosition(position)
-    local planet = system and CrLua.TI4.System.planetFromPosition(system, position, true)
-    if planet then
-        local lines = { CrLua.TI4.System.planetVectorLine(system, planet, {}) }
+    local planetName = system and CrLua.TI4.System.planetFromPosition(system, position, true)
+    if planetName then
+        local lines = { CrLua.TI4.System.planetVectorLine(system, planetName, {}) }
         Global.setVectorLines(lines)
-        Player[playerColor].pingTable(CrLua.TI4.System.planetToPosition(system, planet))
+        Player[playerColor].pingTable(CrLua.TI4.System.planetToPosition(system, planetName))
     else
         Global.setVectorLines()
     end
@@ -121,10 +125,10 @@ function getAllUnitsAndOwnerTokens()
             end
         end
 
-        thing.planet = thing.system and thing.ground and CrLua.TI4.System.planetFromPosition(thing.system, position, true)
+        thing.planetName = thing.system and thing.ground and CrLua.TI4.System.planetFromPosition(thing.system, position, true)
 
         -- Keep all things in space, plus any ground units/owner tokens on planets.
-        if thing.system and (not thing.ground or thing.planet) then
+        if thing.system and (not thing.ground or thing.planetName) then
             local entry = hexToThings[thing.hex]
             if not entry then
                 entry = {}
@@ -137,6 +141,9 @@ function getAllUnitsAndOwnerTokens()
     return hexToThings
 end
 
+--- Get a map from hex to owner table with {ground, space, planetName[]} owners.
+-- If planets are split between different players do not assign ground owner.
+-- If any planet is not owned, do not assign ground owner.
 function getSystemOwners()
     local hexToThings = getAllUnitsAndOwnerTokens()
     local hexToOwners = {}
@@ -144,7 +151,10 @@ function getSystemOwners()
         for _, thing in ipairs(things) do
             local owners = hexToOwners[hex]
             if not owners then
-                owners = { planet = {} }
+                owners = {
+                    system = assert(thing.system),
+                    planetName = {}
+                }
                 hexToOwners[hex] = owners
             end
 
@@ -167,14 +177,49 @@ function getSystemOwners()
 
             -- Per-planet.
             if thing.ground then
-                if owners.planet[thing.planet] and owners.planet[thing.planet] ~= thing.color then
-                    errorHex(hex, TAG .. ': more than one ground color on ' .. thing.planet .. ' tile ' .. thing.system.tile)
+                if owners.planetName[thing.planetName] and owners.planetName[thing.planetName] ~= thing.color then
+                    errorHex(hex, TAG .. ': more than one ground color on ' .. thing.planetName .. ' tile ' .. thing.system.tile)
                 end
-                owners.planet[thing.planet] = thing.color
+                owners.planetName[thing.planetName] = thing.color
             end
         end
     end
+
+    -- Remove ground owner if any planet is not owned.
+    for hex, owners in pairs(hexToOwners) do
+        local system = assert(owners.system)
+        for _, planet in ipairs(system.planets or {}) do
+            if not owners.planetName[planet.name] then
+                owners.ground = false
+                break
+            end
+        end
+    end
+
     return hexToOwners
+end
+
+--- Get the hexes fully owned, partially owned, and space owned.
+function getOwned(hexToOwners, color)
+    local ownFullySet = {}
+    local ownPartialSet = {}
+    local ownSpaceSet = {}
+    for hex, owners in pairs(hexToOwners) do
+        if owners.ground == color then
+            ownFullySet[hex] = true
+        else
+            for _, planetOwner in pairs(owners.planetName) do
+                if planetOwner == color then
+                    ownPartialSet[hex] = true
+                    break
+                end
+            end
+        end
+        if owners.space == color then
+            ownSpaceSet[hex] = true
+        end
+    end
+    return ownFullySet, ownPartialSet, ownSpaceSet
 end
 
 -------------------------------------------------------------------------------
@@ -184,35 +229,24 @@ function edge(hex1, hex2)
     return hex1 < hex2 and (hex1 .. hex2) or (hex2 and hex1)
 end
 
-function getControlEdges(color)
-    local hexToColor, hexToPlanetsToColor = getSystemOwners()
-
-    local colorToEdges = {}
-    for hex, color in pairs(hexToColor) do
+function getControlEdges(hexSet)
+    assert(tyep(hexSet) == 'table')
+    local edgeSet = {}
+    for hex, _ in pairs(hexSet) do
         local neighbors = CrLua.TI4.Hex.neighbors(hex)
         for _, neighbor in ipairs(neighbors) do
-            if hexToColor(neighbor) ~= color then
-                local colorToHex = colorToHexToEdges[color]
-                if not colorToHex then
-                    colorToHex = {}
-                    colorToHexToEdges[color] = colorToHex
-                end
-                local hexToEdges = colorToHex[hex]
-                if not hexToEdges then
-                    hexToEdges = {}
-                    colorToHex[hex] = hexToEdges
-                end
-                hexToEdges[edge(hex, neighbor)] = true
+            if not hexSet[neighbor] then
+                edgeSet[edge(hex, neighbor)] = true
             end
         end
     end
-
+    return edgeSet
 end
 
---- Get one polygon from a collection of hexes, removing from set as it goes.
+--- Get one polygon from a collection of hexes, removing edges as it goes.
 -- The set may still have entries when finished meaning there is at least one
 -- more disconnected polygon to find.
-function getControlPolygon(hexSet)
+function getControlPolygon(hexSet, edgeSet)
     local polygon = false
     local function addHex(hex)
         local position = CrLua.TI4.Hex.toPosition(hex)
@@ -292,10 +326,7 @@ end
 #include <~/CrLua/TI4/Hex>
 #include <~/CrLua/TI4/System>
 #include <~/CrLua/TI4/Unit>
-#include <~/CrLua/TI4/Wormhole>
 #include <~/CrLua/TI4/Zone>
-
-#include <~/CrLua/TTS/Object>
 
 #include <~/CrLua/List>
 #include <~/CrLua/LockTable>
@@ -305,9 +336,9 @@ end
 #include <~/CrLua/Table>
 #include <~/CrLua/Util>
 
-#include <~/CrLua/UnitTest>
-CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
-CrLua.UnitTest.runTests(TAG, CrLua, true)
+--#include <~/CrLua/UnitTest>
+--CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
+--CrLua.UnitTest.runTests(TAG, CrLua, true)
 
 CrLua.assertRequired({ 'TI4.Hex', 'TI4.System', 'TI4.Unit', 'List', 'Log' })
 CrLua.lock()

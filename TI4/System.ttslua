@@ -13,51 +13,146 @@ CrLua.TI4.System = assert(not CrLua.TI4.System) and {
     _allowMissingKeys = { 'SYSTEMS' },
 
     DEFAULT_LINE_THICKNESS = 0.2,
-    LOCAL_TO_WORLD_TILE_RADIUS = 2.26,
-    LOCAL_TO_WORLD_PLANET_RADIUS = 1,
-    LOCAL_TO_WORLD_MECATOL_RADIUS = 1.9,
-    LOCAL_TO_WORLD_Y = 0.318
+    LOCAL_TILE_RADIUS = 2.26,
+    LOCAL_DISTANCE_TO_PLANET = 1.1,
+    LOCAL_PLANET_RADIUS = 0.9,
+    LOCAL_Y = 0.318
 }
 
 CrLua.TI4.System.SYSTEMS = {
-    ['86e50a'] = { tile = 1, planets = { 'Jord' } },
-    ['ac3193'] = { tile = 2, planets = { 'Moll Primus' } },
-    ['db8aac'] = { tile = 3, planets = { 'Darien' } },
-    ['da7879'] = { tile = 4, planets = { 'Muaat' } },
-    ['fc6f7a'] = { tile = 5, planets = { 'Nestphar' } },
-    ['420355'] = { tile = 6, planets = { '[0.0.0]' } },
-    ['087347'] = { tile = 7, planets = { 'Winnu' } },
-    ['ea676a'] = { tile = 8, planets = { 'Mordai II' } },
-    ['0122f9'] = { tile = 9, planets = { 'Maaluuk', 'Druaa' } },
-    ['e001b4'] = { tile = 10, planets = { 'Arc Prime', 'Wren Terra' } },
-    ['d39876'] = { tile = 11, planets = { 'Lisis II', 'Ragh' } },
-    ['11598c'] = { tile = 12, planets = { 'Nar', 'Jol' } },
-    ['6176bf'] = { tile = 13, planets = { "Tren'lak", 'Quinarra' } },
-    ['c2509e'] = { tile = 14, planets = { 'Archon Ren', 'Archon Tau' } },
-    ['9c373a'] = { tile = 15, planets = { 'Retillion', 'Shalloq' } },
-    ['6a4247'] = { tile = 16, planets = { 'Hercant', 'Arretze', 'Kamdorn' } },
+    ['86e50a'] = { tile = 1, home = true, planets = {
+        { name = 'Jord' },
+    }},
+    ['ac3193'] = { tile = 2, home = true, planets = {
+        { name = 'Moll Primus' },
+    }},
+    ['db8aac'] = { tile = 3, home = true, planets = {
+        { name = 'Darien' },
+    }},
+    ['da7879'] = { tile = 4, home = true, planets = {
+        { name = 'Muaat' },
+    }},
+    ['fc6f7a'] = { tile = 5, home = true, planets = {
+        { name = 'Nestphar' },
+    }},
+    ['420355'] = { tile = 6, home = true, planets = {
+        { name = '[0.0.0]' },
+    }},
+    ['087347'] = { tile = 7, home = true, planets = {
+        { name = 'Winnu' },
+    }},
+    ['ea676a'] = { tile = 8, home = true, planets = {
+        { name = 'Mordai II' },
+    }},
+    ['0122f9'] = { tile = 9, home = true, planets = {
+        { name = 'Maaluuk' },
+        { name = 'Druaa' },
+    }},
+    ['e001b4'] = { tile = 10, home = true, planets = {
+        { name = 'Arc Prime' },
+        { name = 'Wren Terra' },
+    }},
+    ['d39876'] = { tile = 11, home = true, planets = {
+        { name = 'Lisis II' },
+        { name = 'Ragh' },
+    }},
+    ['11598c'] = { tile = 12, home = true, planets = {
+        { name = 'Nar' },
+        { name = 'Jol' },
+    }},
+    ['6176bf'] = { tile = 13, home = true, planets = {
+        { name = "Tren'lak" },
+        { name = 'Quinarra' },
+    }},
+    ['c2509e'] = { tile = 14, home = true, planets = {
+        { name = 'Archon Ren' },
+        { name = 'Archon Tau' },
+    }},
+    ['9c373a'] = { tile = 15, home = true, planets = {
+        { name = 'Retillion' },
+        { name = 'Shalloq' },
+    }},
+    ['6a4247'] = { tile = 16, home = true, planets = {
+        { name = 'Hercant' },
+        { name = 'Arretze' },
+        { name = 'Kamdorn' },
+    }},
     ['c56a8a'] = { tile = 17, wormholes = { 'delta' } },
-    ['04df02'] = { tile = 18, planets = { 'Mecatol Rex' } },
-    ['4216fd'] = { tile = 19, planets = { 'Wellon' } },
-    ['bc4bcc'] = { tile = 20, planets = { 'Vefut II' } },
-    ['f2798a'] = { tile = 21, planets = { 'Thibah' } },
-    ['0ea77f'] = { tile = 22, planets = { "Tar'mann" } },
-    ['7975f7'] = { tile = 23, planets = { 'Saudor' } },
-    ['48cc9f'] = { tile = 24, planets = { 'Mehar Xull' } },
-    ['71e1bf'] = { tile = 25, planets = { 'Quann' }, wormholes = { 'beta' } },
-    ['f11ef5'] = { tile = 26, planets = { 'Lodor' }, wormholes = { 'alpha' } },
-    ['fc239f'] = { tile = 27, planets = { 'New Albion', 'Starpoint' } },
-    ['f8caf6'] = { tile = 28, planets = { "Tequ'ran", 'Torkan' } },
-    ['0ac98b'] = { tile = 29, planets = { "Qucen'n", 'Rarron' } },
-    ['aaae9f'] = { tile = 30, planets = { 'Mellon', 'Zohbat' } },
-    ['d5ed63'] = { tile = 31, planets = { 'Lazar', 'Sakulag' } },
-    ['48ac87'] = { tile = 32, planets = { 'Dal Bootha', 'Xxehan' } },
-    ['87a5a2'] = { tile = 33, planets = { 'Corneeq', 'Resculon' } },
-    ['eb99c0'] = { tile = 34, planets = { 'Centauri', 'Gral' } },
-    ['dd2ca7'] = { tile = 35, planets = { 'Bereg', 'Lirta IV' } },
-    ['a284d1'] = { tile = 36, planets = { 'Arnor', 'Lor' } },
-    ['e0ff33'] = { tile = 37, planets = { 'Arinam', 'Meer' } },
-    ['b958aa'] = { tile = 38, planets = { 'Abyz', 'Fria' } },
+    ['04df02'] = { tile = 18, planets = {
+        { name = 'Mecatol Rex', radius = 1.7 },
+    }},
+    ['4216fd'] = { tile = 19, planets = {
+        { name = 'Wellon' },
+    }},
+    ['bc4bcc'] = { tile = 20, planets = {
+        { name = 'Vefut II' },
+    }},
+    ['f2798a'] = { tile = 21, planets = {
+        { name = 'Thibah' },
+    }},
+    ['0ea77f'] = { tile = 22, planets = {
+        { name = "Tar'mann" },
+    }},
+    ['7975f7'] = { tile = 23, planets = {
+        { name = 'Saudor' },
+    }},
+    ['48cc9f'] = { tile = 24, planets = {
+        { name = 'Mehar Xull' },
+    }},
+    ['71e1bf'] = { tile = 25, wormholes = { 'beta' }, planets = {
+        { name = 'Quann' },
+    }},
+    ['f11ef5'] = { tile = 26, wormholes = { 'alpha' }, planets = {
+        { name = 'Lodor' },
+    }},
+    ['fc239f'] = { tile = 27, planets = {
+        { name = 'New Albion' },
+        { name = 'Starpoint' },
+    }},
+    ['f8caf6'] = { tile = 28, planets = {
+        { name = "Tequ'ran" },
+        { name = 'Torkan' },
+    }},
+    ['0ac98b'] = { tile = 29, planets = {
+        { name = "Qucen'n" },
+        { name = 'Rarron' },
+    }},
+    ['aaae9f'] = { tile = 30, planets = {
+        { name = 'Mellon' },
+        { name = 'Zohbat' },
+    }},
+    ['d5ed63'] = { tile = 31, planets = {
+        { name = 'Lazar' },
+        { name = 'Sakulag' },
+    }},
+    ['48ac87'] = { tile = 32, planets = {
+        { name = 'Dal Bootha' },
+        { name = 'Xxehan' },
+    }},
+    ['87a5a2'] = { tile = 33, planets = {
+        { name = 'Corneeq' },
+        { name = 'Resculon' },
+    }},
+    ['eb99c0'] = { tile = 34, planets = {
+        { name = 'Centauri' },
+        { name = 'Gral' },
+    }},
+    ['dd2ca7'] = { tile = 35, planets = {
+        { name = 'Bereg' },
+        { name = 'Lirta IV' },
+    }},
+    ['a284d1'] = { tile = 36, planets = {
+        { name = 'Arnor' },
+        { name = 'Lor' },
+    }},
+    ['e0ff33'] = { tile = 37, planets = {
+        { name = 'Arinam' },
+        { name = 'Meer' },
+    }},
+    ['b958aa'] = { tile = 38, planets = {
+        { name = 'Abyz' },
+        { name = 'Fria' },
+    }},
     ['0378a4'] = { tile = 39, wormholes = { 'alpha' } },
     ['ccd7ac'] = { tile = 40, wormholes = { 'beta' } },
     ['47a55d'] = { tile = 41, anomalies = { 'gravity rift' } },
@@ -70,7 +165,9 @@ CrLua.TI4.System.SYSTEMS = {
     ['ff8f60'] = { tile = 48 },
     ['0216be'] = { tile = 49 },
     ['97ee53'] = { tile = 50 },
-    ['f38182'] = { tile = 51, planets = { 'Creuss' }, wormholes = { 'delta' } }
+    ['f38182'] = { tile = 51, home = true, wormholes = { 'delta' }, planets = {
+        { name = 'Creuss', position = { 0.35, 0.18 }, radius = 0.8 },
+    }},
 }
 
 -------------------------------------------------------------------------------
@@ -119,48 +216,56 @@ end
 -- @param system table : CrLua.TI4.System.SYSTEMS value.
 -- @param position table : {x,y,z} position in world coordinates.
 -- @param exact boolean : if true, position must be on planet (vs closest planet).
--- @return planet string : or nil if no planet in that zone.
+-- @return planet name string : or nil if no planet in that zone.
 -------------------------------------------------------------------------------
 function CrLua.TI4.System.planetFromPosition(system, position, exact)
     assert(type(system) == 'table' and system.tile and type(position) == 'table' and position.x)
     local i = CrLua.TI4.System._getZone(system, position)
     local planet = system.planets and #system.planets >= i and system.planets[i]
     if planet and exact then
-        local planetPosition = CrLua.TI4.System.planetToPosition(system, planet)
-        local local1 = system.object.positionToLocal(position)
-        local local2 = system.object.positionToLocal(planetPosition)
-        local dx = local1.x - local2.x
-        local dz = local1.z - local2.z
+        local planetPosition, planetRadius = CrLua.TI4.System.planetToPosition(system, planet.name)
+        local dx = position.x - planetPosition.x
+        local dz = position.z - planetPosition.z
         local distance = math.sqrt((dx * dx) + (dz * dz))
-        local planetRadius = system.tile == 18 and CrLua.TI4.System.LOCAL_TO_WORLD_MECATOL_RADIUS or CrLua.TI4.System.LOCAL_TO_WORLD_PLANET_RADIUS
         if distance > planetRadius then
             planet = nil
         end
     end
-    return planet
+    return planet and planet.name
 end
 
 -------------------------------------------------------------------------------
 -- Get planet position.
 -- @param system table : CrLua.TI4.System.SYSTEMS value.
--- @param planet string : planet name.
--- @return table : {x,y,z} table.
+-- @param planetName string : planet name.
+-- @return table, number : {x,y,z} position table, planet radius.
 -------------------------------------------------------------------------------
-function CrLua.TI4.System.planetToPosition(system, planet)
-    assert(type(system) == 'table' and system.tile and type(planet) == 'string')
+function CrLua.TI4.System.planetToPosition(system, planetName)
+    assert(type(system) == 'table' and system.tile and type(planetName) == 'string')
 
     local planetIndex = false
     for i, entry in ipairs(system.planets or {}) do
-        if entry == planet then
+        if entry.name == planetName then
             planetIndex = i
             break
         end
     end
     assert(planetIndex)
 
+    -- Compute radius in world space.
+    local localRadius = system.planets[planetIndex].radius or CrLua.TI4.System.LOCAL_PLANET_RADIUS
+    local p1 = system.object.getPosition()
+    local p2 = system.object.positionToWorld({ x = localRadius, y = 0, z = 0 })
+    local radiusWorld = math.sqrt((p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2)
+
+    local overridePosition = system.planets[planetIndex].position
+    if overridePosition then
+        local posXYZ = { x = overridePosition[1], y = CrLua.TI4.System.LOCAL_Y, z = overridePosition[2] }
+        return system.object.positionToWorld(posXYZ), radiusWorld
+    end
+
     local distanceToPlanet = 0
     local bearingToPlanet = 0
-
     local zoneBoundaries = CrLua.TI4.System._getZoneBorders(system)
     if #zoneBoundaries > 2 then
         local a = zoneBoundaries[planetIndex]
@@ -170,34 +275,86 @@ function CrLua.TI4.System.planetToPosition(system, planet)
         else
             bearingToPlanet = ((a + 360 + b) / 2) % 360
         end
-        distanceToPlanet = CrLua.TI4.System.LOCAL_TO_WORLD_TILE_RADIUS / 2.0
+        distanceToPlanet = CrLua.TI4.System.LOCAL_DISTANCE_TO_PLANET
     end
 
-    return CrLua.TI4.System._bearingToPosition(system, bearingToPlanet, distanceToPlanet)
+    -- Planets bearings are almost but not exactly in the center of their zones.
+    -- Home system planets are slightly offset.  Different same-number-of-planets
+    -- systems vary slightly, so unless want to hard code each tile this is close.
+    local numZones = #zoneBoundaries - 1
+    if numZones == 1 then
+        if system.home then
+            distanceToPlanet = 0.35
+            bearingToPlanet = 345
+        else
+            distanceToPlanet = 0.05
+            bearingToPlanet = 270
+        end
+
+    elseif numZones == 2 then
+        if planetIndex == 1 then
+            if system.home then
+                distanceToPlanet = distanceToPlanet + 0.1
+                bearingToPlanet = bearingToPlanet - 4
+            else
+                distanceToPlanet = distanceToPlanet + 0.05
+                bearingToPlanet = bearingToPlanet - 3
+            end
+        elseif planetIndex == 2 then
+            if system.home then
+                distanceToPlanet = distanceToPlanet - 0.05
+                bearingToPlanet = bearingToPlanet - 15
+            else
+                distanceToPlanet = distanceToPlanet - 0.2
+                bearingToPlanet = bearingToPlanet + 5
+            end
+        end
+    elseif numZones == 3 then
+        if planetIndex == 1 then  -- hercant
+            distanceToPlanet = distanceToPlanet + 0.25
+            bearingToPlanet = bearingToPlanet + 9
+        elseif planetIndex == 2 then
+            distanceToPlanet = distanceToPlanet + 0.07
+            bearingToPlanet = bearingToPlanet - 5
+        elseif planetIndex == 3 then
+            distanceToPlanet = distanceToPlanet + 0.22
+            bearingToPlanet = bearingToPlanet - 6
+        end
+    end
+
+
+    local positionWorld = CrLua.TI4.System._bearingToPosition(system, bearingToPlanet, distanceToPlanet)
+    return positionWorld, radiusWorld
 end
 
 -------------------------------------------------------------------------------
 --- Get vector lines for planet.
 -- @param system table : CrLua.TI4.System.SYSTEMS value.
--- @param planet string : planet name.
+-- @param planetName string : planet name.
 -- @param override table : vector lines parameters such as thickness, color.
 -- @return table : vector lines entry wrapping planet.
 -------------------------------------------------------------------------------
-function CrLua.TI4.System.planetVectorLine(system, planet, override)
-    assert(type(system) == 'table' and system.tile and type(planet) == 'string' and type(override) == 'table')
+function CrLua.TI4.System.planetVectorLine(system, planetName, override)
+    assert(type(system) == 'table' and system.tile and type(planetName) == 'string' and type(override) == 'table')
     assert(system.object)
 
-    -- Do not specify system to get a local position.
-    local planetOriginWorld = CrLua.TI4.System.planetToPosition(system, planet)
-    local planetOrigin = system.object.positionToLocal(planetOriginWorld)
-    local planetRadius = system.tile == 18 and CrLua.TI4.System.LOCAL_TO_WORLD_MECATOL_RADIUS or CrLua.TI4.System.LOCAL_TO_WORLD_PLANET_RADIUS
+    local planetOrigin, planetRadius = CrLua.TI4.System.planetToPosition(system, planetName)
+
+    -- Convert to local space (get local radius from planet list).
+    local planetOrigin = system.object.positionToLocal(planetOrigin)
+    for _, planet in ipairs(system.planets) do
+        if planet.name == planetName then
+            planetRadius = planet.radius or CrLua.TI4.System.LOCAL_PLANET_RADIUS
+            break
+        end
+    end
 
     local points = {}
     for i = 1, 16 do
         local theta = math.pi * 2.0 * i / 16.0
         local position = {
             x = planetOrigin.x + math.cos(theta) * planetRadius,
-            y = CrLua.TI4.System.LOCAL_TO_WORLD_Y,
+            y = CrLua.TI4.System.LOCAL_Y,
             z = planetOrigin.z + math.sin(theta) * planetRadius
         }
         table.insert(points, system.object.positionToWorld(position))
@@ -228,9 +385,9 @@ function CrLua.TI4.System.vectorLine(system, override)
         return {}
     end
 
-    local y = CrLua.TI4.System.LOCAL_TO_WORLD_Y
+    local y = CrLua.TI4.System.LOCAL_Y
     local center = system.object.positionToWorld({x = 0, y = y, z = 0})
-    local r = CrLua.TI4.System.LOCAL_TO_WORLD_TILE_RADIUS
+    local r = CrLua.TI4.System.LOCAL_TILE_RADIUS
     local outer = {}
     for i = 1, #zoneBorders - 1 do
         local bearing = zoneBorders[i]
@@ -367,7 +524,7 @@ function CrLua.TI4.System._bearingToPosition(system, bearing, r)
     local result = { x = r * math.sin(bearing), y = 0, z = -r * math.cos(bearing) }
     if system then
         assert(type(system) == 'table' and system.tile and system.object)
-        result.y = CrLua.TI4.System.LOCAL_TO_WORLD_Y
+        result.y = CrLua.TI4.System.LOCAL_Y
         assert(system.object)
         result = system.object.positionToWorld(result)
     end

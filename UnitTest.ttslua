@@ -7,7 +7,7 @@ local TAG = 'CrLua.UnitTest'
 
 CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
 CrLua.UnitTest = assert(not CrLua.UnitTest) and {
-    _require = {}
+    _require = { 'UnitTest' }
 }
 
 -------------------------------------------------------------------------------

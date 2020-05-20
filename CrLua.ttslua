@@ -56,17 +56,17 @@ function CrLua.assertRequired(extraRequires, table)
             for _, name in ipairs(table._require) do
                 requireSet[name] = true
             end
+            if packagePath then
+                haveSet[packagePath] = true
+            end
         end
         for k, v in pairs(table) do
             if type(v) == 'table' and not string.match(k, '^[_%l]') then
-                local isCamelCase = type(k) == 'string' and string.match(k, '^%u%l')
-                if type(packagePath) ~= 'boolean' and isCamelCase then
-                    packagePath = (packagePath and (packagePath .. '.') or '') .. k
-                    haveSet[packagePath] = true
-                else
-                    packagePath = false
+                local recurse = type(k) == 'string' and string.match(k, '^%u')
+                if recurse then
+                    local childPackagePath = (packagePath and (packagePath .. '.') or '') .. k
+                    addRequireEntries(v, childPackagePath)
                 end
-                addRequireEntries(v, packagePath)
             end
         end
     end

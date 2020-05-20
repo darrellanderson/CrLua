@@ -13,7 +13,9 @@
 local TAG = 'CrLua.LockTable'
 
 CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
-CrLua.LockTable = assert(not CrLua.LockTable) and {}
+CrLua.LockTable = assert(not CrLua.LockTable) and {
+    _require = {}
+}
 
 CrLua.LockTable.ATTR = {
     READ_ONLY = 1,

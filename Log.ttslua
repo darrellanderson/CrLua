@@ -7,6 +7,7 @@ local TAG = 'CrLua.Log'
 
 CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
 CrLua.Log = assert(not CrLua.Log) and {
+    _require = {},
     _data = {}
 }
 

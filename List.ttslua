@@ -6,7 +6,9 @@
 local TAG = 'CrLua.List'
 
 CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
-CrLua.List = assert(not CrLua.List) and {}
+CrLua.List = assert(not CrLua.List) and {
+    _require = {}
+}
 
 -------------------------------------------------------------------------------
 --- Concatenate two lists.

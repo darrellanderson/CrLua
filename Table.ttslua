@@ -6,7 +6,9 @@
 local TAG = 'CrLua.Table'
 
 CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
-CrLua.Table = assert(not CrLua.Table) and {}
+CrLua.Table = assert(not CrLua.Table) and {
+    _require = {}
+}
 
 -------------------------------------------------------------------------------
 --- Merge two tables.

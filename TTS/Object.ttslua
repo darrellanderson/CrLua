@@ -9,7 +9,9 @@ local TAG = 'CrLua.TTS.Object'
 
 CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
 CrLua.TTS = CrLua.TTS or {}
-CrLua.TTS.Object = assert(not CrLua.TTS.Object) and {}
+CrLua.TTS.Object = assert(not CrLua.TTS.Object) and {
+    _require = { 'List' }
+}
 
 -------------------------------------------------------------------------------
 --- Get multiple objects with a single getAllObjects pass.

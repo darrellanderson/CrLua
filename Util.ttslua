@@ -6,7 +6,9 @@
 local TAG = 'CrLua.Util'
 
 CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
-CrLua.Util = assert(not CrLua.Util) and {}
+CrLua.Util = assert(not CrLua.Util) and {
+    _require = {}
+}
 
 -------------------------------------------------------------------------------
 --- Compute the distance between two {x,y,z} vectors.

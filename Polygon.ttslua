@@ -6,7 +6,9 @@
 local TAG = 'CrLua.Polygon'
 
 CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
-CrLua.Polygon = assert(not CrLua.Polygon) and {}
+CrLua.Polygon = assert(not CrLua.Polygon) and {
+    _require = {}
+}
 
 -------------------------------------------------------------------------------
 --- Convert from internal [1,2] points to XYZ tables.

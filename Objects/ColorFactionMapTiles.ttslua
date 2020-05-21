@@ -79,9 +79,11 @@ function onLoad(save_state)
         local color = assert(zone.color)
         CrLua.Log.d(TAG, 'onLoad: ' .. color)
         local ownFullySet, ownPartialSet, ownSpaceSet = getOwned(hexToOwners, color)
-        local polygons, _ = getControlPolygons(ownFullySet)
+
+        -- Fully owned, wrap around borders.
+        local polygons, _ = getControlPolygons(ownFullySet, ownPartialSet)
         for _, polygon in ipairs(polygons) do
-            local thickness = 0.4
+            local thickness = 0.6
             local polygon = CrLua.Polygon.inset(polygon, thickness / 2.0)
             local points = CrLua.Polygon.toXYZ(polygon, y)
             table.insert(lines, {
@@ -92,6 +94,33 @@ function onLoad(save_state)
                 loop = true
             })
         end
+
+        --[[
+        -- Partially owned.
+        for hex, _ in pairs(ownPartialSet) do
+            local owners = hexToOwners[hex]
+            for planetName, ownerColor in pairs(owners.planetName) do
+                if color == ownerColor then
+                    table.insert(lines, CrLua.TI4.System.planetVectorLine(owners.system, planetName, {
+                        thickness = 0.3,
+                        color = color
+                    }))
+                end
+            end
+        end
+        --]]
+
+        --[[
+        -- For space, do an inset thin line.
+        for hex, _ in pairs(ownSpaceSet) do
+            if not ownFullySet[hex] then
+                table.insert(lines, CrLua.TI4.Hex.vectorLine(hex, {
+                    thickness = 0.2,
+                    color = color
+                }))
+            end
+        end
+        --]]
     end
     --]]
 
@@ -261,9 +290,17 @@ function getOwned(hexToOwners, color)
         if owners.ground == color then
             ownFullySet[hex] = true
         else
-            for _, planetOwner in pairs(owners.planetName) do
+            for planetName, planetOwner in pairs(owners.planetName) do
                 if planetOwner == color then
-                    ownPartialSet[hex] = true
+                    local entry = ownPartialSet[hex]
+                    if not entry then
+                        entry = {}
+                        ownPartialSet[hex] = entry
+                    end
+                    table.insert(entry, {
+                        system = assert(owners.system),
+                        planetName = assert(planetName)
+                    })
                     break
                 end
             end
@@ -298,7 +335,7 @@ end
 --- Get one polygon from a collection of hexes, removing edges as it goes.
 -- The set may still have entries when finished meaning there is at least one
 -- more disconnected polygon to find.
-function getControlPolygon(hexSet, edgeSet)
+function getControlPolygon(hexSet, edgeSet, partialSet)
     assert(type(hexSet) == 'table' and type(edgeSet) == 'table')
     --CrLua.Log.d(TAG, 'getControlPolygon: |edgeSet|=' .. #CrLua.List.fromKeys(edgeSet))
 
@@ -312,6 +349,10 @@ function getControlPolygon(hexSet, edgeSet)
             local a = polygon[#polygon]
             local b = { edgePoints[1].x, edgePoints[1].z }
             assert(math.abs(a[1] - b[1]) < 0.01 and math.abs(a[2] - b[2]) < 0.01)
+        end
+        if partialSet[neighbor] then
+            local center = CrLua.TI4.Hex.toPosition(neighbor)
+            table.insert(polygon, { center.x, center.z })
         end
         table.insert(polygon, { edgePoints[2].x, edgePoints[2].z })
     end
@@ -387,7 +428,7 @@ function getControlPolygon(hexSet, edgeSet)
     end
 end
 
-function getControlPolygons(hexSet)
+function getControlPolygons(hexSet, partialSet)
     local function isEmptySet(set)
         for _, _ in pairs(set) do
             return false
@@ -400,7 +441,7 @@ function getControlPolygons(hexSet)
     local polygons = {}
     local paths = {}
     while not isEmptySet(edgeSet) do
-        local polygon, path = getControlPolygon(hexSet, edgeSet)
+        local polygon, path = getControlPolygon(hexSet, edgeSet, partialSet)
         if polygon then
             table.insert(polygons, polygon)
         end

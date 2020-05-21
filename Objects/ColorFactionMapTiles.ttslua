@@ -21,6 +21,8 @@ function onLoad(save_state)
 
     local lines = {}
     local hexToOwners = getSystemOwners()
+
+    --[[
     for hex, owners in pairs(hexToOwners) do
         if owners.ground then
             table.insert(lines, CrLua.TI4.Hex.vectorLine(hex, {
@@ -41,6 +43,57 @@ function onLoad(save_state)
             }))
         end
     end
+    --]]
+
+    --[[
+    -- Verify commonEdge
+    for _, zone in ipairs(CrLua.TI4.Zone.all()) do
+        local color = assert(zone.color)
+        CrLua.Log.d(TAG, 'onLoad: ' .. color)
+        local ownFullySet, ownPartialSet, ownSpaceSet = getOwned(hexToOwners, color)
+            for hex, _ in pairs(ownFullySet) do
+                local neighbors = CrLua.TI4.Hex.neighbors(hex)
+                for _, neighbor in ipairs(neighbors) do
+                    if not ownFullySet[neighbor] then
+                        local points = CrLua.TI4.Hex.commonEdge(hex, neighbor)
+                        table.insert(points, { x= (points[1].x + points[2].x) / 2, z = (points[1].z + points[2].z) / 2 })
+                        table.insert(points, CrLua.TI4.Hex.toPosition(hex))
+                        for _, point in ipairs(points) do
+                            point.y = 1.4
+                        end
+                        table.insert(lines, {
+                            points = points,
+                            color = color,
+                            thickness = 0.3,
+                            loop = false,
+                            square = true
+                        })
+                    end
+                end
+            end
+        end
+    end
+    --]]
+
+    for _, zone in ipairs(CrLua.TI4.Zone.all()) do
+        local color = assert(zone.color)
+        CrLua.Log.d(TAG, 'onLoad: ' .. color)
+        local ownFullySet, ownPartialSet, ownSpaceSet = getOwned(hexToOwners, color)
+        local polygons, _ = getControlPolygons(ownFullySet)
+        for _, polygon in ipairs(polygons) do
+            local thickness = 0.4
+            local polygon = CrLua.Polygon.inset(polygon, thickness / 2.0)
+            local points = CrLua.Polygon.toXYZ(polygon, y)
+            table.insert(lines, {
+                points = points,
+                thickness = thickness,
+                color = color,
+                square = true,
+                loop = true
+            })
+        end
+    end
+    --]]
 
     Global.setVectorLines(lines)
 end
@@ -226,15 +279,14 @@ end
 
 function edge(hex1, hex2)
     assert(type(hex1) == 'string' and type(hex2) == 'string')
-    return hex1 < hex2 and (hex1 .. hex2) or (hex2 and hex1)
+    return hex1 .. hex2
 end
 
 function getControlEdges(hexSet)
-    assert(tyep(hexSet) == 'table')
+    assert(type(hexSet) == 'table')
     local edgeSet = {}
     for hex, _ in pairs(hexSet) do
-        local neighbors = CrLua.TI4.Hex.neighbors(hex)
-        for _, neighbor in ipairs(neighbors) do
+        for _, neighbor in ipairs(CrLua.TI4.Hex.neighbors(hex)) do
             if not hexSet[neighbor] then
                 edgeSet[edge(hex, neighbor)] = true
             end
@@ -247,56 +299,95 @@ end
 -- The set may still have entries when finished meaning there is at least one
 -- more disconnected polygon to find.
 function getControlPolygon(hexSet, edgeSet)
+    assert(type(hexSet) == 'table' and type(edgeSet) == 'table')
+    --CrLua.Log.d(TAG, 'getControlPolygon: |edgeSet|=' .. #CrLua.List.fromKeys(edgeSet))
+
     local polygon = false
-    local function addHex(hex)
-        local position = CrLua.TI4.Hex.toPosition(hex)
-        local point2D = { position.x, position.z }
-        table.insert(polygon, point2D)
+    local function addEdge(hex, neighbor)
+        local edgePoints = CrLua.TI4.Hex.commonEdge(hex, neighbor)
+        if not polygon then
+            polygon = { { edgePoints[1].x, edgePoints[1].z } }
+        else
+            -- Polygon always extends from previous point!
+            local a = polygon[#polygon]
+            local b = { edgePoints[1].x, edgePoints[1].z }
+            assert(math.abs(a[1] - b[1]) < 0.01 and math.abs(a[2] - b[2]) < 0.01)
+        end
+        table.insert(polygon, { edgePoints[2].x, edgePoints[2].z })
     end
 
-    -- Get a starting hex.
-    local currentHex = false
-    for hex, _ in pairs(hexSet) do
-        currentHex = hex
-        break
-    end
-    polygon = currentHex and {} or false
-
-    while currentHex do
-        assert(hexSet[currentHex])
-        hexSet[currentHex] = nil
-        addHex(currentHex)
-
-        local nextHex = false
-        local neighbors = CrLua.TI4.Hex.neighbors(currentHex)
-        for _, neighbor in ipairs(neighbors) do
-            if hexSet[neighbor] then
-                nextHex = neighbor
-                break
+    local function getStartingHexAndNeighborIndex()
+        for hex, _ in pairs(hexSet) do
+            for i, neighbor in ipairs(CrLua.TI4.Hex.neighbors(hex)) do
+                local edgeKey = edge(hex, neighbor)
+                if edgeSet[edgeKey] then
+                    return hex, i
+                end
             end
         end
-        currentHex = nextHex
+        error('no starting edge')
     end
-    return polygon
+    local currentHex, neighborIndex = getStartingHexAndNeighborIndex()
+
+    local path = {}  -- also get path to help with debugging
+    local crossedEdgeSet = {}
+    while currentHex do
+        --CrLua.Log.d(TAG, 'getControlPolygon: ' .. currentHex)
+        table.insert(path, currentHex)
+        local neighbors = CrLua.TI4.Hex.neighbors(currentHex)
+        for i = 1, 6 do
+            local neighbor = neighbors[neighborIndex]
+            local currentEdge = edge(currentHex, neighbor)
+
+            if edgeSet[currentEdge] then
+
+                -- Add this edge.
+                assert(not hexSet[neighbor])
+                edgeSet[currentEdge] = nil
+                addEdge(currentHex, neighbor)
+                neighborIndex = neighborIndex == 6 and 1 or neighborIndex + 1
+
+            elseif crossedEdgeSet[currentEdge] then
+
+                -- Already explored there, keep going.
+                neighborIndex = neighborIndex == 6 and 1 or neighborIndex + 1
+
+            elseif hexSet[neighbor] then
+
+                -- We contol this neighbor, move there and start over.
+                --CrLua.Log.d(TAG, 'getControlPolygon: ' .. currentHex .. ' -> ' .. neighbor)
+                crossedEdgeSet[currentEdge] = true
+                assert(not edgeSet[currentEdge])
+
+                local reverseIndex = (((neighborIndex - 1) + 3) % 6) + 1
+
+                currentHex = neighbor
+                neighborIndex = reverseIndex
+                neighborIndex = neighborIndex == 6 and 1 or neighborIndex + 1
+                break  -- start over!
+
+            elseif i == 6 then
+
+                -- If we got to the end, no new edges or neighbors to explore!
+                currentHex = false
+
+            end
+        end
+    end
+
+    -- The last point should always be the same as the first.  Remove last.
+    local a = polygon[1]
+    local b = polygon[#polygon]
+    assert(math.abs(a[1] - b[1]) < 0.01 and math.abs(a[2] - b[2]) < 0.01)
+    table.remove(polygon)
+
+    --CrLua.Log.d(TAG, 'getControlPolygon: |polygon|=' .. #polygon)
+    if #polygon > 2 then
+        return polygon, path
+    end
 end
 
-function getControlPolygons()
-    local hexToPlanetsToColor = getSystemOwners()
-
-    -- Get sets of wholely-owned hexes, grouped by color.
-    local colorToHexSets = {}
-    for hex, planetsToColor in pairs(hexToPlanetsToColor) do
-        if type(planetsToColor) == 'string' then
-            color = planetsToColor
-            local entry = colorToHexSets[color]
-            if not entry then
-                entry = {}
-                colorToHexSets[color] = entry
-            end
-            entry[hex] = true
-        end
-    end
-
+function getControlPolygons(hexSet)
     local function isEmptySet(set)
         for _, _ in pairs(set) do
             return false
@@ -304,18 +395,20 @@ function getControlPolygons()
         return true
     end
 
-    local colorToPolygons = {}
-    for color, hexSet in pairs(colorToHexSets) do
-        local polygons = {}
-        colorToPolygons[color] = polygons
+    local edgeSet = getControlEdges(hexSet)
 
-        while not isEmptySet(hexSet) do
-            local polygon = getControlPolygon(hexSet)
-            assert(polygon)
+    local polygons = {}
+    local paths = {}
+    while not isEmptySet(edgeSet) do
+        local polygon, path = getControlPolygon(hexSet, edgeSet)
+        if polygon then
             table.insert(polygons, polygon)
         end
+        if path then
+            table.insert(paths, path)
+        end
     end
-    return colorToPolygons
+    return polygons, paths
 end
 
 -------------------------------------------------------------------------------
@@ -336,8 +429,8 @@ end
 #include <~/CrLua/Table>
 #include <~/CrLua/Util>
 
+CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
 --#include <~/CrLua/UnitTest>
---CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
 --CrLua.UnitTest.runTests(TAG, CrLua, true)
 
 CrLua.assertRequired({ 'TI4.Hex', 'TI4.System', 'TI4.Unit', 'List', 'Log' })

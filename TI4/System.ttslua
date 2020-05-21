@@ -165,7 +165,7 @@ CrLua.TI4.System.SYSTEMS = {
     ['ff8f60'] = { tile = 48 },
     ['0216be'] = { tile = 49 },
     ['97ee53'] = { tile = 50 },
-    ['f38182'] = { tile = 51, home = true, wormholes = { 'delta' }, planets = {
+    ['f38182'] = { tile = 51, home = true, localY = 0.101, wormholes = { 'delta' }, planets = {
         { name = 'Creuss', position = { 0.35, 0.18 }, radius = 0.8 },
     }},
 }
@@ -260,7 +260,7 @@ function CrLua.TI4.System.planetToPosition(system, planetName)
 
     local overridePosition = system.planets[planetIndex].position
     if overridePosition then
-        local posXYZ = { x = overridePosition[1], y = CrLua.TI4.System.LOCAL_Y, z = overridePosition[2] }
+        local posXYZ = { x = overridePosition[1], y = system.localY or CrLua.TI4.System.LOCAL_Y, z = overridePosition[2] }
         return system.object.positionToWorld(posXYZ), radiusWorld
     end
 
@@ -354,7 +354,7 @@ function CrLua.TI4.System.planetVectorLine(system, planetName, override)
         local theta = math.pi * 2.0 * i / 16.0
         local position = {
             x = planetOrigin.x + math.cos(theta) * planetRadius,
-            y = CrLua.TI4.System.LOCAL_Y,
+            y = system.localY or CrLua.TI4.System.LOCAL_Y,
             z = planetOrigin.z + math.sin(theta) * planetRadius
         }
         table.insert(points, system.object.positionToWorld(position))
@@ -385,7 +385,7 @@ function CrLua.TI4.System.vectorLine(system, override)
         return {}
     end
 
-    local y = CrLua.TI4.System.LOCAL_Y
+    local y = system.localY or CrLua.TI4.System.LOCAL_Y
     local center = system.object.positionToWorld({x = 0, y = y, z = 0})
     local r = CrLua.TI4.System.LOCAL_TILE_RADIUS
     local outer = {}
@@ -524,7 +524,7 @@ function CrLua.TI4.System._bearingToPosition(system, bearing, r)
     local result = { x = r * math.sin(bearing), y = 0, z = -r * math.cos(bearing) }
     if system then
         assert(type(system) == 'table' and system.tile and system.object)
-        result.y = CrLua.TI4.System.LOCAL_Y
+        result.y = system.localY or CrLua.TI4.System.LOCAL_Y
         assert(system.object)
         result = system.object.positionToWorld(result)
     end

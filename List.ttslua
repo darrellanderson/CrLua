@@ -11,6 +11,29 @@ CrLua.List = assert(not CrLua.List) and {
 }
 
 -------------------------------------------------------------------------------
+--- Get list index of item.
+-- @param list: table with number indices.
+-- @param item: item to find
+-- @return number or nil: list index, if found.
+-------------------------------------------------------------------------------
+function CrLua.List.indexOf(list, item)
+    assert(type(list) == 'table')
+    for i, v in ipairs(list) do
+        if v == item then
+            return i
+        end
+    end
+end
+
+function CrLua.List._testIndexOf()
+    local list = { 'one', 'two', 'three' }
+    assert(CrLua.List.indexOf(list, 'one') == 1)
+    assert(CrLua.List.indexOf(list, 'two') == 2)
+    assert(CrLua.List.indexOf(list, 'three') == 3)
+    assert(not CrLua.List.indexOf(list, 'four'))
+end
+
+-------------------------------------------------------------------------------
 --- Concatenate two lists.
 -- @param a list: table with number indices.
 -- @param b list: table with number indices.

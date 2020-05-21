@@ -142,9 +142,6 @@ function CrLua.TI4.Hex._testCommonEdge()
         assert(edgeF, 'edge[1]')
         assert(edgeB, 'edge[2]')
 
-        CrLua.Log.d(TAG, 'edgeF', edgeF)
-        CrLua.Log.d(TAG, 'edgeB', edgeB)
-
         -- Edge winding means the reverse will be 'backward'.
         assert(math.abs(edgeF[1].x - edgeB[2].x) < 0.01, 'edge[1].x')
         assert(math.abs(edgeF[1].z - edgeB[2].z) < 0.01, 'edge[1].z')

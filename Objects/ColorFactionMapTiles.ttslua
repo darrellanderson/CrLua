@@ -12,7 +12,7 @@ local _config = {
 }
 
 function onLoad(save_state)
-    onDrop('White')
+    onDrop()
 end
 
 function onDrop(playerColor)
@@ -25,6 +25,7 @@ function onDrop(playerColor)
 
     local lines = {}
     local hexToOwners = getSystemOwners()
+    CrLua.LockTable.readOnly('hexToOwners', hexToOwners)
 
     for _, zone in ipairs(CrLua.TI4.Zone.all()) do
         local color = assert(zone.color)
@@ -210,7 +211,6 @@ function getOwned(hexToOwners, color)
                         ownPartialSet[hex] = entry
                     end
                     table.insert(entry.planetNames, assert(planetName))
-                    break
                 end
             end
         end
@@ -347,7 +347,93 @@ function applyPartialControlEdges(edgeSet, partialHexSet)
 
                 end
             end
+
+        elseif #system.planets == 3 then
+
+            local ownedPlanetNameSet = {}
+            for i, planet in ipairs(system.planets) do
+                for _, planetName in ipairs(partial.planetNames) do
+                    ownedPlanetNameSet[planetName] = true
+                end
+            end
+
+            local zonePoints = CrLua.TI4.System.zoneEdgePositions(system)
+            assert(#zonePoints == 3)
+            local function isZonePoint(position)
+                for i, zonePoint in ipairs(zonePoints) do
+                    if almostEqual(position, zonePoint, 1) then
+                        return i
+                    end
+                end
+            end
+
+            for _, hex in ipairs(CrLua.TI4.Hex.neighbors(partialHex)) do
+                local partialEdge = edge(partialHex, hex)
+                local reverseEdge = edge(hex, partialHex)
+                local existingEdge = edgeSet[reverseEdge]
+
+                local a1, a2 = table.unpack(CrLua.TI4.Hex.commonEdge(hex, partialHex))
+                local aMidpoint = { x = (a1.x + a2.x) / 2, y = (a1.y + a2.y) / 2, z = (a1.z + a2.z) / 2 }
+                local function planetDistance(planet)
+                    local position = CrLua.TI4.System.planetToPosition(system, planet.name)
+                    return CrLua.Util.distanceSq(position, aMidpoint)
+                end
+                local _, closestPlanet = CrLua.Util.min(system.planets, planetDistance)
+                local ownZone = ownedPlanetNameSet[closestPlanet.name]
+
+                local zoneIndex = false
+                for i, planet in ipairs(system.planets) do
+                    if planet.name == closestPlanet.name then
+                        zoneIndex = i
+                    end
+                end
+                assert(zoneIndex)
+                local zonePrev = zoneIndex == 1 and 3 or zoneIndex - 1
+                local zoneNext = zoneIndex == 3 and 1 or zoneIndex + 1
+
+                if existingEdge and ownZone then
+                    if isZonePoint(a1) then
+                        local previousPlanetName = system.planets[zonePrev].name
+                        if ownedPlanetNameSet[previousPlanetName] then
+                            edgeSet[reverseEdge] = nil
+                        else
+                            edgeSet[reverseEdge] = { a1, system.object.getPosition() }
+                        end
+                    elseif isZonePoint(a2) then
+                        local nextPlanetName = system.planets[zoneNext].name
+                        if ownedPlanetNameSet[nextPlanetName] then
+                            edgeSet[reverseEdge] = nil
+                        else
+                            edgeSet[reverseEdge] = { system.object.getPosition(), a2 }
+                        end
+                    else
+                        error('neither edge endpoint is a zone point?')
+                    end
+                end
+
+                if not existingEdge and ownZone then
+                    if isZonePoint(a1) then
+                        local previousPlanetName = system.planets[zonePrev].name
+                        if ownedPlanetNameSet[previousPlanetName] then
+                            edgeSet[partialEdge] = { a2, a1 }
+                        else
+                            edgeSet[partialEdge] = { system.object.getPosition(), a2, a1 }
+                        end
+                    elseif isZonePoint(a2) then
+                        local nextPlanetName = system.planets[zoneNext].name
+                        if ownedPlanetNameSet[nextPlanetName] then
+                            edgeSet[partialEdge] = { a2, a1 }
+                        else
+                            edgeSet[partialEdge] = { a2, a1, system.object.getPosition() }
+                        end
+                    else
+                        error('neither edge endpoint is a zone point?')
+                    end
+                end
+            end
+
         end
+
     end
 end
 

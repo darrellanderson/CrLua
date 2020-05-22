@@ -322,7 +322,6 @@ function CrLua.TI4.System.planetToPosition(system, planetName)
         end
     end
 
-
     local positionWorld = CrLua.TI4.System._bearingToPosition(system, bearingToPlanet, distanceToPlanet)
     return positionWorld, radiusWorld
 end

@@ -8,11 +8,29 @@
 local TAG = 'CrLua.Objects.ColorFactionMapTiles'
 
 local _config = {
-    thickness = 0.5,
+    thickness = {
+        planet = 0.1,
+        ground = 0.2,
+        space = 0.1
+    },
+    padding = {
+        ground = 0,
+        space = 0.5
+    }
 }
 
-function onLoad(save_state)
-    onDrop()
+function onLoad(saveState)
+    CrLua.Log.d(TAG, 'onLoad: |data|=' .. (saveState and string.len(saveState) or -1))
+    local success, value = pcall(function() return JSON.decode(saveState) end)
+    if success then
+        CrLua.Log.d(TAG, 'onLoad: saveState', value)
+    end
+end
+
+function onSave()
+    local result = JSON.encode(_config)
+    --CrLua.Log.d(TAG, 'onSave: |data|=' .. string.len(result))
+    return result
 end
 
 function onDrop(playerColor)
@@ -25,18 +43,28 @@ function onDrop(playerColor)
 
     local lines = {}
     local hexToOwners = getSystemOwners()
-    CrLua.LockTable.readOnly('hexToOwners', hexToOwners)
 
+    -- Per-planet.
+    for hex, owners in pairs(hexToOwners) do
+        for planetName, color in pairs(owners.planetName) do
+            table.insert(lines, CrLua.TI4.System.planetVectorLine(owners.system, planetName, {
+                thickness = _config.thickness.planet,
+                color = color
+            }))
+        end
+    end
+
+    -- Control polygons.
     for _, zone in ipairs(CrLua.TI4.Zone.all()) do
         local color = assert(zone.color)
-        CrLua.Log.d(TAG, 'onLoad: ' .. color)
         local ownFullySet, ownPartialSet, ownSpaceSet = getOwned(hexToOwners, color)
 
-        -- Fully owned, wrap around borders.
+        -- Control ground, with partial hexes.
         local polygons = getControlPolygons(ownFullySet, ownPartialSet)
         for _, polygon in ipairs(polygons) do
-            local thickness = 0.5
-            local polygon = CrLua.Polygon.inset(polygon, thickness / 2.0)
+            local thickness = _config.thickness.ground
+            local inset = _config.padding.ground + thickness / 2.0
+            local polygon = CrLua.Polygon.inset(polygon, inset)
             local points = CrLua.Polygon.toXYZ(polygon, y)
             table.insert(lines, {
                 points = points,
@@ -46,7 +74,25 @@ function onDrop(playerColor)
                 loop = true
             })
         end
+
+        -- Control space.
+        local polygons = getControlPolygons(ownSpaceSet, false)
+        for _, polygon in ipairs(polygons) do
+            local thickness = _config.thickness.space
+            local inset = _config.padding.space + thickness / 2.0
+            local polygon = CrLua.Polygon.inset(polygon, inset)
+            local points = CrLua.Polygon.toXYZ(polygon, y)
+            table.insert(lines, {
+                points = points,
+                thickness = thickness,
+                color = color,
+                square = true,
+                loop = true
+            })
+        end
+
     end
+
     Global.setVectorLines(lines)
 end
 
@@ -242,11 +288,6 @@ function reverseNeighborIndex(forwardIndex)
     return (((forwardIndex - 1) + 3) % 6) + 1
 end
 
-function reverseNeighborIndexPlusOne(forwardIndex)
-    local reverseIndex = reverseNeighborIndex(forwardIndex)
-    return reverseIndex == 6 and 1 or reverseIndex + 1
-end
-
 -- Get map from edge to points.
 function getControlEdges(hexSet)
     assert(type(hexSet) == 'table')
@@ -388,20 +429,28 @@ function applyPartialControlEdges(edgeSet, partialHexSet)
                     end
                 end
                 assert(zoneIndex)
-                local zonePrev = zoneIndex == 1 and 3 or zoneIndex - 1
-                local zoneNext = zoneIndex == 3 and 1 or zoneIndex + 1
+                local prevPlanetName = system.planets[zoneIndex == 1 and 3 or zoneIndex - 1].name
+                local nextPlanetName = system.planets[zoneIndex == 3 and 1 or zoneIndex + 1].name
+                local ownPrev = ownedPlanetNameSet[prevPlanetName]
+                local ownNext = ownedPlanetNameSet[nextPlanetName]
+
+                --[[
+                CrLua.Log.d(TAG, table.concat({
+                    'closest=' .. closestPlanet.name .. '/' .. tostring(ownZone),
+                    'prev=' .. prevPlanetName .. '/' .. tostring(ownPrev),
+                    'next=' .. nextPlanetName .. '/' .. tostring(ownNext),
+                }, ', '))
+                --]]
 
                 if existingEdge and ownZone then
                     if isZonePoint(a1) then
-                        local previousPlanetName = system.planets[zonePrev].name
-                        if ownedPlanetNameSet[previousPlanetName] then
+                        if ownNext then
                             edgeSet[reverseEdge] = nil
                         else
                             edgeSet[reverseEdge] = { a1, system.object.getPosition() }
                         end
                     elseif isZonePoint(a2) then
-                        local nextPlanetName = system.planets[zoneNext].name
-                        if ownedPlanetNameSet[nextPlanetName] then
+                        if ownPrev then
                             edgeSet[reverseEdge] = nil
                         else
                             edgeSet[reverseEdge] = { system.object.getPosition(), a2 }
@@ -413,18 +462,16 @@ function applyPartialControlEdges(edgeSet, partialHexSet)
 
                 if not existingEdge and ownZone then
                     if isZonePoint(a1) then
-                        local previousPlanetName = system.planets[zonePrev].name
-                        if ownedPlanetNameSet[previousPlanetName] then
-                            edgeSet[partialEdge] = { a2, a1 }
-                        else
-                            edgeSet[partialEdge] = { system.object.getPosition(), a2, a1 }
-                        end
-                    elseif isZonePoint(a2) then
-                        local nextPlanetName = system.planets[zoneNext].name
-                        if ownedPlanetNameSet[nextPlanetName] then
+                        if ownNext then
                             edgeSet[partialEdge] = { a2, a1 }
                         else
                             edgeSet[partialEdge] = { a2, a1, system.object.getPosition() }
+                        end
+                    elseif isZonePoint(a2) then
+                        if ownPrev then
+                            edgeSet[partialEdge] = { a2, a1 }
+                        else
+                            edgeSet[partialEdge] = { system.object.getPosition(), a2, a1 }
                         end
                     else
                         error('neither edge endpoint is a zone point?')
@@ -523,7 +570,9 @@ function getControlPolygons(hexSet, partialSet)
     end
 
     local edgeSet = getControlEdges(hexSet)
-    applyPartialControlEdges(edgeSet, partialSet)
+    if partialSet then
+        applyPartialControlEdges(edgeSet, partialSet)
+    end
 
     local polygons = {}
     while not isEmptySet(edgeSet) do

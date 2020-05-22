@@ -380,19 +380,7 @@ function CrLua.TI4.System.vectorLine(system, override)
     assert(type(system) == 'table' and system.tile and type(override) == 'table')
     assert(system.object)
 
-    local zoneBorders = CrLua.TI4.System._getZoneBorders(system)
-    if #zoneBorders <= 2 then
-        return {}
-    end
-
-    local y = system.localY or CrLua.TI4.System.LOCAL_Y
-    local center = system.object.positionToWorld({x = 0, y = y, z = 0})
-    local r = CrLua.TI4.System.LOCAL_TILE_RADIUS
-    local outer = {}
-    for i = 1, #zoneBorders - 1 do
-        local bearing = zoneBorders[i]
-        table.insert(outer, CrLua.TI4.System._bearingToPosition(system, bearing, r))
-    end
+    local outer = CrLua.TI4.System.zoneEdgePositions(system)
 
     local points = false
     if #outer < 2 then
@@ -413,6 +401,31 @@ function CrLua.TI4.System.vectorLine(system, override)
         loop = false,
         square = true
     }
+end
+
+-------------------------------------------------------------------------------
+--- Get on-edge points for zone boundaries.
+-- @param system table : CrLua.TI4.System.SYSTEMS value.
+-- @return table : list of {x,y,z} points.
+-------------------------------------------------------------------------------
+function CrLua.TI4.System.zoneEdgePositions(system)
+    assert(type(system) == 'table' and system.tile)
+    assert(system.object)
+
+    local zoneBorders = CrLua.TI4.System._getZoneBorders(system)
+    if #zoneBorders <= 2 then
+        return {}
+    end
+
+    local y = system.localY or CrLua.TI4.System.LOCAL_Y
+    local center = system.object.positionToWorld({x = 0, y = y, z = 0})
+    local r = CrLua.TI4.System.LOCAL_TILE_RADIUS
+    local outer = {}
+    for i = 1, #zoneBorders - 1 do
+        local bearing = zoneBorders[i]
+        table.insert(outer, CrLua.TI4.System._bearingToPosition(system, bearing, r))
+    end
+    return outer
 end
 
 -------------------------------------------------------------------------------

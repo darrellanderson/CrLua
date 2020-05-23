@@ -36,7 +36,7 @@ function onLoad(saveState)
     CrLua.Log.d(TAG, 'onLoad: |data|=' .. (saveState and string.len(saveState) or -1))
     local success, value = pcall(function() return JSON.decode(saveState) end)
     if success then
-        _config = value
+        _config = value or _config
     end
 
     -- Use a second object with restricted visibility to affect who can see the lines.
@@ -61,10 +61,13 @@ function onLoad(saveState)
         _controlledViewObject.interactable = false
     end
 
-    updateUiFromConfig()
-    if _config.enabled then
-        drawPolygons()
-    end
+    Wait.frames(updateUiFromConfig, 10)
+
+    -- Require manaul update to show again.  If something when HORRIBLY WRONG,
+    -- do not jump into doing it again unless asked!
+    --if _config.enabled then
+    --    drawPolygons()
+    --end
 end
 
 function onSave()
@@ -196,6 +199,7 @@ function updateCache()
         for planetName, color in pairs(owners.planetName) do
             local line = CrLua.TI4.System.planetVectorLine(owners.system, planetName, {thickness = 0})
             local polygon = CrLua.Polygon.fromXYZ(line.points)
+            table.insert(polygon, polygon[1])  -- loop
             table.insert(_cache.originalPolygons.planets, {
                 color = color,
                 polygon = polygon
@@ -250,18 +254,26 @@ function drawPolygons()
 
     local lines = {}
     local function addLine(polygon, inset, thickness, color)
-        local polygon = CrLua.Polygon.inset(polygon, inset)
-        local points = CrLua.Polygon.toXYZ(polygon, y)
-        for i, point in ipairs(points) do
-            points[i] = _controlledViewObject.positionToLocal(point)
+        local a = polygon[1]
+        local b = polygon[#polygon]
+        local loop = almostEqual(a, b)
+        if loop then
+            table.remove(polygon)
         end
-        table.insert(lines, {
-            points = points,
-            thickness = thickness,
-            color = color,
-            square = true,
-            loop = true
-        })
+        if #polygon > 2 then
+            local polygon = CrLua.Polygon.inset(polygon, inset)
+            local points = CrLua.Polygon.toXYZ(polygon, y)
+            for i, point in ipairs(points) do
+                points[i] = _controlledViewObject.positionToLocal(point)
+            end
+            table.insert(lines, {
+                points = points,
+                thickness = thickness,
+                color = color,
+                square = true,
+                loop = loop
+            })
+        end
     end
 
     if _config.show.planet then
@@ -334,10 +346,22 @@ function getAllUnitsAndOwnerTokens()
     local ownerTokens = getOwnerTokens()
     local things = CrLua.List.join(units, ownerTokens)
 
+    -- It is possible orphaned tokens are on the board (someone forgot to
+    -- place plastic?).  Ignore those (fixes MrSmains bug report).
+    local function hasColor(thing)
+        return type(thing.color) == 'string'
+    end
+    things = CrLua.List.filter(things, hasColor)
+
     -- Add hex, system, and ground, planet.
     local hexToThings = {}
     for _, thing in ipairs(things) do
-        assert(type(thing.object) == 'userdata' and type(thing.color) == 'string')
+        if type(thing.object) ~= 'userdata' then
+            error(TAG .. ': thing.object is unexpected type "' .. type(thing.object))
+        end
+        if type(thing.color) ~= 'string' then
+            error(TAG .. ': thing.color is unexpected type "' .. type(thing.color))
+        end
         local position = thing.object.getPosition()
         thing.hex = CrLua.TI4.Hex.fromPosition(position)
         thing.system = hexToSystem[thing.hex]
@@ -517,9 +541,16 @@ function applyPartialControlEdges(edgeSet, partialHexSet)
                 local bIsZonePoint1 = almostEqual(bMidpoint, zonePoints[1], 1)
 
                 -- Is the owned planet on "this side" of the system?
-                local d1 = CrLua.Util.distanceSq(a1, planetPosition)
-                local d2 = CrLua.Util.distanceSq(a2, planetPosition)
-                local thisSide = d1 < d2
+                local thisSide
+                if aIsZonePoint1 or bIsZonePoint1 then
+                    local d1 = CrLua.Util.distanceSq(a1, planetPosition)
+                    local d2 = CrLua.Util.distanceSq(a2, planetPosition)
+                    thisSide = d1 < d2
+                else
+                    local d1 = CrLua.Util.distanceSq(aMidpoint, planetPosition)
+                    local d2 = CrLua.Util.distanceSq(bMidpoint, planetPosition)
+                    thisSide = d1 < d2
+                end
 
                 -- Is there an existing edge?
                 local partialEdge = edge(partialHex, hex)
@@ -731,9 +762,7 @@ function getControlPolygon(hexSet, edgeSet)
     -- The last point should always be the same as the first.  Remove last.
     local a = polygon[1]
     local b = polygon[#polygon]
-    if almostEqual(a, b) then
-        table.remove(polygon)
-    else
+    if not almostEqual(a, b) then
         --error('last ~= first')
     end
 

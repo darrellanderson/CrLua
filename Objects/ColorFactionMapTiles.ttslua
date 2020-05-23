@@ -8,16 +8,23 @@
 local TAG = 'CrLua.Objects.ColorFactionMapTiles'
 
 local _config = {
+    enabled = true,
+    show = {
+        planet = false,
+        ground = true,
+        space = false,
+    },
     thickness = {
         planet = 0.1,
-        ground = 0.2,
+        ground = 0.8,
         space = 0.1
     },
     padding = {
         planet = 0,
         ground = 0,
         space = 0.5
-    }
+    },
+    invisibleToSet = {}
 }
 
 local _cache = false
@@ -30,6 +37,7 @@ function onLoad(saveState)
     local success, value = pcall(function() return JSON.decode(saveState) end)
     if success then
         CrLua.Log.d(TAG, 'onLoad: saveState', value)
+        _config = value
     end
 
     -- Use a second object with restricted visibility to affect who can see the lines.
@@ -52,7 +60,11 @@ function onLoad(saveState)
         _controlledViewObject.setDescription('Restricts visibility to control who can see lines')
         _controlledViewObject.setLock(true)
         _controlledViewObject.interactable = false
-        _controlledViewObject.setInvisibleTo({})
+    end
+
+    updateUiFromConfig()
+    if _config.enabled then
+        drawPolygons()
     end
 end
 
@@ -68,6 +80,108 @@ end
 
 function onDrop(playerColor)
     drawPolygons()
+end
+
+-------------------------------------------------------------------------------
+
+function onButtonClick(player, wha, id)
+    if id == 'hide' then
+        _config.enabled = false
+        removePolygons()
+    elseif id == 'update' then
+        _config.enabled = true
+        updateCache()
+        drawPolygons()
+    else
+        error(TAG .. ': unknown button "' .. id .. '"')
+    end
+end
+
+function onSliderValueChanged(player, value, id)
+    local itemType, valueType = string.match(id, '(%l+)(%u%l+)Slider')
+    local valueId = itemType .. valueType .. 'Value'
+
+    local value = tonumber(value)
+    local displayValue = math.floor(value * 100.0) / 10.0
+    self.UI.setValue(valueId, displayValue)
+
+    valueType = string.lower(valueType)
+    assert(_config[valueType] and _config[valueType][itemType])
+
+    _config[valueType][itemType] = value
+
+    if _config.enabled then
+        drawPolygons()
+    end
+end
+
+function onToggleValueChanged(player, value, id)
+    CrLua.Log.d(TAG, 'onToggleValueChanged: ' .. type(player) .. ' ' .. type(value) .. ' ' .. value .. ' '.. id)
+
+    local valueAsBool = string.lower(value) == 'true' or false
+    if string.match(id, '^%l') then
+        if id == 'enabled' then
+            _config.enabled = valueAsBool
+            if _config.enabled then
+                updateCache()
+                drawPolygons()
+            else
+                removePolygons()
+            end
+        end
+        if id == 'planet' then
+            _config.show.planet = valueAsBool or false
+        elseif id == 'ground' then
+            _config.show.ground = valueAsBool or false
+        elseif id == 'space' then
+            _config.show.space = valueAsBool or false
+        else
+            error(TAG .. ': unknown id "' .. id '"')
+        end
+    else
+        local found = false
+        for _, color in ipairs(Player.getColors()) do
+            if color == id then
+                found = true
+                break
+            end
+        end
+        if not found then
+            error(TAG .. ': unknown id "' .. id '"')
+        end
+        _config.invisibleToSet[id] = valueAsBool or nil
+    end
+
+    if _config.enabled then
+        drawPolygons()
+    end
+end
+
+function updateUiFromConfig()
+    self.UI.setAttribute('enabled', 'isOn', _config.enabled)
+    for itemType, value in pairs(_config.show) do
+        local id = itemType
+        self.UI.setAttribute(id, 'isOn', value)
+    end
+    for itemType, value in pairs(_config.thickness) do
+        local id = itemType .. 'ThicknessSlider'
+        self.UI.setAttribute(id, 'value', value)
+        local id = itemType .. 'ThicknessValue'
+        local value = math.floor(tonumber(value) * 100) / 10
+        self.UI.setValue(id, value)
+    end
+    for itemType, value in pairs(_config.padding) do
+        local id = itemType .. 'PaddingSlider'
+        self.UI.setAttribute(id, 'value', value)
+        local id = itemType .. 'PaddingValue'
+        local value = math.floor(tonumber(value) * 100) / 10
+        self.UI.setValue(id, value)
+    end
+    for _, color in ipairs(Player.getColors()) do
+        if not _config.invisibleToSet[color] then
+            self.UI.setAttribute(color, 'isOn', true)
+        end
+    end
 end
 
 -------------------------------------------------------------------------------
@@ -164,28 +278,31 @@ function drawPolygons()
             loop = true
         })
     end
-    for _, entry in ipairs(_cache.originalPolygons.planets) do
-        local thickness = _config.thickness.planet
-        local inset = thickness / 2.0 + _config.padding.planet
-        addLine(entry.polygon, inset, thickness, entry.color)
-    end
-    for _, entry in ipairs(_cache.originalPolygons.ground) do
-        local thickness = _config.thickness.ground
-        local inset = thickness / 2.0 + _config.padding.ground
-        addLine(entry.polygon, inset, thickness, entry.color)
-    end
-    for _, entry in ipairs(_cache.originalPolygons.space) do
-        local thickness = _config.thickness.space
-        local inset = thickness / 2.0 + _config.padding.space
-        addLine(entry.polygon, inset, thickness, entry.color)
-    end
-    _controlledViewObject.setVectorLines(lines)
-end
 
--- UI can only call a single function without arguments.  Join these for update.
-function updateCacheAndDrawPolygons()
-    updateCache()
-    drawPolygons()
+    if _config.show.planet then
+        for _, entry in ipairs(_cache.originalPolygons.planets) do
+            local thickness = _config.thickness.planet
+            local inset = thickness / 2.0 + _config.padding.planet
+            addLine(entry.polygon, inset, thickness, entry.color)
+        end
+    end
+    if _config.show.ground then
+        for _, entry in ipairs(_cache.originalPolygons.ground) do
+            local thickness = _config.thickness.ground
+            local inset = thickness / 2.0 + _config.padding.ground
+            addLine(entry.polygon, inset, thickness, entry.color)
+        end
+    end
+    if _config.show.space then
+        for _, entry in ipairs(_cache.originalPolygons.space) do
+            local thickness = _config.thickness.space
+            local inset = thickness / 2.0 + _config.padding.space
+            addLine(entry.polygon, inset, thickness, entry.color)
+        end
+    end
+
+    _controlledViewObject.setInvisibleTo(CrLua.List.fromKeys(_config.invisibleToSet))
+    _controlledViewObject.setVectorLines(lines)
 end
 
 -------------------------------------------------------------------------------

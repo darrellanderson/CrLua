@@ -1,0 +1,152 @@
+<Defaults>
+    <!-- colors="normalColor|highlightedColor|pressedColor|disabledColor" -->
+    <Toggle fontSize="12" onValueChanged="onToggleValueChanged" />
+    <Slider minValue="0" maxValue="1" wholeNumbers="false"
+       colors="#555555|Red|Red|Grey" onValueChanged="onSliderValueChanged"
+        />
+    <Button onClick="onButtonClick" />
+
+    <TableLayout cellBackgroundColor="Clear" />
+
+    <Text class="heading" fontSize="12" alignment="MiddleLeft" />
+    <Text class="label" fontSize="9" alignment="MiddleRight" />
+    <Text class="sliderValue" fontSize="9" alignment="MiddleLeft" />
+
+
+</Defaults>
+
+<!-- Coordinate space is XY, with positive Z is up relative to top. -->
+<!-- Units are 100x game units. -->
+<!-- Tile is 280x200x20 -->
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<VerticalLayout id="top"
+    position="0 0 0.05"
+    rotation="0 180 90"
+    width="200"
+    height="280"
+    padding="10 10 10 10"
+    spacing="10"
+    >
+
+    <Text fontSize="24"><b>Draw TI4 Faction Borders</b></Text>
+    <Button id="update" fontSize="24">Update</Button>
+    <Button id="hide" fontSize="24">Hide</Button>
+    <Text fontSize="12">(Flip for settings)</Text>
+
+</VerticalLayout>
+
+<!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
+
+<VerticalLayout
+    id="bottom"
+    position="0 0 -20.05"
+    rotation="0 0 90"
+    width="200"
+    height="280"
+    padding="10 10 0 10"
+    spacing="5"
+    childForceExpandHeight="false"
+    >
+
+    <!-- Cell padding override not working?  Use some empty columns... yuck. -->
+    <TableLayout
+        padding="0 0 10 10"
+        columnWidths="50 10 0 10 20"
+        autoCalculateHeight="true"
+        >
+
+        <Row preferredHeight="20">
+            <Cell columnSpan="5">
+                <Toggle id="planet">Individual Planets</Toggle>
+            </Cell>
+        </Row>
+        <Row preferredHeight="15">
+            <Cell><Text class="label">Thickness</Text></Cell>
+            <Cell></Cell>
+            <Cell><Slider id="planetThicknessSlider" /></Cell>
+            <Cell></Cell>
+            <Cell><Text id="planetThicknessValue" class="sliderValue">0</Text></Cell>
+        </Row>
+        <Row preferredHeight="15">
+            <Cell><Text class="label">Padding</Text></Cell>
+            <Cell></Cell>
+            <Cell><Slider id="planetPaddingSlider" /></Cell>
+            <Cell></Cell>
+            <Cell><Text id="planetPaddingValue" class="sliderValue">0</Text></Cell>
+        </Row>
+
+        <Row preferredHeight="20">
+            <Cell columnSpan="5">
+                <Toggle id="ground">System Zones</Toggle>
+            </Cell>
+        </Row>
+        <Row preferredHeight="15">
+            <Cell><Text class="label">Thickness</Text></Cell>
+            <Cell></Cell>
+            <Cell><Slider id="groundThicknessSlider" /></Cell>
+            <Cell></Cell>
+            <Cell><Text id="groundThicknessValue" class="sliderValue">0</Text></Cell>
+        </Row>
+        <Row preferredHeight="15">
+            <Cell><Text class="label">Padding</Text></Cell>
+            <Cell></Cell>
+            <Cell><Slider id="groundPaddingSlider" /></Cell>
+            <Cell></Cell>
+            <Cell><Text id="groundPaddingValue" class="sliderValue">0</Text></Cell>
+        </Row>
+
+        <Row preferredHeight="20">
+            <Cell columnSpan="5">
+                <Toggle id="space">Space</Toggle>
+            </Cell>
+        </Row>
+        <Row preferredHeight="15">
+            <Cell><Text class="label">Thickness</Text></Cell>
+            <Cell></Cell>
+            <Cell><Slider id="spaceThicknessSlider" /></Cell>
+            <Cell></Cell>
+            <Cell><Text id="spaceThicknessValue" class="sliderValue">0</Text></Cell>
+        </Row>
+        <Row preferredHeight="15">
+            <Cell><Text class="label">Padding</Text></Cell>
+            <Cell></Cell>
+            <Cell><Slider id="spacePaddingSlider" /></Cell>
+            <Cell></Cell>
+            <Cell><Text id="spacePaddingValue" class="sliderValue">0</Text></Cell>
+        </Row>
+    </TableLayout>
+
+    <Text class="heading">Visible to:</Text>
+    <GridLayout cellSize="60 20">
+        <Toggle id="White" textColor="Black">White</Toggle>
+        <Toggle id="Brown" textColor="Brown">Brown</Toggle>
+        <Toggle id="Red" textColor="Red">Red</Toggle>
+        <Toggle id="Orange" textColor="Orange">Orange</Toggle>
+        <Toggle id="Yellow" textColor="Yellow">Yellow</Toggle>
+        <Toggle id="Green" textColor="Green">Green</Toggle>
+        <Toggle id="Teal" textColor="Teal">Teal</Toggle>
+        <Toggle id="Blue" textColor="Blue">Blue</Toggle>
+        <Toggle id="Purple" textColor="Purple">Purple</Toggle>
+        <Toggle id="Pink" textColor="Pink">Pink</Toggle>
+        <Toggle id="Grey" textColor="Grey">Grey</Toggle>
+        <Toggle id="Black" textColor="Black">Black</Toggle>
+    </GridLayout>
+
+</VerticalLayout>
+
+
+<!--
+<GridLayout position="0 -101% 0" rotation="180 0 180" height="100%" width="100%" cellSize="50 50" outline="White">
+    <Toggle id="toggleWhite" colors="White|White|White|White">White</Toggle>
+    <Toggle id="toggleRed" textColor="Red">Red</Toggle>
+    <Toggle id="toggleBlue" colors="Blue|Blue|Blue|Blue">Blue</Toggle>
+</GridLayout>
+
+<GridLayout position="0 0 0" height="200" width="200" cellSize="50 50" outline="White">
+    <Toggle id="toggleWhite" colors="White|White|White|White">X</Toggle>
+    <Toggle id="toggleRed" textColor="Red">Y</Toggle>
+    <Toggle id="toggleBlue" colors="Blue|Blue|Blue|Blue">Z</Toggle>
+</GridLayout>
+-->

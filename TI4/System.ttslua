@@ -349,7 +349,7 @@ function CrLua.TI4.System.planetVectorLine(system, planetName, override)
     end
 
     local points = {}
-    for i = 1, 16 do
+    for i = 16, 1, -1 do
         local theta = math.pi * 2.0 * i / 16.0
         local position = {
             x = planetOrigin.x + math.cos(theta) * planetRadius,

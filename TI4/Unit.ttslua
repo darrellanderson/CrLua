@@ -173,6 +173,7 @@ function CrLua.TI4.Unit.getAllUnits(filterFunction)
             table.insert(result, unit)
         end
     end
+    CrLua.TI4.Unit.assignUnitTokenColors(result)
     return result
 end
 

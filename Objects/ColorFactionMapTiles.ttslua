@@ -73,14 +73,6 @@ function onSave()
     return result
 end
 
-function onPickUp(player_color)
-    removePolygons()
-end
-
-function onDrop(playerColor)
-    drawPolygons()
-end
-
 -------------------------------------------------------------------------------
 
 function onButtonClick(player, wha, id)

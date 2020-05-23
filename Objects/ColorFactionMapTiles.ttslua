@@ -16,13 +16,13 @@ local _config = {
     },
     thickness = {
         planet = 0.1,
-        ground = 0.8,
+        ground = 0.2,
         space = 0.1
     },
     padding = {
         planet = 0,
         ground = 0,
-        space = 0.5
+        space = 0.4
     },
     invisibleToSet = {}
 }
@@ -36,7 +36,6 @@ function onLoad(saveState)
     CrLua.Log.d(TAG, 'onLoad: |data|=' .. (saveState and string.len(saveState) or -1))
     local success, value = pcall(function() return JSON.decode(saveState) end)
     if success then
-        CrLua.Log.d(TAG, 'onLoad: saveState', value)
         _config = value
     end
 
@@ -116,19 +115,9 @@ function onSliderValueChanged(player, value, id)
 end
 
 function onToggleValueChanged(player, value, id)
-    CrLua.Log.d(TAG, 'onToggleValueChanged: ' .. type(player) .. ' ' .. type(value) .. ' ' .. value .. ' '.. id)
-
-    local valueAsBool = string.lower(value) == 'true' or false
+    local valueAsBool = string.lower(value) == 'true' and true or false
+    assert(type(valueAsBool) == 'boolean')
     if string.match(id, '^%l') then
-        if id == 'enabled' then
-            _config.enabled = valueAsBool
-            if _config.enabled then
-                updateCache()
-                drawPolygons()
-            else
-                removePolygons()
-            end
-        end
         if id == 'planet' then
             _config.show.planet = valueAsBool or false
         elseif id == 'ground' then
@@ -138,7 +127,7 @@ function onToggleValueChanged(player, value, id)
         else
             error(TAG .. ': unknown id "' .. id '"')
         end
-    else
+    else -- uppercase means toggle color
         local found = false
         for _, color in ipairs(Player.getColors()) do
             if color == id then
@@ -149,7 +138,11 @@ function onToggleValueChanged(player, value, id)
         if not found then
             error(TAG .. ': unknown id "' .. id '"')
         end
-        _config.invisibleToSet[id] = valueAsBool or nil
+        if not valueAsBool then
+            _config.invisibleToSet[id] = true
+        else
+            _config.invisibleToSet[id] = nil
+        end
     end
 
     if _config.enabled then
@@ -301,7 +294,8 @@ function drawPolygons()
         end
     end
 
-    _controlledViewObject.setInvisibleTo(CrLua.List.fromKeys(_config.invisibleToSet))
+    local invisibleToList = CrLua.List.fromKeys(_config.invisibleToSet)
+    _controlledViewObject.setInvisibleTo(invisibleToList)
     _controlledViewObject.setVectorLines(lines)
 end
 
@@ -802,9 +796,9 @@ end
 #include <~/CrLua/Table>
 #include <~/CrLua/Util>
 
-CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
-#include <~/CrLua/UnitTest>
-CrLua.UnitTest.runTests(TAG, CrLua, true)
+--CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
+--#include <~/CrLua/UnitTest>
+--CrLua.UnitTest.runTests(TAG, CrLua, true)
 
 CrLua.assertRequired({ 'TI4.Hex', 'TI4.System', 'TI4.Unit', 'List', 'Log' })
 CrLua.lock()

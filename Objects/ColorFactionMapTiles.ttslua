@@ -662,13 +662,13 @@ function applyPartialControlEdges(edgeSet, partialHexSet)
                         if ownNext then
                             edgeSet[reverseEdge] = nil
                         else
-                            edgeSet[reverseEdge] = { a1, system.object.getPosition() }
+                            edgeSet[reverseEdge] = { a1, systemPosition }
                         end
                     elseif isZonePoint(a2) then
                         if ownPrev then
                             edgeSet[reverseEdge] = nil
                         else
-                            edgeSet[reverseEdge] = { system.object.getPosition(), a2 }
+                            edgeSet[reverseEdge] = { systemPosition, a2 }
                         end
                     else
                         error('neither edge endpoint is a zone point?')

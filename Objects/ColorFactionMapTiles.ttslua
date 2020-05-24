@@ -645,7 +645,7 @@ function applyPartialControlEdges(edgeSet, partialHexSet)
             for _, neighbor in ipairs(neighbors) do
                 local a1, a2 = table.unpack(CrLua.TI4.Hex.commonEdge(partialHex, neighbor))
                 for i = 1, 3 do
-                    if almostEqual(zonePoints[i], a1) then
+                    if almostEqual(zonePoints[i], a1, 1) then
                         zoneCorners[i] = a1
                         break
                     end
@@ -654,8 +654,8 @@ function applyPartialControlEdges(edgeSet, partialHexSet)
             assert(#zoneCorners == 3)
             -- Now connect zone corners to middle.
             for i = 1, 3 do
-                local planetCurrent = system.planet[i].planetName
-                local planetPrev = system.planet[i == 1 and 3 or i - 1].name
+                local planetCurrent = system.planets[i].name
+                local planetPrev = system.planets[i == 1 and 3 or i - 1].name
                 if ownedPlanetNameSet[planetCurrent] ~= ownedPlanetNameSet[planetPrev] then
                     partialEdgeSet[partialHex .. i] = { zoneCorners[i], system.object.getPosition() }
                 end

@@ -32,6 +32,8 @@ local _controlledViewObject = false
 local _clickPlayerColor = false
 local _warnedSystems = {}
 
+local _debugVisualize = false
+
 -------------------------------------------------------------------------------
 
 function onLoad(saveState)
@@ -280,6 +282,9 @@ function drawPolygons()
 
     local lines = {}
     local function addLine(polygon, inset, thickness, color)
+        -- Make a copy because this may mutate the polygon!
+        polygon = CrLua.List.join(polygon, {})
+
         local a = polygon[1]
         local b = polygon[#polygon]
         local loop = almostEqual(a, b)
@@ -287,19 +292,24 @@ function drawPolygons()
             table.remove(polygon)
         end
         if #polygon > 2 then
-            local polygon = CrLua.Polygon.inset(polygon, inset)
-            local points = CrLua.Polygon.toXYZ(polygon, y)
-            for i, point in ipairs(points) do
-                points[i] = _controlledViewObject.positionToLocal(point)
-            end
-            table.insert(lines, {
-                points = points,
-                thickness = thickness,
-                color = color,
-                square = true,
-                loop = loop
-            })
+            -- Need at least 3 points to inset.
+            polygon = CrLua.Polygon.inset(polygon, inset)
         end
+        local points = CrLua.Polygon.toXYZ(polygon, y)
+        if _debugVisualize then
+            local p = points[#points]
+            table.insert(points, { x = p.x + 0.01, y = p.y + 2, z = p.z + 0.01})
+        end
+        for i, point in ipairs(points) do
+            points[i] = _controlledViewObject.positionToLocal(point)
+        end
+        table.insert(lines, {
+            points = points,
+            thickness = thickness,
+            color = color,
+            square = true,
+            loop = loop
+        })
     end
 
     if _config.show.planet then
@@ -530,10 +540,26 @@ end
 
 -------------------------------------------------------------------------------
 
+function commonEdgeWithMid(hex1, hex2)
+    local a1, a2 = table.unpack(CrLua.TI4.Hex.commonEdge(hex1, hex2))
+    local midpoint = { x = (a1.x + a2.x) / 2, y = (a1.y + a2.y) / 2, z = (a1.z + a2.z) / 2 }
+    return a1, midpoint, a2
+end
+
+
 function almostEqual(a, b, epsilon)
+    assert(type(a) == 'table' and type(b) == 'table')
     local dx = math.abs((a.x or a[1]) - (b.x or b[1]))
     local dz = math.abs((a.z or a[2]) - (b.z or b[2]))
-    return dx < (epsilon or 0.01) and dz < (epsilon or 0.01)
+    return dx < (epsilon or 0.1) and dz < (epsilon or 0.1)
+end
+
+function almostEqualEdges(a, b, epsilon)
+    assert(#a == 2 and #b == 2)
+    assert(type(a[1]) == 'table' and type(b[1]) == 'table')
+    if almostEqual(a[1], b[1], epsilon) or almostEqual(a[1], b[2], epsilon) then
+        return almostEqual(a[2], b[1], epsilon) or almostEqual(a[2], b[2], epsilon)
+    end
 end
 
 function edge(hex1, hex2)
@@ -562,251 +588,292 @@ end
 -- Mutate edges to flow into partially owned hexes.
 function applyPartialControlEdges(edgeSet, partialHexSet)
     assert(type(edgeSet) == 'table' and type(partialHexSet) == 'table')
+    local partialEdgeSet = {}
 
+    -- Get all owned planet names as a set.
+    local ownedPlanetNameSet = {}
+    for _, partial in pairs(partialHexSet) do
+        for _, planetName in ipairs(partial.planetNames) do
+            ownedPlanetNameSet[planetName] = true
+        end
+    end
+
+    local function zonePointIndex(zonePoints, position)
+        assert(type(zonePoints) == 'table' and type(position) == 'table' and position.x)
+        for i, zonePoint in ipairs(zonePoints) do
+            if almostEqual(position, zonePoint, 1) then
+                return i
+            end
+        end
+    end
+
+    -- Add zone interior bondaries to partial lines.  Unlike edges, this do not
+    -- require clockwise polygon winding (that will happen naturally via extended).
     for partialHex, partial in pairs(partialHexSet) do
-
         local system = assert(partial.system)
-        if #system.planets == 2 then
-            -- Get zone points and planet location.
+        local zonePoints = CrLua.TI4.System.zoneEdgePositions(system)
+        local neighbors = CrLua.TI4.Hex.neighbors(partialHex)
+
+        if #system.planets == 2 and #zonePoints == 2 then
             assert(#partial.planetNames == 1)
-            local planetName = assert(partial.planetNames[1])
-            local planetPosition = CrLua.TI4.System.planetToPosition(system, planetName)
-            local zonePoints = CrLua.TI4.System.zoneEdgePositions(system)
-            assert(#zonePoints == 2)
 
-            -- Replace any neighbor's edges?
-            local neighbors = CrLua.TI4.Hex.neighbors(partialHex)
-            for i, hex in ipairs(neighbors) do
+            -- System split between two planets, line between two edge midpoints.
+            for i, neighbor in ipairs(neighbors) do
+                local a1, aMidpoint, a2 = commonEdgeWithMid(partialHex, neighbor)
+                if zonePointIndex(zonePoints, aMidpoint) == 1 then
+                    local farHex = neighbors[reverseNeighborIndex(i)]
+                    local b1, bMidpoint, b2 = commonEdgeWithMid(partialHex, farHex)
+                    partialEdgeSet[partialHex] = { aMidpoint, bMidpoint }
+                    break
+                end
+                error(TAG .. ': 2-zone system but no divider?')
+            end
 
-                -- Get midpoint of the common edge (and points in wind order wrt neighbor).
-                local a1, a2 = table.unpack(CrLua.TI4.Hex.commonEdge(hex, partialHex))
-                local aMidpoint = { x = (a1.x + a2.x) / 2, y = (a1.y + a2.y) / 2, z = (a1.z + a2.z) / 2 }
-                local aIsZonePoint1 = almostEqual(aMidpoint, zonePoints[1], 1)
+        elseif #system.planets == 3 and #zonePoints == 3 then
+            assert(#partial.planetNames >= 1 and #partial.planetNames <= 2)
 
-                -- Get midpoint of the opposite edge (a,b in winding order).
-                local farHex = neighbors[reverseNeighborIndex(i)]
-                local b1, b2 = table.unpack(CrLua.TI4.Hex.commonEdge(farHex, partialHex))
-                local bMidpoint = { x = (b1.x + b2.x) / 2, y = (b1.y + b2.y) / 2, z = (b1.z + b2.z) / 2 }
-                local bIsZonePoint1 = almostEqual(bMidpoint, zonePoints[1], 1)
+            -- Three planet system, draw lines from corner to middle.
+            -- Zone points are not edge aligned, make at-corner versions.
+            local zoneCorners = {}
+            for _, neighbor in ipairs(neighbors) do
+                local a1, a2 = table.unpack(CrLua.TI4.Hex.commonEdge(partialHex, neighbor))
+                for i = 1, 3 do
+                    if almostEqual(zonePoints[i], a1) then
+                        zoneCorners[i] = a1
+                        break
+                    end
+                end
+            end
+            assert(#zoneCorners == 3)
+            -- Now connect zone corners to middle.
+            for i = 1, 3 do
+                local planetCurrent = system.planet[i].planetName
+                local planetPrev = system.planet[i == 1 and 3 or i - 1].name
+                if ownedPlanetNameSet[planetCurrent] ~= ownedPlanetNameSet[planetPrev] then
+                    partialEdgeSet[partialHex .. i] = { zoneCorners[i], system.object.getPosition() }
+                end
+            end
 
-                -- Is the owned planet on "this side" of the system?
-                local thisSide
-                if aIsZonePoint1 or bIsZonePoint1 then
+        end
+    end
+
+    -- Add lines about the partial zone edges.  Full edges go into the proper
+    -- edge set in winding order, partials into partial set with "preferred"
+    -- wind order but can go backwards if necessary.
+    for partialHex, partial in pairs(partialHexSet) do
+        local system = assert(partial.system)
+        local zonePoints = CrLua.TI4.System.zoneEdgePositions(system)
+        local neighbors = CrLua.TI4.Hex.neighbors(partialHex)
+
+        if #system.planets == 2 and #zonePoints == 2 then
+            assert(#partial.planetNames == 1)
+            local planetPosition = CrLua.TI4.System.planetToPosition(system, partial.planetNames[1])
+
+            -- Connect from midpoint to approriate corner based on which side
+            -- of the partial zone is owned, and to we own the adjacent system.
+            for i, neighbor in ipairs(neighbors) do
+                local a1, aMidpoint, a2 = commonEdgeWithMid(partialHex, neighbor)
+                local isZoneMidpoint = zonePointIndex(zonePoints, aMidpoint)
+
+                local ownThisSide
+                if isZoneMidpoint then
+                    -- Zone connects to this edge.
                     local d1 = CrLua.Util.distanceSq(a1, planetPosition)
                     local d2 = CrLua.Util.distanceSq(a2, planetPosition)
-                    thisSide = d1 < d2
+                    ownThisSide = d1 < d2 and true or false
                 else
+                    -- This edge is not on border.  Compare vs far edge.
+                    local farHex = neighbors[reverseNeighborIndex(i)]
+                    local b1, bMidpoint, b2 = commonEdgeWithMid(partialHex, farHex)
                     local d1 = CrLua.Util.distanceSq(aMidpoint, planetPosition)
                     local d2 = CrLua.Util.distanceSq(bMidpoint, planetPosition)
-                    thisSide = d1 < d2
+                    ownThisSide = d1 < d2 and true or false
                 end
 
-                -- Is there an existing edge?
-                local partialEdge = edge(partialHex, hex)
-                local reverseEdge = edge(hex, partialHex)
-                local existingEdge = edgeSet[reverseEdge]
+                -- Add partial edge.  Only consider other side owned if fully
+                -- owned, meaning two adjacent partial edges could contain a
+                -- shared edge.  Prune those out at the end.
+                local partialEdge = edge(partialHex, neighbor)
+                local reverseEdge = edge(neighbor, partialHex)
+                local ownOtherSide = edgeSet[reverseEdge] and true or false
 
-                -- If this edge midpoint is a zone border point, add or replace
-                -- with a partial edge.  Only cross mid for one direction.
-                if aIsZonePoint1 then
+                if isZoneMidpoint then
 
-                    if existingEdge then
-                        if thisSide then
-                            edgeSet[reverseEdge] = { bMidpoint, aMidpoint, a2 }
+                    -- Edge contains a zone point.  Connect to approriate corner.
+                    if ownThisSide then
+                        if ownOtherSide then
+                            edgeSet[reverseEdge] = nil  -- replace this edge
+                            partialEdgeSet[partialEdge] = { aMidpoint, a2 }
                         else
-                            edgeSet[reverseEdge] = { a1, aMidpoint, bMidpoint }
+                            partialEdgeSet[partialEdge] = { a1, aMidpoint }
                         end
                     else
-                        if thisSide then
-                            edgeSet[partialEdge] = { bMidpoint, aMidpoint, a1 }
+                        if ownOtherSide then
+                            edgeSet[reverseEdge] = nil  -- replace this edge
+                            partialEdgeSet[partialEdge] = { a1, aMidpoint }
                         else
-                            edgeSet[partialEdge] = { a2, aMidpoint, bMidpoint }
+                            partialEdgeSet[partialEdge] = { aMidpoint, a2 }
                         end
                     end
 
-                elseif bIsZonePoint1 then
+                elseif ownThisSide then
 
-                    if existingEdge then
-                        if thisSide then
-                            edgeSet[reverseEdge] = { aMidpoint, a2 }
-                        else
-                            edgeSet[reverseEdge] = { a1, aMidpoint }
-                        end
+                    -- Edge is a full edge on partial zone boundary.  Keep winding!
+                    if ownOtherSide then
+                        edgeSet[reverseEdge] = nil
                     else
-                        if thisSide then
-                            edgeSet[partialEdge] = { aMidpoint, a1 }
-                        else
-                            edgeSet[partialEdge] = { a2, aMidpoint }
-                        end
+                        edgeSet[partialEdge] = { a1, a2 }
                     end
 
-                elseif thisSide and existingEdge then
-
-                    -- This edge connects to the partial control area.  Remove.
-                    edgeSet[reverseEdge] = nil
-
-                elseif thisSide then
-
-                    -- No edge but partial control area.  Add edge.
-                    edgeSet[partialEdge] = { a2, a1 }
-
                 end
             end
 
-        elseif #system.planets == 3 then
+        elseif #system.planets == 3 and #zonePoints == 3 then
 
-            local ownedPlanetNameSet = {}
-            for i, planet in ipairs(system.planets) do
-                for _, planetName in ipairs(partial.planetNames) do
-                    ownedPlanetNameSet[planetName] = true
-                end
-            end
+            for i, neighbor in ipairs(neighbors) do
+                local a1, aMidpoint, a2 = commonEdgeWithMid(partialHex, neighbor)
 
-            local zonePoints = CrLua.TI4.System.zoneEdgePositions(system)
-            assert(#zonePoints == 3)
-            local function isZonePoint(position)
-                for i, zonePoint in ipairs(zonePoints) do
-                    if almostEqual(position, zonePoint, 1) then
-                        return i
-                    end
-                end
-            end
-
-            for _, hex in ipairs(CrLua.TI4.Hex.neighbors(partialHex)) do
-                local partialEdge = edge(partialHex, hex)
-                local reverseEdge = edge(hex, partialHex)
-                local existingEdge = edgeSet[reverseEdge]
-
-                local a1, a2 = table.unpack(CrLua.TI4.Hex.commonEdge(hex, partialHex))
-                local aMidpoint = { x = (a1.x + a2.x) / 2, y = (a1.y + a2.y) / 2, z = (a1.z + a2.z) / 2 }
                 local function planetDistance(planet)
                     local position = CrLua.TI4.System.planetToPosition(system, planet.name)
                     return CrLua.Util.distanceSq(position, aMidpoint)
                 end
                 local _, closestPlanet = CrLua.Util.min(system.planets, planetDistance)
-                local ownZone = ownedPlanetNameSet[closestPlanet.name]
+                local ownThisSide = ownedPlanetNameSet[closestPlanet.name]
 
-                local zoneIndex = false
-                for i, planet in ipairs(system.planets) do
-                    if planet.name == closestPlanet.name then
-                        zoneIndex = i
-                    end
-                end
-                assert(zoneIndex)
-                local prevPlanetName = system.planets[zoneIndex == 1 and 3 or zoneIndex - 1].name
-                local nextPlanetName = system.planets[zoneIndex == 3 and 1 or zoneIndex + 1].name
-                local ownPrev = ownedPlanetNameSet[prevPlanetName]
-                local ownNext = ownedPlanetNameSet[nextPlanetName]
+                local partialEdge = edge(partialHex, neighbor)
+                local reverseEdge = edge(neighbor, partialHex)
+                local ownOtherSide = edgeSet[reverseEdge] and true or false
 
-                --[[
-                CrLua.Log.d(TAG, table.concat({
-                    'closest=' .. closestPlanet.name .. '/' .. tostring(ownZone),
-                    'prev=' .. prevPlanetName .. '/' .. tostring(ownPrev),
-                    'next=' .. nextPlanetName .. '/' .. tostring(ownNext),
-                }, ', '))
-                --]]
-
-                if existingEdge and ownZone then
-                    if isZonePoint(a1) then
-                        if ownNext then
-                            edgeSet[reverseEdge] = nil
-                        else
-                            edgeSet[reverseEdge] = { a1, systemPosition }
-                        end
-                    elseif isZonePoint(a2) then
-                        if ownPrev then
-                            edgeSet[reverseEdge] = nil
-                        else
-                            edgeSet[reverseEdge] = { systemPosition, a2 }
-                        end
-                    else
-                        error('neither edge endpoint is a zone point?')
-                    end
-                end
-
-                if not existingEdge and ownZone then
-                    if isZonePoint(a1) then
-                        if ownNext then
-                            edgeSet[partialEdge] = { a2, a1 }
-                        else
-                            edgeSet[partialEdge] = { a2, a1, system.object.getPosition() }
-                        end
-                    elseif isZonePoint(a2) then
-                        if ownPrev then
-                            edgeSet[partialEdge] = { a2, a1 }
-                        else
-                            edgeSet[partialEdge] = { system.object.getPosition(), a2, a1 }
-                        end
-                    else
-                        error('neither edge endpoint is a zone point?')
-                    end
+                -- Three zone system go corner->mid->corner so all edges are
+                -- full edges.
+                if ownOtherSide and ownThisSide then
+                    edgeSet[reverseEdge] = nil
+                elseif ownThisSide and not ownOtherSide then
+                    edgeSet[partialEdge] = { a1, a2 }
                 end
             end
 
         end
-
     end
+
+    -- At this point the partial edge set contains half-edges.  If two partial
+    -- zones are adjacent they may share a common half-edge.  Remove those.
+    -- This is not the most efficient, but is fast enough and clean.
+    local dele = {}
+    for k1, edge1 in pairs(partialEdgeSet) do
+        for k2, edge2 in pairs(partialEdgeSet) do
+            if (k1 ~= k2) and almostEqualEdges(edge1, edge2) then
+                table.insert(dele, k1)
+                table.insert(dele, k2)
+            end
+        end
+    end
+    for _, k in ipairs(dele) do
+        CrLua.Log.d(TAG, 'pruning ' .. k)
+        partialEdgeSet[k] = nil
+    end
+
+    return partialEdgeSet
 end
 
 --- Get one polygon from a collection of hexes, removing edges as it goes.
 -- The set may still have entries when finished meaning there is at least one
 -- more disconnected polygon to find.
-function getControlPolygon(hexSet, edgeSet)
+function getControlPolygon(hexSet, edgeSet, partialEdgeSet)
     assert(type(hexSet) == 'table' and type(edgeSet) == 'table')
     --CrLua.Log.d(TAG, 'getControlPolygon: |edgeSet|=' .. #CrLua.List.fromKeys(edgeSet))
 
     local polygon = false
-    local function addEdge(key, points)
-        assert(edgeSet[key])
-        edgeSet[key] = nil
-        polygon = polygon or {{ points[1].x, points[1].z }}
-        assert(almostEqual(polygon[#polygon], points[1]))  -- always extend from last
-        for i = 2, #points do
-            table.insert(polygon, { points[i].x, points[i].z })
-        end
-    end
 
-    local function getStartingEdge()
+    -- First a first point of a full (winding) edge.
+    local function getStartingPoint()
         for k, points in pairs(edgeSet) do
-            addEdge(k, points)
+            polygon = {{ points[1].x, points[1].z }}
             return true
         end
-        return false
     end
-    if not getStartingEdge() then
-        CrLua.Log.d(TAG, 'getControlPolygon: getStartedEdge failed')
+    if not getStartingPoint() then
+        CrLua.Log.d(TAG, 'getControlPolygon: getStartingPoint failed')
         return false
     end
 
-    -- Connect forward.
-    local connected = false
-    repeat
-        local connect = polygon[#polygon]
-        connected = false
+    -- Full edges must be added in wind order.
+    local function maybeAddFullEdge()
+        local first = polygon[1]
+        local last = polygon[#polygon]
+        assert(type(first) == 'table' and #first == 2)
+        assert(type(last) == 'table' and #last == 2)
         for k, points in pairs(edgeSet) do
-            if almostEqual(connect, points[1]) then
-                addEdge(k, points)
-                connected = true
-                break
-            end
-        end
-    until not connected
-
-    -- Connect backward (should not happen if getting closed polygons).
-    repeat
-        local connect = polygon[1]
-        connected = false
-        for k, points in pairs(edgeSet) do
-            if almostEqual(connect, points[#points]) then
+            assert(#points == 2)
+            local a, b = table.unpack(points)
+            assert(type(a) == 'table' and a.x and type(b) == 'table' and b.x)
+            if almostEqual(first, b) then
                 edgeSet[k] = nil
-                for i = #points - 1, 1, -1 do
-                    table.insert(polygon, 1, { points[i].x, points[i].z })
-                end
-                connected = true
-                break
+                table.insert(polygon, 1, { a.x, a.z })
+                return true
+            elseif almostEqual(last, a) then
+                edgeSet[k] = nil
+                table.insert(polygon, { b.x, b.z })
+                return true
             end
         end
-    until not connected
+    end
+
+    -- Pick best (if any) candidate, may be reversed.
+    local function maybeAddPartialEdge()
+        local first = polygon[1]
+        local last = polygon[#polygon]
+        assert(type(first) == 'table' and #first == 2)
+        assert(type(last) == 'table' and #last == 2)
+
+        -- Get all possible partial edges, along with the prev/cur/next path.
+        local candidates = false
+        for k, points in pairs(partialEdgeSet) do
+            assert(#points == 2)
+            local a, b = table.unpack(points)
+            assert(type(a) == 'table' and a.x and type(b) == 'table' and b.x)
+            if almostEqual(first, a) then
+                candidates = candidates or {}
+                table.insert(candidates, { k = k, i = 1, prev = polygon[2], cur = first, next = { b.x, b.z }})
+            elseif almostEqual(first, b) then
+                candidates = candidates or {}
+                table.insert(candidates, { k = k, i = 1, prev = polygon[2], cur = first, next = { a.x, a.z }})
+            elseif almostEqual(last, a) then
+                candidates = candidates or {}
+                table.insert(candidates, { k = k, i = #polygon + 1, prev = polygon[#polygon - 1], cur = last, next = { b.x, b.z }})
+            elseif almostEqual(last, b) then
+                candidates = candidates or {}
+                table.insert(candidates, { k = k, i = #polygon + 1, prev = polygon[#polygon - 1], cur = last, next = { a.x, a.z }})
+            end
+        end
+
+        -- If there is more than one partial edge sharing this point, choose
+        -- the one with the smallest clockwise winding to get pretty insets.
+        local function bearingDelta(candidate)
+            local dirPrev = { x = candidate.prev[1] - candidate.cur[1], z = candidate.prev[2] - candidate.cur[2] }
+            local dirNext = { x = candidate.next[1] - candidate.cur[1], z = candidate.next[2] - candidate.cur[2] }
+            local bearingPrev = CrLua.TI4.System._positionToBearing(false, dirPrev)
+            local bearingNext = CrLua.TI4.System._positionToBearing(false, dirNext)
+            local d = bearingNext - bearingPrev
+            if d < 0 then
+                d = d + 360
+            end
+            return 360 - d  -- reverse to get smallest winding
+        end
+        if candidates then
+            local _, best = CrLua.Util.min(candidates, bearingDelta)
+            assert(best and partialEdgeSet[best.k])
+            partialEdgeSet[best.k] = nil
+            table.insert(polygon, best.i, best.next)
+            return true
+        end
+    end
+
+    local joinCount = 0
+    while maybeAddFullEdge() or (partialEdgeSet and maybeAddPartialEdge()) do
+        joinCount = joinCount + 1
+        assert(joinCount < 1000)  -- watch for infinite loop!
+    end
 
     -- The last point should always be the same as the first.  Remove last.
     local a = polygon[1]
@@ -817,9 +884,19 @@ function getControlPolygon(hexSet, edgeSet)
 
     --CrLua.Log.d(TAG, 'getControlPolygon: |polygon|=' .. #polygon)
     if #polygon <= 2 then
-        --error('#polygon=' .. #polygon)
+        error('#polygon=' .. #polygon)
         return false
     end
+
+    -- Sanity check all points are [1,2] tables.
+    for _, point in ipairs(polygon) do
+        assert(type(point) == 'table')
+        assert(#point == 2)
+        assert(type(point[1]) == 'number')
+        assert(type(point[2]) == 'number')
+        assert(point.x == nil)
+    end
+
     return polygon
 end
 
@@ -832,19 +909,29 @@ function getControlPolygons(hexSet, partialSet)
     end
 
     local edgeSet = getControlEdges(hexSet)
-    if partialSet then
-        applyPartialControlEdges(edgeSet, partialSet)
-    end
+    local partialEdgeSet = partialSet and applyPartialControlEdges(edgeSet, partialSet)
 
     local polygons = {}
     while not isEmptySet(edgeSet) do
-        local polygon = getControlPolygon(hexSet, edgeSet)
+        local polygon = getControlPolygon(hexSet, edgeSet, partialEdgeSet)
         if polygon then
             table.insert(polygons, polygon)
         else
             break
         end
     end
+
+    -- If any partials remain, add them?
+    if false then
+        for _, points in pairs(partialEdgeSet or {}) do
+            local polygon = {}
+            for _, point in ipairs(points) do
+                table.insert(polygon, { point.x, point.z })
+            end
+            table.insert(polygons, polygon)
+        end
+    end
+
     return polygons
 end
 

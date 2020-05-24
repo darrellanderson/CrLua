@@ -9,7 +9,7 @@ CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
 CrLua.TI4 = CrLua.TI4 or {}
 CrLua.TI4.Unit = assert(not CrLua.TI4.Unit) and {
     _require = { 'List', 'Table', 'Util', 'TI4.Zone' },
-    _allowMissingKeys = { 'UNIT', 'FLAGSHIP' }
+    _allowMissingKeys = { 'UNIT', 'FLAGSHIP', 'TOKEN' }
 }
 
 CrLua.TI4.Unit.ATTR = {
@@ -98,6 +98,13 @@ CrLua.TI4.Unit.FLAGSHIP = {
     ["Y'sia Y'ssrila"] = { faction = 'The Yssaril Tribes' }
 }
 
+CrLua.TI4.Unit.TOKEN = {
+    ['x3 Fighter Token'] = { unitName = 'Fighter', count = 3 },
+    ['x1 Fighter Token'] = { unitName = 'Fighter', count = 1 },
+    ['x3 Infantry'] = { unitName = 'Infantry', count = 3 },
+    ['x1 Infantry'] = { unitName = 'Infantry', count = 1 },
+}
+
 -------------------------------------------------------------------------------
 --- Create a unit table.
 -- @param unitName string : unit name.
@@ -173,6 +180,9 @@ function CrLua.TI4.Unit.getAllUnits(filterFunction)
             table.insert(result, unit)
         end
     end
+
+    -- Do this now to make sure tokens get assigned, but caller should really
+    -- call again with just per-hex units to prevent assignment across borders.
     CrLua.TI4.Unit.assignUnitTokenColors(result)
     return result
 end
@@ -199,17 +209,9 @@ function CrLua.TI4.Unit.fromObject(object)
     -- Do not attempt to assign a color now, let the caller decide if they
     -- care about the unit, then they can fill in the color.
     -- @see CrLua.TI4.Unit.assignUnitTokenColors()
-    if name == 'x3 Fighter Token' then
-        return CrLua.TI4.Unit.unit('Fighter', false, 3, object)
-    end
-    if name == 'x1 Fighter Token' then
-        return CrLua.TI4.Unit.unit('Fighter', false, 1, object)
-    end
-    if name == 'x3 Infantry' then
-        return CrLua.TI4.Unit.unit('Infantry', false, 3, object)
-    end
-    if name == 'x1 Infantry' then
-        return CrLua.TI4.Unit.unit('Infantry', false, 1, object)
+    local tokenData = CrLua.TI4.Unit.TOKEN[name]
+    if tokenData then
+        return CrLua.TI4.Unit.unit(tokenData.unitName, false, tokenData.count, object)
     end
 
     -- Most units have a "{color} {unitName}" object name, e.g. "Red Infantry".
@@ -292,6 +294,13 @@ function CrLua.TI4.Unit.assignUnitTokenColors(units)
     local haveColorGroundUnits = {}
     local needColorShipUnits = {}
     local needColorGroundUnits = {}
+
+    -- Remove any previously assigned token colors.
+    for _, unit in ipairs(units) do
+        if CrLua.TI4.Unit.TOKEN[unit.object.getName()] then
+            unit.color = false
+        end
+    end
 
     -- When splitting into ship vs ground, do not consider Flagship attributes
     -- that let infantry participate in space combat or fighters on ground.

@@ -171,6 +171,23 @@ CrLua.TI4.System.SYSTEMS = {
 }
 
 -------------------------------------------------------------------------------
+--- Get a string describing the system.
+-- @param system table : CrLua.TI4.System.SYSTEMS value.
+-- @return string
+-------------------------------------------------------------------------------
+function CrLua.TI4.System.toString(system)
+    assert(type(system) == 'table' and system.tile)
+    local messageParts = {
+        'System ' .. system.tile
+    }
+    for i, planet in ipairs(system.planets or {}) do
+        table.insert(messageParts, i == 1 and ': ' or ', ')
+        table.insert(messageParts, '“' .. planet.name .. '”')
+    end
+    return table.concat(messageParts, '')
+end
+
+-------------------------------------------------------------------------------
 --- Get all systems.
 -- @return table : list of CrLua.TI4.System.SYSTEMS values, with new object field.
 -------------------------------------------------------------------------------

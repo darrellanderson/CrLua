@@ -29,6 +29,8 @@ local _config = {
 
 local _cache = false
 local _controlledViewObject = false
+local _clickPlayerColor = false
+local _warnedSystems = {}
 
 -------------------------------------------------------------------------------
 
@@ -76,9 +78,17 @@ function onSave()
     return result
 end
 
+function onDestroy()
+    if _controlledViewObject then
+        destroyObject(_controlledViewObject)
+        _controlledViewObject = false
+    end
+end
+
 -------------------------------------------------------------------------------
 
 function onButtonClick(player, wha, id)
+    _clickPlayerColor = player and player.color
     if id == 'hide' then
         _config.enabled = false
         removePolygons()
@@ -174,9 +184,25 @@ end
 
 -------------------------------------------------------------------------------
 
-function errorHex(hex, message)
-    Global.setVectorLines({ CrLua.TI4.Hex.vectorLine(hex, { color = 'Red' }) })
-    error(message)
+function warnSystem(system, message)
+    assert(type(system) == 'table' and system.tile)
+
+    if _warnedSystems[system.tile] == Time.frame_count then
+        return  -- only warn once per system per update
+    end
+    _warnedSystems[system.tile] = Time.frame_count
+
+    local messageParts = {
+        self.getName() .. ': ',
+        message,
+        ' (' .. CrLua.TI4.System.toString(system) .. ')'
+    }
+    message = table.concat(messageParts, '')
+    printToAll(message, _clickPlayerColor and _clickPlayerColor or nil)
+
+    if _clickPlayerColor then
+        Player[_clickPlayerColor].pingTable(system.object.getPosition())
+    end
 end
 
 -------------------------------------------------------------------------------
@@ -201,7 +227,7 @@ function updateCache()
             local polygon = CrLua.Polygon.fromXYZ(line.points)
             table.insert(polygon, polygon[1])  -- loop
             table.insert(_cache.originalPolygons.planets, {
-                color = color,
+                color = assert(color),
                 polygon = polygon
             })
         end
@@ -217,7 +243,7 @@ function updateCache()
         local polygons = getControlPolygons(ownFullySet, ownPartialSet)
         for _, polygon in ipairs(polygons) do
             table.insert(_cache.originalPolygons.ground, {
-                color = color,
+                color = assert(color),
                 polygon = polygon
             })
         end
@@ -226,7 +252,7 @@ function updateCache()
         local polygons = getControlPolygons(ownSpaceSet, false)
         for _, polygon in ipairs(polygons) do
             table.insert(_cache.originalPolygons.space, {
-                color = color,
+                color = assert(color),
                 polygon = polygon
             })
         end
@@ -341,50 +367,59 @@ function getAllUnitsAndOwnerTokens()
         hexToSystem[hex] = assert(not hexToSystem[hex]) and system
     end
 
-    -- Get all relevant things.
-    local units = CrLua.TI4.Unit.getAllUnits()
-    local ownerTokens = getOwnerTokens()
-    local things = CrLua.List.join(units, ownerTokens)
-
-    -- It is possible orphaned tokens are on the board (someone forgot to
-    -- place plastic?).  Ignore those (fixes MrSmains bug report).
-    local function hasColor(thing)
-        return type(thing.color) == 'string'
-    end
-    things = CrLua.List.filter(things, hasColor)
-
     -- Add hex, system, and ground, planet.
     local hexToThings = {}
-    for _, thing in ipairs(things) do
-        if type(thing.object) ~= 'userdata' then
-            error(TAG .. ': thing.object is unexpected type "' .. type(thing.object))
-        end
-        if type(thing.color) ~= 'string' then
-            error(TAG .. ': thing.color is unexpected type "' .. type(thing.color))
-        end
-        local position = thing.object.getPosition()
-        thing.hex = CrLua.TI4.Hex.fromPosition(position)
-        thing.system = hexToSystem[thing.hex]
+    local function fillHexToThings(things)
+        for _, thing in ipairs(things) do
+            if type(thing.object) ~= 'userdata' then
+                error(TAG .. ': thing.object is unexpected type "' .. type(thing.object))
+            end
+            local position = thing.object.getPosition()
+            thing.hex = CrLua.TI4.Hex.fromPosition(position)
+            thing.system = hexToSystem[thing.hex]
 
-        if thing.ownerToken then
-            thing.ground = true
-        else
-            local attributes = CrLua.TI4.Unit.attributes(thing)
-            if attributes[CrLua.TI4.Unit.ATTR.GROUND] or attributes[CrLua.TI4.Unit.ATTR.STRUCTURE] then
+            if thing.ownerToken then
                 thing.ground = true
+            else
+                local attributes = CrLua.TI4.Unit.attributes(thing)
+                if attributes[CrLua.TI4.Unit.ATTR.GROUND] or attributes[CrLua.TI4.Unit.ATTR.STRUCTURE] then
+                    thing.ground = true
+                end
+            end
+
+            thing.planetName = thing.system and thing.ground and CrLua.TI4.System.planetFromPosition(thing.system, position, true)
+
+            -- Keep all things in space, plus any ground units/owner tokens on planets.
+            if thing.system and (not thing.ground or thing.planetName) then
+                local entry = hexToThings[thing.hex]
+                if not entry then
+                    entry = {}
+                    hexToThings[thing.hex] = entry
+                end
+                table.insert(entry, thing)
             end
         end
+    end
 
-        thing.planetName = thing.system and thing.ground and CrLua.TI4.System.planetFromPosition(thing.system, position, true)
+    -- Get units first, then (since exclusively units) attempt to assign unit
+    -- tokens (e.g., x1 Infantry) to nearby plastic in the same hex.
+    fillHexToThings(CrLua.TI4.Unit.getAllUnits(), true)
+    for hex, units in pairs(hexToThings) do
+        CrLua.TI4.Unit.assignUnitTokenColors(units)
+    end
 
-        -- Keep all things in space, plus any ground units/owner tokens on planets.
-        if thing.system and (not thing.ground or thing.planetName) then
-            local entry = hexToThings[thing.hex]
-            if not entry then
-                entry = {}
-                hexToThings[thing.hex] = entry
+    -- Now add owner tokens.
+    fillHexToThings(getOwnerTokens(), false)
+
+    -- It is possible orphaned tokens are on the board (someone forgot to
+    -- place plastic?).  Issue a warning and remove those things.
+    for hex, things in pairs(hexToThings) do
+        for i = #things, 1, -1 do
+            local thing = things[i]
+            if not thing.color then
+                table.remove(things, i)
+                warnSystem(thing.system, 'Item “' .. thing.object.getName() .. '” has not been assigned a color')
             end
-            table.insert(entry, thing)
         end
     end
 
@@ -421,16 +456,19 @@ function getSystemOwners()
                 if owners.space == nil then
                     owners.space = thing.color
                 elseif owners.space ~= thing.color then
-                    errorHex(hex, TAG .. ': more than one space color in tile ' .. thing.system.tile)
+                    warnSystem(owners.system, 'More than one space unit color')
+                    owners.space = false
                 end
             end
 
             -- Per-planet.
             if thing.ground then
-                if owners.planetName[thing.planetName] and owners.planetName[thing.planetName] ~= thing.color then
-                    errorHex(hex, TAG .. ': more than one ground color on ' .. thing.planetName .. ' tile ' .. thing.system.tile)
+                if owners.planetName[thing.planetName] == nil then
+                    owners.planetName[thing.planetName] = thing.color
+                elseif owners.planetName[thing.planetName] ~= thing.color then
+                    warnSystem(owners.system, 'More than one ground unit color on "' .. thing.planetName .. '"')
+                    owners.planetName[thing.planetName] = false
                 end
-                owners.planetName[thing.planetName] = thing.color
             end
         end
     end
@@ -443,6 +481,17 @@ function getSystemOwners()
                 owners.ground = false
                 break
             end
+        end
+    end
+
+    -- Wholely remove planet table entries if contention prevented assignment.
+    for hex, owners in pairs(hexToOwners) do
+        local dele = {}
+        for planetName, color in pairs(owners.planetName) do
+            if not color then table.insert(dele, planetName) end
+        end
+        for _, planetName in ipairs(dele) do
+            owners.planetName[planetName] = nil
         end
     end
 

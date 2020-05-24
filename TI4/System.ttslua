@@ -397,6 +397,7 @@ function CrLua.TI4.System.vectorLine(system, override)
     assert(system.object)
 
     local outer = CrLua.TI4.System.zoneEdgePositions(system)
+    local center = CrLua.TI4.System._bearingToPosition(system, 0, 0)
 
     local points = false
     if #outer < 2 then
@@ -516,12 +517,15 @@ function CrLua.TI4.System._positionToBearing(system, position)
     local bearing = math.atan2(position.z, -position.x) + (math.pi / 2)
 
     -- Convert to degrees between 0 and 360.
-    bearing = (bearing * 180.0 / math.pi) % 360.0
+    bearing = (bearing * 180 / math.pi) % 360
     if bearing < 0 then
-        bearing = bearing + 360.0
+        bearing = bearing + 360
+    end
+    if bearing == 360 then
+        bearing = 0  -- hmm, apparently this can happen.  floating point precision?
     end
 
-    assert(0 <= bearing and bearing < 360)
+    assert(0 <= bearing and bearing < 360, 'bearing='..bearing)
     return bearing
 end
 

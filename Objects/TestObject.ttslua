@@ -1,82 +1,14 @@
+local TAG = 'TestObject'
+
 function onLoad(save_state)
-    print('onLoad')
+    local origLogLevel = CrLua.Log.getLogLevel()
+    CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
     CrLua.UnitTest.runTests('CrLua', CrLua, true)
+    CrLua.Log.setLogLevel(origLogLevel)
 
     Global.setVectorLines({})
-    local vectorLines = CrLua.TI4.Zone.allVectorLines({})
+    local vectorLines = CrLua.TI4.Zone.allVectorLines()
     Global.setVectorLines(vectorLines)
-end
-
-function onDrop(playerColor)
-    print('onDrop')
-
-    -- Set self color to zone color.
-    CrLua.TI4.Zone.updateZones()
-    local zone = CrLua.TI4.Zone.insideWhichPlayerZone(self.getPosition())
-    local zoneColor = zone and CrLua.TI4.Zone.color(zone)
-    local zoneFaction = zone and CrLua.TI4.Zone.faction(zone)
-    self.setColorTint(zoneColor or 'Grey')
-    print('onDrop: zone faction = "' .. (zoneFaction or '<nil>') .. '"')
-
-    local position = self.getPosition()
-    local selfHex = CrLua.TI4.Hex.fromPosition(position)
-    local vectorLines = {
-        CrLua.TI4.Hex.vectorLines(selfHex, {
-            color = { 1, 0, 0 },
-            thickness = 0.2
-        })
-    }
-
-    local neighborHexes = CrLua.TI4.Hex.neighbors(selfHex)
-    for _, neighborHex in ipairs(neighborHexes) do
-        local lines = CrLua.TI4.Hex.vectorLines(neighborHex, {
-            color = { 0, 1, 0 },
-            thickness = 0.2
-        })
-        table.insert(vectorLines, lines)
-    end
-
-    -- Add 'hex' to all wormholes.  Get the wormholes in self hex, plus
-    -- other wormhole-adjacent wormholes in other hexes.
-    local function filterWormhole(wormhole)
-        local position = wormhole.object.getPosition()
-        wormhole.hex = CrLua.TI4.Hex.fromPosition(position)
-        return wormhole.hex == selfHex
-    end
-    local selfWormholes, neighborWormholes = CrLua.TI4.Wormhole.getAllWormholes(filterWormhole)
-
-    local function wormholeToHex(wormhole)
-        return wormhole.hex
-    end
-    local wormholeNeighborHexes = CrLua.List.map(neighborWormholes, wormholeToHex)
-
-    for _, hex in ipairs(wormholeNeighborHexes) do
-        local lines = CrLua.TI4.Hex.vectorLines(hex, {
-            color = { 0, 0, 1 },
-            thickness = 0.2
-        })
-        table.insert(vectorLines, lines)
-    end
-
-    Global.setVectorLines(vectorLines)
-
-    local allHexes = { selfHex }
-    local allHexes = CrLua.List.join( allHexes, neighborHexes, wormholeNeighborHexes)
-    local allHexes = CrLua.List.join( allHexes, wormholeNeighborHexes)
-    local allHexesSet = CrLua.List.toSet(allHexes)
-
-    local function filterToHexes(unit)
-        local hex = CrLua.TI4.Hex.fromPosition(unit.object.getPosition())
-        if allHexesSet[hex] then
-            unit.hex = hex
-            return true
-        end
-        return false
-    end
-    local units = CrLua.TI4.Unit.getAllUnits(filterToHexes)
-    for _, unit in ipairs(units) do
-        print ('xxx color=' .. unit.color .. ' unitName=' .. unit.unitName)
-    end
 end
 
 -------------------------------------------------------------------------------
@@ -90,15 +22,19 @@ end
 #include <~/CrLua/Polygon>
 #include <~/CrLua/RedBlobHex>
 #include <~/CrLua/Table>
-#include <~/CrLua/TI4/Hex>
-#include <~/CrLua/TI4/Unit>
-#include <~/CrLua/TI4/WormHole>
-#include <~/CrLua/TI4/Zone>
-#include <~/CrLua/TTS/Object>
-#include <~/CrLua/TTS/Player>
 #include <~/CrLua/UnitTest>
 #include <~/CrLua/Util>
 
-CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
-CrLua.assertRequired() -- do this BEFORE lock
+#include <~/CrLua/TI4/Hex>
+#include <~/CrLua/TI4/System>
+#include <~/CrLua/TI4/Unit>
+#include <~/CrLua/TI4/WormHole>
+#include <~/CrLua/TI4/Zone>
+
+#include <~/CrLua/TTS/Object>
+#include <~/CrLua/TTS/Player>
+#include <~/CrLua/TTS/Throttle>
+
+-- Do not assert required, this includes everything in order to load unittests.
+--CrLua.assertRequired() -- do this BEFORE lock
 CrLua.lock()

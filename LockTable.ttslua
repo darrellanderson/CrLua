@@ -28,6 +28,37 @@ CrLua.LockTable.ACCESS_TYPE = {
     OVERWRITE = 'overwrite'
 }
 
+-------------------------------------------------------------------------------
+--- Inject or overwrite a value into a locked table.
+-- This is similar to rawset, except it preserves locked access to set items.
+-- @param lockedTable table.
+-- @param key.
+-- @param value.
+-------------------------------------------------------------------------------
+function CrLua.LockTable.setEvenIfLocked(lockedTable, key, value)
+    assert(type(lockedTable) == 'table')
+    local metatable = getmetatable(lockedTable)
+    if metatable then
+        if not metatable._name or not metatable._tableContents then
+            error(TAG .. ': setEvenIfLocked has unknown metatable')
+        end
+        metatable._tableContents[key] = value
+    else
+        -- Not actually locked, do normal set.
+        lockedTable[key] = value
+    end
+end
+
+function CrLua.LockTable._testSetEvenIfLocked()
+    local table = CrLua.LockTable.readOnly('myTable', { 'foo', 'bar' })
+    CrLua.LockTable.setEvenIfLocked(table, 3, 'baz')
+    assert(table[1] == 'foo')
+    assert(table[3] == 'baz')
+end
+
+-------------------------------------------------------------------------------
+--- Error and stop script when misusing a locked table.
+-------------------------------------------------------------------------------
 function CrLua.LockTable._error(lockedTable, key, accessType)
     assert(type(lockedTable) == 'table' and type(accessType) == 'string')
     local metatable = assert(getmetatable(lockedTable))

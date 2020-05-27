@@ -8,53 +8,29 @@ local TAG = 'CrLua.TI4.Unit'
 CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
 CrLua.TI4 = CrLua.TI4 or {}
 CrLua.TI4.Unit = assert(not CrLua.TI4.Unit) and {
-    _require = { 'List', 'Table', 'Util', 'TI4.Zone' },
+    _require = { 'List', 'LockTable', 'Table', 'Util', 'TI4.Zone' },
     _allowMissingKeys = { 'UNIT', 'FLAGSHIP', 'TOKEN' }
 }
 
+-- Expose keys by way of a (read-only, require keys) table.  External users
+-- can specify attributes via CrLua.TI4.Unit.ATTR.COST.key rather than using
+-- the key string directly to prevent typos or if the keys ever change.
 CrLua.TI4.Unit.ATTR = {
-
-    -- Number, production cost.
-    COST = 'cost',
-
-    -- Boolean, does this unit participate in space combat?
-    SHIP = 'ship',
-
-    -- Boolean, does this unit participate in ground combat?
-    GROUND = 'ground',
-
-    -- Boolean, is this unit a structure?
-    STRUCTURE = 'structure',
-
-    -- Number, space cannon hit value.
-    SPACE_CANNON = 'spaceCannon',
-
-    -- Boolean, has AFB.
-    ANTI_FIGHTER_BARRAGE = 'antiFighterBarrage',
-
-    -- Number, bombardment hit value.
-    BOMBARDMENT = 'bombardment',
-
-    -- Boolean, unit has planetary shield.
-    PLANETARY_SHIELD = 'planetaryShield',
-
-    -- Boolean, unit bombardment ignores planetary shield.
-    IGNORE_PLANETARY_SHIELD = 'ignorePlanetaryShield',
-
-    -- String faction name (if flagship).
-    FACTION = 'faction',
-
-    -- String wormhole type (e.g. "delta").
-    WORMHOLE = 'wormhole',
-
-    -- Boolean, do fighters in system participate in ground combat?
-    FIGHTERS_ON_GROUND = 'fightersOnGround',
-
-    -- Boolean, do infantry in system participate in space combat?
-    INFANTRY_IN_SPACE = 'infantryInSpace',
-
-    -- Boolean, unit dice count is equal to the number of non-fighter enemy ships?
-    NON_FIGHTER_DICE = 'nonFighterDice',
+    cost = { type = 'number' },  -- production cost
+    ship = { type = 'boolean' },  -- participates in space combat?
+    ground = { type = 'boolean' },  -- participates in ground combat?
+    structure = { type = 'boolean' },  -- ground-based structure (control)
+    spaceCannon = { type = 'number' },  -- if set, Space Cannon hit value
+    antiFighterBarrage = { type = 'boolean' },  -- has AFB?
+    sustainDamage = { type = 'boolean' },  -- can sustain damage?
+    bombardment = { type = 'number' },  -- if set, Bombardment hit value
+    planetaryShield = { type = 'boolean' },  -- has Planetary Shield?
+    ignorePlanetaryShield = { type = 'boolean' },  -- system units may ignore PS?
+    faction = { type = 'string' },  -- owning faction name (matching "{Faction} Sheet")
+    wormhole = { type = 'string' },  -- if set, creates a wormhole (e.g. "delta")
+    fightersOnGround = { type = 'boolean' },  -- do fighers participate in ground combat?
+    infantryInSpace = { type = 'boolean' },  -- do infantry participate in space combat?
+    nonFighterDice = { type = 'boolean' },  -- rolls dice equal to the number of non-fighter ships?
 }
 
 -- Unit attributes:
@@ -66,9 +42,9 @@ CrLua.TI4.Unit.UNIT = {
     ['Carrier'] = { ship = true, cost = 3 },
     ['Space Dock'] = { structure = true },
     ['PDS'] = { structure = true, spaceCannon = 5, planetaryShield = true },
-    ['Dreadnought'] = { ship = true, bombardment = 5, cost = 4 },
-    ['War Sun'] = { ship = true, bombardment = 3, cost = 12, ignorePlanetaryShield = true },
-    ['Flagship'] = { ship = true, cost = 8 }
+    ['Dreadnought'] = { ship = true, bombardment = 5, cost = 4, sustainDamage = true },
+    ['War Sun'] = { ship = true, bombardment = 3, cost = 12, ignorePlanetaryShield = true, sustainDamage = true },
+    ['Flagship'] = { ship = true, cost = 8, sustainDamage = true }
 }
 
 -- Flagship attributes:
@@ -104,6 +80,70 @@ CrLua.TI4.Unit.TOKEN = {
     ['x3 Infantry'] = { unitName = 'Infantry', count = 3 },
     ['x1 Infantry'] = { unitName = 'Infantry', count = 1 },
 }
+
+-------------------------------------------------------------------------------
+--- Validate attribute table.
+-- @param attributes table : unit attributes (e.g., bombardment = 5).
+-- @param requireFaction : unit must have a 'faction' attribute?
+-- @return success boolean, error message string.
+-------------------------------------------------------------------------------
+function CrLua.TI4.System.isValidAttributes(attributes, requireFaction)
+    assert(type(attributes) == 'table' and type(requireFaction) == 'boolean')
+    for k, v in pairs(attributes) do
+        local requirements = CrLua.TI4.Unit.ATTR[k]
+        if not requirements then
+            return false, 'unknown attribute "' .. k .. '"'
+        end
+        if type(v) ~= assert(requirements.type) then
+            return false, 'attribute "' .. k .. '" must be a ' .. requirements.type
+        elseif requirements.type == 'string' and string.len(v) == 0 then
+            return false, 'attribute "' .. k .. '" must be a non-empty string'
+        end
+    end
+    if requireFaction and not attributes['faction'] then
+        return false, 'missing required "faction" attribute'
+    end
+    return true
+end
+
+function CrLua.TI4.Unit._testDefaultAttributes()
+    for name, attributes in pairs(CrLua.TI4.Unit.UNIT) do
+        local success, errorMessage = CrLua.TI4.System.isValidAttributes(attributes, false)
+        assert(success, name .. ': ' .. errorMessage)
+    end
+    for name, attributes in pairs(CrLua.TI4.Unit.FLAGSHIP) do
+        local success, errorMessage = CrLua.TI4.System.isValidAttributes(attributes, true)
+        assert(success, name .. ': ' .. errorMessage)
+    end
+end
+
+-------------------------------------------------------------------------------
+--- Add a new flagship at runtime (homebrew support).
+-- @param name string : flagship name.
+-- @param attributes table : flagship attributes (e.g., bombardment = 5).
+-- @return success boolean, error message
+-------------------------------------------------------------------------------
+function CrLua.TI4.Unit.addFlagship(name, attributes)
+    assert(type(name) == 'string' and type(attributes) == 'table')
+
+    if string.len(name) == 0 then
+        return false, 'flagship name must be non-empty'
+    end
+    for existingName, _ in pairs(CrLua.TI4.Unit.FLAGSHIP) do
+        if name == existingName then
+            return false, 'flagship "' .. name .. '" already exists'
+        end
+    end
+
+    local success, errorMessage = CrLua.TI4.System.isValidAttributes(attributes, true)
+    if not success then
+        return false, errorMessage
+    end
+
+    -- Looks good!
+    CrLua.LockTable.setEvenIfLocked(CrLua.TI4.Unit.FLAGSHIP, name, attributes)
+    return true
+end
 
 -------------------------------------------------------------------------------
 --- Create a unit table.

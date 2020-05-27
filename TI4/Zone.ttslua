@@ -106,6 +106,29 @@ CrLua.TI4.Zone = assert(not CrLua.TI4.Zone) and {
 }
 
 -------------------------------------------------------------------------------
+--- Add a faction name at runtime (homebrew support)
+-- @param faction string : matches "{Faction} Sheet".
+-- @return success boolean, error message
+-------------------------------------------------------------------------------
+function CrLua.TI4.Zone.addFaction(faction, allowExisting)
+    assert(type(faction) == 'string', type(allowExisting) == 'boolean')
+
+    for _, existing in ipairs(CrLua.TI4.Zone.FACTION_NAMES) do
+        if faction == existing then
+            if allowExisting then
+                return true
+            else
+                return false, 'Faction "' .. faction '" already exists'
+            end
+        end
+    end
+
+    local i = #CrLua.TI4.Zone.FACTION_NAMES + 1
+    CrLua.LockTable.setEvenIfLocked(CrLua.TI4.Zone.FACTION_NAMES, i, faction)
+    return true
+end
+
+-------------------------------------------------------------------------------
 --- Get all zones.
 -- @return table : list of zone tables.
 -------------------------------------------------------------------------------

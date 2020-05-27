@@ -220,6 +220,7 @@ function updateCache()
         y = false
     }
 
+    CrLua.TI4.Zone.update()
     local hexToOwners = getSystemOwners()
 
     _cache.originalPolygons.planets = {}
@@ -384,6 +385,7 @@ function getAllUnitsAndOwnerTokens()
             if type(thing.object) ~= 'userdata' then
                 error(TAG .. ': thing.object is unexpected type "' .. type(thing.object))
             end
+
             local position = thing.object.getPosition()
             thing.hex = CrLua.TI4.Hex.fromPosition(position)
             thing.system = hexToSystem[thing.hex]
@@ -392,7 +394,7 @@ function getAllUnitsAndOwnerTokens()
                 thing.ground = true
             else
                 local attributes = CrLua.TI4.Unit.attributes(thing)
-                if attributes[CrLua.TI4.Unit.ATTR.GROUND] or attributes[CrLua.TI4.Unit.ATTR.STRUCTURE] then
+                if attributes['ground'] or attributes['structure'] then
                     thing.ground = true
                 end
             end
@@ -413,7 +415,7 @@ function getAllUnitsAndOwnerTokens()
 
     -- Get units first, then (since exclusively units) attempt to assign unit
     -- tokens (e.g., x1 Infantry) to nearby plastic in the same hex.
-    fillHexToThings(CrLua.TI4.Unit.getAllUnits(), true)
+    fillHexToThings(CrLua.TI4.Unit.getAllUnits())
     for hex, units in pairs(hexToThings) do
         CrLua.TI4.Unit.assignUnitTokenColors(units)
     end
@@ -961,6 +963,7 @@ end
 -------------------------------------------------------------------------------
 
 #include <~/CrLua/CrLua>
+#include <~/CrLua/TI4/Homebrew>
 #include <~/CrLua/LockGlobals>
 
 #include <~/CrLua/TI4/Hex>

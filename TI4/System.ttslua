@@ -9,7 +9,7 @@ local TAG = 'CrLua.TI4.System'
 CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
 CrLua.TI4 = CrLua.TI4 or {}
 CrLua.TI4.System = assert(not CrLua.TI4.System) and {
-    _require = {},
+    _require = { 'LockTable' },
     _allowMissingKeys = { 'SYSTEMS' },
 
     DEFAULT_LINE_THICKNESS = 0.2,
@@ -171,6 +171,98 @@ CrLua.TI4.System.SYSTEMS = {
 }
 
 -------------------------------------------------------------------------------
+--- Verify system follows expectations.
+-- Validates known keys, ignores others.
+-- @parameters table: system.
+-- @return success boolean, string error message.
+-------------------------------------------------------------------------------
+function CrLua.TI4.System.isValid(system)
+    local tile = system.tile
+    if not tile or type(tile) ~= 'number' then
+        return false, 'system.tile must be a number (zero can be used for homebrew)'
+    end
+
+    local planets = system.planets
+    if planets and (type(planets) ~= 'table' or not planets[1]) then
+        return false, 'system.planets must be nil or a non-empty list'
+    elseif planets then
+        for _, planet in ipairs(planets) do
+            local name = planet.name
+            if not name or type(name) ~= 'string' or string.len(name) == 0 then
+                return false, 'planet.name must be a non-empty string'
+            end
+            local radius = planet.radius
+            if radius and (type(radius) ~= 'number' or radius <= 0) then
+                return false, 'planet.radius must be nil or a positive number'
+            end
+            local position = planet.position
+            if position and (type(position) ~= 'table' or type(position[1]) ~= 'number' or type(position[2]) ~= 'number') then
+                return false, 'planet.position must be nil or a local {x, z} list'
+            end
+            local home = planet.home
+            if home and type(home) ~= 'boolean' then
+                return false, 'planet.home must be nil or a boolean'
+            end
+        end
+    end
+
+    local wormholes = system.wormholes
+    if wormholes then
+        if type(wormholes) ~= 'table' or not wormholes[1] then
+            return false, 'system.wormholes must be nil or a non-empty list'
+        end
+        for _, wormhole in ipairs(wormholes) do
+            if not type(wormhole) == 'string' or string.len(wormhole) == 0 then
+                return false, 'wormhole must be a non-empty string'
+            end
+        end
+    end
+
+    local anomalies = system.anomalies
+    if anomalies then
+        if type(anomalies) ~= 'table' or not anomalies[1] then
+            return false, 'system.anomalies must be nil or a non-empty list'
+        end
+        for _, anomaly in ipairs(anomalies) do
+            if not type(anomaly) == 'string' or string.len(anomaly) == 0 then
+                return false, 'anomaly must be a non-empty string'
+            end
+        end
+    end
+
+    return true
+end
+
+function CrLua.TI4.System._testDefaultSystems()
+    -- Make sure all SYSTEMS values are valid.
+    for _, system in ipairs(CrLua.TI4.System.SYSTEMS) do
+        local success, errorMessage = CrLua.TI4.System.isValid(system)
+        assert(success, errorMessage)
+    end
+end
+
+-------------------------------------------------------------------------------
+--- Inject a new system (homebrew support).
+-- @parameters table
+-- @return success boolean, string error message.
+-------------------------------------------------------------------------------
+function CrLua.TI4.System.addSystem(guid, system)
+    assert(type(guid) == 'string' and type(system) == 'table')
+
+    local success, errorMessage = CrLua.TI4.System.isValid(system)
+    if not success then
+        return false, errorMessage
+    end
+
+    if CrLua.TI4.System.SYSTEMS[guid] then
+        return false, 'already have a system with that guid "' .. guid .. '"'
+    end
+
+    CrLua.LockTable.setEvenIfLocked(CrLua.TI4.System.SYSTEMS, guid, system)
+    return true
+end
+
+-------------------------------------------------------------------------------
 --- Get a string describing the system.
 -- @param system table : CrLua.TI4.System.SYSTEMS value.
 -- @return string
@@ -187,6 +279,13 @@ function CrLua.TI4.System.toString(system)
     return table.concat(messageParts, '')
 end
 
+function CrLua.TI4.System._testToString()
+    for _, system in pairs(CrLua.TI4.System.SYSTEMS) do
+        local s = CrLua.TI4.System.toString(system)
+        assert(type(s) == 'string' and string.len(s) > 0)
+    end
+end
+
 -------------------------------------------------------------------------------
 --- Get all systems.
 -- @return table : list of CrLua.TI4.System.SYSTEMS values, with new object field.
@@ -197,7 +296,7 @@ function CrLua.TI4.System.getAllSystems()
     for _, object in ipairs(getAllObjects()) do
         local system = systems[object.getGUID()]
         if system then
-            rawset(system, 'object', object)  -- rawset in case locked
+            CrLua.LockTable.setEvenIfLocked(system, 'object', object)
             table.insert(result, system)
         end
     end
@@ -222,7 +321,7 @@ function CrLua.TI4.System.fromPosition(position)
         local object = hit.hit_object
         local system = systems[object.getGUID()]
         if system then
-            rawset(system, 'object', object)  -- rawset in case locked
+            CrLua.LockTable.setEvenIfLocked(system, 'object', object)
             return system
         end
     end
@@ -457,15 +556,17 @@ function CrLua.TI4.System._getZoneBorders(system)
 
         -- The local coordinate space for a tile shows {x=1,z=1} to be lower left.
         -- Set zone borders to track planets starting left going clockwise.
+        local zoneBorders
         if numZones <= 1 then
-            rawset(system, '_zoneBorders', { 0, 360 })
+            zoneBorders = { 0, 360 }
         elseif numZones == 2 then
-            rawset(system, '_zoneBorders', { 240, 60, 240 })
+            zoneBorders = { 240, 60, 240 }
         elseif numZones == 3 then
-            rawset(system, '_zoneBorders', { 210, 330, 90, 210 })
+            zoneBorders = { 210, 330, 90, 210 }
         else
             error(TAG .. ': too many zones (' .. numZones .. ')')
         end
+        CrLua.LockTable.setEvenIfLocked(system, '_zoneBorders', zoneBorders)
 
     end
     return assert(system._zoneBorders)

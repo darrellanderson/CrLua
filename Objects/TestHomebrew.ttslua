@@ -1,0 +1,33 @@
+--- Test homebrew hooks to inject factions/systems into other tools.
+
+-- Look for objects supporting homebrew injection.
+function onLoad(save_state)
+    for _, object in ipairs(getAllObjects()) do
+        local homebrewVersion = object.getVar('homebrewVersion')
+        if homebrewVersion then
+            print('Homebrew "' .. object.getName() .. '" version=' .. homebrewVersion)
+            injectHomebrew(object)
+        end
+    end
+end
+
+-- Add the 'Khage' faction from @Tactic Blue
+function injectHomebrew(object)
+    -- See CrLua.TI4.Unit.ATTR for supported attribute list.
+    object.call('homebrewAddFlagship', {
+        name = 'Khage',
+        faction = 'The Khet Drakkol Union',
+        sustainDamage = true,
+        bombardment = 5
+    })
+    -- See CrLua.TI4.System.SYSTEMS for additional system/planet attributes.
+    object.call('homebrewAddSystem', {
+        guid = '2e10be',
+        tile = 0,  -- 0 reserved for homebrew
+        home = true,
+        planets = {
+            { name = 'Khet' },
+            { name = 'Drakkol' },
+        },
+    })
+end

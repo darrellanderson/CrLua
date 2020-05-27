@@ -1,0 +1,71 @@
+--- Let homebrew modules add factions, flagships, and systems.
+-- Unlike most CrLua modules this one exposes functions for Object.call, which
+-- must be global function and may take only one argument.
+-- @author Darrell
+
+local TAG = 'CrLua.TI4.Homebrew'
+
+CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
+CrLua.TI4 = CrLua.TI4 or {}
+CrLua.TI4.Homebrew = assert(not CrLua.TI4.Zone) and {
+    -- Add self to require list so merely including the file works without warning.
+    _require = { 'TI4.System', 'TI4.Unit', 'TI4.Zone', 'TI4.Homebrew' }
+}
+
+-- Expose in case there are future versioning requirements.  Also provides a
+-- single test to detect if homebrew injection exists on an object.
+homebrewVersion = 1.0
+
+--- Inject new objects into the CrLua.TI4 tables.
+function homebrewAddFlagship(parameters)
+    if type(parameters) ~= 'table' then
+        error('homebrewAddFlagship: missing parameters table')
+    end
+    local name = parameters.name
+    if type(name) ~= 'string' or string.len(name) == 0 then
+        error('homebrewAddFlaghip: parameters.name must be non-empty string')
+    end
+    local faction = parameters.faction
+    if type(faction) ~= 'string' or string.len(faction) == 0 then
+        error('homebrewAddFlaghip: parameters.faction must be non-empty string')
+    end
+
+    -- After removing name, remaining values are CrLua.TI4.Unit.ATTR attributes.
+    parameters.name = nil
+    
+    local success, errorMessage = CrLua.TI4.Unit.addFlagship(name, parameters)
+    if not success then
+        error('homebrewAddFlaghip: ' .. errorMessage)
+    end
+
+    -- Also add faction to zone (allow it to already be there, homebrew factions
+    -- *could* have multiple flagships).
+    local success, errorMessage = CrLua.TI4.Zone.addFaction(faction, true)
+    if not success then
+        error('homebrewAddFlaghip: ' .. errorMessage)
+    end
+
+    return true
+end
+
+--- Inject new objects into the CrLua.TI4 tables.
+function homebrewAddSystem(parameters)
+    if type(parameters) ~= 'table' then
+        error('homebrewAddSystem: missing parameters table')
+    end
+
+    local guid = parameters.guid
+    if type(guid) ~= 'string' or string.len(guid) == 0 then
+        error('homebrewAddSystem: parameters.guid must be non-empty string')
+    end
+
+    -- After removing guid, remaining values are CrLua.TI4.System.SYSTEMS table.
+    parameters.guid = nil
+
+    local success, errorMessage = CrLua.TI4.System.addSystem(guid, parameters)
+    if not success then
+        error('homebrewAddSystem: ' .. errorMessage)
+    end
+
+    return true
+end

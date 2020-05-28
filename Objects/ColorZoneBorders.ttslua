@@ -1,0 +1,29 @@
+--- Quick test object to color zone borders.
+
+local _thickness
+
+function onLoad()
+    local function delayedUpdate()
+        local id = 'thicknessSlider'
+        local value = 0.5
+        self.UI.setAttribute(id, 'value', value)
+        onSliderValueChanged(false, value, id)
+    end
+    Wait.frames(delayedUpdate, 2)
+end
+
+function onSliderValueChanged(player, value, id)
+    local thickness = tonumber(value) * 2.0
+    Global.setVectorLines(CrLua.TI4.Zone.allVectorLines(thickness))
+end
+
+#include <~/CrLua/CrLua>
+#include <~/CrLua/LockGlobals>
+
+#include <~/CrLua/LockTable>
+#include <~/CrLua/Polygon>
+#include <~/CrLua/Util>
+#include <~/CrLua/TI4/Zone>
+
+CrLua.assertRequired({ 'TI4.Zone' }) -- do this BEFORE lock
+CrLua.lock()

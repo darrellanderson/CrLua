@@ -11,7 +11,7 @@ CrLua.Table = assert(not CrLua.Table) and {
 }
 
 -------------------------------------------------------------------------------
---- Merge two tables.
+--- Copy a table, including sub-tables.
 -- Make a new table, copying key->value from source table.
 -- @param table
 -- @return new table
@@ -21,7 +21,7 @@ function CrLua.Table.copy(table)
 
     local result = {}
     for k, v in pairs(table) do
-        result[k] = v
+        result[k] = type(v) == 'table' and CrLua.Table.copy(v) or v
     end
     return result
 end

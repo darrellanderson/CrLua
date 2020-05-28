@@ -7,16 +7,16 @@
 
 local TAG = 'CrLua.Objects.ColorFactionMapTiles'
 
-local _config = {
+local DEFAULT_CONFIG = {
     enabled = true,
     show = {
         planet = false,
         ground = true,
-        space = false,
+        space = true,
     },
     thickness = {
         planet = 0.1,
-        ground = 0.2,
+        ground = 0.25,
         space = 0.1
     },
     padding = {
@@ -27,6 +27,7 @@ local _config = {
     invisibleToSet = {}
 }
 
+local _config = false
 local _cache = false
 local _controlledViewObject = false
 local _clickPlayerColor = false
@@ -41,6 +42,9 @@ function onLoad(saveState)
     local success, value = pcall(function() return JSON.decode(saveState) end)
     if success then
         _config = value or _config
+    end
+    if not _config then
+        _config = CrLua.Table.copy(DEFAULT_CONFIG)
     end
 
     -- Use a second object with restricted visibility to affect who can see the lines.
@@ -96,6 +100,11 @@ function onButtonClick(player, wha, id)
         removePolygons()
     elseif id == 'update' then
         _config.enabled = true
+        updateCache()
+        drawPolygons()
+    elseif id == 'reset' then
+        _config = CrLua.Table.copy(DEFAULT_CONFIG)
+        updateUiFromConfig()
         updateCache()
         drawPolygons()
     else
@@ -390,25 +399,35 @@ function getAllUnitsAndOwnerTokens()
             thing.hex = CrLua.TI4.Hex.fromPosition(position)
             thing.system = hexToSystem[thing.hex]
 
-            if thing.ownerToken then
-                thing.ground = true
-            else
-                local attributes = CrLua.TI4.Unit.attributes(thing)
-                if attributes['ground'] or attributes['structure'] then
-                    thing.ground = true
+            if thing.system then
+                -- Assign planet name for ground units and owner tokens.
+                if not thing.ownerToken then
+                    local attributes = CrLua.TI4.Unit.attributes(thing)
+                    if attributes['ground'] or attributes['structure'] then
+                        thing.ground = true
+                    end
                 end
-            end
+                thing.planetName = (thing.ownerToken or thing.ground) and CrLua.TI4.System.planetFromPosition(thing.system, position, true)
 
-            thing.planetName = thing.system and thing.ground and CrLua.TI4.System.planetFromPosition(thing.system, position, true)
-
-            -- Keep all things in space, plus any ground units/owner tokens on planets.
-            if thing.system and (not thing.ground or thing.planetName) then
-                local entry = hexToThings[thing.hex]
-                if not entry then
-                    entry = {}
-                    hexToThings[thing.hex] = entry
+                -- Owner tokens on planets count for ground control.
+                -- Include owner tokens in space ONLY IF NO PLANETS IN SYSTEM!
+                if thing.ownerToken then
+                    if thing.planetName then
+                        thing.ground = true
+                    elseif #(thing.system.planets or {}) == 0 then
+                        thing.ground = true
+                    end
                 end
-                table.insert(entry, thing)
+
+                -- Keep all things in space, plus ground units on planets.
+                if thing.ownerToken or not thing.ground or thing.planetName then
+                    local entry = hexToThings[thing.hex]
+                    if not entry then
+                        entry = {}
+                        hexToThings[thing.hex] = entry
+                    end
+                    table.insert(entry, thing)
+                end
             end
         end
     end
@@ -474,7 +493,7 @@ function getSystemOwners()
             end
 
             -- Per-planet.
-            if thing.ground then
+            if thing.ground and thing.planetName then
                 if owners.planetName[thing.planetName] == nil then
                     owners.planetName[thing.planetName] = thing.color
                 elseif owners.planetName[thing.planetName] ~= thing.color then
@@ -983,5 +1002,5 @@ end
 --#include <~/CrLua/UnitTest>
 --CrLua.UnitTest.runTests(TAG, CrLua, true)
 
-CrLua.assertRequired({ 'TI4.Hex', 'TI4.System', 'TI4.Unit', 'List', 'Log' })
+CrLua.assertRequired({ 'TI4.Hex', 'TI4.System', 'TI4.Unit', 'List', 'Log', 'Table' })
 CrLua.lock()

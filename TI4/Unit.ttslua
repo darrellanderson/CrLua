@@ -109,11 +109,11 @@ end
 function CrLua.TI4.Unit._testDefaultAttributes()
     for name, attributes in pairs(CrLua.TI4.Unit.UNIT) do
         local success, errorMessage = CrLua.TI4.System.isValidAttributes(attributes, false)
-        assert(success, name .. ': ' .. errorMessage)
+        assert(success, name .. ': ' .. (errorMessage or 'nil'))
     end
     for name, attributes in pairs(CrLua.TI4.Unit.FLAGSHIP) do
         local success, errorMessage = CrLua.TI4.System.isValidAttributes(attributes, true)
-        assert(success, name .. ': ' .. errorMessage)
+        assert(success, name .. ': ' .. (errorMessage or 'nil'))
     end
 end
 

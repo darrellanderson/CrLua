@@ -9,7 +9,7 @@ CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
 CrLua.TI4 = CrLua.TI4 or {}
 CrLua.TI4.Homebrew = assert(not CrLua.TI4.Zone) and {
     -- Add self to require list so merely including the file works without warning.
-    _require = { 'TI4.System', 'TI4.Unit', 'TI4.Zone', 'TI4.Homebrew' }
+    _require = { 'TI4.System', 'TI4.Unit', 'TI4.Faction', 'TI4.Homebrew' }
 }
 
 -- Expose in case there are future versioning requirements.  Also provides a
@@ -32,7 +32,7 @@ function homebrewAddFlagship(parameters)
 
     -- After removing name, remaining values are CrLua.TI4.Unit.ATTR attributes.
     parameters.name = nil
-    
+
     local success, errorMessage = CrLua.TI4.Unit.addFlagship(name, parameters)
     if not success then
         error('homebrewAddFlaghip: ' .. errorMessage)
@@ -40,7 +40,7 @@ function homebrewAddFlagship(parameters)
 
     -- Also add faction to zone (allow it to already be there, homebrew factions
     -- *could* have multiple flagships).
-    local success, errorMessage = CrLua.TI4.Zone.addFaction(faction, true)
+    local success, errorMessage = CrLua.TI4.Faction.addFaction(faction, {}, true)
     if not success then
         error('homebrewAddFlaghip: ' .. errorMessage)
     end

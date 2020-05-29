@@ -8,7 +8,7 @@ local TAG = 'CrLua.TI4.Unit'
 CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
 CrLua.TI4 = CrLua.TI4 or {}
 CrLua.TI4.Unit = assert(not CrLua.TI4.Unit) and {
-    _require = { 'List', 'LockTable', 'Table', 'Util', 'TI4.Zone' },
+    _require = { 'List', 'LockTable', 'Table', 'Util', 'TI4.Faction' },
     _allowMissingKeys = { 'UNIT', 'FLAGSHIP', 'TOKEN' }
 }
 
@@ -259,8 +259,8 @@ function CrLua.TI4.Unit.fromObject(object)
     if flagship then
         -- Flagships do not have color in their name.  Find their faction
         -- sheet to get player color.  (Zone does this for us.)
-        local zone = CrLua.TI4.Zone.fromFaction(flagship.faction)
-        local color = zone and zone.color
+        local faction = CrLua.TI4.Faction.faction(flagship.faction)
+        local color = faction and faction.color
         return CrLua.TI4.Unit.unit('Flagship', color, 1, object)
     end
 

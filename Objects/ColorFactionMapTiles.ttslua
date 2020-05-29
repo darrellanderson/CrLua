@@ -356,10 +356,10 @@ end
 function getOwnerTokens()
     -- Map from token faction to color.
     local tokenFactionColor = {}
-    local zones = CrLua.TI4.Zone.all()
-    for _, zone in ipairs(zones) do
-        if zone.tokenFaction and zone.color then
-            tokenFactionColor[zone.tokenFaction] = zone.color
+    local factions = CrLua.TI4.Faction.all()
+    for _, faction in ipairs(factions) do
+        if faction.tokenName and faction.color then
+            tokenFactionColor[faction.tokenName] = faction.color
         end
     end
 
@@ -985,6 +985,7 @@ end
 #include <~/CrLua/TI4/Homebrew>
 #include <~/CrLua/LockGlobals>
 
+#include <~/CrLua/TI4/Faction>
 #include <~/CrLua/TI4/Hex>
 #include <~/CrLua/TI4/System>
 #include <~/CrLua/TI4/Unit>
@@ -1002,5 +1003,5 @@ end
 --#include <~/CrLua/UnitTest>
 --CrLua.UnitTest.runTests(TAG, CrLua, true)
 
-CrLua.assertRequired({ 'TI4.Hex', 'TI4.System', 'TI4.Unit', 'List', 'Log', 'Table' })
+CrLua.assertRequired({ 'TI4.Hex', 'TI4.System', 'TI4.Unit', 'TI4.Zone', 'List', 'Log', 'Table' })
 CrLua.lock()

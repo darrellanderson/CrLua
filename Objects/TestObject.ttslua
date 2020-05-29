@@ -7,13 +7,14 @@ function onLoad(save_state)
     CrLua.Log.setLogLevel(origLogLevel)
 
     Global.setVectorLines({})
-    local vectorLines = CrLua.TI4.Zone.allVectorLines()
+    local vectorLines = CrLua.TI4.Zone.allVectorLines(0.5)
     Global.setVectorLines(vectorLines)
 end
 
 -------------------------------------------------------------------------------
 
 #include <~/CrLua/CrLua>
+#include <~/CrLua/TI4/Homebrew>
 #include <~/CrLua/LockGlobals>
 
 #include <~/CrLua/List>
@@ -24,9 +25,8 @@ end
 #include <~/CrLua/Table>
 #include <~/CrLua/UnitTest>
 #include <~/CrLua/Util>
-
+#include <~/CrLua/TI4/Faction>
 #include <~/CrLua/TI4/Hex>
-#include <~/CrLua/TI4/Homebrew>
 #include <~/CrLua/TI4/System>
 #include <~/CrLua/TI4/Unit>
 #include <~/CrLua/TI4/WormHole>

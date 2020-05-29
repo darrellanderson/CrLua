@@ -1,0 +1,233 @@
+--- Faction names, token names.
+-- @author Darrell
+--
+-- In addition to CrLua.TI4.Faction.FACTION values, results have:
+-- - name (string), "FACTION Sheet"
+-- - tokenName (string), "TOKEN_FACTION Command Tokens Bag"
+-- - color (string)
+
+local TAG = 'CrLua.TI4.Faction'
+
+CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
+CrLua.TI4 = CrLua.TI4 or {}
+CrLua.TI4.Faction = assert(not CrLua.TI4.Faction) and {
+    _require = { 'Util', },
+    _allowMissingKeys = { 'FACTION' },
+    _data = {
+        factions = {}
+    },
+}
+
+-- Index by faction name, add any attributes as needed.
+CrLua.TI4.Faction.FACTION = {
+    ['The Arborec'] = {},
+    ['The Barony of Letnev'] = {},
+    ['The Clan of Saar'] = {},
+    ['The Embers of Muaat'] = {},
+    ['The Emirates of Hacan'] = {},
+    ['The Federation of Sol'] = {},
+    ['The Ghosts of Creuss'] = {},
+    ['The L1Z1X Mindnet'] = {},
+    ['The Mentak Coalition'] = {},
+    ['The Naalu Collective'] = {},
+    ['The Nekro Virus'] = {},
+    ["The Sardakk N'orr"] = {},
+    ['The Universities of Jol-Nar'] = {},
+    ['The Winnu'] = {},
+    ['The Xxcha Kingdom'] = {},
+    ['The Yin Brotherhood'] = {},
+    ['The Yssaril Tribes'] = {},
+
+    -- Tactic Blue's homebrew
+    ['The Drahn Consortium'] = {},
+    ['The Fremen'] = {},
+    ['The Khet Drakkol Union'] = {},
+    ['The Veldyr Sovereignty'] = {},
+    ['The Mandalorian Clans'] = {},
+    ['The Advent'] = {},
+    ['The Free Systems Alliance'] = {},
+    ['The Navigators Guild'] = {},
+    ['The Vasari Empire'] = {},
+    ['The Trader Emergency Coalition'] = {},
+    ['The Kortali Horde'] = {},
+    ['The Rhodyn Migrant Fleet'] = {},
+    ['The HCEN Defense System'] = {},
+    ['The Gheldor Authority'] = {},
+    ['The Zeth Contingency'] = {},
+    ['The Lazax'] = {},
+    ['The Mahact Sorcerer Kings'] = {},
+    ['The Savages of Cymiae'] = {},
+}
+
+-------------------------------------------------------------------------------
+--- Add a faction name at runtime (homebrew support)
+-- @param factionName string : matches "{Faction} Sheet".
+-- @return success boolean, error message
+-------------------------------------------------------------------------------
+function CrLua.TI4.Faction.addFaction(factionName, attributes, allowExisting)
+    assert(type(factionName) == 'string' and type(attributes) == 'table' and type(allowExisting) == 'boolean')
+
+    if CrLua.TI4.Faction.FACTION[factionName] then
+        if allowExisting then
+            return true
+        else
+            return false, 'Faction "' .. factionName '" already exists'
+        end
+    end
+
+    CrLua.LockTable.setEvenIfLocked(CrLua.TI4.Faction.FACTION, factionName, attributes)
+    return true
+end
+
+-------------------------------------------------------------------------------
+--- Get all factions.
+-- @return table: list of faction tables.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Faction.all()
+    return CrLua.TI4.Faction._data.factions
+end
+
+-------------------------------------------------------------------------------
+--- Get faction table from faction name.
+-- @param faction string : either faction sheet or command token faction string.
+-- @return faction table.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Faction.faction(factionNameOrTokenName)
+    assert(type(factionNameOrTokenName) == 'string')
+    CrLua.TI4.Faction.updateIfNeeded()
+    factionNameOrTokenName = string.lower(factionNameOrTokenName)  -- compare lowercase
+    for _, faction in ipairs(CrLua.TI4.Faction._data.factions) do
+        if string.lower(faction.name) == factionNameOrTokenName then
+            return faction
+        end
+        if string.lower(faction.tokenName) == factionNameOrTokenName then
+            return faction
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
+--- Get faction from color.
+-- @param color string.
+-- @return faction table.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Faction.fromColor(color)
+    assert(type(color) == 'string')
+    CrLua.TI4.Faction.updateIfNeeded()
+    for _, faction in ipairs(CrLua.TI4.Faction._data.factions) do
+        if faction.color == color then
+            return faction
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
+--- Update if have not done so yet.
+-------------------------------------------------------------------------------
+function CrLua.TI4.Faction.updateIfNeeded()
+    if not CrLua.TI4.Faction._data.lastUpdateFrameCount then
+        CrLua.TI4.Faction.update()
+    end
+end
+
+-------------------------------------------------------------------------------
+--- Fill in the zones' runtime fields (faction, color, etc).
+-------------------------------------------------------------------------------
+function CrLua.TI4.Faction.update()
+    -- Abort if already updated this frame.
+    local frameCount = Time.frame_count
+    if CrLua.TI4.Faction._data.lastUpdateFrameCount == frameCount then
+        return
+    end
+    CrLua.TI4.Faction._data.lastUpdateFrameCount = frameCount
+
+    local factionLowerToFactionName = {}
+    for factionName, _ in pairs(CrLua.TI4.Faction.FACTION) do
+        factionLowerToFactionName[string.lower(factionName)] = factionName
+    end
+
+    -- Find command sheets (indexed by color), faction sheets (indexed by
+    -- faction name), and command token bags (indexed by "token faction" name,
+    -- which may differ slightly from the faction sheet faction name).
+    local colorToCommandSheet = {}
+    local factionNameToFactionSheet = {}
+    local tokenFactionNameToBag = {}
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+
+        -- "Command Sheet (COLOR)"
+        local color = string.match(name, '^Command Sheet %((%a+)%)$')
+        if color then
+            colorToCommandSheet[color] = object
+        end
+
+        -- "FACTION Sheet" (only accept if FACTION in whitelist!)
+        -- Replace name with "expected" case, sometimes "of" vs "Of" depending on object.
+        local factionName = string.match(name, '^(.+) Sheet$')
+        factionName = factionName and factionLowerToFactionName[string.lower(factionName)]
+        if factionName then
+            factionNameToFactionSheet[factionName] = object
+        end
+
+        -- "TOKEN_FACTION Command Tokens Bag"
+        local tokenFactionName, tokenType = string.match(name, '^(.*) (%u%a+) Tokens Bag$')
+        if tokenType == 'Command' then
+            tokenFactionNameToBag[tokenFactionName] = object
+        end
+    end
+
+    -- Given a key/object-value table, return a map from command sheet color
+    -- to the key whose object is closest to the command sheet AND VICE VERSA.
+    -- For example, consider a table with an empty seat that has a command sheet
+    -- but no faction sheet.  In that case, that orphaned command sheet does
+    -- have a closest faction sheet, but that faction sheet is closer to another.
+    -- Likewise consider an extra faction sheet placed on the table for some
+    -- reason.  That faction sheet has a closest command sheet, but that
+    -- command sheet is closer to another.
+    local function colorToClosestKey(keyToObjectTable)
+        local result = {}
+        -- Assign each object to its closest command sheet.
+        local colorToKeys = {}
+        for key, object in pairs(keyToObjectTable) do
+            local objectPosition = object.getPosition()
+            local function distance(commandSheet)
+                local commandSheetPosition = commandSheet.getPosition()
+                return CrLua.Util.distanceSq(objectPosition, commandSheetPosition)
+            end
+            local color, _ = CrLua.Util.min(colorToCommandSheet, distance)
+            if color then
+                local entry = colorToKeys[color]
+                if not entry then
+                    entry = {}
+                    colorToKeys[color] = entry
+                end
+                table.insert(entry, key)
+            end
+        end
+        -- For each color, get the closest candidate object.
+        for color, keys in pairs(colorToKeys) do
+            local colorPosition = colorToCommandSheet[color].getPosition()
+            local function distance(key)
+                local objectPosition = keyToObjectTable[key].getPosition()
+                return CrLua.Util.distanceSq(objectPosition, colorPosition)
+            end
+            local _, key = CrLua.Util.min(keys, distance)
+            result[color] = key
+        end
+        return result
+    end
+
+    -- Map command sheet color to nearest faction, tokenFaction, and seated player.
+    local colorToFactionName = colorToClosestKey(factionNameToFactionSheet)
+    local colorToTokenFactionName = colorToClosestKey(tokenFactionNameToBag)
+
+    CrLua.TI4.Faction._data.factions = {}
+    for color, factionName in pairs(colorToFactionName) do
+        local attributes = CrLua.TI4.Faction.FACTION[factionName]
+        table.insert(CrLua.TI4.Faction._data.factions, CrLua.Table.join(attributes, {
+            name = assert(factionName),
+            tokenName = colorToTokenFactionName[color] or false, -- just in case bag is not in zone
+            color = assert(color)
+        }))
+    end
+end

@@ -24,7 +24,7 @@ def error(message):
 # -----------------------------------------------------------------------------
 
 functionNamePattern = re.compile(r'^(local )?function ([^(]*)\(')
-functionCallPattern = re.compile(r'(CrLua\.[A-Za-z0-9]*\.[\._A-Za-z0-9]*)\(')
+functionCallPattern = re.compile(r'(CrLua\.[\._A-Za-z0-9]*)\(')
 
 # In-order blocks.  Each block is { lines: [], function: name, calls: set }
 blocks = [ newBlock() ]

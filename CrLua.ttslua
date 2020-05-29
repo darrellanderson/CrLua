@@ -1,6 +1,6 @@
 -------------------------------------------------------------------------------
 --- Create the base CrLua table, with require function for dependencies.
--- @author bonkersbgg on BoardGameGeek.com
+-- @author Darrell
 --
 -- Suggested use: at the END of the object script (so #include does not affect
 -- line number reporting in the above portion), include CrLua and dependencies:
@@ -8,16 +8,13 @@
 -- #include <~/CrLua/CrLua>
 -- #include <~/CrLua/LockGlobals>
 --
--- #include <~/CrLua/[OTHER_DEPENDENCY]>
--- ...
--- #include <~/CrLua/[OTHER_DEPENDENCY]>
+-- #include <~/CrLua/[OTHER_DEPENDENCY]> (repeat)
 --
 -- CrLua.assertRequired() -- do this BEFORE lock
 -- CrLua.lock()
 --
 -- -- Optionally enable logging.
 -- CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
---
 -------------------------------------------------------------------------------
 
 local TAG = 'CrLua'

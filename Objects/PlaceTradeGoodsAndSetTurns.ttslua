@@ -1,0 +1,109 @@
+--- Place trade goods on unclaimed strategy cards, assign turns.
+-- @author ? original (not given in the file, not sure)
+-- @author Darrell update May 2020, work with 6p/8p tables, optionally ignore unseated players
+
+STRATEGY_CARD_INITIATIVE = {
+    ['Zero Strategy Token'] = 0,
+    ['Leadership'] = 1,
+    ['Diplomacy'] = 2,
+    ['Diplomacy (Revised)'] = 2,
+    ['Politics'] = 3,
+    ['Construction'] = 4,
+    ['Industry'] = 4.5,
+    ['Trade'] = 5,
+    ['Warfare'] = 6,
+    ['Logistics'] = 6.5,
+    ['Technology'] = 7,
+    ['Imperial'] = 8
+}
+
+function onLoad(save_state)
+    self.createButton({
+        click_function = 'placeTradeGoodsAndSetTurns',
+        function_owner = self,
+        label          = 'Place Trade\nGoods and\nSet Turns',
+        position       = {x=0, y=0.2, z=0},
+        width          = 1200,
+        height         = 800,
+        font_size      = 200,
+    })
+end
+
+--- Get the closest bag (avoid flying aross the table from an arbitrary bag).
+function closestBag(tradeGoodBags, strategyCard)
+    local cardPos = strategyCard.getPosition()
+    local closestBag, closestDistanceSq = false, false
+    for _, bag in ipairs(tradeGoodBags) do
+        local bagPos = bag.getPosition()
+        local distanceSq = (cardPos.x - bagPos.x) ^ 2 + (cardPos.z - bagPos.z) ^ 2
+        if not closestDistanceSq or distanceSq < closestDistanceSq then
+            closestDistanceSq = distanceSq
+            closestBag = bag
+        end
+    end
+    return closestBag
+end
+
+function placeTradeGood(tradeGoodBag, strategyCard)
+    -- Copy jitter logic from v2.0, looks good.
+    local pos = strategyCard.getPosition()
+    pos.x = pos.x + 0.5 * math.random(-1, 1)
+    pos.z = pos.z + 0.5 * math.random(-1, 1)
+    local takeParameters = {
+        position = { x = pos.x, y = 5, z = pos.z },
+        rotation = { x = 180, y = 90, z = math.random(30,60) }
+    }
+    tradeGoodBag.takeObject(takeParameters)
+end
+
+function placeTradeGoodsAndSetTurns(obj, playerClickerColor, altClick)
+    CrLua.TI4.Zone.update()
+
+    -- Get per color lowest initiative, unpicked strategy cards, and trade good bags.
+    local colorToInitiative = {}
+    local unpickedStrategyCards = {}
+    local tradeGoodBags = {}
+    for _, object in ipairs(getAllObjects()) do
+        local initiative = STRATEGY_CARD_INITIATIVE[object.getName()]
+        if initiative then
+            local zone = CrLua.TI4.Zone.insideWhich(object.getPosition())
+            if zone then
+                local vsValue = colorToInitiative[zone.color] or initiative
+                colorToInitiative[zone.color] = math.min(initiative, vsValue)
+            elseif initiative > 0 then
+                table.insert(unpickedStrategyCards, object)
+            end
+        elseif object.tag == 'Infinite' and string.find(object.getName(), 'Tradegoods x1 Bag') then
+            table.insert(tradeGoodBags, object)
+        end
+    end
+
+    -- Place trade goods.
+    for _, unpickedStrategyCard in ipairs(unpickedStrategyCards) do
+        local bag = closestBag(tradeGoodBags, unpickedStrategyCard)
+        placeTradeGood(bag, unpickedStrategyCard)
+    end
+
+    -- Generate turn order, ONLY INCLUDE PLAYERS WITH INITIATIVE VALUES!
+    -- (Skip non-grey "spectators", non-players that can interact with table.)
+    local turnOrder = {}
+    for color, _ in pairs(colorToInitiative) do
+        table.insert(turnOrder, color)
+    end
+    table.sort(turnOrder, function(a, b) return colorToInitiative[a] < colorToInitiative[b] end)
+
+    -- If alt (right) click, add clicking color player as new last turn (moderator?).
+    if altClick and not colorToInitiative[playerClickerColor] then
+        table.insert(turnOrder, playerClickerColor)
+    end
+
+    printToAll('Turn order: ' .. table.concat(turnOrder, ', '), playerClickerColor)
+
+    Turns.enable = true
+    Turns.type = 2
+    Turns.order = turnOrder
+    Turns.turn_color = turnOrder[1]
+end
+
+#include <~/CrLua/TI4/Zone>
+#include <~/CrLua/Polygon>

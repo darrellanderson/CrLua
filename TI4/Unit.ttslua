@@ -107,7 +107,7 @@ CrLua.TI4.Unit.TOKEN = {
 -- @param requireFaction : unit must have a 'faction' attribute?
 -- @return success boolean, error message string.
 -------------------------------------------------------------------------------
-function CrLua.TI4.System.isValidAttributes(attributes, requireFaction)
+function CrLua.TI4.Unit.isValidAttributes(attributes, requireFaction)
     assert(type(attributes) == 'table' and type(requireFaction) == 'boolean')
     for k, v in pairs(attributes) do
         local requirements = CrLua.TI4.Unit.ATTR[k]
@@ -128,11 +128,11 @@ end
 
 function CrLua.TI4.Unit._testDefaultAttributes()
     for name, attributes in pairs(CrLua.TI4.Unit.UNIT) do
-        local success, errorMessage = CrLua.TI4.System.isValidAttributes(attributes, false)
+        local success, errorMessage = CrLua.TI4.Unit.isValidAttributes(attributes, false)
         assert(success, name .. ': ' .. (errorMessage or 'nil'))
     end
     for name, attributes in pairs(CrLua.TI4.Unit.FLAGSHIP) do
-        local success, errorMessage = CrLua.TI4.System.isValidAttributes(attributes, true)
+        local success, errorMessage = CrLua.TI4.Unit.isValidAttributes(attributes, true)
         assert(success, name .. ': ' .. (errorMessage or 'nil'))
     end
 end

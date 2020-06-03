@@ -21,7 +21,7 @@
 --
 -- Darrell's hexbox: http://cloud-3.steamusercontent.com/ugc/1052100459404186281/643C6C76721F95244DC2AA1D3EF7D83529241FC1/
 
-local TAG = 'PlayerColorPicker'
+local TAG = 'ColorPicker'
 
 local SWAP = {
     -- Only pack one copy of these, only expect one during unpack.
@@ -60,9 +60,16 @@ local SWAP = {
     }
 }
 
+-- Keep in 'contstant' rather than placing the string in code.
+local ANONYMOUS_FLAGSHIP_NAME = '$COLOR Flagship'
+local ANONYMOUS_PIECES_BAG_NAME = '$COLOR Player Pieces'
+
 function onLoad(saveState)
-    --CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
+    CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
     CrLua.Log.d(TAG, 'onLoad')
+
+    Player['Pink'].changeColor('White')
+
     Wait.time(resetUi, 0.2)
 end
 
@@ -231,8 +238,8 @@ end
 function onButtonClick(player, wha, id)
     if id == 'swapColors' then
         -- self.UI.getAttribute('prevColor', 'text') does not work?
-        local prevColor = _values['prevColor']
-        local nextColor = _values['nextColor']
+        local prevColor = _values['prevColor'] or 'White'
+        local nextColor = _values['nextColor'] or 'Pink'
         CrLua.Log.d(TAG, 'onButtonClick: prev=' .. tostring(prevColor) .. ' next=' .. tostring(nextColor))
         if prevColor and nextColor then
             swap(prevColor, nextColor)
@@ -251,153 +258,290 @@ end
 function swap(prevColor, nextColor)
     assert(type(prevColor) == 'string' and type(nextColor) == 'string')
 
-    -- Rename flagship to generic name BEFORE scanning for units.
     local flagshipName = getFlagshipName(prevColor)
-    if flagshipName then
-        local genericFlagshipName = prevColor .. ' Flagship'
-        renameFlagship(flagshipName, genericFlagshipName)
-    end
+    CrLua.Log.d(TAG, 'swap: prev=' .. prevColor .. ' next=' .. nextColor .. ' flagship=' .. (flagshipName or 'nil'))
 
-    -- Scan for swap items (including generic flagship).
-    local anonNameToItems, itemsInHand = getSwapObjects(prevColor, nextColor)
-    verifyPrev(prevColor, anonNameToItems)
+    -- Get to-pack items, make sure they are all there before swapping!
+    local ruleToItems = getSwapRuleToItems(prevColor, nextColor, flagshipName)
+    verifyRuleToItems(ruleToItems)
 
-    local function getPiecesBag(color, createIfMissing, offset)
-        local name = color .. ' Player Pieces'
-        local guid = getContainerEntryGuid(self, name)
-        local position = {
-            x = self.getPosition().x + (offset.x or offset[1]),
-            y = self.getPosition().y + (offset.y or offset[2]),
-            z = self.getPosition().z + (offset.z or offset[3])
-        }
-        local bag = guid and self.takeObject({
-            guid = guid,
-            position = position
-        })
-        if not bag and createIfMissing then
-            bag = spawnObject({
-                type = 'Bag',
-                position = position,
-                sound = false,
-                snap_to_grid = false,
-            })
-            bag.setName(name)
-            bag.use_grid = false
-            bag.use_snap_points = false
-            bag.sticky = false
-        end
-        assert(bag)
-        return bag
-    end
-
-    local prevBag = getPiecesBag(prevColor, true, {-3, 3, 0})
-    local nextBag = getPiecesBag(nextColor, false, {3, 3, 0})
-
-    packPrev(prevColor, anonNameToItems, prevBag)
-    local handZones = saveAndRemoveHandZones(prevColor)
-    local turnState = saveTurnState()
-
-    Player[prevColor].changeColor(nextColor)
-
-    -- Give changeColor a change to finish before proceeding.
-    local function finishSwap()
-        updateHandZones(nextColor, handZones)
-        updateTurnState(turnState, prevColor, nextColor)
-
-        unpackNext(nextColor, anonNameToItems, nextBag)
-        doSimpleRename(anonNameToItems)
-
-        self.putObject(prevBag)
-        destroyObject(nextBag)
-    end
-    Wait.frames(finishSwap, 3)
-
-    local function restoreExtraItemsInHand()
-        for _, item in ipairs(itemsInHand) do
-            item.object.deal(1, nextColor, item.handIndex)
-        end
-    end
-    Wait.frames(restoreExtraItemsInHand, 6)
-
-    -- Wait even longer to rename flagship, need to unpack flagship bag AND
-    -- potentially the flagship unit.
-    if flagshipName then
-        local function delayedRenameFlagship()
-            local genericFlagshipName = nextColor .. ' Flagship'
-            renameFlagship(genericFlagshipName, flagshipName)
-        end
-        Wait.time(delayedRenameFlagship, 3)
-    end
-end
-
--------------------------------------------------------------------------------
-
-function saveAndRemoveHandZones(color)
-    assert(type(color) == 'string')
-    local player = Player[color]
-    local zones = {}
-    for i = 1, player.getHandCount() do
-        -- Remove items from hand before "removing" hand.
-        for j, object in ipairs(player.getHandObjects(i)) do
-            object.setPosition({ x = 0, y = 2 + j, z = 0 })
-        end
-        table.insert(zones, player.getHandTransform(i))
-        player.setHandTransform({
-            position = { x = 0, y = -10, z = 0 },
-        }, i)
-    end
-    return zones
-end
-
-function updateHandZones(color, zones)
-    local player = Player[color]
-
-    for i, zone in ipairs(zones) do
-        player.setHandTransform(zone, i)
-    end
-end
-
-function saveTurnState()
-    return {
-        enable = Turns.enable,
-        order = Turns.order,
-        current = Turns.turn_color
-    }
-end
-
-function updateTurnState(state, prevColor, nextColor)
-    assert(type(state) == 'table' and type(prevColor) == 'string' and type(nextColor) == 'string')
-
-    if state.order then
-        for i, color in ipairs(state.order) do
-            if color == prevColor then
-                state.order[i] = nextColor
+    -- TTS needs a frame to finish pack/unpack to let objects settle.  Express
+    -- the swap as a series of in-order functions, skipping a frame between each.
+    -- Rather than managing callback_function for barriers, just inspect state.
+    local data = {}
+    local executeQueue = {
+        {
+            execute = function()
+                data.prevBag = getPiecesBag(prevColor, true, {-3, 3, 0})
+            end,
+            isFinished = function()
+                return not data.prevBag.spawning
             end
+        },
+
+        {
+            execute = function()
+                packSingletons(ruleToItems, data.prevBag)
+            end,
+        },
+
+        {
+            execute = function()
+                data.deckRuleToCardObjects = retrieveCards(ruleToItems)
+            end,
+            isFinished = function()
+                for _, cardObjects in pairs(data.deckRuleToCardObjects) do
+                    for _, cardObject in ipairs(cardObjects) do
+                        if cardObject.spawning then
+                            return false
+                        end
+                    end
+                end
+                return true
+            end
+        },
+
+        {
+            execute = function()
+                data.deckRuleToDeckObject = packCardsIntoDecks(prevColor, data.deckRuleToCardObjects)
+                data.deckRuleToCardObjects = nil
+            end,
+        },
+
+        {
+            execute = function()
+                packDecks(data.deckRuleToDeckObject, data.prevBag)
+                data.deckRuleToDeckObject = nil
+            end,
+        },
+
+        {
+            execute = function()
+                data.unitBags = packUnitsIntoUnitBags(ruleToItems)
+            end,
+        },
+
+        {
+            execute = function()
+                data.flagships, data.flagshipBag = startRenameFlagshipToGeneric(data.unitBags, prevColor, flagshipName)
+            end,
+            ifFinished = function()
+                for _, flagship in ipairs(data.flagships) do
+                    if flagship.spawning then
+                        return false
+                    end
+                end
+                return true
+            end
+        },
+
+        {
+            execute = function()
+                finishRenameFlagshipToGeneric(data.flagships, data.flagshipBag)
+                data.flagships = nil
+                data.flagshipBag = nil
+            end,
+        },
+
+        {
+            execute = function()
+                packUnitBags(data.unitBags, data.prevBag)
+                data.unitBags = nil
+            end,
+        },
+
+        {
+            execute = function()
+                data.prevBag.setLock(false)
+                self.putObject(data.prevBag)
+                data.prevBag = nil
+            end
+        },
+
+        {
+            execute = function()
+                doSimpleRename(ruleToItems)
+            end
+        },
+
+        {
+            execute = function()
+                data.turnState = getTurnState()
+                local player = Player[prevColor]
+                player.changeColor(nextColor)
+            end
+        },
+
+        {
+            execute = function()
+                setTurnState(data.turnState, prevColor, nextColor)
+                data.turnState = nil
+            end
+        },
+
+        {
+            execute = function()
+                data.handState, data.handObjects = getHandState(prevColor, nextColor)
+                -- Start moving these so they break from the hand.
+                for i, object in ipairs(data.handObjects) do
+                    object.setPositionSmooth({ x = 0, y = 3 + i, z = 0 }, false, true)
+                end
+            end
+        },
+
+        {
+            execute = function()
+                swapHandState(data.handState, prevColor, nextColor)
+                data.handState = nil
+            end
+        },
+
+        {
+            execute = function()
+                -- Return hand objects to new hand.
+                for i, object in ipairs(data.handObjects) do
+                    object.deal(1, nextColor)
+                end
+            end
+        },
+
+        {
+            execute = function()
+                data.nextBag = getPiecesBag(nextColor, true, {3, 3, 0})
+            end,
+            isFinished = function()
+                return not data.nextBag.spawning
+            end
+        },
+
+        {
+            execute = function()
+                unpackSingletons(ruleToItems, data.nextBag)
+            end
+        },
+
+        {
+            execute = function()
+                data.deckRuleToDeckObject = unpackDecks(nextColor, ruleToItems, data.nextBag)
+            end,
+            isFinished = function()
+                for _, deckObject in ipairs(data.deckRuleToDeckObject or {}) do
+                    if deckObject.spawning then
+                        return false
+                    end
+                end
+                return true
+            end
+        },
+
+        {
+            execute = function()
+                unpackCardsFromDecks(ruleToItems, data.deckRuleToDeckObject)
+                data.deckRuleToDeckObject = nil
+            end
+        },
+
+        {
+            execute = function()
+                data.unitRuleToUnitBag = unpackUnitBags(nextColor, ruleToItems, data.nextBag)
+            end,
+            isFinished = function()
+                for _, unitBag in ipairs(data.unitRuleToUnitBag or {}) do
+                    if unitBag.spawning then
+                        return false
+                    end
+                end
+                return true
+            end
+        },
+
+        {
+            execute = function()
+                data.flagships, data.flagshipBag = startRenameFlagshipFromGeneric(data.unitRuleToUnitBag, flagshipName)
+            end,
+            ifFinished = function()
+                for _, flagship in ipairs(data.flagships) do
+                    if flagship.spawning then
+                        return false
+                    end
+                end
+                return true
+            end
+        },
+
+        {
+            execute = function()
+                finishRenameFlagshipFromGeneric(data.flagships, data.flagshipBag)
+                data.flagships = nil
+                data.flagshipBag = nil
+            end
+        },
+
+        {
+            execute = function()
+                unpackUnitsFromUnitBags(ruleToItems, data.unitRuleToUnitBag)
+                data.unitRuleToUnitBag = nil
+            end
+        },
+
+        {
+            execute = function()
+                self.putObject(data.nextBag)
+                data.nextBag = nil
+                print(TAG .. ': finished')
+            end
+        }
+
+        -- TODO XXX RENAME FLAGSHIP
+
+    }
+
+    local function executeNext()
+        if #executeQueue > 0 then
+            local entry = executeQueue[1]
+
+            -- Execute, wait for isFinished before moving on.
+            assert(entry.execute ~= nil)
+            if entry.execute then
+                entry.execute()
+                entry.execute = false
+            elseif (not entry.isFinished) or entry.isFinished() then
+                table.remove(executeQueue, 1)
+            end
+
+            Wait.frames(executeNext, 2)
         end
     end
-    if state.current == prevColor then
-        state.current = nextColor
-    end
+    executeNext()
 
-    Turns.order = state.order
-    Turns.turn_color = state.current
-    Turns.enable = state.enable
 end
 
 -------------------------------------------------------------------------------
 
-function doSimpleRename(anonNameToItems)
-    for _, anonymousName in ipairs(SWAP.SIMPLE_RENAME) do
-        local items = anonNameToItems[anonymousName]
-        for i, item in ipairs(items or {}) do
-            item.object.setName(item.name.next)
-            item.object = nil
+--- Find entry in a container.
+-- @container: game Object.
+-- @name string: object name.
+-- @return string: container entry guid (may changer after unpacking!).
+function getContainerEntryGuid(container, name)
+    assert(container.tag == 'Deck' or container.tag == 'Bag' or container.tag == 'Generic')
+    for _, entry in ipairs(container.getObjects()) do
+        if entry.name == name then
+            return entry.guid
         end
     end
 end
 
--------------------------------------------------------------------------------
+--- Get with-color name.
+-- @param anonymousName string: string containing $COLOR.
+-- @return string: same string substiting actual color.
+function applyColorToAnonymousName(anonymousName, color)
+    assert(type(anonymousName) == 'string' and type(color) == 'string')
+    return string.gsub(anonymousName, '$COLOR', color)
+end
 
+--- Get flagship.
+-- @param color string.
+-- @return string: flagship name.
 function getFlagshipName(color)
     CrLua.TI4.Faction.update()
     local faction = CrLua.TI4.Faction.fromColor(color)
@@ -411,432 +555,683 @@ function getFlagshipName(color)
     end
 end
 
-function renameFlagship(fromName, toName)
-    assert(type(fromName) == 'string' and type(toName) == 'string')
-
-    for _, object in ipairs(getAllObjects()) do
-        if object.getName() == fromName then
-            object.setName(toName)
-            if object.getQuantity() > 0 then
-                assert(object.getQuantity() == 1)
-                local inner = object.takeObject()
-                inner.setName(toName)
-                object.putObject(inner)
-            end
-        end
+--- Retrieve or create a bag for color pieces.
+function getPiecesBag(color, createIfMissing, offset)
+    local name = applyColorToAnonymousName(ANONYMOUS_PIECES_BAG_NAME, color)
+    local guid = getContainerEntryGuid(self, name)
+    local position = {
+        x = self.getPosition().x + (offset.x or offset[1]),
+        y = self.getPosition().y + (offset.y or offset[2]),
+        z = self.getPosition().z + (offset.z or offset[3])
+    }
+    local bag = guid and self.takeObject({
+        guid = guid,
+        position = position
+    })
+    if not bag and createIfMissing then
+        bag = spawnObject({
+            type = 'Bag',
+            position = position,
+            sound = false,
+            snap_to_grid = false,
+        })
+        bag.setName(name)
+        bag.use_grid = false
+        bag.use_snap_points = false
+        bag.sticky = false
     end
+    assert(bag)
+    bag.setLock(true)
+    return bag
 end
 
 -------------------------------------------------------------------------------
 
---- Make sure we have everything before swapping!
-function verifyPrev(prevColor, anonNameToItems)
-    assert(type(prevColor) == 'string' and type(anonNameToItems) == 'table')
+--- Gather to-be-replaced objects.
+-- Build map from "$COLOR" anonymous name to list of items.
+-- @param prevColor string (existing color getting replaced).
+-- @param nextColor string (new color to be used).
+-- @param flagshipName string, may be nil/false to ignore.
+-- @return table: map from top-level swap rule to list of items.
+function getSwapRuleToItems(prevColor, nextColor, flagshipName)
+    assert(type(prevColor) == 'string' and type(nextColor) == 'string')
+    assert(not flagshipName or type(flagshipName) == 'string')
+
+    local simpleRules = {}
+    simpleRules = CrLua.List.join(simpleRules, SWAP.SINGLETONS)
+    simpleRules = CrLua.List.join(simpleRules, SWAP.UNITS)
+    simpleRules = CrLua.List.join(simpleRules, SWAP.SIMPLE_RENAME)
+
+    -- Map from object name to swap rule.  For cards, the swap rule is the deck.
+    local nameToAnonAndNext = {}
+    for _, anonymousName in ipairs(simpleRules) do
+        local prevName = applyColorToAnonymousName(anonymousName, prevColor)
+        local nextName = applyColorToAnonymousName(anonymousName, nextColor)
+        nameToAnonAndNext[prevName] = { anon = anonymousName, next = nextName }
+    end
+    for anonymousDeck, anonymousCards in pairs(SWAP.DECKS) do
+        -- Store the deck mostly for unpack position.  Packing only uses
+        -- individual cards (stored with the anonymous deck name rule).
+        -- Decks may contain non-swap things like faction promissory notes,
+        -- other player's notes, etc.
+        local prevName = applyColorToAnonymousName(anonymousDeck, prevColor)
+        local nextName = applyColorToAnonymousName(anonymousDeck, nextColor)
+        nameToAnonAndNext[prevName] = { anon = anonymousDeck, next = nextName }
+        for _, anonymousCard in ipairs(anonymousCards) do
+            local prevName = applyColorToAnonymousName(anonymousCard, prevColor)
+            local nextName = applyColorToAnonymousName(anonymousCard, nextColor)
+            nameToAnonAndNext[prevName] = { anon = anonymousCard, next = nextName }
+        end
+    end
+    if flagshipName then
+        -- Add a special rule for custom flagship name.
+        nameToAnonAndNext[flagshipName] = { anon = ANONYMOUS_FLAGSHIP_NAME, next = flagshipName }
+    end
+
+    -- Find items in a single pass.
+    local ruleToItems = {}
+    local function getRuleToItems(anonAndNext)
+        assert(type(anonAndNext) == 'table')
+        local items = ruleToItems[anonAndNext.anon]
+        if not items then
+            items = {}
+            ruleToItems[anonAndNext.anon] = items
+        end
+        return items
+    end
+    for _, object in ipairs(getAllObjects()) do
+
+        -- Live objects.
+        local name = object.getName()
+        local anonAndNext = nameToAnonAndNext[name]
+        if anonAndNext then
+            local items = getRuleToItems(anonAndNext)
+            table.insert(items, {
+                name = {
+                    anon = anonAndNext.anon,
+                    prev = name,
+                    next = anonAndNext.next,
+                },
+                live = {
+                    object = object,
+                    transform = {
+                        position = CrLua.Table.copy(object.getPosition()),
+                        rotation = CrLua.Table.copy(object.getRotation()),
+                        scale = CrLua.Table.copy(object.getScale())
+                    },
+                    tag = object.tag,
+                    value = object.getValue() or false,
+                    lock = object.getLock() or false,
+                },
+                dead = false
+            })
+        end
+
+        -- "Dead" objects inside a deck.
+        if object.tag == 'Deck' then
+            for _, entry in ipairs(object.getObjects()) do
+                local anonAndNext = nameToAnonAndNext[entry.name]
+                if anonAndNext then
+                    local items = getRuleToItems(anonAndNext)
+                    table.insert(items, {
+                        name = {
+                            anon = anonAndNext.anon,
+                            prev = entry.name,
+                            next = anonAndNext.next,
+                        },
+                        live = false,
+                        dead = {
+                            guid = entry.guid,
+                            container = object,
+                            transform = {
+                                position = CrLua.Table.copy(object.getPosition()),
+                                rotation = CrLua.Table.copy(object.getRotation()),
+                                scale = CrLua.Table.copy(object.getScale())
+                            }
+                        }
+                    })
+                end
+            end
+        end
+    end
+
+    -- Lock the table down, prevent attempting to access missing keys.
+    -- Do not lock transform, metatables are not compatible with vectors.
+    local function lockRecursive(name, t)
+        assert(type(t) == 'table')
+        for k, v in pairs(t) do
+            if type(v) == 'table' and k ~= 'transform' then
+                lockRecursive(tostring(k), v)
+            end
+        end
+        CrLua.LockTable.readOnlyRequireKey(name, t)
+    end
+    lockRecursive('ruleToItems', ruleToItems)
+
+    return ruleToItems
+end
+
+--- Make sure all items are found!
+function verifyRuleToItems(ruleToItems)
+    assert(type(ruleToItems) == 'table')
 
     for _, anonymousName in ipairs(SWAP.SINGLETONS) do
-        local items = anonNameToItems[anonymousName]
+        local items = ruleToItems[anonymousName]
         if not items then
             error(TAG .. ': missing "' .. anonymousName .. '"')
         end
     end
 
-    for anonymousName, anonymousCards in pairs(SWAP.DECKS) do
+    for anonymousDeck, anonymousCards in pairs(SWAP.DECKS) do
         -- Only look for cards, they were pulled from decks during scan.
-        local totalCardCount = 0
         for _, anonymousCard in ipairs(anonymousCards) do
-            local items = anonNameToItems[anonymousCard]
-            if items then
-                if #items > 1 then
-                    error(TAG .. ': multiple "' .. anonymousCard .. '"')
-                end
-                totalCardCount = totalCardCount + 1
+            local items = ruleToItems[anonymousCard]
+            if not items then
+                error(TAG .. ': missing "' .. anonymousCard .. '"')
+            elseif #items > 1 then
+                error(TAG .. ': multiple "' .. anonymousCard .. '"')
             end
-        end
-        if totalCardCount ~= #anonymousCards then
-            error(TAG .. ': too few cards in "' .. anonymousName .. '"')
         end
     end
 
     for _, anonymousName in ipairs(SWAP.UNITS) do
-        local items = anonNameToItems[anonymousName]
+        local items = ruleToItems[anonymousName]
         local bag = false
         for _, item in ipairs(items or {}) do
-            if item.tag == 'Bag' then
+            if item.live and item.live.tag == 'Bag' then
                 if bag then
                     error(TAG .. ': multiple unit bags "' .. anonymousName .. '"')
                 end
-                bag = item.object
+                bag = item.live.object
             end
         end
         if not bag then
             error(TAG .. ': missing unit bag "' .. anonymousName .. '"')
         end
     end
+    return true
 end
 
---- Put existing objects for the previous (getting replaced) color into a bag.
--- Pack cards into appropriate decks and units into unit bags.
--- Remove object references for packed items.  Do not blanket remove, there may
--- be items not treated here (e.g. simple rename).
-function packPrev(prevColor, anonNameToItems, prevBag)
-    assert(type(prevColor) == 'string' and type(anonNameToItems) == 'table' and type(prevBag) == 'userdata')
+-------------------------------------------------------------------------------
+
+function packSingletons(ruleToItems, bag)
+    assert(type(ruleToItems) == 'table' and type(bag) == 'userdata')
+    CrLua.Log.d(TAG, 'packSingletons')
 
     -- Keep only the first of any singleton objects (players may have cloned extras).
     for _, anonymousName in ipairs(SWAP.SINGLETONS) do
-        local items = anonNameToItems[anonymousName]
+        local items = ruleToItems[anonymousName]
         for i, item in ipairs(items or {}) do
+            assert(item.live.object)
             if i == 1 then
-                prevBag.putObject(item.object)
-                item.object = nil
+                item.live.object.setLock(false)
+                bag.putObject(item.live.object)
+                CrLua.LockTable.setEvenIfLocked(item.live, 'object', false)
             else
-                destroyObject(item.object)
-                item.object = nil
-            end
-        end
-    end
-
-    -- Place loose cards into decks, then put deck.
-    for anonymousName, anonymousCards in pairs(SWAP.DECKS) do
-        local items = anonNameToItems[anonymousName]
-        local deck = false
-        if items then
-            assert(#items == 1)
-            local item = items[1]
-            deck = item.object
-            item.object = nil
-            -- Add any loose cards to the existing deck.
-            for _, anonymousCard in ipairs(anonymousCards) do
-                local items = anonNameToItems[anonymousCard]
-                if items then
-                    assert(#items == 1)
-                    local item = items[1]
-                    deck.putObject(item.object)
-                    item.object = nil
-                end
-            end
-        else
-            -- No deck, build one from loose cards.
-            for i, anonymousCard in ipairs(anonymousCards) do
-                local items = anonNameToItems[anonymousCard]
-                assert(#items == 1)
-                local item = items[1]
-                item.object.setLock(false)
-                if i == 1 then
-                    deck = item.object
-                    item.object = nil
-                else
-                    deck = deck.putObject(item.object)
-                    item.object = nil
-                end
-            end
-            deck.setName(applyColorToAnonymousName(anonymousName, prevColor))
-        end
-        assert(deck)
-
-        assert(deck and deck.getQuantity() == #anonymousCards)
-        -- Let the deck formation finish before putting the deck.
-        Wait.frames(function() prevBag.putObject(deck) end, 1)
-    end
-
-    -- Place loose units into bags, put bags.
-    for _, anonymousName in ipairs(SWAP.UNITS) do
-        local items = anonNameToItems[anonymousName]
-        if items then
-            local unitBag = false
-            for _, item in ipairs(items) do
-                if item.tag == 'Bag' then
-                    assert(not unitBag)
-                    unitBag = item.object
-                    item.object = nil
-                end
-            end
-            assert(unitBag)
-            for _, item in ipairs(items) do
-                if item.tag ~= 'Bag' then
-                    unitBag.putObject(item.object)
-                    item.object = nil
-                end
-            end
-            unitBag.setLock(false)
-            prevBag.putObject(unitBag)
-        else
-            -- The only time it is ok not to have items if for wacky flagship names.
-            if not string.find(anonymousName, 'Flagship') then
-                error(TAG .. ': missing ' .. anonymousName)
+                destroyObject(item.live.object)
+                CrLua.LockTable.setEvenIfLocked(item.live, 'object', false)
             end
         end
     end
 end
 
-function unpackNext(nextColor, anonNameToItems, nextBag)
-    assert(type(nextColor) == 'string' and type(anonNameToItems) == 'table' and type(nextBag) == 'userdata')
+function retrieveCards(ruleToItems)
+    assert(type(ruleToItems) == 'table')
+    CrLua.Log.d(TAG, 'retrieveCards')
 
-    -- When taking the second-last item from a deck, use container.remainder
-    -- to get the last item (deck gets replaced by it).  Setting the position
-    -- to be inside a hand is sufficient to deal it there.
-    local function take(container, item, callback)
-        local guid = assert(getContainerEntryGuid(container, item.name.next))
-        local object = assert(container.takeObject({
-            guid = guid,
-            position = item.transform.position,
-            rotation = item.transform.rotation,
-            callback_function = callback,
-        }))
-        object.setScale(item.transform.scale)
-        if item.lock then
-            object.setLock(item.lock)
+    local deckRuleToCardObjects = {}
+
+    -- When taking the second last card from a deck, the deck turns into a card.
+    local containerToRemainder = {}
+
+    -- Get card objects, taking from decks if necessary.
+    for anonymousDeck, anonymousCards in pairs(SWAP.DECKS) do
+        local cardObjects = deckRuleToCardObjects[anonymousDeck]
+        if not cardObjects then
+            cardObjects = {}
+            deckRuleToCardObjects[anonymousDeck] = cardObjects
         end
-        if item.value then
-            object.setValue(item.value)
-        end
-        return object
-    end
+        for i, anonymousCard in ipairs(anonymousCards) do
+            for _, item in ipairs(ruleToItems[anonymousCard] or {}) do
+                if item.live then
+                    assert(item.live.object)
+                    table.insert(cardObjects, item.live.object)
+                    CrLua.LockTable.setEvenIfLocked(item.live, 'object', false)
+                else
+                    assert(item.dead)
+                    local position = CrLua.Table.copy(item.dead.transform.position)
+                    position.y = position.y + 3 + i
 
-    for _, anonymousName in ipairs(SWAP.SINGLETONS) do
-        local items = anonNameToItems[anonymousName]
-        local object = false
-        for i, item in ipairs(items or {}) do
-            if i == 1 then
-                object = take(nextBag, item)
-            else
-                object.clone({
-                    position = item.transform.position
-                })
-                object.setRotation(item.transform.rotation)
-                object.setScale(item.transform.scale)
-            end
-        end
-    end
-
-    for anonymousName, anonymousCards in pairs(SWAP.DECKS) do
-        local items = anonNameToItems[anonymousName]
-        local deck = false
-
-        -- Wait for deck unpack to finish before unpacking cards.
-        local function unpackCards()
-            assert(deck)
-            for _, anonymousCard in ipairs(anonymousCards) do
-                local items = anonNameToItems[anonymousCard]
-                if items then
-                    assert(#items == 1)
-                    local item = items[1]
-                    if deck.tag == 'Deck' then
-                        take(deck, item)
-                        deck = deck.remainder or deck
+                    local object = false
+                    local remainder = containerToRemainder[item.dead.container]
+                    if remainder then
+                        assert(remainder.getName() == item.name.prev)
+                        object = remainder
                     else
-                        assert(deck.tag == 'Card')
-                        local card = deck
-                        card.setLock(false)
-                        assert(card.getName() == item.name.next)
-                        card.setPosition(item.transform.position)
-                        card.setRotation(item.transform.rotation)
-                        card.setScale(item.transform.scale)
+                        object = item.dead.container.takeObject({
+                            guid = item.dead.guid,
+                            position = position
+                        })
+                        containerToRemainder[item.dead.container] = item.dead.container.remainder
                     end
+                    assert(object and object.tag == 'Card')
+                    object.setLock(true)
+                    table.insert(cardObjects, object)
                 end
             end
         end
+    end
 
-        if items then
-            assert(#items == 1)
-            local item = items[1]
-            deck = take(nextBag, item, unpackCards)
-        else
-            -- Deck does not exist, place it above then deal out cards.
-            local name = applyColorToAnonymousName(anonymousName, nextColor)
-            local position = self.getPosition()
-            position.y = position.y + 3
-            deck = nextBag.takeObject({
-                guid = getContainerEntryGuid(nextBag, name),
-                position = position,
-                callback_function = unpackCards
-            })
-            deck.setLock(true)
+    return deckRuleToCardObjects
+end
+
+function packCardsIntoDecks(deckColor, deckRuleToCardObjects)
+    assert(type(deckColor) == 'string' and type(deckRuleToCardObjects) == 'table')
+    CrLua.Log.d(TAG, 'packCardsIntoDecks')
+
+    local deckRuleToDeckObject = {}
+    for anonymousDeck, anonymousCards in pairs(SWAP.DECKS) do
+        local cardObjects = deckRuleToCardObjects[anonymousDeck]
+        assert(#cardObjects == #anonymousCards)
+        local deck = false
+        for i, cardObject in ipairs(cardObjects) do
+            cardObject.setLock(false)
+            if i == 1 then
+                deck = cardObject
+            else
+                deck = deck.putObject(cardObject)
+            end
         end
         assert(deck and deck.tag == 'Deck')
-
+        deck.setLock(true)
+        deck.setName(applyColorToAnonymousName(anonymousDeck, deckColor))
+        deckRuleToDeckObject[anonymousDeck] = deck
     end
+    return deckRuleToDeckObject
+end
 
+function packDecks(deckRuleToDeckObject, bag)
+    assert(type(deckRuleToDeckObject) == 'table' and type(bag) == 'userdata')
+    CrLua.Log.d(TAG, 'packDecks')
+
+    for anonymousDeck, deckObject in pairs(deckRuleToDeckObject) do
+        assert(deckObject.tag == 'Deck')
+        deckObject.setLock(false)
+        bag.putObject(deckObject)
+    end
+end
+
+function packUnitsIntoUnitBags(ruleToItems)
+    assert(type(ruleToItems) == 'table')
+    CrLua.Log.d(TAG, 'packUnitsIntoUnitBags')
+
+    local unitBags = {}
     for _, anonymousName in ipairs(SWAP.UNITS) do
-        local items = anonNameToItems[anonymousName]
-        if items then
-            local unitBag = false
+        local items = ruleToItems[anonymousName]
 
-            -- Wait for unit bag unpack to finish before unpacking units.
-            local function unpackUnits()
-                assert(unitBag)
-                for _, item in ipairs(items) do
-                    if item.tag ~= 'Bag' then
-                        take(unitBag, item)
-                    end
-                end
-            end
-
-            for _, item in ipairs(items) do
-                if item.tag == 'Bag' then
-                    assert(not unitBag)
-                    unitBag = take(nextBag, item, unpackUnits)
-                end
-            end
-            assert(unitBag)
-        else
-            -- The only time it is ok not to have items if for wacky flagship names.
-            if not string.find(anonymousName, 'Flagship') then
-                error(TAG .. ': missing ' .. anonymousName)
+        -- Find bag.
+        local unitBag = false
+        for _, item in ipairs(items or {}) do
+            assert(item.live and item.live.object)
+            if item.live.tag == 'Bag' then
+                assert(not unitBag)
+                unitBag = item.live.object
+                CrLua.LockTable.setEvenIfLocked(item.live, 'object', false)
             end
         end
+        assert(unitBag)
+        table.insert(unitBags, unitBag)
+
+        -- Pack units into unit bag.
+        for _, item in ipairs(items or {}) do
+            if item.live.tag ~= 'Bag' then
+                unitBag.putObject(item.live.object)
+                CrLua.LockTable.setEvenIfLocked(item.live, 'object', false)
+            end
+        end
+    end
+    return unitBags
+end
+
+function startRenameFlagshipToGeneric(unitBags, color, flagshipName)
+    assert(type(unitBags) == 'table' and type(color) == 'string')
+    assert(not flagshipName or type(flagshipName) == 'string')
+    CrLua.Log.d(TAG, 'startRenameFlagshipToGeneric')
+
+    local genericName = applyColorToAnonymousName(ANONYMOUS_FLAGSHIP_NAME, color)
+
+    local function getFlagshipBag()
+        for _, unitBag in ipairs(unitBags) do
+            if unitBag.getName() == flagshipName then
+                return unitBag
+            end
+        end
+    end
+
+    local flagshipBag = getFlagshipBag()
+    local flagships = {}
+    if flagshipName then
+        flagshipBag.setName(genericName)
+        while flagshipBag.getQuantity() > 0 do
+            local position = CrLua.Table.copy(flagshipBag.getPosition())
+            position.y = position.y + 3 + flagshipBag.getQuantity()
+            local flagship = flagshipBag.takeObject({
+                position = position
+            })
+            flagship.setName(genericName)
+            flagship.setLock(true)
+            table.insert(flagships, flagship)
+        end
+    end
+    assert(not flagshipName or #flagships > 0)
+    return flagships, flagshipBag
+end
+
+function finishRenameFlagshipToGeneric(flagships, flagshipBag)
+    assert(type(flagships) == 'table' and not flagshipBag or type(flagshipBag) == 'userdata')
+    CrLua.Log.d(TAG, 'finishRenameFlagshipToGeneric')
+
+    if flagshipBag then
+        assert(flagshipBag.tag == 'Bag')
+        for _, flagship in ipairs(flagships) do
+            flagship.setLock(false)
+            flagshipBag.putObject(flagship)
+        end
+    end
+end
+
+function packUnitBags(unitBags, bag)
+    assert(type(unitBags) == 'table' and type(bag) == 'userdata')
+    CrLua.Log.d(TAG, 'packUnitBags')
+
+    for _, unitBag in ipairs(unitBags) do
+        assert(unitBag.tag == 'Bag')
+        unitBag.setLock(false)
+        bag.putObject(unitBag)
     end
 end
 
 -------------------------------------------------------------------------------
 
---- Gather to-be-replaced objects.
--- Build map from "$COLOR" anonymous name to list of items.  Each item has the
--- object, plus tag, name.{prev,next}, transform, value.
--- (Copy relevant data b/c objects get put/deleted, do not use it afterward!)
-function getSwapObjects(prevColor, nextColor)
-    assert(type(prevColor) == 'string' and type(nextColor) == 'string')
+function doSimpleRename(ruleToItems)
+    assert(type(ruleToItems) == 'table')
+    CrLua.Log.d(TAG, 'doSimpleRename')
 
-    -- Build a map from previous (currently on the table) object names to their
-    -- anonymous ($COLOR) version as well as next name (with next color).
-    local prevNameToAnonAndNextName = {}
-    for _, anonymousName in ipairs(SWAP.SINGLETONS) do
-        prevNameToAnonAndNextName[applyColorToAnonymousName(anonymousName, prevColor)] = {
-            anon = anonymousName,
-            next = applyColorToAnonymousName(anonymousName, nextColor)
-        }
-    end
-    for anonymousName, anonymousCards in pairs(SWAP.DECKS) do
-        -- Do not add the deck itself, instead draw out the relevant cards.
-        -- This lets faction promissory notes remain in the expected location.
-        for _, anonymousCard in ipairs(anonymousCards) do
-            prevNameToAnonAndNextName[applyColorToAnonymousName(anonymousCard, prevColor)] = {
-                anon = anonymousCard,
-                next = applyColorToAnonymousName(anonymousCard, nextColor)
-            }
-        end
-    end
-    for _, anonymousName in ipairs(SWAP.UNITS) do
-        prevNameToAnonAndNextName[applyColorToAnonymousName(anonymousName, prevColor)] = {
-            anon = anonymousName,
-            next = applyColorToAnonymousName(anonymousName, nextColor)
-        }
-    end
     for _, anonymousName in ipairs(SWAP.SIMPLE_RENAME) do
-        prevNameToAnonAndNextName[applyColorToAnonymousName(anonymousName, prevColor)] = {
-            anon = anonymousName,
-            next = applyColorToAnonymousName(anonymousName, nextColor)
-        }
-    end
-
-    local objectToInHand = {}
-    for _, player in ipairs(Player.getPlayers()) do
-        for i = 1, player.getHandCount() do
-            for _, object in ipairs(player.getHandObjects()) do
-                objectToInHand[object] = {
-                    color = player.color == prevColor and nextColor or player.color,
-                    handIndex = i
-                }
-            end
+        local items = ruleToItems[anonymousName]
+        for i, item in ipairs(items or {}) do
+            assert(item.live and item.live.object)
+            item.live.object.setName(item.name.next)
         end
     end
-
-    local anonNameToItems = {}
-    local function maybeAddObject(object)
-        local prevName = object.getName()
-        if string.len(prevName) == 0 then
-            return false
-        end
-        local anonAndNextName = prevNameToAnonAndNextName[prevName]
-        if not anonAndNextName then
-            return false
-        end
-        local anonName = anonAndNextName.anon
-        local items = anonNameToItems[anonName]
-        if not items then
-            items = {}
-            anonNameToItems[anonName] = items
-        end
-        table.insert(items, {
-            object = object,
-            tag = object.tag,
-            name = {
-                prev = prevName,
-                next = anonAndNextName.next,
-            },
-            transform = {
-                position = object.getPosition(),
-                rotation = object.getRotation(),
-                scale = object.getScale()
-            },
-            lock = object.getLock(),
-            value = object.getValue(),
-            inHand = objectToInHand[object] or false,
-        })
-        return true
-    end
-
-    -- Find relevant objects, including in players' hands.
-    local decks = {}
-    for _, object in ipairs(getAllObjects()) do
-        if not maybeAddObject(object, false) and object.tag == 'Deck' then
-            table.insert(decks, object)
-        end
-    end
-
-    -- Look for promissory notes in decks.  Draw notes above the deck,
-    -- let the replacements fall onto the deck.
-    for _, deck in ipairs(decks) do
-        for i, entry in ipairs(deck.getObjects()) do
-            if prevNameToAnonAndNextName[entry.name] then
-                local position = deck.getPosition()
-                position.y = position.y + 2 + deck.getQuantity()
-                local object = deck.takeObject({
-                    guid = entry.guid,
-                    position = position
-                })
-                if maybeAddObject(object) then
-                    object.setLock(true)
-                end
-                if deck.remainder then
-                    local card = deck.remainder
-                    maybeAddObject(card)
-                    break
-                end
-            end
-        end
-    end
-
-    -- Get other items in the players hand.
-    local itemsInHand = {}
-    local player = Player[prevColor]
-    for i = 1, player.getHandCount() do
-        for _, object in ipairs(player.getHandObjects(i)) do
-            if not prevNameToAnonAndNextName[object.getName()] then
-                table.insert(itemsInHand, {
-                    object = object,
-                    handIndex = i
-                })
-            end
-        end
-    end
-
-    return anonNameToItems, itemsInHand
 end
 
 -------------------------------------------------------------------------------
 
-function getContainerEntryGuid(container, name)
-    assert(container.tag == 'Deck' or container.tag == 'Bag' or container.tag == 'Generic')
-    for _, entry in ipairs(container.getObjects()) do
-        if entry.name == name then
-            return entry.guid
+function getTurnState()
+    CrLua.Log.d(TAG, 'getTurnState')
+
+    return {
+        enable = Turns.enable,
+        order = CrLua.Table.copy(Turns.order),
+        current = Turns.turn_color
+    }
+end
+
+function setTurnState(state, prevColor, nextColor)
+    assert(type(state) == 'table' and type(prevColor) == 'string' and type(nextColor) == 'string')
+    CrLua.Log.d(TAG, 'setTurnState')
+
+    for i, color in ipairs(state.order) do
+        if color == prevColor then
+            state.order[i] = nextColor
+        end
+    end
+    if state.current == prevColor then
+        state.current = nextColor
+    end
+
+    Turns.order = state.order
+    Turns.turn_color = state.current
+    Turns.enable = state.enable
+end
+
+-------------------------------------------------------------------------------
+
+function getHandState(prevColor, nextColor)
+    assert(type(prevColor) == 'string' and type(nextColor) == 'string')
+    CrLua.Log.d(TAG, 'getHandState')
+
+    local function getHandTransforms(player)
+        local handTransforms = {}
+        for i = 1, player.getHandCount() do
+            table.insert(handTransforms, CrLua.Table.copy(player.getHandTransform(i)))
+        end
+        return handTransforms
+    end
+    local function getHandObjects(player)
+        local handObjects = {}
+        for i = 1, player.getHandCount() do
+            for _, object in ipairs(player.getHandObjects(i)) do
+                table.insert(handObjects, object)
+            end
+        end
+        return handObjects
+    end
+
+    local prevPlayer = Player[prevColor]
+    local nextPlayer = Player[nextColor]
+
+    return {
+        prev = {
+            handTransforms = getHandTransforms(prevPlayer),
+        },
+        next = {
+            handTransforms = getHandTransforms(nextPlayer)
+        }
+    }, getHandObjects(prevPlayer)
+end
+
+function swapHandState(state, prevColor, nextColor)
+    assert(type(state) == 'table')
+    CrLua.Log.d(TAG, 'swapHandState')
+
+    local function setHandTransforms(player, handTransforms)
+        for i, handTransform in ipairs(handTransforms) do
+            player.setHandTransform(handTransform, i)
+        end
+    end
+
+    local prevPlayer = Player[prevColor]
+    local nextPlayer = Player[nextColor]
+
+    setHandTransforms(prevPlayer, state.next.handTransforms)
+    setHandTransforms(nextPlayer, state.prev.handTransforms)
+end
+
+-------------------------------------------------------------------------------
+
+function _unpackLive(container, item, color)
+    assert(item.live)
+    local name = color and applyColorToAnonymousName(item.name.anon, color) or item.name.next
+    local guid = getContainerEntryGuid(container, name)
+    local object = guid and container.takeObject({
+        guid = guid,
+        position = item.live.transform.position,
+        rotation = item.live.transform.rotation,
+    })
+    if object then
+        object.setScale(item.live.transform.scale)
+        if item.live.lock then
+            object.setLock(item.live.lock)
+        end
+        if item.live.value then
+            object.setValue(item.live.value)
+        end
+    end
+    return object
+end
+
+function unpackSingletons(ruleToItems, bag)
+    assert(type(ruleToItems) == 'table' and type(bag) == 'userdata')
+    CrLua.Log.d(TAG, 'unpackSingletons')
+
+    for _, anonymousName in ipairs(SWAP.SINGLETONS) do
+        local items = ruleToItems[anonymousName]
+        local object = false
+        for i, item in ipairs(items or {}) do
+            assert(item.live)
+            if i == 1 then
+                object = _unpackLive(bag, item)
+            else
+                local clone = object.clone({
+                    position = item.live.transform.position
+                })
+                clone.setRotation(item.live.transform.rotation)
+                clone.setScale(item.live.transform.scale)
+                if item.live.lock then
+                    clone.setLock(item.live.lock)
+                end
+                if item.live.value then
+                    clone.setValue(item.live.value)
+                end
+            end
         end
     end
 end
 
-function applyColorToAnonymousName(anonymousName, color)
-    assert(type(anonymousName) == 'string' and type(color) == 'string')
-    return string.gsub(anonymousName, '$COLOR', color)
+function unpackDecks(nextColor, ruleToItems, bag)
+    assert(type(ruleToItems) == 'table' and type(bag) == 'userdata')
+    CrLua.Log.d(TAG, 'unpackDecks')
+
+    local deckRuleToDeckObject = {}
+
+    local i = 0
+    for anonymousDeck, anonymousCards in pairs(SWAP.DECKS) do
+        local deck = false
+        local deckItems = ruleToItems[anonymousDeck]
+        if deckItems then
+            deck = _unpackLive(bag, deckItems[1])
+        else
+            local position = CrLua.Table.copy(bag.getPosition())
+            position.y = position.y + 3 + i
+            i = i + 1
+            local deckName = applyColorToAnonymousName(anonymousDeck, nextColor)
+            local guid = assert(getContainerEntryGuid(bag, deckName))
+            deck = bag.takeObject({
+                guid = guid,
+                position = position
+            })
+        end
+        assert(deck and deck.tag == 'Deck')
+        deckRuleToDeckObject[anonymousDeck] = deck
+    end
+
+    return deckRuleToDeckObject
+end
+
+function unpackCardsFromDecks(ruleToItems, deckRuleToDeckObject)
+    assert(type(ruleToItems) == 'table' and type(deckRuleToDeckObject) == 'table')
+    CrLua.Log.d(TAG, 'unpackCardsFromDecks')
+
+    for anonymousDeck, anonymousCards in pairs(SWAP.DECKS) do
+        local deck = assert(deckRuleToDeckObject[anonymousDeck])
+        local remainder = false
+        for _, anonymousCard in ipairs(anonymousCards) do
+            local items = ruleToItems[anonymousCard]
+            assert(items)
+            local item = items[1]  -- if more than one, just swap first (copy for scoring?)
+            if item.live then
+                if remainder then
+                    assert(remainder.tag == 'Card')
+                    assert(remainder.getName() == item.name.next)
+                    remainder.setPosition(item.live.transform.position)
+                    remainder.setRotation(item.live.transform.rotation)
+                    remainder.setScale(item.live.transform.scale)
+                    remainder.setLock(item.lock)
+                else
+                    _unpackLive(deck, item)
+                    remainder = deck.remainder
+                end
+            end
+        end
+    end
+end
+
+function unpackUnitBags(nextColor, ruleToItems, bag)
+    assert(type(nextColor) == 'string' and type(ruleToItems) == 'table' and type(bag) == 'userdata')
+    CrLua.Log.d(TAG, 'unpackUnitBags')
+
+    local unitRuleToUnitBag = {}
+
+    for _, anonymousName in ipairs(SWAP.UNITS) do
+        local items = ruleToItems[anonymousName]
+        local unitBagItem = false
+        for _, item in ipairs(items) do
+            if item.live and item.live.tag == 'Bag' then
+                assert(not unitBagItem)
+                unitBagItem = item
+            end
+        end
+        assert(unitBagItem)
+        local unitBag = _unpackLive(bag, unitBagItem, nextColor)
+        unitRuleToUnitBag[anonymousName] = unitBag
+    end
+
+    return unitRuleToUnitBag
+end
+
+function startRenameFlagshipFromGeneric(unitRuleToUnitBag, flagshipName)
+    assert(type(unitRuleToUnitBag) == 'table' and type(flagshipName) == 'string')
+    assert(not flagshipName or type(flagshipName) == 'string')
+    CrLua.Log.d(TAG, 'startRenameFlagshipFromGeneric')
+
+    local flagshipBag = assert(unitRuleToUnitBag[ANONYMOUS_FLAGSHIP_NAME])
+
+    local flagships = {}
+    if flagshipName then
+        flagshipBag.setName(flagshipName)
+        while flagshipBag.getQuantity() > 0 do
+            local position = CrLua.Table.copy(flagshipBag.getPosition())
+            position.y = position.y + 3 + flagshipBag.getQuantity()
+            local flagship = flagshipBag.takeObject({
+                position = position
+            })
+            flagship.setName(flagshipName)
+            flagship.setLock(true)
+            table.insert(flagships, flagship)
+        end
+    end
+    assert(not flagshipName or #flagships > 0)
+    return flagships, flagshipBag
+end
+
+function finishRenameFlagshipFromGeneric(flagships, flagshipBag)
+    assert(type(flagships) == 'table' and not flagshipBag or type(flagshipBag) == 'userdata')
+    CrLua.Log.d(TAG, 'finishRenameFlagshipFromGeneric')
+
+    if flagshipBag then
+        assert(flagshipBag.tag == 'Bag')
+        for _, flagship in ipairs(flagships) do
+            flagship.setLock(false)
+            flagshipBag.putObject(flagship)
+        end
+    end
+end
+
+function unpackUnitsFromUnitBags(ruleToItems, unitRuleToUnitBag)
+    assert(type(ruleToItems) == 'table' and type(unitRuleToUnitBag) == 'table')
+    CrLua.Log.d(TAG, 'unpackUnitsFromUnitBags')
+
+    for _, anonymousName in ipairs(SWAP.UNITS) do
+        local items = ruleToItems[anonymousName]
+        local unitBag = assert(unitRuleToUnitBag[anonymousName])
+        for _, item in ipairs(items) do
+            if item.live and item.live.tag ~= 'Bag' then
+                _unpackLive(unitBag, item)
+            end
+        end
+    end
 end
 
 -------------------------------------------------------------------------------

@@ -66,10 +66,6 @@ local ANONYMOUS_PIECES_BAG_NAME = '$COLOR Player Pieces'
 
 function onLoad(saveState)
     CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
-    CrLua.Log.d(TAG, 'onLoad')
-
-    Player['Pink'].changeColor('White')
-
     Wait.time(resetUi, 0.2)
 end
 
@@ -238,8 +234,8 @@ end
 function onButtonClick(player, wha, id)
     if id == 'swapColors' then
         -- self.UI.getAttribute('prevColor', 'text') does not work?
-        local prevColor = _values['prevColor'] or 'White'
-        local nextColor = _values['nextColor'] or 'Pink'
+        local prevColor = _values['prevColor']
+        local nextColor = _values['nextColor']
         CrLua.Log.d(TAG, 'onButtonClick: prev=' .. tostring(prevColor) .. ' next=' .. tostring(nextColor))
         if prevColor and nextColor then
             swap(prevColor, nextColor)
@@ -250,7 +246,6 @@ end
 function onValueChanged(player, value, id)
     CrLua.Log.d(TAG, 'onValueChanged: id=' .. tostring(id) .. ' value=' .. tostring(value))
     _values[id] = value
-
 end
 
 -------------------------------------------------------------------------------
@@ -265,255 +260,166 @@ function swap(prevColor, nextColor)
     local ruleToItems = getSwapRuleToItems(prevColor, nextColor, flagshipName)
     verifyRuleToItems(ruleToItems)
 
-    -- TTS needs a frame to finish pack/unpack to let objects settle.  Express
-    -- the swap as a series of in-order functions, skipping a frame between each.
+    -- TTS needs a frame to finish pack/unpack to let objects settle.  Do the
+    -- swap in a coroutine, yielding after each take/put and other major state
+    -- change (such as Player.changeColor).
     -- Rather than managing callback_function for barriers, just inspect state.
-    local data = {}
-    local executeQueue = {
-        {
-            execute = function()
-                data.prevBag = getPiecesBag(prevColor, true, {-3, 3, 0})
-            end,
-            isFinished = function()
-                return not data.prevBag.spawning
+    local function swapCoroutineFunction()
+        -- Do coroutine management manually vs startLuaCoroutine version.
+        local swapCoroutine = coroutine.running()
+        local function resumeSwapCoroutine()
+            local success, errorMessage = coroutine.resume(swapCoroutine)
+            if not success then
+                error(TAG .. ': error in swap coroutine: ' .. (errorMessage or 'nil'))
             end
-        },
-
-        {
-            execute = function()
-                packSingletons(ruleToItems, data.prevBag)
-            end,
-        },
-
-        {
-            execute = function()
-                data.deckRuleToCardObjects = retrieveCards(ruleToItems)
-            end,
-            isFinished = function()
-                for _, cardObjects in pairs(data.deckRuleToCardObjects) do
-                    for _, cardObject in ipairs(cardObjects) do
-                        if cardObject.spawning then
-                            return false
-                        end
-                    end
-                end
-                return true
-            end
-        },
-
-        {
-            execute = function()
-                data.deckRuleToDeckObject = packCardsIntoDecks(prevColor, data.deckRuleToCardObjects)
-                data.deckRuleToCardObjects = nil
-            end,
-        },
-
-        {
-            execute = function()
-                packDecks(data.deckRuleToDeckObject, data.prevBag)
-                data.deckRuleToDeckObject = nil
-            end,
-        },
-
-        {
-            execute = function()
-                data.unitBags = packUnitsIntoUnitBags(ruleToItems)
-            end,
-        },
-
-        {
-            execute = function()
-                data.flagships, data.flagshipBag = startRenameFlagshipToGeneric(data.unitBags, prevColor, flagshipName)
-            end,
-            ifFinished = function()
-                for _, flagship in ipairs(data.flagships) do
-                    if flagship.spawning then
-                        return false
-                    end
-                end
-                return true
-            end
-        },
-
-        {
-            execute = function()
-                finishRenameFlagshipToGeneric(data.flagships, data.flagshipBag)
-                data.flagships = nil
-                data.flagshipBag = nil
-            end,
-        },
-
-        {
-            execute = function()
-                packUnitBags(data.unitBags, data.prevBag)
-                data.unitBags = nil
-            end,
-        },
-
-        {
-            execute = function()
-                data.prevBag.setLock(false)
-                self.putObject(data.prevBag)
-                data.prevBag = nil
-            end
-        },
-
-        {
-            execute = function()
-                doSimpleRename(ruleToItems)
-            end
-        },
-
-        {
-            execute = function()
-                data.turnState = getTurnState()
-                local player = Player[prevColor]
-                player.changeColor(nextColor)
-            end
-        },
-
-        {
-            execute = function()
-                setTurnState(data.turnState, prevColor, nextColor)
-                data.turnState = nil
-            end
-        },
-
-        {
-            execute = function()
-                data.handState, data.handObjects = getHandState(prevColor, nextColor)
-                -- Start moving these so they break from the hand.
-                for i, object in ipairs(data.handObjects) do
-                    object.setPositionSmooth({ x = 0, y = 3 + i, z = 0 }, false, true)
-                end
-            end
-        },
-
-        {
-            execute = function()
-                swapHandState(data.handState, prevColor, nextColor)
-                data.handState = nil
-            end
-        },
-
-        {
-            execute = function()
-                -- Return hand objects to new hand.
-                for i, object in ipairs(data.handObjects) do
-                    object.deal(1, nextColor)
-                end
-            end
-        },
-
-        {
-            execute = function()
-                data.nextBag = getPiecesBag(nextColor, true, {3, 3, 0})
-            end,
-            isFinished = function()
-                return not data.nextBag.spawning
-            end
-        },
-
-        {
-            execute = function()
-                unpackSingletons(ruleToItems, data.nextBag)
-            end
-        },
-
-        {
-            execute = function()
-                data.deckRuleToDeckObject = unpackDecks(nextColor, ruleToItems, data.nextBag)
-            end,
-            isFinished = function()
-                for _, deckObject in ipairs(data.deckRuleToDeckObject or {}) do
-                    if deckObject.spawning then
-                        return false
-                    end
-                end
-                return true
-            end
-        },
-
-        {
-            execute = function()
-                unpackCardsFromDecks(ruleToItems, data.deckRuleToDeckObject)
-                data.deckRuleToDeckObject = nil
-            end
-        },
-
-        {
-            execute = function()
-                data.unitRuleToUnitBag = unpackUnitBags(nextColor, ruleToItems, data.nextBag)
-            end,
-            isFinished = function()
-                for _, unitBag in ipairs(data.unitRuleToUnitBag or {}) do
-                    if unitBag.spawning then
-                        return false
-                    end
-                end
-                return true
-            end
-        },
-
-        {
-            execute = function()
-                data.flagships, data.flagshipBag = startRenameFlagshipFromGeneric(data.unitRuleToUnitBag, flagshipName)
-            end,
-            ifFinished = function()
-                for _, flagship in ipairs(data.flagships) do
-                    if flagship.spawning then
-                        return false
-                    end
-                end
-                return true
-            end
-        },
-
-        {
-            execute = function()
-                finishRenameFlagshipFromGeneric(data.flagships, data.flagshipBag)
-                data.flagships = nil
-                data.flagshipBag = nil
-            end
-        },
-
-        {
-            execute = function()
-                unpackUnitsFromUnitBags(ruleToItems, data.unitRuleToUnitBag)
-                data.unitRuleToUnitBag = nil
-            end
-        },
-
-        {
-            execute = function()
-                self.putObject(data.nextBag)
-                data.nextBag = nil
-                print(TAG .. ': finished')
-            end
-        }
-
-        -- TODO XXX RENAME FLAGSHIP
-
-    }
-
-    local function executeNext()
-        if #executeQueue > 0 then
-            local entry = executeQueue[1]
-
-            -- Execute, wait for isFinished before moving on.
-            assert(entry.execute ~= nil)
-            if entry.execute then
-                entry.execute()
-                entry.execute = false
-            elseif (not entry.isFinished) or entry.isFinished() then
-                table.remove(executeQueue, 1)
-            end
-
-            Wait.frames(executeNext, 2)
         end
-    end
-    executeNext()
+        local function waitAndAutoResume()
+            Wait.frames(resumeSwapCoroutine, 2)
+            coroutine.yield(1)
+        end
 
+        local prevBag = getPiecesBag(prevColor, true, {-3, 3, 0})
+        waitAndAutoResume()
+        while prevBag.spawning do waitAndAutoResume() end
+
+        packSingletons(ruleToItems, prevBag)
+        waitAndAutoResume()
+
+        local deckRuleToCardObjects = retrieveCards(ruleToItems)
+        waitAndAutoResume()
+        local function isBusy()
+            for _, cardObjects in pairs(deckRuleToCardObjects) do
+                for _, cardObject in ipairs(cardObjects) do
+                    if cardObject.spawning then
+                        return true
+                    end
+                end
+            end
+        end
+        while isBusy() do waitAndAutoResume() end
+
+        local deckRuleToDeckObject = packCardsIntoDecks(prevColor, deckRuleToCardObjects)
+        deckRuleToCardObjects = nil
+        waitAndAutoResume()
+
+        packDecks(deckRuleToDeckObject, prevBag)
+        deckRuleToDeckObject = nil
+        waitAndAutoResume()
+
+        local unitBags = packUnitsIntoUnitBags(ruleToItems)
+        waitAndAutoResume()
+
+        local flagships, flagshipBag = startRenameFlagshipToGeneric(unitBags, prevColor, flagshipName)
+        waitAndAutoResume()
+        local function isBusy()
+            for _, flagship in ipairs(flagships) do
+                if flagship.spawning then
+                    return true
+                end
+            end
+        end
+        while isBusy() do waitAndAutoResume() end
+
+        finishRenameFlagshipToGeneric(flagships, flagshipBag)
+        flagships = nil
+        flagshipBag = nil
+        waitAndAutoResume()
+
+        packUnitBags(unitBags, prevBag)
+        unitBags = nil
+        waitAndAutoResume()
+
+        prevBag.setLock(false)
+        self.putObject(prevBag)
+        prevBag = nil
+        waitAndAutoResume()
+
+        doSimpleRename(ruleToItems)
+        waitAndAutoResume()
+
+        local turnState = getTurnState()
+        Player[prevColor].changeColor(nextColor)
+        waitAndAutoResume()
+
+        setTurnState(turnState, prevColor, nextColor)
+        turnState = nil
+        waitAndAutoResume()
+
+        local handState, handObjects = getHandState(prevColor, nextColor)
+        for i, object in ipairs(handObjects) do
+            -- Start moving so they break from the hand.
+            object.setPositionSmooth({ x = 0, y = 3 + i, z = 0 }, false, true)
+        end
+        waitAndAutoResume()
+
+        swapHandState(handState, prevColor, nextColor)
+        handState = nil
+        waitAndAutoResume()
+
+        -- Move prev hand objects to next hand.
+        for i, object in ipairs(handObjects) do
+            object.deal(1, nextColor)
+        end
+
+        local nextBag = getPiecesBag(nextColor, true, {3, 3, 0})
+        waitAndAutoResume()
+        while nextBag.spawning do waitAndAutoResume() end
+
+        unpackSingletons(ruleToItems, nextBag)
+        waitAndAutoResume()
+
+        local deckRuleToDeckObject = unpackDecks(nextColor, ruleToItems, nextBag)
+        waitAndAutoResume()
+        local function isBusy()
+            for _, deckObject in ipairs(deckRuleToDeckObject or {}) do
+                if deckObject.spawning then
+                    return true
+                end
+            end
+        end
+        while isBusy() do waitAndAutoResume() end
+
+        unpackCardsFromDecks(ruleToItems, deckRuleToDeckObject)
+        deckRuleToDeckObject = nil
+        waitAndAutoResume()
+
+        local unitRuleToUnitBag = unpackUnitBags(nextColor, ruleToItems, nextBag)
+        waitAndAutoResume()
+        local function isBusy()
+            for _, unitBag in ipairs(unitRuleToUnitBag or {}) do
+                if unitBag.spawning then
+                    return true
+                end
+            end
+        end
+        while isBusy() do waitAndAutoResume() end
+
+        local flagships, flagshipBag = startRenameFlagshipFromGeneric(unitRuleToUnitBag, flagshipName)
+        waitAndAutoResume()
+        local function isBusy()
+            for _, flagship in ipairs(flagships) do
+                if flagship.spawning then
+                    return true
+                end
+            end
+        end
+        while isBusy() do waitAndAutoResume() end
+
+        finishRenameFlagshipFromGeneric(flagships, flagshipBag)
+        flagships = nil
+        flagshipBag = nil
+        waitAndAutoResume()
+
+        unpackUnitsFromUnitBags(ruleToItems, unitRuleToUnitBag)
+        unitRuleToUnitBag = nil
+        waitAndAutoResume()
+
+        self.putObject(nextBag)
+        print(TAG .. ': finished')
+
+        return 1
+    end
+    coroutine.resume(coroutine.create(swapCoroutineFunction))
 end
 
 -------------------------------------------------------------------------------

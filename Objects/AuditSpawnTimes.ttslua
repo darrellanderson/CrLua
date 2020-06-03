@@ -1,0 +1,167 @@
+--- Pack and unpack everything, keep track of unpack time.
+-- @author Darrell
+
+local TAG = 'AuditSpawnTimes'
+
+local config = {
+    repeatCount = 10,
+
+    exclude = {
+        'Board',
+        'The Kraken Table',
+        'Board Cabinet (Drawn)',
+        'Table Extension',
+    }
+}
+
+local _active = false
+
+function _secsToMsecs(seconds)
+    return math.floor(seconds * 100000) / 100
+end
+
+function onLoad(save_state)
+    self.createButton({
+        click_function = 'doAudit',
+        function_owner = self,
+        label          = 'AUDIT',
+        position       = {0,2,1.25},
+        rotation       = {-50,0,0},
+        width          = 1100,
+        height         = 500,
+        font_size      = 300,
+        color          = 'Red',
+        font_color     = 'White',
+        tooltip        = 'Pack and unpack objects, measure unpack time'
+    })
+end
+
+function onObjectEnterContainer(container, enter_object)
+    return container ~= self or not _active
+end
+
+function doAudit()
+    CrLua.Log.d(TAG, 'doAudit')
+    _active = true
+    self.setLock(true)
+
+    local excludeSet = {}
+    for _, name in ipairs(config.exclude) do
+        excludeSet[name] = true
+    end
+    local auditObjects = {}
+    for _, object in ipairs(getAllObjects()) do
+        if object ~= self and not excludeSet[object.getName()] then
+            table.insert(auditObjects, object)
+        end
+    end
+
+    local function auditCoroutine()
+        CrLua.Log.d(TAG, 'starting audit coroutine: ' .. #auditObjects .. ' potential candidates')
+        local thisCoroutine = coroutine.running()
+
+        local function resumeAuditCoroutine()
+            assert(coroutine.running() ~= thisCoroutine)
+            local success, errorMessage = coroutine.resume(thisCoroutine)
+            if not success then
+                error(TAG .. ': error in audit coroutine: ' .. (errorMessage or 'nil'))
+            end
+        end
+        local function pauseOneFrame()
+            Wait.frames(resumeAuditCoroutine, 1)
+            coroutine.yield(1)
+        end
+
+        -- Wait one frame for bag creation.
+        pauseOneFrame()
+
+        -- Collect audit object (place in self), place non-audit in done.
+        -- Pause one frame between puts to let TTS breathe.
+        local sawNameSet = {}
+        while #auditObjects > 0 do
+            local object = table.remove(auditObjects)
+            local name = object.getName()
+            if string.len(name) == 0 or sawNameSet[name] then
+                CrLua.Log.d(TAG, 'skipping "' .. name .. '"')
+                destroyObject(object)
+            else
+                sawNameSet[name] = true
+                CrLua.Log.d(TAG, 'queueing "' .. name .. '"')
+                self.putObject(object)
+            end
+            pauseOneFrame()
+        end
+
+        CrLua.Log.d(TAG, 'auditing ' .. self.getQuantity() .. ' candidates')
+
+        local results = {}
+        while self.getQuantity() > 0 do
+
+            local position = self.getPosition()
+            position = { x = position.x + 3, y = position.y + 3, z = position.z - 3 }
+            local object = self.takeObject({
+                position = position,
+                callback_function = resumeAuditCoroutine
+            })
+            while object.spawning do
+                coroutine.yield(1)
+            end
+
+            local objectJson = object.getJSON()
+
+            local result = {
+                name = object.getName(),
+                guid = object.getGUID(),
+                jsonSize = string.len(objectJson),
+                spawnTimes = {},
+                avgSpawnTime = 0
+            }
+
+            destroyObject(object)
+            object = nil
+
+            for _ = 1, config.repeatCount do
+                pauseOneFrame()
+
+                local startTime = Time.time
+                local object = spawnObjectJSON({
+                    json              = objectJson,
+                    position          = position,
+                    callback_function = resumeAuditCoroutine,
+                    sound             = false,
+                    snap_to_grid      = false,
+                })
+                while object.spawning do
+                    coroutine.yield(1)
+                end
+
+                local spawnTime = Time.time - startTime
+                table.insert(result.spawnTimes, spawnTime)
+                result.avgSpawnTime = result.avgSpawnTime + (spawnTime / config.repeatCount)
+
+                destroyObject(object)
+            end
+
+            CrLua.Log.d(TAG, 'audit "' .. result.name .. '" -> ' .. _secsToMsecs(result.avgSpawnTime))
+            table.insert(results, result)
+        end
+
+        CrLua.Log.i(TAG, 'done!')
+        table.sort(results, function(a, b) return a.avgSpawnTime < b.avgSpawnTime end)
+        for i, result in ipairs(results) do
+            print(table.concat({
+                '[' .. string.format('%3d', i) .. ']',
+                ' ',
+                _secsToMsecs(result.avgSpawnTime),
+                ' ',
+                result.name,
+            }, ''))
+        end
+
+    end
+    coroutine.resume(coroutine.create(auditCoroutine))
+end
+
+#include <~/CrLua/Log>
+
+CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)

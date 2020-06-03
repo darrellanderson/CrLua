@@ -136,7 +136,7 @@ function buildXmlTable()
         }
     }
     for _, color in ipairs(nextColors) do
-        if color != 'Grey' then
+        if color ~= 'Grey' and color ~= 'Black' then
             table.insert(nextOptions, {
                 tag = 'Option',
                 value = color,
@@ -612,7 +612,7 @@ function getSwapRuleToItems(prevColor, nextColor, flagshipName)
         end
         CrLua.LockTable.readOnlyRequireKey(name, t)
     end
-    lockRecursive('ruleToItems', ruleToItems)
+    --lockRecursive('ruleToItems', ruleToItems)
 
     return ruleToItems
 end
@@ -1088,7 +1088,7 @@ function unpackUnitBags(nextColor, ruleToItems, bag)
 end
 
 function startRenameFlagshipFromGeneric(unitRuleToUnitBag, flagshipName)
-    assert(type(unitRuleToUnitBag) == 'table' and type(flagshipName) == 'string')
+    assert(type(unitRuleToUnitBag) == 'table' and not flagshipName or type(flagshipName) == 'string')
     assert(not flagshipName or type(flagshipName) == 'string')
     CrLua.Log.d(TAG, 'startRenameFlagshipFromGeneric')
 

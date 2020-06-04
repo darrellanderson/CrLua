@@ -47,15 +47,306 @@ function onLoad(saveState)
         _config = CrLua.Table.copy(DEFAULT_CONFIG)
     end
 
+    Wait.frames(_createUI, 2)
+    Wait.frames(updateUiFromConfig, 4)
+
+    -- Require manaul update to show again.  If something when HORRIBLY WRONG,
+    -- do not jump into doing it again unless asked!  Also, keep onLoad fast!
+    --if _config.enabled then
+    --    drawPolygons()
+    --end
+end
+
+function onSave()
+    local result = JSON.encode(_config)
+    --CrLua.Log.d(TAG, 'onSave: |data|=' .. string.len(result))
+    return result
+end
+
+-------------------------------------------------------------------------------
+
+function _createUI()
+    local defaults = {
+        tag = 'Defaults',
+        children = {
+            {
+                tag = 'Toggle',
+                attributes = {
+                    fontSize = 12,
+                    onValueChanged = 'onToggleValueChanged',
+                }
+            },
+            {
+                tag = 'Slider',
+                attributes = {
+                    minValue = 0,
+                    maxValue = 1,
+                    wholeNumbers = false,
+                    colors = '#555555|Red|Red|Grey',
+                    onValueChanged = 'onSliderValueChanged'
+                }
+            },
+            {
+                tag = 'Button',
+                attributes = {
+                    onClick = 'onButtonClick'
+                }
+            },
+            {
+                tag = 'Text',
+                attributes = {
+                    class = 'label',
+                    fontSize = 9,
+                    alignment = 'MiddleRight'
+                }
+            },
+            {
+                tag = 'Text',
+                attributes = {
+                    class = 'sliderValue',
+                    fontSize = 9,
+                    alignment = 'MiddleLeft'
+                }
+            },
+            {
+                tag = 'Text',
+                attributes = {
+                    class = 'heading',
+                    fontSize = 12,
+                    alignment = 'MiddleLeft'
+                }
+            },
+        }
+    }
+    local top = {
+        tag = 'VerticalLayout',
+        attributes = {
+            position = '0 0 0.05',
+            rotation = '0 180 90',
+            width = 200,
+            height = 280,
+            padding = '10 10 10 10',
+            spacing = 10,
+        },
+        children = {
+            {
+                tag = 'Text',
+                attributes = {
+                    fontSize = 24,
+                    fontStyle = 'Bold'
+                },
+                value = 'Draw TI4 Faction Borders'
+            },
+            {
+                tag = 'Button',
+                attributes = {
+                    id = 'update',
+                    minHeight = 70,
+                    fontSize = 36,
+                },
+                value = 'Update'
+            },
+            {
+                tag = 'Button',
+                attributes = {
+                    id = 'hide',
+                    minHeight = 70,
+                    fontSize = 36,
+                },
+                value = 'Hide'
+            },
+            {
+                tag = 'Text',
+                attributes = {
+                    fontSize = 12
+                },
+                value = '(Flip for settings)'
+            }
+        }
+    }
+
+    local function tableRowToggle(id, label)
+        return {
+            tag = 'Row',
+            attributes = {
+                preferredHeight = 20
+            },
+            children = {
+                {
+                    tag = 'Cell',
+                    attributes = {
+                        columnSpan = 5
+                    },
+                    children = {
+                        {
+                            tag = 'Toggle',
+                            attributes = {
+                                id = id
+                            },
+                            value = label
+                        }
+                    }
+                }
+            }
+        }
+    end
+    local function tableRowSlider(idPrefix, label)
+        return {
+            tag = 'Row',
+            attributes = {
+                preferredHeight = 15
+            },
+            children = {
+                {
+                    tag = 'Cell',
+                    children = {
+                        {
+                            tag = 'Text',
+                            attributes = {
+                                class = 'label'
+                            },
+                            value = label
+                        },
+                    }
+                },
+                {
+                    tag = 'Cell'
+                },
+                {
+                    tag = 'Cell',
+                    children = {
+                        {
+                            tag = 'Slider',
+                            attributes = {
+                                id = idPrefix .. 'Slider'
+                            }
+                        },
+                    }
+                },
+                {
+                    tag = 'Cell'
+                },
+                {
+                    tag = 'Cell',
+                    children = {
+                        {
+                            tag = 'Text',
+                            attributes = {
+                                id = idPrefix .. 'Value',
+                                class = 'sliderValue'
+                            },
+                            value = 0
+                        }
+                    }
+                },
+            }
+        }
+    end
+
+    local function colorToggles()
+        local result = {}
+        for _, color in ipairs(Player.getColors()) do
+            table.insert(result, {
+                tag = 'Toggle',
+                attributes = {
+                    id = color,
+                    textColor = color == 'White' and 'Black' or color
+                },
+                value = color
+            })
+        end
+        return result
+    end
+
+    local bottom = {
+        tag = 'Panel',
+        attributes = {
+            position = '0 0 -20.05',
+            rotation = '0 0 90',
+            width = 200,
+            height = 280
+        },
+        children = {
+            {
+                tag = 'VerticalLayout',
+                attributes = {
+                    padding = '10 10 0 10',
+                    spacing = 5,
+                    childForceExpandHeight = false
+                },
+                children = {
+                    -- Override cell padding does not work?  Use empty colums (yuck).
+                    {
+                        tag = 'TableLayout',
+                        attributes = {
+                            padding = '0 0 10 10',
+                            columnWidths = '50 10 0 10 20',
+                            autoCalculateHeight = true,
+                            cellBackgroundColor = 'Clear'
+                        },
+                        children = {
+                            tableRowToggle('planet', 'Individual Planets'),
+                            tableRowSlider('planetThickness', 'Thickness'),
+                            tableRowSlider('planetPadding', 'Padding'),
+                            tableRowToggle('ground', 'System Zones'),
+                            tableRowSlider('groundThickness', 'Thickness'),
+                            tableRowSlider('groundPadding', 'Padding'),
+                            tableRowToggle('space', 'Space'),
+                            tableRowSlider('spaceThickness', 'Thickness'),
+                            tableRowSlider('spacePadding', 'Padding'),
+                        }
+                    },
+                    {
+                        tag = 'Text',
+                        attributes = {
+                            class = 'heading'
+                        },
+                        value = 'Visible to:',
+                    },
+                    {
+                        tag = 'GridLayout',
+                        attributes = {
+                            cellSize = '60 20'
+                        },
+                        children = colorToggles()
+                    }
+                }
+            },
+            {
+                tag = 'Button',
+                attributes = {
+                    id = 'reset',
+                    width = 60,
+                    height = 20,
+                    offsetXY = '-5 -5',
+                    rectAlignment = 'UpperRight'
+                },
+                value = 'RESET'
+            }
+        }
+    }
+
+    self.UI.setXmlTable({ defaults, top, bottom })
+end
+
+-------------------------------------------------------------------------------
+
+function _getOrCreateControlledViewObject()
     -- Use a second object with restricted visibility to affect who can see the lines.
     -- Do not restrict visibility on self, control panel is visible to all.
-    local cvoName = self.getName() .. ' controlled view object'
-    for _, object in ipairs(getAllObjects()) do
-        if object.getName() == cvoName then
-            _controlledViewObject = object
-            break
+
+    -- If not known, see if there is one already out there.
+    if not _controlledViewObject then
+        local cvoName = self.getName() .. ' controlled view object'
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == cvoName then
+                _controlledViewObject = object
+                break
+            end
         end
     end
+
+    -- If not out there, create one.
     if not _controlledViewObject then
         _controlledViewObject = spawnObject({
             type              = 'BlockSquare',
@@ -69,26 +360,7 @@ function onLoad(saveState)
         _controlledViewObject.interactable = false
     end
 
-    Wait.frames(updateUiFromConfig, 10)
-
-    -- Require manaul update to show again.  If something when HORRIBLY WRONG,
-    -- do not jump into doing it again unless asked!
-    --if _config.enabled then
-    --    drawPolygons()
-    --end
-end
-
-function onSave()
-    local result = JSON.encode(_config)
-    --CrLua.Log.d(TAG, 'onSave: |data|=' .. string.len(result))
-    return result
-end
-
-function onDestroy()
-    if _controlledViewObject then
-        destroyObject(_controlledViewObject)
-        _controlledViewObject = false
-    end
+    return _controlledViewObject
 end
 
 -------------------------------------------------------------------------------
@@ -226,7 +498,7 @@ function updateCache()
             ground = false,
             space = false,
         },
-        y = false
+        y = false,
     }
 
     CrLua.TI4.Zone.update()
@@ -279,7 +551,7 @@ function updateCache()
 end
 
 function removePolygons()
-    _controlledViewObject.setVectorLines()
+    _getOrCreateControlledViewObject().setVectorLines()
     _cache = false
 end
 
@@ -290,6 +562,7 @@ function drawPolygons()
     assert(_cache and _cache.originalPolygons)
     local y = assert(_cache.y)
 
+    local controlledViewObject = _getOrCreateControlledViewObject()
     local lines = {}
     local function addLine(polygon, inset, thickness, color)
         -- Make a copy because this may mutate the polygon!
@@ -311,7 +584,7 @@ function drawPolygons()
             table.insert(points, { x = p.x + 0.01, y = p.y + 2, z = p.z + 0.01})
         end
         for i, point in ipairs(points) do
-            points[i] = _controlledViewObject.positionToLocal(point)
+            points[i] = controlledViewObject.positionToLocal(point)
         end
         table.insert(lines, {
             points = points,
@@ -345,8 +618,8 @@ function drawPolygons()
     end
 
     local invisibleToList = CrLua.List.fromKeys(_config.invisibleToSet)
-    _controlledViewObject.setInvisibleTo(invisibleToList)
-    _controlledViewObject.setVectorLines(lines)
+    controlledViewObject.setInvisibleTo(invisibleToList)
+    controlledViewObject.setVectorLines(lines)
 end
 
 -------------------------------------------------------------------------------
@@ -384,7 +657,11 @@ function getAllUnitsAndOwnerTokens()
     local hexToSystem = {}
     for _, system in ipairs(CrLua.TI4.System.getAllSystems()) do
         local hex = CrLua.TI4.Hex.fromPosition(system.object.getPosition())
-        hexToSystem[hex] = assert(not hexToSystem[hex]) and system
+        if hexToSystem[hex] then
+            warnSystem(system, 'Multiple system tiles in same hex?')
+        else
+            hexToSystem[hex] = system
+        end
     end
 
     -- Add hex, system, and ground, planet.

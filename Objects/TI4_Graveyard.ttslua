@@ -2,6 +2,9 @@
 -- @author original by Mantis
 -- @author card handling by GarnetBear
 -- @author May 2020 update by Darrell
+-- @author v3 May 2020 update by Darrell
+--
+-- v3.1: safer transition when two cards forming a deck, and vice versa.
 
 -- Token bags use inconsistent name to bag, hard code for simplicity.
 local TOKEN_BAGS = {
@@ -11,6 +14,12 @@ local TOKEN_BAGS = {
     ['x3 Infantry'] = 'x3 Infantry Token Bag',
     ['Commodities/Tradegoods x1'] = 'Commodities/Tradegoods x1 Bag',
     ['Commodities/Tradegoods x3'] = 'Commodities/Tradegoods x3 Bag'
+}
+
+-- Bag with faction tokens.
+local PICK_FACTION_BAG = {
+    'Pick a Race to Play',
+    'Pick a Faction to Play',
 }
 
 -- Decks with discard location and card names.
@@ -282,9 +291,11 @@ local function getNonCardDestination(objectName)
         bag = bagGuid and getObjectFromGUID(bagGuid)
         if not bag then
             for _, candidate in ipairs(getAllObjects()) do
-                if candidate.getName() == 'Pick a Race to Play' then
-                    bag = candidate
-                    break
+                for _, pickFactionBag in ipairs(PICK_FACTION_BAG) do
+                    if candidate.getName() == pickFactionBag then
+                        bag = candidate
+                        break
+                    end
                 end
             end
         end
@@ -297,8 +308,8 @@ end
 -------------------------------------------------------------------------------
 
 --- Put cards into the deck discard pile.
-local function putCard(cardObject, deckAttributes)
-    assert(cardObject.tag == 'Card' and deckAttributes.cards)
+function putCard(cardObject, deckAttributes)
+    assert(type(cardObject) == 'userdata' and cardObject.tag == 'Card' and type(deckAttributes) == 'table')
 
     -- Find the discard pile.
     local discardTransform = deckAttributes.discardTransforms[data.tableSize]
@@ -320,13 +331,13 @@ local function putCard(cardObject, deckAttributes)
         end
     end
 
-    -- Move card to be above the discard pile.  If there is a discard pile,
-    -- this ensures it goes on top.  If no pile, it drops to start a new one.
+    -- Place into discard pile, or drop to start a new one.
+    -- (Move to above discard pile even if will putObject so puts on top.)
     local cardPosition = firstPoint or castPosition
     cardPosition.y = cardPosition.y + 0.1
     cardObject.setPosition(cardPosition)
     cardObject.setRotation(discardTransform.rotation)
-    if deck then
+    if deck and deck.tag == 'Deck' and not deck.spawning then
         deck.putObject(cardObject)
         if deckAttributes.shuffleOnDiscard then
             deck.shuffle()
@@ -336,7 +347,8 @@ end
 
 --- Given a deck, return guid list for cards that should be put elsewhere.
 -- Does not mutate the deck, ok to use the onObjectEnterContainer object.
-local function shouldPutCardsFromDeck(deckObject)
+function shouldPutCardsFromDeck(deckObject)
+    assert(type(deckObject) == 'userdata' and deckObject.tag == 'Deck')
     local cardGuids = false
     for i, card in ipairs(deckObject.getObjects()) do
         local deckAttributes = getCardDestination(card.name)
@@ -350,13 +362,25 @@ end
 
 --- Put cards from a deck into their respective discard piles.
 -- Mutates the deck, must remove from graveyard bag first!
-local function putCardsFromDeck(deckObject, cardGuids)
-    for _, cardGuid in ipairs(cardGuids) do
-        if deckObject.getQuantity() > 0 then
-            local cardObject = deckObject.takeObject({ guid = cardGuid })
-            local deckAttributes = getCardDestination(cardObject.getName())
-            putCard(cardObject, deckAttributes)
+function putCardsFromDeck(deckObject, cardGuids)
+    assert(type(deckObject) == 'userdata' and deckObject.tag == 'Deck' and type(cardGuids) == 'table')
+    local position = deckObject.getPosition()
+    for i, cardGuid in ipairs(cardGuids) do
+        if deckObject.tag == 'Deck' then
+            local cardObject = deckObject.takeObject({
+                guid = cardGuid,
+                position = { x = position.x, y = position.y + 1 + i, z = position.z },
+            })
+            putCard(cardObject)
+            deckObject = deckObject.remainder or deckObject
+        elseif deckObject.tag == 'Card' and deckObject.getGUID() == cardGuid then
+            putCard(deckObject)
+            deckObject = nil
         end
+    end
+    -- Any any remaining card(s) they have nowhere to go.  Put in self.
+    if deckObject then
+        self.putObject(deckObject)
     end
 end
 
@@ -377,40 +401,35 @@ function onLoad(saveState)
 end
 
 function onObjectEnterContainer(container, enterObject)
-    if container ~= self then
-        return
-    end
+    if container == self then
 
-    -- Objects need to be removed from this graveyard bag before they can move
-    -- to their final location.  Take them from here to a position above the
-    -- graveyard bag (to prevent them from falling into a different bag).
-    local bounds = self.getBounds()
-    local takeParameters = {
-        position = {
-            x = bounds.center.x,
-            y = bounds.center.y + (bounds.size.y / 2) + 2,
-            z = bounds.center.z
-        }
-    }
-
-    if enterObject.tag == 'Card' then
-        local deckAttributes = getCardDestination(enterObject.getName())
-        if deckAttributes then
-            putCard(self.takeObject(takeParameters), deckAttributes)
+        local function getEnterObject()
+            local bounds = self.getBounds()
+            return self.takeObject({
+                guid = enterObject.getGUID(),
+                position = {
+                    x = bounds.center.x,
+                    y = bounds.center.y + (bounds.size.y / 2) + 2,
+                    z = bounds.center.z,
+                }
+            })
         end
-    elseif enterObject.tag == 'Deck' then
-        local shouldPut = shouldPutCardsFromDeck(enterObject)
-        if shouldPut then
-            local deckObject = self.takeObject(takeParameters)
-            putCardsFromDeck(deckObject, shouldPut)
-            if deckObject.getQuantity() > 0 then
-                self.putObject(deckObject)
+
+        if enterObject.tag == 'Card' then
+            local deckAttributes = getCardDestination(enterObject.getName())
+            if deckAttributes then
+                putCard(getEnterObject(), deckAttributes)
             end
-        end
-    else
-        local bag = getNonCardDestination(enterObject.getName())
-        if bag then
-            bag.putObject(self.takeObject(takeParameters))
+        elseif enterObject.tag == 'Deck' then
+            local shouldPut = shouldPutCardsFromDeck(enterObject)
+            if shouldPut then
+                putCardsFromDeck(getEnterObject(), shouldPut)
+            end
+        else
+            local bag = getNonCardDestination(enterObject.getName())
+            if bag then
+                bag.putObject(getEnterObject())
+            end
         end
     end
 end

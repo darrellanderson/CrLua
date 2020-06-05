@@ -308,7 +308,7 @@ end
 -------------------------------------------------------------------------------
 
 --- Put cards into the deck discard pile.
-function putCard(cardObject, deckAttributes)
+function putCard(cardObject, deckAttributes, index)
     assert(type(cardObject) == 'userdata' and cardObject.tag == 'Card' and type(deckAttributes) == 'table')
 
     -- Find the discard pile.
@@ -334,7 +334,7 @@ function putCard(cardObject, deckAttributes)
     -- Place into discard pile, or drop to start a new one.
     -- (Move to above discard pile even if will putObject so puts on top.)
     local cardPosition = firstPoint or castPosition
-    cardPosition.y = cardPosition.y + 0.1
+    cardPosition.y = cardPosition.y + 0.1 * (index or 1)
     cardObject.setPosition(cardPosition)
     cardObject.setRotation(discardTransform.rotation)
     if deck and deck.tag == 'Deck' and not deck.spawning then
@@ -371,10 +371,13 @@ function putCardsFromDeck(deckObject, cardGuids)
                 guid = cardGuid,
                 position = { x = position.x, y = position.y + 1 + i, z = position.z },
             })
-            putCard(cardObject)
+            local deckAttributes = getCardDestination(cardObject.getName())
+            putCard(cardObject, deckAttributes, i)
             deckObject = deckObject.remainder or deckObject
         elseif deckObject.tag == 'Card' and deckObject.getGUID() == cardGuid then
-            putCard(deckObject)
+            local cardObject = deckObject
+            local deckAttributes = getCardDestination(cardObject.getName())
+            putCard(cardObject, deckAttributes, i)
             deckObject = nil
         end
     end

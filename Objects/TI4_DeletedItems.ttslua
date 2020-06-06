@@ -17,7 +17,9 @@ local STATE = {
     IN_OTHER = 2,
     REMOVING_FROM_SELF = 3,
 }
-local objectState = {} -- map from guid to object state
+local guidToState = {}
+local nameToState = {}
+
 local searchingContainers = {} -- map from container guid to search-in-progress containers
 local lastErrorTimestamp = false
 
@@ -29,37 +31,38 @@ function onLoad()
         self.setLock(true)
     end
     for _, entry in ipairs(self.getObjects()) do
-        objectState[entry.guid] = STATE.IN_SELF
+        guidToState[entry.guid] = STATE.IN_SELF
+        nameToState[entry.name] = STATE.IN_SELF
     end
     createButton()
 end
 
 function onObjectEnterContainer(bag, unit)
     if bag == self then
-        if objectState[unit.guid] ~= STATE.IN_SELF then
+        if getState(unit) ~= STATE.IN_SELF then
             print("WARNING: Object " .. unit.getName() .. " directly added to deleted objects bag.")
         end
-        objectState[unit.guid] = STATE.IN_SELF
+        setState(unit, STATE.IN_SELF)
         self.setLock(true)
     else
-        if objectState[unit.guid] == STATE.IN_SELF then
-            removeOneFromSelf(unit.guid)
+        if getState(unit) == STATE.IN_SELF then
+            removeOneFromSelf(unit)
         end
-        objectState[unit.guid] = STATE.IN_OTHER
+        setState(unit, STATE.IN_OTHER)
     end
 end
 
 function onObjectLeaveContainer(bag, unit)
     if bag == self then
-        if objectState[unit.guid] ~= STATE.REMOVING_FROM_SELF then
+        if getState(unit) ~= STATE.REMOVING_FROM_SELF then
             print("Restoring " .. getName(unit))
         end
     else
-        if objectState[unit.guid] == STATE.IN_SELF then
-            removeOneFromSelf(unit.guid)
+        if getState(unit) == STATE.IN_SELF then
+            removeOneFromSelf(unit)
         end
     end
-    objectState[unit.guid] = nil
+    setState(unit, nil)
 end
 
 function onObjectSearchStart(container)
@@ -75,23 +78,34 @@ function onObjectDestroy(dying_obj)
     -- It turns out TTS does not respect pcall, errors out without pcall return.
     -- Since we don't trust pcall, mark ourself as having an error, then AFTER
     -- handling the object clear the error state.  Yuck?
-    local function protectedOnObjectDestroy()
-        if not lastErrorTimestamp or (Time.time - lastErrorTimestamp) > 5 then
-            lastErrorTimestamp = Time.time
-            if shouldZombify(dying_obj) then
-                zombifyObject(dying_obj)
-            end
-            lastErrorTimestamp = false
+    if not lastErrorTimestamp or (Time.time - lastErrorTimestamp) > 5 then
+        lastErrorTimestamp = Time.time
+        if shouldZombify(dying_obj) then
+            zombifyObject(dying_obj)
         end
+        lastErrorTimestamp = false
     end
-    pcall(protectedOnObjectDestroy)
+end
+
+-------------------------------------------------------------------------------
+
+function getState(object)
+    return guidToState[object.guid] or nameToState[object.getName()]
+end
+
+function setState(object, state)
+    guidToState[object.guid] = state
+    local name = object.getName() or object.name
+    if name then
+        nameToState[name] = state
+    end
 end
 
 -------------------------------------------------------------------------------
 
 function createButton()
     self.createButton({
-        click_function = "removeAllFromSelf",
+        click_function = "emptySelf",
         function_owner = self,
         label          = "Empty",
         position       = {0,2,1.25},
@@ -105,19 +119,31 @@ function createButton()
     })
 end
 
+function emptySelf()
+    self.reset()
+    guidToState = {}
+    nameToState = {}
+end
+
 function debugMessage(message)
     if enableDebugMessages then print(message) end
 end
 
-function removeOneFromSelf(guid)
-    assert(objectState[unit.guid] == STATE.IN_SELF)
-    objectState[unit.guid] = STATE.REMOVING_FROM_SELF
-    self.takeObject({ guid = guid }).destruct()
-end
-
-function removeAllFromSelf()
+function removeOneFromSelf(object)
+    assert(getState(object) == STATE.IN_SELF)
+    setState(object, STATE.REMOVING_FROM_SELF)
+    -- Try guid, then name.
     for _, entry in ipairs(self.getObjects()) do
-        removeOneFromSelf(entry.guid)
+        if entry.guid == object.guid then
+            destroyObject(self.takeObject({ guid = entry.guid }))
+            return
+        end
+    end
+    for _, entry in ipairs(self.getObjects()) do
+         if entry.name == object.getName() then
+             destroyObject(self.takeObject({ guid = entry.guid }))
+             return
+         end
     end
 end
 
@@ -127,7 +153,8 @@ end
 
 function shouldZombify(object)
     local name = getName(object)
-    local state = objectState[object.guid]
+    local state = getState(object)
+    debugMessage('shouldZombify "' .. name .. '" guid=' .. object.guid .. ' state=' .. (state or 0))
 
     if not object or not object.guid then
         debugMessage('onObjectDestroy: no object')
@@ -153,7 +180,7 @@ function shouldZombify(object)
     end
 
     -- Ignore some types.
-    if object.tag == 'Dice' or object.tag == 'Deck' then
+    if object.tag == 'Dice' then
         debugMessage('onObjectDestroy: ignored object tag')
         return false
     end
@@ -176,14 +203,16 @@ function shouldZombify(object)
             end
         end
     end
-
     return true
 end
 
 function zombifyObject(dying_obj)
     debugMessage('zombify object')
-    local zombie = dying_obj.clone({ position = dying_obj.getPosition() })
-    zombie.setLock(false)  -- unlock for easy removal
-    objectState[zombie.guid] = STATE.IN_SELF
+    zombie = dying_obj.clone({
+        position = dying_obj.getPosition(),
+        snap_to_grid = dying_obj.use_grid
+    })
+    zombie.setLock(false)  -- unlock so can drag out of self
+    setState(zombie, STATE.IN_SELF)
     self.putObject(zombie)
 end

@@ -1,0 +1,641 @@
+--- Create magic patch button to patch Raptor's TTS/TI4 mod.
+-- @author Darrell June 2020
+
+local TAG = "Darrell's TI4 Goodies Patcher"
+
+local DEFAULT_CONFIG = {
+    toggles = {},
+    encodedIdToObjectJson = false
+}
+
+local _config = false
+local _lastButtonClickTime = false
+
+-------------------------------------------------------------------------------
+
+-- Rule types:
+-- replaceOnTable = { list of object name patterns }
+-- addOnTable = { list of transforms (postion, rotation, scale, snap_to_grid, lock) }
+-- removeFromTable = { list of object name patterns }
+-- replaceInContainer = { list of paths }
+-- addToContainer = { list of paths }
+-- removeToContainer = { list of paths }
+
+local PATCH_RULES = {
+    ['TI4 Graveyard v3.1'] = {
+        replaceOnTable = {
+            '^TI4 Graveyard v.+$',
+        }
+    },
+
+    ['Active/Passed (White)'] = {
+        replaceOnTable = {
+            '^Active/Passed %(%a+%)$',
+        },
+        replaceInContainer = {
+            { '.+ Box$', '^Active/Passed %(%a+%)$' },
+            { '^Variant Pieces ', '^Frankenstein Bags$', '^Active/Passed %(%a+%)$' }
+        }
+    },
+
+    ['TI4 Faction Borders'] = {
+        replaceOnTable = { '^TI4 Faction Borders$' }
+    },
+
+    ['Variant Colors & Color Picker'] = {
+        addToContainer = {
+            { '^Variant Pieces ' },
+        },
+        removeFromContainer = {
+            { '^Variant Pieces ', '^Player Color Picker$' },
+            { '^Variant Pieces ', '^%a+ Player Pieces$' },
+        },
+    },
+
+    ['Trade Good Placer v3.0'] = {
+        replaceOnTable = { '^Trade Good Placer v.+$' }
+    },
+
+    ['TI4 Deleted Items'] = {
+        replaceOnTable = { '^TI4 Deleted Items$' }
+    },
+
+    ['Maps with Strings'] = {
+        replaceOnTable = { 'Maps with Strings' },
+    },
+}
+
+-------------------------------------------------------------------------------
+
+function onLoad(saveState)
+    CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.INFO)
+    CrLua.Log.d(TAG, 'onLoad: |saveState|=' .. (saveState and string.len(saveState) or -1))
+
+    _config = saveState and JSON.decode(saveState) or DEFAULT_CONFIG
+
+    if self.tag == 'Bag' then
+        -- This is the do-patch bag.
+        Wait.frames(setDoPatchUi, 3)
+    else
+        -- This is the create-patch panel  Size self for toggle count.
+        local count = 0
+        for _, _ in pairs(PATCH_RULES) do
+            count = count + 1
+        end
+        local zScale = 1.7 + (count * 0.3)
+        self.setScale({
+            x = 3,
+            y = 0.2,
+            z = zScale
+        })
+        Wait.frames(setCreatePatchBagUi, 3)
+        Wait.frames(updateCreatePatchBagUiFromConfig, 6)
+    end
+end
+
+function onSave()
+    return JSON.encode(_config)
+end
+
+function onObjectEnterContainer(container, enterObject)
+    -- Reset name, yuck.
+    if enterObject.getName() == 'Active/Passed (White)' then
+        enterObject.setName('Active/Passed (unassigned)')
+    end
+end
+
+-------------------------------------------------------------------------------
+
+function onToggleValueChanged(player, value, id)
+    CrLua.Log.d(TAG, 'onToggleValueChanged: ' .. id .. ' <- ' .. tostring(value))
+    local value = string.lower(value) == 'true' and true or false
+    _config.toggles[id] = value
+end
+
+function onButtonClick(player, wha, id)
+    CrLua.Log.d(TAG, 'onButtonClick: ' .. id)
+
+    -- This is some dicey stuff, watch out for accidental double clicks to
+    -- prevent kicking off redundant work.
+    if _lastButtonClickTime and (Time.time - _lastButtonClickTime) < 2 then
+        print('Second button click too soon after first, ignoring')
+        return
+    end
+    _lastButtonClickTime = Time.time
+
+    if not self.getVar(id) then
+        error(TAG .. ': no such var')
+    end
+    if string.find(id, 'LuaCoroutine') then
+        startLuaCoroutine(self, id)
+    else
+        self.call(id)
+    end
+end
+
+-------------------------------------------------------------------------------
+
+function updateCreatePatchBagUiFromConfig()
+    assert(type(_config.toggles) == 'table')
+    CrLua.Log.d(TAG, 'updateCreatePatchBagUiFromConfig')
+    for id, patchRule in pairs(PATCH_RULES) do
+        local value = _config.toggles[id] and true or false
+        CrLua.Log.d(TAG, 'toggle="' .. id .. '" value=' .. tostring(value))
+        self.UI.setAttribute(id, 'isOn', value)
+    end
+end
+
+function setCreatePatchBagUi()
+    local bounds = self.getBoundsNormalized()
+    local width, height = bounds.size.x, bounds.size.z
+    CrLua.Log.d(TAG, 'setCreatePatchBagUi: ' .. math.floor(width) .. 'x' .. math.floor(height))
+
+    local invScale = {
+        x = 1.0 / self.getScale().x,
+        z = 1.0 / self.getScale().z
+    }
+
+    local patchRuleToggles = {}
+    for id, patchRule in pairs(PATCH_RULES) do
+        table.insert(patchRuleToggles, {
+            tag = 'Toggle',
+            attributes = {
+                id = id,
+            },
+            value = id
+        })
+    end
+
+    self.UI.setXmlTable({
+        {
+            tag = 'Defaults',
+            children = {
+                {
+                    tag = 'Text',
+                    attributes = {
+                        fontSize = 18,
+                        fontStyle = 'Bold',
+                        horizontalOverflow = 'Overflow',
+                    }
+                },
+                {
+                    tag = 'Toggle',
+                    attributes = {
+                        onValueChanged = 'onToggleValueChanged',
+                    }
+                },
+                {
+                    tag = 'Button',
+                    attributes = {
+                        fontSize = 18,
+                        fontStyle = 'Bold',
+                        onClick = 'onButtonClick',
+                    }
+                },
+            }
+        },
+        {
+            tag = 'Panel',
+            attributes = {
+                position = '0 0 -51',
+                rotation = '0 0 0',
+                scale = '"' .. invScale.x .. ' ' .. invScale.z .. '"',
+                width = width * 100,
+                height = height * 100,
+            },
+            children = {
+                {
+                    tag = 'VerticalLayout',
+                    attributes = {
+                        padding = '20 20 20 20',
+                        spacing = 10,
+                    },
+                    children = {
+                        {
+                            tag = 'Text',
+                            value = TAG
+                        },
+                        {
+                            tag = 'VerticalLayout',
+                            children = patchRuleToggles
+                        },
+                        {
+                            tag = 'Button',
+                            attributes = {
+                                id = 'createPatchBagLuaCoroutine',
+                            },
+                            value = 'Create Patcher'
+                        }
+                    }
+                }
+            }
+        }
+    })
+end
+
+function setDoPatchUi()
+    CrLua.Log.d(TAG, 'setDoPatchUi')
+
+    local bounds = self.getBoundsNormalized()
+    local position = {
+        x = bounds.offset.x * 100 / bounds.size.x,
+        y = -130,
+        z = -200
+    }
+
+    local width, height = bounds.size.x, bounds.size.z
+
+    self.UI.setXmlTable({
+        {
+            tag = 'Defaults',
+            children = {
+                {
+                    tag = 'Button',
+                    attributes = {
+                        fontSize = 36,
+                        fontStyle = 'Bold',
+                        onClick = 'onButtonClick',
+                    }
+                },
+            }
+        },
+        {
+            tag = 'Panel',
+            attributes = {
+                position = position.x .. ' ' .. position.y .. ' ' .. position.z,
+                rotation = '-50 0 0',
+                width = 200,
+                height = 75,
+                color = '#ff0000'
+            },
+            children = {
+                tag = 'VerticalLayout',
+                attributes = {
+                    padding = '5 5 5 5',
+                },
+                children = {
+                    {
+                        tag = 'Button',
+                        attributes = {
+                            id = 'doPatchLuaCoroutine',
+                        },
+                        value = 'Do Patch'
+                    },
+                }
+            }
+        }
+    })
+end
+
+-------------------------------------------------------------------------------
+
+function isTI4Proper()
+    local countEm = {
+        ['x3 Infantry Token Bag'] = 0,
+        ['x1 Fighters Tokens Bag'] = 0
+    }
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        if countEm[name] then
+            countEm[name] = countEm[name] + 1
+        end
+    end
+    for name, count in pairs(countEm) do
+        if count == 0 then
+            CrLua.Log.d(TAG, 'isTI4Proper: missing "' .. name .. '"')
+            return false
+        end
+    end
+    return true
+end
+
+function getObjectByName(name)
+    CrLua.Log.d(TAG, 'getObjectByName: "' .. name .. '"')
+    local result = false
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag ~= 'Notecard' and object.getName() == name then
+            if result then
+                error(TAG .. ': multiple "' .. name .. '"')
+            end
+            result = object
+        end
+    end
+    if not result then
+        error(TAG .. ': missing "' .. name .. '"')
+    end
+    return result
+end
+
+-------------------------------------------------------------------------------
+
+function createPatchBagLuaCoroutine()
+    local co, isMain = coroutine.running()
+    assert(not isMain)
+
+    if isTI4Proper() then
+        print(TAG .. ': inside the TI4 mod, aborting')
+        return 1 -- MUST RETURN 1 TO TERMINATE
+    end
+
+    CrLua.Log.i(TAG, 'creating patch bag')
+    local pos = self.getPosition()
+    local patchBag = spawnObject({
+        type = 'Bag',
+        position = { x = pos.x + 4, y = pos.y + 3, z = pos.z + 1 },
+        sound = false,
+        snap_to_grid = false
+    })
+    patchBag.setLuaScript(self.getLuaScript())
+    patchBag.setColorTint('Red')
+    patchBag.setName(self.getName())
+    patchBag.setDescription('Save and spawn into TI4, click button to patch.')
+    coroutine.yield(0)
+    coroutine.yield(0)
+
+    for id, patchRule in pairs(PATCH_RULES) do
+        local isOn = _config.toggles[id]
+        if isOn then
+            CrLua.Log.i(TAG, 'cloning "' .. id .. '" into patch pag')
+            local object = getObjectByName(id)
+            local pos = object.getPosition()
+            local clone = object.clone({
+                position = { x = pos.x, y = pos.y + 3, z = pos.z },
+                snap_to_grid = false,
+            })
+            clone.setLock(true)
+            coroutine.yield(0)
+            coroutine.yield(0)
+
+            -- Wait a frame to fully create TTS object (may be loading assets).
+            clone.setLock(false)
+            patchBag.putObject(clone)
+            coroutine.yield(0)
+            coroutine.yield(0)
+
+        end
+    end
+
+    CrLua.Log.i(TAG, 'finished creating patch pag, save/spawn into TI4 to patch')
+
+    return 1 -- MUST RETURN 1 TO TERMINATE
+end
+
+-------------------------------------------------------------------------------
+
+local function _anyMatch(name, nameMatchList)
+    assert(type(name) == 'string' and type(nameMatchList) == 'table')
+    for _, nameMatch in ipairs(nameMatchList) do
+        if string.match(name, nameMatch) then
+            return true
+        end
+    end
+end
+
+local function replaceOnTable(nameMatches, newVersionObject)
+    for _, object in ipairs(getAllObjects()) do
+        if object ~= newVersionObject and _anyMatch(object.getName(), nameMatches) then
+            CrLua.Log.d(TAG, 'replaceOnTable: replacing "' .. object.getName() .. '"')
+            destroyObject(object)
+            local pos = object.getPosition()
+            local clone = newVersionObject.clone({
+                position = { x = pos.x, y = pos.y + 3, z = pos.z },
+                snap_to_grid = object.use_grid
+            })
+            clone.setRotation(object.getRotation())
+            clone.setScale(object.getScale())
+            clone.setLock(true)
+            coroutine.yield(0)
+            coroutine.yield(0)
+
+            -- Now that the original should be gone, move to position.
+            clone.setLock(false)
+            clone.setPosition(pos)
+            clone.setLock(object.getLock())
+        end
+    end
+end
+
+local function addOnTable(transforms, newVersionObject)
+    for _, transform in ipairs(transforms) do
+        CrLua.Log.d(TAG, 'addOnTable: adding "' .. newVersionObject.getName() .. '"')
+        local clone = newVersionObject.clone({
+            position = transform.position or { x = 0, y = 0, z = 0 },
+            snap_to_grid = transform.snap_to_grid and true or false
+        })
+        clone.setRotation(transform.rotation or { x = 0, y = 0, z = 0 })
+        clone.setScale(transform.scale or { x = 1, y = 1, z = 1 })
+        coroutine.yield(0)
+        coroutine.yield(0)
+        clone.setLock(transform.lock and true or false)
+    end
+end
+
+local function removeFromTable(nameMatches, newVersionObject)
+    for _, object in ipairs(getAllObjects()) do
+        if object ~= newVersionObject and _anyMatch(object.getName(), nameMatches) then
+            CrLua.Log.d(TAG, 'removeFromTable: removing "' .. object.getName() .. '"')
+            destroyObject(object)
+            coroutine.yield(0)
+            coroutine.yield(0)
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
+
+local function _containerPath(containerList)
+    local path = {}
+    for _, container in ipairs(containerList) do
+        table.insert(path, container.getName())
+    end
+    return table.concat(path, ' / ')
+end
+
+local function _descend(pathMatch, onLeafCallback, containerList)
+    assert(type(pathMatch) == 'table' and type(pathMatch[1]) == 'string')
+    assert(type(onLeafCallback) == 'function', 'callback')
+    CrLua.Log.d(TAG, '_descend ' .. _containerPath(containerList or {}))
+    if not containerList then
+        -- Start by finding the first path entry as a live container.
+        local firstMatch = pathMatch[1]
+        for _, object in ipairs(getAllObjects()) do
+            if string.match(object.getName(), firstMatch) then
+                _descend(pathMatch, onLeafCallback, { object })
+            end
+        end
+    elseif #containerList < #pathMatch then
+        -- Find the next path entry.
+        local currentContainer = containerList[#containerList]
+        local nextMatch = pathMatch[#containerList + 1]
+        for _, entry in ipairs(currentContainer.getObjects()) do
+            if string.match(entry.name, nextMatch) then
+                local pos = currentContainer.getPosition()
+                local nextContainer = currentContainer.takeObject({
+                    guid = entry.guid,
+                    position = { x = pos.x, y = pos.y + 3, z = pos.z }
+                })
+                nextContainer.lock()
+                table.insert(containerList, nextContainer)
+                coroutine.yield(0)
+                coroutine.yield(0)
+
+                _descend(pathMatch, onLeafCallback, containerList)
+
+                -- After descend returns, repack current into prev.
+                -- Get it from the list in case something changed it!
+                local currentContainer = table.remove(containerList)
+                local prevContainer = containerList[#containerList]
+
+                if currentContainer then
+                    currentContainer.setLock(false)
+                    prevContainer.putObject(currentContainer)
+                end
+                coroutine.yield(0)
+                coroutine.yield(0)
+            end
+        end
+    else
+        -- Leaf entry
+        CrLua.Log.d(TAG, '_descend.onLeafCallback ' .. _containerPath(containerList or {}))
+        onLeafCallback(containerList)
+    end
+end
+
+local function _descendMultiple(pathMatches, onLeafCallback)
+    assert(type(pathMatches) == 'table' and type(pathMatches[1]) == 'table')
+    assert(type(onLeafCallback) == 'function', 'callback')
+    for _, pathMatch in ipairs(pathMatches) do
+        _descend(pathMatch, onLeafCallback, false)
+    end
+end
+
+local function replaceInContainer(pathMatches, newVersionObject)
+    local function onLeafCallback(containerList)
+        CrLua.Log.i(TAG, 'PATCH REPLACE "' .. _containerPath(containerList) .. '"')
+        local object = containerList[#containerList]
+        destroyObject(object)
+        local clone = newVersionObject.clone({
+            position = object.getPosition(),
+            snap_to_grid = object.use_grid
+        })
+        clone.setRotation(object.getRotation())
+        clone.setScale(object.getScale())
+        clone.setLock(object.getLock())
+        coroutine.yield(0)
+        coroutine.yield(0)
+        containerList[#containerList] = clone
+    end
+    _descendMultiple(pathMatches, onLeafCallback)
+end
+
+local function addToContainer(pathMatches, newVersionObject)
+    local function onLeafCallback(containerList)
+        CrLua.Log.i(TAG, 'PATCH ADDING TO "' .. _containerPath(containerList) .. '"')
+        local container = containerList[#containerList]
+
+        local pos = container.getPosition()
+        local clone = newVersionObject.clone({
+            position = { x = pos.x, y = pos.y + 3, z = pos.z },
+            snap_to_grid = false
+        })
+        clone.setLock(true)
+        coroutine.yield(0)
+        coroutine.yield(0)
+
+        clone.setLock(false)
+        container.putObject(clone)
+        coroutine.yield(0)
+        coroutine.yield(0)
+    end
+    _descendMultiple(pathMatches, onLeafCallback)
+end
+
+local function removeFromContainer(pathMatches, newVersionObject)
+    local function onLeafCallback(containerList)
+        CrLua.Log.i(TAG, 'PATCH REMOVING "' .. _containerPath(containerList) .. '"')
+        local object = containerList[#containerList]
+        destroyObject(object)
+        containerList[#containerList] = false
+    end
+    _descendMultiple(pathMatches, onLeafCallback)
+end
+
+-------------------------------------------------------------------------------
+
+-- Careful with coroutine.yield: legal to call from a local function, NOT GLOBAL!
+function doPatchLuaCoroutine()
+    local co, isMain = coroutine.running()
+    assert(not isMain)
+
+    if not isTI4Proper() then
+        print(TAG .. ': not the TI4 mod, aborting')
+        return 1 -- MUST RETURN 1 TO TERMINATE
+    end
+
+    while self.getQuantity() > 0 do
+        local pos = self.getPosition()
+        local object = self.takeObject({
+            position = { x = pos.x, y = pos.y + 3, z = pos.z }
+        })
+        object.setLock(true)
+
+        -- Get name before yielding in case object renames itself.
+        local id = object.getName()
+        if id == 'Active/Passed (unassigned)' then
+            id = 'Active/Passed (White)'
+        end
+
+        coroutine.yield(0)
+        coroutine.yield(0)
+
+        CrLua.Log.i(TAG, 'PATCHING "' .. id .. '"')
+        local rules = PATCH_RULES[id]
+        assert(rules)
+        for ruleType, value in pairs(rules) do
+            if ruleType == 'replaceOnTable' then
+                replaceOnTable(value, object)
+            elseif ruleType == 'addOnTable' then
+                addOnTable(value, object)
+            elseif ruleType == 'removeFromTable' then
+                removeFromTable(value, object)
+            elseif ruleType == 'replaceInContainer' then
+                replaceInContainer(value, object)
+            elseif ruleType == 'addToContainer' then
+                addToContainer(value, object)
+            elseif ruleType == 'removeFromContainer' then
+                removeFromContainer(value, object)
+            else
+                error(TAG .. ': unknown rule type "' .. ruleType .. '"')
+            end
+            coroutine.yield(0)
+            coroutine.yield(0)
+        end
+
+        object.setLock(false)
+        destroyObject(object)
+        coroutine.yield(0)
+        coroutine.yield(0)
+    end
+
+    for _, object in ipairs(getAllObjects()) do
+        if string.find(object.getName(), 'TI4 Deleted Items') then
+            CrLua.Log.i(TAG, 'PATCH: emptying "' .. object.getName() .. '"')
+            object.reset()
+        end
+    end
+
+    CrLua.Log.i(TAG, 'PATCH FINISHED!')
+    return 1 -- MUST RETURN 1 TO TERMINATE
+end
+
+-------------------------------------------------------------------------------
+
+#include <~/CrLua/CrLua>
+#include <~/CrLua/LockGlobals>
+
+#include <~/CrLua/LockTable>
+#include <~/CrLua/Log>
+
+CrLua.LockTable.readOnly('PATCH_RULES', PATCH_RULES)
+CrLua.assertRequired({ 'Log' }) -- do this BEFORE lock
+CrLua.lock()

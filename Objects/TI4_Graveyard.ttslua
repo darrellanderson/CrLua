@@ -311,37 +311,53 @@ end
 function putCard(cardObject, deckAttributes, index)
     assert(type(cardObject) == 'userdata' and cardObject.tag == 'Card' and type(deckAttributes) == 'table')
 
-    -- Find the discard pile.
-    local discardTransform = deckAttributes.discardTransforms[data.tableSize]
-    local p = discardTransform.position
-    local castPosition = { x = p.x, y = p.y + 2, z = p.z }
-    local hits = Physics.cast({
-        origin       = castPosition,
-        direction    = { x = 0, y = -1, z = 0 },
-        type         = 1,  -- ray
-        max_distance = 4
-    })
-    local firstPoint = false
-    local deck = false
-    for _, hit in ipairs(hits) do
-        firstPoint = firstPoint or hit.point
-        if hit.hit_object.tag == 'Card' or hit.hit_object.tag == 'Deck' then
-            deck = hit.hit_object
-            break
+    local function getDiscardPile()
+        local discardTransform = deckAttributes.discardTransforms[data.tableSize]
+        local p = discardTransform.position
+        local castPosition = { x = p.x, y = p.y + 4, z = p.z }
+        local hits = Physics.cast({
+            origin       = castPosition,
+            direction    = { x = 0, y = -1, z = 0 },
+            type         = 1,  -- ray
+            max_distance = 6
+        })
+        local firstPoint = false
+        local deckOrCard = false
+        for _, hit in ipairs(hits) do
+            firstPoint = firstPoint or hit.point
+            if hit.hit_object.tag == 'Card' or hit.hit_object.tag == 'Deck' then
+                deckOrCard = hit.hit_object
+                break
+            end
         end
+        return deckOrCard, firstPoint
     end
+
+    local discardTransform = deckAttributes.discardTransforms[data.tableSize]
+    local deckOrCard, firstPoint = getDiscardPile()
 
     -- Place into discard pile, or drop to start a new one.
     -- (Move to above discard pile even if will putObject so puts on top.)
     local cardPosition = firstPoint or castPosition
-    cardPosition.y = cardPosition.y + 0.1 * (index or 1)
+    cardPosition.y = cardPosition.y + 0.2 * (index or 1)
     cardObject.setPosition(cardPosition)
     cardObject.setRotation(discardTransform.rotation)
-    if deck and deck.tag == 'Deck' and not deck.spawning then
-        deck.putObject(cardObject)
-        if deckAttributes.shuffleOnDiscard then
-            deck.shuffle()
+    if deckOrCard then
+        if deckOrCard.tag == 'Deck' and not deckOrCard.spawning then
+            deckOrCard.putObject(cardObject)
+        elseif deckOrCard.tag == 'Card' then
+            deckOrCard.putObject(cardObject)
         end
+    end
+
+    if deckAttributes.shuffleOnDiscard then
+        local function delayedShuffle()
+            local deckOrCard, firstPoint = getDiscardPile()
+            if deckOrCard and deckOrCard.tag == 'Deck' and not deckOrCard.spawning then
+                deckOrCard.shuffle()
+            end
+        end
+        Wait.time(delayedShuffle, 1)
     end
 end
 
@@ -365,6 +381,7 @@ end
 function putCardsFromDeck(deckObject, cardGuids)
     assert(type(deckObject) == 'userdata' and deckObject.tag == 'Deck' and type(cardGuids) == 'table')
     local position = deckObject.getPosition()
+    local cardsPerDeck = {}
     for i, cardGuid in ipairs(cardGuids) do
         if deckObject.tag == 'Deck' then
             local cardObject = deckObject.takeObject({
@@ -372,12 +389,14 @@ function putCardsFromDeck(deckObject, cardGuids)
                 position = { x = position.x, y = position.y + 1 + i, z = position.z },
             })
             local deckAttributes = getCardDestination(cardObject.getName())
-            putCard(cardObject, deckAttributes, i)
+            cardsPerDeck[deckAttributes] = (cardsPerDeck[deckAttributes] or 0) + 1
+            putCard(cardObject, deckAttributes, cardsPerDeck[deckAttributes])
             deckObject = deckObject.remainder or deckObject
         elseif deckObject.tag == 'Card' and deckObject.getGUID() == cardGuid then
             local cardObject = deckObject
             local deckAttributes = getCardDestination(cardObject.getName())
-            putCard(cardObject, deckAttributes, i)
+            cardsPerDeck[deckAttributes] = (cardsPerDeck[deckAttributes] or 0) + 1
+            putCard(cardObject, deckAttributes, cardsPerDeck[deckAttributes])
             deckObject = nil
         end
     end

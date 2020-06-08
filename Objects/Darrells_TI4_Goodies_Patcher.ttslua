@@ -371,7 +371,6 @@ function createPatchBagLuaCoroutine()
             patchBag.putObject(clone)
             coroutine.yield(0)
             coroutine.yield(0)
-
         end
     end
 
@@ -625,6 +624,8 @@ function doPatchLuaCoroutine()
     end
 
     CrLua.Log.i(TAG, 'PATCH FINISHED!')
+    CrLua.Log.i(TAG, 'Destroying self, please empty the deleted items bag once more.')
+    destroyObject(self)
     return 1 -- MUST RETURN 1 TO TERMINATE
 end
 

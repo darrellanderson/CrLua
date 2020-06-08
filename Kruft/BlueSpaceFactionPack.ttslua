@@ -1,0 +1,140 @@
+local BOX_POSITIONS = {
+    ["Advent Box"] = { x = 72.64, y = 2.96, z = 18.98 },
+    ["Drahn Consortium Box"] = { x = 72.62, y = 2.96, z = 15.75 },
+    ["Free Systems Alliance Box"] = { x = 72.72, y = 2.96, z = 12.48 },
+    ["Fremen Box"] = { x = 72.67, y = 2.96, z = 9.28 },
+    ["Gheldor Authority Box"] = { x = 72.66, y = 2.96, z = 5.96 },
+    ["HCEN Defense System Box"] = { x = 72.72, y = 2.96, z = 2.72 },
+    ["Khet Drakkol Union Box"] = { x = 72.69, y = 2.96, z = -0.61 },
+    ["Kortali Horde Box"] = { x = 72.73, y = 2.96, z = -3.98 },
+    ["Lazax Box"] = { x = 72.68, y = 2.96, z = -7.34 },
+    ["Mahact Sorcerer Kings Box"] = { x = 69.2, y = 2.96, z = 18.96 },
+    ["Mandalorian Clans Box"] = { x = 69.18, y = 2.96, z = 15.82 },
+    ["Navigators' Guild Box"] = { x = 69.21, y = 2.96, z = 12.55 },
+    ["Rhodyn Migrant Fleet Box"] = { x = 69.11, y = 2.96, z = 9.28 },
+    ["Trader Emergency Coalition Box"] = { x = 69.17, y = 2.96, z = 5.97 },
+    ["Vasari Empire Box"] = { x = 69.07, y = 2.96, z = 2.74 },
+    ["Veldyr Sovereignty Box"] = { x = 69.1, y = 2.96, z = -0.62 },
+    ["Zeth Contingency Box"] = { x = 69.08, y = 2.96, z = -4.04}
+}
+local BOX_ROTATION = { x = 360, y = 0, z = 0 }
+
+function onLoad(save_state)
+    self.addContextMenuItem('Remove boxes', removeBoxes, false)
+    self.addContextMenuItem('Unpack boxes', unpackBoxes, false)
+end
+
+function getBoxesOnTable()
+    local boxNameSet = {}
+    for _, entry in ipairs(self.getObjects()) do
+        boxNameSet[entry.name] = true
+    end
+    local result = {}
+    for _, object in ipairs(getAllObjects()) do
+        if boxNameSet[object.getName()] then
+            result[object.getName()] = object
+        end
+    end
+    return result
+end
+
+function getPickFactionToPlayBag()
+    for _, object in ipairs(getAllObjects()) do
+        if object.getName() == 'Pick a Faction to Play' then
+            return object
+        end
+    end
+    error('no faction to play bag?')
+end
+
+function unpackBoxes()
+    -- Boxes.
+    local boxesOnTable = getBoxesOnTable()
+    for i, entry in ipairs(self.getObjects()) do
+        local position = BOX_POSITIONS[entry.name]
+        if position and not boxesOnTable[entry.name] then
+
+            -- When take is done, clone and insert into self.
+            -- This way this box always has the boxes, even if copies on table.
+            local function onTakeBoxCallback(object)
+                local p = self.getPosition()
+                local clone = object.clone({
+                    position = { x = p.x, y = p.y + (i * 5), z = p.z },
+                    snap_to_grid = false
+                })
+                self.putObject(clone)
+            end
+
+            local object = self.takeObject({
+                guid = entry.guid,
+                position = position,
+                rotation = BOX_ROTATION,
+                callback_function = onTakeBoxCallback
+            })
+        end
+    end
+
+    -- Pick a faction tokens.
+    local pickFactionToPlayBag = getPickFactionToPlayBag()
+    local haveTokenSet = {}
+    for _, entry in ipairs(pickFactionToPlayBag.getObjects()) do
+        haveTokenSet[entry.name] = true
+    end
+    local function onTakeFactionTokensBag(object)
+        -- Clone, and put original back in the box.
+        local p = object.getPosition()
+        local clone = object.clone({
+            position = { x = p.x + 5, y = p.y, z = p.z }
+        })
+        object.setLock(false)
+        self.putObject(object)
+
+        -- Take tokens from the clone, then destroy clone.
+        for _, entry in ipairs(clone.getObjects()) do
+            if not haveTokenSet[entry.name] then
+                local token = clone.takeObject()
+                pickFactionToPlayBag.putObject(token)
+            end
+        end
+        destroyObject(clone)
+    end
+    local found = false
+    for i, entry in ipairs(self.getObjects()) do
+        if entry.name == 'Faction Tokens' then
+            found = true
+            local p = self.getPosition()
+            local object = self.takeObject({
+                guid = entry.guid,
+                position = { x = p.x + 5, y = p.y + 5, z = p.z },
+                callback_function = onTakeFactionTokensBag
+            })
+            object.setLock(true)
+        end
+    end
+    if not found then
+        error('no faction tokens bag?')
+    end
+end
+
+function removeBoxes()
+    -- Boxes.
+    for boxName, box in pairs(getBoxesOnTable()) do
+        destroyObject(box)
+    end
+
+    -- Faction tokens from faction to play bag.
+    local ownerTokenNameSet = {}
+    for boxName, _ in pairs(BOX_POSITIONS) do
+        local ownerTokenName = string.gsub(boxName, 'Box', 'Owner Token')
+        ownerTokenNameSet[ownerTokenName] = true
+    end
+    local pickFactionToPlayBag = getPickFactionToPlayBag()
+    for _, entry in ipairs(pickFactionToPlayBag.getObjects()) do
+        if ownerTokenNameSet[entry.name] then
+            local object = pickFactionToPlayBag.takeObject({
+                guid = entry.guid
+            })
+            destroyObject(object)
+        end
+    end
+end

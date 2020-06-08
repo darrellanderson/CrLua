@@ -63,11 +63,13 @@ function getBoxesOnTable()
 end
 
 function takeBlueSpaceFactionTokensBag()
-    for i, entry in ipairs(self.getObjects()) do
+    local entries = self.getObjects()
+    for i = #entries, 1, -1 do
+        entry = entries[i]
         if entry.name == 'Faction Tokens' then
             local position = self.getPosition()
             local object = self.takeObject({
-                guid = entry.guid,
+                index = i - 1,
                 position = { x = position.x, y = position.y + 5, z = position.z },
             })
             object.setLock(true)
@@ -107,11 +109,13 @@ function deleteTokensFromPickFactionBagThatAreAlsoInsideSelf(pickFactionToPlayBa
     for _, entry in ipairs(blueSpaceFactionTokensBag.getObjects()) do
         unpackSet[entry.name] = true
     end
-    for i, entry in ipairs(pickFactionToPlayBag.getObjects()) do
+    local entries = pickFactionToPlayBag.getObjects()
+    for i = #entries, 1, -1 do
+        local entry = entries[i]
         if unpackSet[entry.name] then
             local position = pickFactionToPlayBag.getPosition()
             local object = pickFactionToPlayBag.takeObject({
-                guid = entry.guid,
+                index = i - 1,
                 position = { x = position.x, y = position.y + 2 + i, z = position.z },
             })
             destroyObject(object)
@@ -131,7 +135,6 @@ function unpackBoxesLuaCoroutine()
     deleteBoxesFromTableThatAreAlsoInsideSelf(boxesOnTable)
     deleteTokensFromPickFactionBagThatAreAlsoInsideSelf(pickFactionToPlayBag, blueSpaceFactionTokensBag)
     coroutine.yield(0)
-    coroutine.yield(0)
 
     -- Move existing boxes to be above final positions, wait, then to final.
     for name, object in pairs(boxesOnTable) do
@@ -142,8 +145,6 @@ function unpackBoxesLuaCoroutine()
         end
         object.setLock(true)
     end
-    coroutine.yield(0)
-    coroutine.yield(0)
     for name, object in pairs(boxesOnTable) do
         local position = BOX.BLUE_SPACE[name] or BOX.STANDARD[name]
         object.setLock(false)
@@ -152,15 +153,15 @@ function unpackBoxesLuaCoroutine()
             coroutine.yield(0)
         end
     end
-    coroutine.yield(0)
-    coroutine.yield(0)
 
     -- Unpack boxes.
-    for i, entry in ipairs(self.getObjects()) do
+    local entries = self.getObjects()
+    for i = #entries, 1, -1 do
+        local entry = entries[i]
         local position = BOX.BLUE_SPACE[entry.name]
         if position then
             self.takeObject({
-                guid = entry.guid,
+                index = i - 1,
                 position = position,
                 rotation = BOX.ROTATION,
             })
@@ -169,18 +170,24 @@ function unpackBoxesLuaCoroutine()
     end
 
     -- Unpack tokens.
-    for i, entry in ipairs(blueSpaceFactionTokensBag.getObjects()) do
-        local position = blueSpaceFactionTokensBag.getPosition()
-        local object = blueSpaceFactionTokensBag.takeObject({
-            guid = entry.guid,
-            position = { x = position.x, y = position.y + 5 + i, z = position.z },
-        })
-        coroutine.yield(0)
-        pickFactionToPlayBag.putObject(object)
-        coroutine.yield(0)
+    local entries = blueSpaceFactionTokensBag.getObjects()
+    for i = #entries, 1, -1 do
+        local entry = entries[i]
+        local boxName = string.gsub(entry.name, 'Owner Token', 'Box')
+        if BOX.BLUE_SPACE[boxName] then
+            local position = blueSpaceFactionTokensBag.getPosition()
+            local object = blueSpaceFactionTokensBag.takeObject({
+                index = i - 1,
+                position = { x = position.x, y = position.y + 5 + i, z = position.z },
+            })
+            object.setLock(true)
+            coroutine.yield(0)
+
+            object.setLock(false)
+            pickFactionToPlayBag.putObject(object)
+            coroutine.yield(0)
+        end
     end
-    coroutine.yield(0)
-    coroutine.yield(0)
 
     pickFactionToPlayBag.shuffle()
 
@@ -207,7 +214,6 @@ function packBoxesLuaCoroutine()
     deleteBoxesFromTableThatAreAlsoInsideSelf(boxesOnTable)
     deleteTokensFromPickFactionBagThatAreAlsoInsideSelf(pickFactionToPlayBag, blueSpaceFactionTokensBag)
     coroutine.yield(0)
-    coroutine.yield(0)
 
     -- Pack boxes.
     for name, object in pairs(boxesOnTable) do
@@ -218,21 +224,24 @@ function packBoxesLuaCoroutine()
     end
 
     -- Pack faction tokens.
-    for i, entry in ipairs(pickFactionToPlayBag.getObjects()) do
+    local entries = pickFactionToPlayBag.getObjects()
+    for i = #entries, 1, -1 do
+        local entry = entries[i]
         local boxName = string.gsub(entry.name, 'Owner Token', 'Box')
         if BOX.BLUE_SPACE[boxName] then
             local position = pickFactionToPlayBag.getPosition()
             local object = pickFactionToPlayBag.takeObject({
-                guid = entry.guid,
+                index = i - 1,
                 position = { x = position.x, y = position.y + 5 + i, z = position.z },
             })
+            object.setLock(true)
             coroutine.yield(0)
+
+            object.setLock(false)
             blueSpaceFactionTokensBag.putObject(object)
             coroutine.yield(0)
         end
     end
-    coroutine.yield(0)
-    coroutine.yield(0)
 
     -- Put faction token bag back.
     blueSpaceFactionTokensBag.setLock(false)

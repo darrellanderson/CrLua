@@ -180,7 +180,7 @@ function shouldZombify(object)
     end
 
     -- Ignore some types.
-    if object.tag == 'Dice' then
+    if object.tag == 'Dice' or object.tag == 'Deck' then
         debugMessage('onObjectDestroy: ignored object tag')
         return false
     end

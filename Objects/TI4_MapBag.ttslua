@@ -64,6 +64,7 @@ function onBuildMap(buttonContainer, clickerColor, altClick)
                     object.editInput(input)
                 end
             end
+            object.setVar('cur_input', mapString)
         end
     end
 

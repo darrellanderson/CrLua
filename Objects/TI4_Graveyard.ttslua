@@ -5,6 +5,7 @@
 -- @author v3 May 2020 update by Darrell
 --
 -- v3.1: safer transition when two cards forming a deck, and vice versa.
+-- v3.2: wait for TTS before moving to final destination in order to preserve guid.
 
 -- Token bags use inconsistent name to bag, hard code for simplicity.
 local TOKEN_BAGS = {
@@ -229,6 +230,17 @@ local data = {
     cardNameToDeckAttributes = false,
     objectNameToBagGuid = {},
     pickFactionTokenBagGuid = nil,
+
+    objects = {
+        -- Objects added to graveyard deemed worth processing.
+        waitingForDestroy = {},
+
+        -- When an object from waitingForDestroy gets destroyed, move here.
+        ready = {},
+    },
+
+    -- Coroutine that moves items from objects.ready to final destination.
+    processReadyCoroutine = false
 }
 
 -------------------------------------------------------------------------------
@@ -308,10 +320,11 @@ end
 -------------------------------------------------------------------------------
 
 --- Put cards into the deck discard pile.
-function putCard(cardObject, deckAttributes, index)
+local function putCard(cardObject, deckAttributes, index, throttleCoroutine)
     assert(type(cardObject) == 'userdata' and cardObject.tag == 'Card' and type(deckAttributes) == 'table')
 
-    local function getDiscardPile()
+    local function getDiscardPile(deckAttributes)
+        assert(type(deckAttributes) == 'table')
         local discardTransform = deckAttributes.discardTransforms[data.tableSize]
         local p = discardTransform.position
         local castPosition = { x = p.x, y = p.y + 4, z = p.z }
@@ -321,20 +334,27 @@ function putCard(cardObject, deckAttributes, index)
             type         = 1,  -- ray
             max_distance = 6
         })
-        local firstPoint = false
+        local firstPoint = (hits and hits[1] and hits[1].point) or false
+
+        -- Prioritize deck over a card that may be falling onto it.
         local deckOrCard = false
-        for _, hit in ipairs(hits) do
-            firstPoint = firstPoint or hit.point
-            if hit.hit_object.tag == 'Card' or hit.hit_object.tag == 'Deck' then
+        for _, hit in ipairs(hits or {}) do
+            if hit.hit_object.tag == 'Deck' then
                 deckOrCard = hit.hit_object
-                break
+                return deckOrCard, firstPoint
+            end
+        end
+        for _, hit in ipairs(hits or {}) do
+            if hit.hit_object.tag == 'Card' then
+                deckOrCard = hit.hit_object
+                return deckOrCard, firstPoint
             end
         end
         return deckOrCard, firstPoint
     end
 
     local discardTransform = deckAttributes.discardTransforms[data.tableSize]
-    local deckOrCard, firstPoint = getDiscardPile()
+    local deckOrCard, firstPoint = getDiscardPile(deckAttributes)
 
     -- Place into discard pile, or drop to start a new one.
     -- (Move to above discard pile even if will putObject so puts on top.)
@@ -342,28 +362,41 @@ function putCard(cardObject, deckAttributes, index)
     cardPosition.y = cardPosition.y + 0.2 * (index or 1)
     cardObject.setPosition(cardPosition)
     cardObject.setRotation(discardTransform.rotation)
-    if deckOrCard then
-        if deckOrCard.tag == 'Deck' and not deckOrCard.spawning then
+    if deckOrCard and not deckOrCard.spawning then
+        if deckOrCard.tag == 'Deck' then
             deckOrCard.putObject(cardObject)
         elseif deckOrCard.tag == 'Card' then
-            deckOrCard.putObject(cardObject)
+            deckOrCard = deckOrCard.putObject(cardObject)
+        end
+    end
+
+    -- If we just created a deck by combining two cards, optionally wait for it
+    -- to be ready to receive more.  With this do not need to rely on physics
+    -- to drop cards only deck correctly.
+    if deckOrCard and deckOrCard.tag == 'Deck' and throttleCoroutine then
+        while deckOrCard.spawning do
+            coroutine.yield(0)
         end
     end
 
     if deckAttributes.shuffleOnDiscard then
         local function delayedShuffle()
-            local deckOrCard, firstPoint = getDiscardPile()
+            deckAttributes._shuffleWaitId = nil
+            local deckOrCard, firstPoint = getDiscardPile(deckAttributes)
             if deckOrCard and deckOrCard.tag == 'Deck' and not deckOrCard.spawning then
                 deckOrCard.shuffle()
             end
         end
-        Wait.time(delayedShuffle, 1)
+        if deckAttributes._shuffleWaitId then
+            Wait.stop(deckAttributes._shuffleWaitId)
+        end
+        deckAttributes._shuffleWaitId = Wait.time(delayedShuffle, 1)
     end
 end
 
 --- Given a deck, return guid list for cards that should be put elsewhere.
 -- Does not mutate the deck, ok to use the onObjectEnterContainer object.
-function shouldPutCardsFromDeck(deckObject)
+local function shouldPutCardsFromDeck(deckObject)
     assert(type(deckObject) == 'userdata' and deckObject.tag == 'Deck')
     local cardGuids = false
     for i, card in ipairs(deckObject.getObjects()) do
@@ -378,30 +411,62 @@ end
 
 --- Put cards from a deck into their respective discard piles.
 -- Mutates the deck, must remove from graveyard bag first!
-function putCardsFromDeck(deckObject, cardGuids)
+local function putCardsFromDeck(deckObject, cardGuids, throttleCoroutine)
     assert(type(deckObject) == 'userdata' and deckObject.tag == 'Deck' and type(cardGuids) == 'table')
-    local position = deckObject.getPosition()
+    deckObject.setLock(true)
+
+    -- Split into per-deck sets.
     local cardsPerDeck = {}
+    local position = deckObject.getPosition()
     for i, cardGuid in ipairs(cardGuids) do
         if deckObject.tag == 'Deck' then
             local cardObject = deckObject.takeObject({
                 guid = cardGuid,
-                position = { x = position.x, y = position.y + 1 + i, z = position.z },
+                position = { x = position.x, y = position.y + 3 + i * 0.2, z = position.z },
             })
+            cardObject.setLock(true)
             local deckAttributes = getCardDestination(cardObject.getName())
-            cardsPerDeck[deckAttributes] = (cardsPerDeck[deckAttributes] or 0) + 1
-            putCard(cardObject, deckAttributes, cardsPerDeck[deckAttributes])
-            deckObject = deckObject.remainder or deckObject
+            local cards = cardsPerDeck[deckAttributes]
+            if not cards then
+                cards = {}
+                cardsPerDeck[deckAttributes] = cards
+            end
+            table.insert(cards, cardObject)
+            if deckObject.remainder then
+                deckObject = deckObject.remainder
+                deckObject.setLock(true)
+            end
         elseif deckObject.tag == 'Card' and deckObject.getGUID() == cardGuid then
             local cardObject = deckObject
             local deckAttributes = getCardDestination(cardObject.getName())
-            cardsPerDeck[deckAttributes] = (cardsPerDeck[deckAttributes] or 0) + 1
-            putCard(cardObject, deckAttributes, cardsPerDeck[deckAttributes])
+            local cards = cardsPerDeck[deckAttributes]
+            if not cards then
+                cards = {}
+                cardsPerDeck[deckAttributes] = cards
+            end
+            table.insert(cards, cardObject)
             deckObject = nil
         end
     end
+
+    if throttleCoroutine then
+        coroutine.yield(0)
+    end
+
+    -- Put cards into discard locations / decks.
+    for deckAttributes, cardObjects in pairs(cardsPerDeck) do
+        for i, cardObject in ipairs(cardObjects) do
+            cardObject.setLock(false)
+            putCard(cardObject, deckAttributes, i, throttleCoroutine)
+            if throttleCoroutine then
+                coroutine.yield(0)
+            end
+        end
+    end
+
     -- Any any remaining card(s) they have nowhere to go.  Put in self.
     if deckObject then
+        deckObject.setLock(false)
         self.putObject(deckObject)
     end
 end
@@ -425,33 +490,98 @@ end
 function onObjectEnterContainer(container, enterObject)
     if container == self then
 
-        local function getEnterObject()
-            local bounds = self.getBounds()
-            return self.takeObject({
-                guid = enterObject.getGUID(),
-                position = {
-                    x = bounds.center.x,
-                    y = bounds.center.y + (bounds.size.y / 2) + 2,
-                    z = bounds.center.z,
-                }
-            })
+        local function waitForDestroy(object, state)
+            data.objects.waitingForDestroy[object] = {
+                guid = object.guid,
+                name = object.getName(),
+                state = state
+            }
         end
 
         if enterObject.tag == 'Card' then
             local deckAttributes = getCardDestination(enterObject.getName())
             if deckAttributes then
-                putCard(getEnterObject(), deckAttributes)
+                waitForDestroy(enterObject, deckAttributes)
             end
         elseif enterObject.tag == 'Deck' then
             local shouldPut = shouldPutCardsFromDeck(enterObject)
             if shouldPut then
-                putCardsFromDeck(getEnterObject(), shouldPut)
+                waitForDestroy(enterObject, shouldPut)
             end
         else
             local bag = getNonCardDestination(enterObject.getName())
             if bag then
-                bag.putObject(getEnterObject())
+                waitForDestroy(enterObject, bag)
             end
         end
     end
 end
+
+function onObjectDestroy(dyingObject)
+    local objectData = data.objects.waitingForDestroy[dyingObject]
+    if objectData then
+        data.objects.waitingForDestroy[dyingObject] = nil
+        table.insert(data.objects.ready, objectData)
+    end
+    if not data.processReadyCoroutine and #data.objects.ready > 0 then
+        startLuaCoroutine(self, 'processReadyCoroutine')
+    end
+end
+
+function processReadyCoroutine()
+    while #data.objects.ready > 0 do
+        local objectData = table.remove(data.objects.ready)
+
+        -- Coroutine started on object's last frame (during onObjectDestroy).
+        -- Wait one more frame for TTS to reclaim it, so we can retrieve it from
+        -- self preserving the same GUID.
+        coroutine.yield(0)
+
+        -- Be paranoid about guid collisions.  Unlikely but not impossible.
+        local function getObjectIndex()
+            for _, entry in ipairs(self.getObjects()) do
+                if entry.guid == objectData.guid and entry.name == objectData.name then
+                    return entry.index
+                end
+                -- When an entry does not have a name, TTS uses the tag (it seems).
+                -- If we did not find a guid AND name match, try guid only.
+                if entry.guid == objectData.guid then
+                    return entry.index
+                end
+
+            end
+            print('xxx objectData{ guid=' .. objectData.guid .. ' name="' .. objectData.name .. '" }')
+            for _, entry in ipairs(self.getObjects()) do
+                print('xxx entry{ guid=' .. entry.guid .. ' name="' .. entry.name .. '" }')
+            end
+            error(self.getName() .. ': missing entry')
+        end
+
+        local position = self.getPosition()
+        local object = self.takeObject({
+            index = getObjectIndex(),
+            position = { x = position.x, y = position.y + 10, z = position.z }
+        })
+
+        -- Wait a frame after takeObject before put so the leave/enter
+        -- events happen in logical order.
+        object.setLock(true)
+        coroutine.yield(0)
+        object.setLock(false)
+
+        if object.tag == 'Card' then
+            putCard(object, objectData.state)
+        elseif object.tag == 'Deck' then
+            putCardsFromDeck(object, objectData.state, true)
+        else
+            objectData.state.putObject(object)
+        end
+
+    end
+
+    -- Finished.  RETURN 1 TO STOP COROUTINE!
+    return 1
+end
+
+CrLua = {}
+#include <~/CrLua/LockGlobals>

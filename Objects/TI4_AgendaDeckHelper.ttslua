@@ -1,0 +1,160 @@
+--- Add context menu to agenda cards to "top" and "bottom" during politics.
+-- @author Darrell
+
+local AGENDA_DECK = {
+    transforms = {
+        [6] = {
+            position = { x = -70.68, y = 1.7, z = 15.42 },
+            rotation = { x = 0, y = 90, z = 180 },
+        },
+        [8] = {
+            position = { x = 83.29, y = 5.65, z = -16.34 },
+            rotation = { x = 0, y = 90, z = 180 },
+        }
+    },
+    cards = {
+        'Anti-Intellectual Revolution',
+        'Archived Secret',
+        'Arms Reduction',
+        'Classified Document Leaks',
+        'Colonial Redistribution',
+        'Committee Formation',
+        'Compensated Disarmament',
+        'Conventions of War',
+        'Core Mining',
+        'Demilitarized Zone',
+        'Economic Equality',
+        'Enforced Travel Ban',
+        'Executive Sanctions',
+        'Fleet Regulations',
+        'Holy Planet of Ixth',
+        'Homeland Defense Act',
+        'Imperial Arbiter',
+        'Incentive Program',
+        'Ixthian Artifact',
+        'Judicial Abolishment',
+        'Minister of Commerce',
+        'Minister of Exploration',
+        'Minister of Industry',
+        'Minister of Peace',
+        'Minister of Policy',
+        'Minister of Sciences',
+        'Minister of War',
+        'Miscount Disclosed',
+        'Mutiny',
+        'New Constitution',
+        'Prophecy of Ixth',
+        'Public Execution',
+        'Publicize Weapon Schematics',
+        'Regulated Conscription',
+        'Representative Government',
+        'Research Team - Biotic',
+        'Research Team - Cybernetic',
+        'Research Team - Propulsion',
+        'Research Team - Warfare',
+        'Seed of an Empire',
+        'Senate Sanctuary',
+        'Shard of the Throne',
+        'Shared Research',
+        'Swords to Plowshares',
+        'Terraforming Initiative',
+        'The Crown of Emphidia',
+        'The Crown of Thanlos',
+        'Unconventional Measures',
+        'Wormhole Reconstruction',
+        'Wormhole Research',
+    }
+}
+
+local data = {
+    agendaCardNameSet = false,
+    numCommandSheets = false,
+    playerColorToLastAgendaHover = {},
+}
+
+-------------------------------------------------------------------------------
+
+function onObjectLeaveContainer(container, leaveObject)
+    if isAgendaCard(leaveObject) then
+        leaveObject.addContextMenuItem('Place Agenda Top', putTop, false)
+        leaveObject.addContextMenuItem('Place Agenda Bottom', putBottom, false)
+    end
+end
+
+function onObjectEnterContainer(container, enterObject)
+    if isAgendaCard(enterObject) then
+        enterObject.clearContextMenu()
+    end
+end
+
+function onObjectDestroy(dyingObject)
+    local dele = {}
+    for playerColor, object in pairs(data.playerColorToLastAgendaHover) do
+        if object == dyingObject then
+            table.insert(dele, playerColor)
+        end
+    end
+    for _, playerColor in ipairs(dele) do
+        data.playerColorToLastAgendaHover[dele] = nil
+    end
+end
+
+function onObjectHover(playerColor, hoverObject)
+    if hoverObject and isAgendaCard(hoverObject) then
+        data.playerColorToLastAgendaHover[playerColor] = hoverObject
+    end
+end
+
+-------------------------------------------------------------------------------
+
+function putTop(playerColor)
+    local lastAgendaHover = data.playerColorToLastAgendaHover[playerColor]
+    if lastAgendaHover then
+        local transform = getAgendaDeckTransform()
+        transform.position.y = transform.position.y + 3
+        lastAgendaHover.setPositionSmooth(transform.position, false, true)
+        lastAgendaHover.setRotationSmooth(transform.rotation, false, true)
+        data.playerColorToLastAgendaHover[playerColor] = nil
+    end
+end
+
+function putBottom(playerColor)
+    local lastAgendaHover = data.playerColorToLastAgendaHover[playerColor]
+    if lastAgendaHover then
+        local transform = getAgendaDeckTransform()
+        transform.position.y = transform.position.y
+        lastAgendaHover.setPositionSmooth(transform.position, false, true)
+        lastAgendaHover.setRotationSmooth(transform.rotation, false, true)
+        data.playerColorToLastAgendaHover[playerColor] = nil
+    end
+end
+
+-------------------------------------------------------------------------------
+
+function isAgendaCard(object)
+    if not data.agendaCardNameSet then
+        data.agendaCardNameSet = {}
+        for _, name in ipairs(AGENDA_DECK.cards) do
+            data.agendaCardNameSet[name] = true
+        end
+    end
+    return object.tag == 'Card' and data.agendaCardNameSet[object.getName()] or false
+end
+
+function getAgendaDeckTransform()
+    if not data.numCommandSheets then
+        data.numCommandSheets = 0
+        for _, object in ipairs(getAllObjects()) do
+            local name = object.getName()
+            if string.match(name, '^Command Sheet %((%a+)%)$') then
+                data.numCommandSheets = data.numCommandSheets + 1
+            end
+        end
+        data.numCommandSheets = data.numCommandSheets == 8 and 8 or 6
+    end
+    local t = AGENDA_DECK.transforms[data.numCommandSheets]
+    return {
+        position = { x = t.position.x, y = t.position.y, z = t.position.z },
+        rotation = { x = t.rotation.x, y = t.rotation.y, z = t.rotation.z },
+    }
+end

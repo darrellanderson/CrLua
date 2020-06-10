@@ -24,6 +24,7 @@ local DEFAULT_CONFIG = {
         ground = 0,
         space = 0.4
     },
+    updateBetweenTurns = false,
     invisibleToSet = {}
 }
 
@@ -61,6 +62,14 @@ function onSave()
     local result = JSON.encode(_config)
     --CrLua.Log.d(TAG, 'onSave: |data|=' .. string.len(result))
     return result
+end
+
+function onPlayerTurnStart(playerColorStart, playerColorPrevious)
+    if _config.updateBetweenTurns then
+        _config.enabled = true
+        updateCache()
+        drawPolygons()
+    end
 end
 
 -------------------------------------------------------------------------------
@@ -141,7 +150,7 @@ function _createUI()
                 tag = 'Button',
                 attributes = {
                     id = 'update',
-                    minHeight = 70,
+                    minHeight = 50,
                     fontSize = 36,
                 },
                 value = 'Update'
@@ -150,10 +159,18 @@ function _createUI()
                 tag = 'Button',
                 attributes = {
                     id = 'hide',
-                    minHeight = 70,
+                    minHeight = 50,
                     fontSize = 36,
                 },
                 value = 'Hide'
+            },
+            {
+                tag = 'Toggle',
+                attributes = {
+                    id = 'updateBetweenTurns',
+                    fontSize = 14,
+                },
+                value = 'Update between turns'
             },
             {
                 tag = 'Text',
@@ -412,6 +429,8 @@ function onToggleValueChanged(player, value, id)
             _config.show.ground = valueAsBool or false
         elseif id == 'space' then
             _config.show.space = valueAsBool or false
+        elseif id == 'updateBetweenTurns' then
+            _config.updateBetweenTurns = valueAsBool or false
         else
             error(TAG .. ': unknown id "' .. id '"')
         end
@@ -440,6 +459,7 @@ end
 
 function updateUiFromConfig()
     self.UI.setAttribute('enabled', 'isOn', _config.enabled)
+    self.UI.setAttribute('updateBetweenTurns', 'isOn', _config.updateBetweenTurns)
     for itemType, value in pairs(_config.show) do
         local id = itemType
         self.UI.setAttribute(id, 'isOn', value)

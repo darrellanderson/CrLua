@@ -6,19 +6,18 @@
 -- - Improve awareness when objects move between containers.  Fixes a race where
 -- this would copy action cards during the window when the graveyard was moving
 -- them to discard piles.
--- - Rather than scanning all containers on every delete, keep track of what
--- gets added to other containers (guids only).  No need to restore this on
--- load as the only way to delete something that was already inside a container
--- is to spawn it first.
+-- - Rather than scanning all containers on every delete, keep track of objects
+-- added to other containers and ignore them when TTS deletes.
 -- - Stop processing deletions for a few seconds after an error (closing the game?).
 
-local STATE = {
-    IN_SELF = 1,
-    IN_OTHER = 2,
-    REMOVING_FROM_SELF = 3,
-}
-local guidToState = {}
-local nameToState = {}
+-- Placing an object in a container triggers onObjectEnterContainer, followed
+-- by onObjectDestroy when TTS gets around to garbage collection.  Keep track
+-- of these objects between enter and destroy, do not consider "deleted".
+local objectEnteredContainerSet = {}
+
+-- Set of objects that will be put in self, used to print a warning when adding
+-- an unexpected object.
+local objectWillEnterSelfSet = {}
 
 local searchingContainers = {} -- map from container guid to search-in-progress containers
 local lastErrorTimestamp = false
@@ -27,42 +26,24 @@ local enableDebugMessages = false
 
 function onLoad()
     debugMessage('DEBUG MESSAGES ARE ENABLED')
-    if self.getQuantity() > 0 then
-        self.setLock(true)
-    end
-    for _, entry in ipairs(self.getObjects()) do
-        guidToState[entry.guid] = STATE.IN_SELF
-        nameToState[entry.name] = STATE.IN_SELF
-    end
     createButton()
 end
 
-function onObjectEnterContainer(bag, unit)
+function onObjectEnterContainer(bag, enterObject)
     if bag == self then
-        if getState(unit) ~= STATE.IN_SELF then
-            print("WARNING: Object " .. unit.getName() .. " directly added to deleted objects bag.")
+        if objectWillEnterSelfSet[enterObject] then
+            objectWillEnterSelfSet[enterObject] = nil
+        else
+            print("WARNING: Object " .. enterObject.getName() .. " directly added to deleted objects bag.")
         end
-        setState(unit, STATE.IN_SELF)
-        self.setLock(true)
-    else
-        if getState(unit) == STATE.IN_SELF then
-            removeOneFromSelf(unit)
-        end
-        setState(unit, STATE.IN_OTHER)
     end
+    objectEnteredContainerSet[enterObject] = true
 end
 
-function onObjectLeaveContainer(bag, unit)
+function onObjectLeaveContainer(bag, leaveObject)
     if bag == self then
-        if getState(unit) ~= STATE.REMOVING_FROM_SELF then
-            print("Restoring " .. getName(unit))
-        end
-    else
-        if getState(unit) == STATE.IN_SELF then
-            removeOneFromSelf(unit)
-        end
+        print("Restoring " .. leaveObject.getName())
     end
-    setState(unit, nil)
 end
 
 function onObjectSearchStart(container)
@@ -73,31 +54,24 @@ function onObjectSearchEnd(container)
     searchingContainers[container.guid] = nil
 end
 
-function onObjectDestroy(dying_obj)
+function onObjectDestroy(dyingObject)
     -- Closing a game destroys objects, which can cause weird errors.
     -- It turns out TTS does not respect pcall, errors out without pcall return.
     -- Since we don't trust pcall, mark ourself as having an error, then AFTER
     -- handling the object clear the error state.  Yuck?
     if not lastErrorTimestamp or (Time.time - lastErrorTimestamp) > 5 then
         lastErrorTimestamp = Time.time
-        if shouldZombify(dying_obj) then
-            zombifyObject(dying_obj)
+
+        if objectEnteredContainerSet[dyingObject] then
+            -- Typical deletion after putting something in a bag or deck.
+            objectEnteredContainerSet[dyingObject] = nil
+        elseif shouldZombie(dyingObject) then
+            local zombie = createZombie(dyingObject)
+            objectWillEnterSelfSet[zombie] = true
+            self.putObject(zombie)
         end
+
         lastErrorTimestamp = false
-    end
-end
-
--------------------------------------------------------------------------------
-
-function getState(object)
-    return guidToState[object.guid] or nameToState[object.getName()]
-end
-
-function setState(object, state)
-    guidToState[object.guid] = state
-    local name = object.getName() or object.name
-    if name then
-        nameToState[name] = state
     end
 end
 
@@ -121,77 +95,37 @@ end
 
 function emptySelf()
     self.reset()
-    guidToState = {}
-    nameToState = {}
 end
 
 function debugMessage(message)
     if enableDebugMessages then print(message) end
 end
 
-function removeOneFromSelf(object)
-    assert(getState(object) == STATE.IN_SELF)
-    setState(object, STATE.REMOVING_FROM_SELF)
-    -- Try guid, then name.
-    for _, entry in ipairs(self.getObjects()) do
-        if entry.guid == object.guid then
-            destroyObject(self.takeObject({ guid = entry.guid }))
-            return
-        end
-    end
-    for _, entry in ipairs(self.getObjects()) do
-         if entry.name == object.getName() then
-             destroyObject(self.takeObject({ guid = entry.guid }))
-             return
-         end
-    end
-end
-
-function getName(obj)
-    return obj.getName() == "" and obj.name or obj.getName()
-end
-
-function shouldZombify(object)
-    local name = getName(object)
-    local state = getState(object)
-    debugMessage('shouldZombify "' .. name .. '" guid=' .. object.guid .. ' state=' .. (state or 0))
+function shouldZombie(object)
+    local name = object.getName()
 
     if not object or not object.guid then
-        debugMessage('onObjectDestroy: no object')
-        return false
-    end
-
-    -- We are destroying this intentionally?
-    if state == STATE.REMOVING_FROM_SELF then
-        debugMessage('onObjectDestroy: removing from self')
-        return false
-    end
-
-    -- Already have? (spawn, delete-to-here, spawn again, delete again)
-    if state == STATE.IN_SELF then
-        debugMessage('onObjectDestroy: already in self')
-        return false
-    end
-
-    -- Was this object placed into some other container, or back on the table?
-    if state == STATE.IN_OTHER then
-        debugMessage('onObjectDestroy: in other container')
+        debugMessage('shouldZombie: rejecting not object')
         return false
     end
 
     -- Ignore some types.
-    if object.tag == 'Dice' or object.tag == 'Deck' then
-        debugMessage('onObjectDestroy: ignored object tag')
+    if object.tag == 'Dice' then
+        debugMessage('shouldZombie: ignored object tag')
+        return false
+    end
+
+    if object.tag == 'Deck' and object.remainder then
         return false
     end
 
     -- Accept commnd tokens, reject other tokens.
-    if string.match(name, "Command Token") then
-        debugMessage('onObjectDestroy: command token')
+    if string.match(name, 'Command Token') then
+        debugMessage('shouldZombie: accepting command token')
         return true
     end
-    if string.match(name, "Token") or string.match(name, "Commodities/Tradegoods") or string.match(name, 'x[13] Infantry') then
-        debugMessage('onObjectDestroy: token')
+    if string.match(name, 'Token') or string.match(name, 'Commodities/Tradegoods') or string.match(name, 'x[13] Infantry') then
+        debugMessage('shouldZombie: rejecting non-command token')
         return false
     end
 
@@ -206,13 +140,12 @@ function shouldZombify(object)
     return true
 end
 
-function zombifyObject(dying_obj)
+function createZombie(dyingObject)
     debugMessage('zombify object')
-    zombie = dying_obj.clone({
-        position = dying_obj.getPosition(),
-        snap_to_grid = dying_obj.use_grid
+    local zombie = dyingObject.clone({
+        position = dyingObject.getPosition(),
+        snap_to_grid = dyingObject.use_grid
     })
     zombie.setLock(false)  -- unlock so can drag out of self
-    setState(zombie, STATE.IN_SELF)
-    self.putObject(zombie)
+    return zombie
 end

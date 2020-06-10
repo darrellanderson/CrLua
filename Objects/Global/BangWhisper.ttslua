@@ -1,0 +1,31 @@
+--- Use "!color message" to send an announced whisper.  Prints a message to
+-- everyone else that the whisper happened, then sends whisper to the target.
+-- Note that normal "/color message" whispers still work as before.
+-- @author Darrell
+local orginalOnChat = onChat
+function onChat(message, srcPlayer)
+    if orginalOnChat and not orginalOnChat(message, srcPlayer) then
+        return false -- originial suppressed message
+    end
+    local srcColor = srcPlayer.color
+    local dstColor, message = string.match(message, '^!(%a+) (.+)')
+    if dstColor then
+        dstColor = dstColor:sub(1,1):upper()..dstColor:sub(2):lower()
+        local publicMessage = 'Whisper: ' .. srcColor .. ' -> ' .. dstColor
+        local privateMessage = '<' .. srcColor .. ' -> ' .. dstColor .. '>: ' .. message
+        local found = false
+        for _, color in ipairs(getSeatedPlayers()) do
+            found = found or color == dstColor
+            if color == srcColor or color == dstColor then
+                printToColor(privateMessage, color, srcColor)
+            else
+                printToColor(publicMessage, color, srcColor)
+            end
+        end
+        if not found then
+            printToColor('No one is playing as ' .. dstColor, srcColor, srcColor)
+        end
+        return false
+    end
+    return true
+end

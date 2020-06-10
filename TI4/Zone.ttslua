@@ -238,8 +238,8 @@ function CrLua.TI4.Zone.update()
             end
 
             -- If no default zone or does not match, scan for polygon.
-            for candidateColor, candidate in pairs(polygons) do
-                if color ~= candidateColor and CrLua.Polygon.inside(candidate, pointXZ) then
+            for defaultColor, polygon in pairs(polygons) do
+                if CrLua.Polygon.inside(polygon, pointXZ) then
                     return polygon
                 end
             end

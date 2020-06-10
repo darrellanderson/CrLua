@@ -30,7 +30,7 @@ local DECKS = {
         shuffleOnDiscard = true,
         discardTransforms = {
             [6] = {
-                position = { x = -70.7, y = 1.8, z = 11.6 },
+                position = { x = -70.72, y = 1.7, z = 11.60 },
                 rotation = { x = 0, y = 90, z = 180 },
             },
             [8] = {
@@ -65,7 +65,7 @@ local DECKS = {
         name = 'Agenda',
         discardTransforms = {
             [6] = {
-                position = { x = -67.0, y = 1.7, z = 15.4 },
+                position = { x = -66.97, y = 1.7, z = 15.42 },
                 rotation = { x = 0, y = 90, z = 0 },
             },
             [8] = {
@@ -130,7 +130,7 @@ local DECKS = {
         name = 'Actions',
         discardTransforms = {
             [6] = {
-                position = { x = -67.0, y = 1.7, z = 19.3 },
+                position = { x = -67.03, y = 1.7, z = 19.25 },
                 rotation = { x = 0, y = 90, z = 0 },
             },
             [8] = {
@@ -238,6 +238,8 @@ local data = {
         -- When an object from waitingForDestroy gets destroyed, move here.
         ready = {},
     },
+
+    coroutineStartTime = false,
 }
 
 -------------------------------------------------------------------------------
@@ -325,25 +327,28 @@ local function getDiscardPile(deckAttributes)
         origin       = castPosition,
         direction    = { x = 0, y = -1, z = 0 },
         type         = 1,  -- ray
-        max_distance = 11
+        max_distance = 11,
+        debug        = false
     })
 
     -- Get location above first hit.
-    local firstPoint = (hits and hits[1] and hits[1].point) or castPosition
-    local abovePoint = { x = firstPoint.x, y = firstPoint.y + 0.2, z = firstPoint.z }
+    local firstPoint = castPosition
+    if hits and hits[1] then
+        firstPoint = hits[1].point
+    end
+    local abovePoint = { x = firstPoint.x, y = firstPoint.y + 0.5, z = firstPoint.z }
 
-    -- Prioritize deck over a card that may be falling onto it.
+    -- For some reason physics cast does not always see decks when putting
+    -- a lot of cards.  Use a minimum Y value as a safety.
+    abovePoint.y = math.max(abovePoint.y, discardTransform.position.y + 3)
+
+    -- Get the first deck or card encountered.
     local deckOrCard = false
     for _, hit in ipairs(hits or {}) do
         local object = hit.hit_object
-        if not object.spawning then
-            local tag = object.tag
-            if tag == 'Deck' then
-                deckOrCard = hit.hit_object
-                break
-            elseif not deckOrCard and tag == 'Card' then
-                deckOrCard = hit.hit_object
-            end
+        if object.tag == 'Deck' or object.tag == 'Card' then
+            deckOrCard = object
+            break
         end
     end
 
@@ -415,8 +420,9 @@ local function putCardsFromDeck(deckObject, deckAttributesToCardGuids)
         local discardTransform = deckAttributes.discardTransforms[data.tableSize]
         local deckOrCard, abovePoint = getDiscardPile(deckAttributes)
 
+        local numCardGuids = #cardGuids
         for i, cardGuid in ipairs(cardGuids) do
-            local position = { x = abovePoint.x, y = abovePoint.y + i * 0.01, z = abovePoint.z }
+            local position = { x = abovePoint.x, y = abovePoint.y + 1 * i * 0.01, z = abovePoint.z }
 
             -- Take card from deck.
             local cardObject = false
@@ -429,6 +435,7 @@ local function putCardsFromDeck(deckObject, deckAttributesToCardGuids)
                 if deckObject.remainder then
                     deckObject.setLock(false)
                     deckObject = deckObject.remainder
+                    coroutine.yield(0)
                 end
             elseif deckObject.tag == 'Card' and deckObject.getGUID() == cardGuid then
                 cardObject = deckObject
@@ -443,11 +450,13 @@ local function putCardsFromDeck(deckObject, deckAttributesToCardGuids)
 
             -- Give it a little MORE breathing room, can struggle with very
             -- large decks and small decks are still fine.
-            if (i % 20) == 0 then
+            if (i % 20) == 0 or (i > 20 and i == numCardGuids) then
                 local now = Time.time
                 while Time.time - now < 0.5 do
                     coroutine.yield(0)
                 end
+                -- Also skip upward slightly in case of lagging physics.
+                abovePoint.y = abovePoint.y + 0.05
             end
 
             -- We *could* try to be clever and put cards into the deck.  There
@@ -518,26 +527,27 @@ end
 function onObjectDestroy(dyingObject)
     local objectData = data.objects.waitingForDestroy[dyingObject]
     if objectData then
+        -- Promote to ready.
         data.objects.waitingForDestroy[dyingObject] = nil
         table.insert(data.objects.ready, objectData)
-    end
-    -- Start coroutine if work to be done.  Start even if one is already running,
-    -- if for some reason the current one errors out it does not have a clean
-    -- way to communicate that (TTS errors do not respect pcall).  Extra
-    -- coroutines will start and immediatly exit if queue is empty.
-    if #data.objects.ready > 0 then
-        local obj = startLuaCoroutine(self, 'processReadyCoroutine')
+
+        -- Start coroutine if work to be done.
+        local isRunning = data.coroutineStartTime and (Time.time - data.coroutineStartTime) < 3
+        if #data.objects.ready > 0 and not isRunning then
+            startLuaCoroutine(self, 'processReadyCoroutine')
+            data.coroutineStartTime = Time.time
+        end
     end
 end
 
 function processReadyCoroutine()
+    -- Coroutine started on object's last frame (during onObjectDestroy).
+    -- Wait one more frame for TTS to reclaim it, so we can retrieve it from
+    -- self preserving the same GUID.
+    coroutine.yield(0)
+
     while #data.objects.ready > 0 do
         local objectData = table.remove(data.objects.ready)
-
-        -- Coroutine started on object's last frame (during onObjectDestroy).
-        -- Wait one more frame for TTS to reclaim it, so we can retrieve it from
-        -- self preserving the same GUID.
-        coroutine.yield(0)
 
         -- Be paranoid about guid collisions.  Unlikely but not impossible.
         local function getObjectIndex()
@@ -561,6 +571,7 @@ function processReadyCoroutine()
             index = getObjectIndex(),
             position = { x = position.x, y = position.y + 10, z = position.z }
         })
+        assert(object)
 
         -- Wait a frame after takeObject before put so the leave/enter
         -- events happen in logical order.
@@ -575,9 +586,9 @@ function processReadyCoroutine()
         else
             objectData.state.putObject(object)
         end
-
     end
 
     -- Finished.  RETURN 1 TO STOP COROUTINE!
+    data.coroutineStartTime = false
     return 1
 end

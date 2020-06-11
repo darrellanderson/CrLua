@@ -63,6 +63,12 @@ local PATCH_RULES = {
     ['Maps with Strings'] = {
         replaceOnTable = { 'Maps with Strings' },
     },
+
+    ['TI4 Agenda Top/Bottom'] = {
+        addToContainer = {
+            { '^Variant Pieces ' },
+        },
+    }
 }
 
 -------------------------------------------------------------------------------

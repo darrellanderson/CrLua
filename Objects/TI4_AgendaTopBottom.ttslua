@@ -69,15 +69,27 @@ local AGENDA_DECK = {
 local data = {
     agendaCardNameSet = false,
     numCommandSheets = false,
-    playerColorToLastAgendaHover = {},
+    cardObjectToFunctionName = {},
 }
 
 -------------------------------------------------------------------------------
 
 function onObjectLeaveContainer(container, leaveObject)
     if isAgendaCard(leaveObject) then
+        local function putTop(playerColor)
+            printToAll('Put agenda top', playerColor)
+            put(leaveObject, true)
+        end
+        local function putBottom(playerColor)
+            printToAll('Put agenda bottom', playerColor)
+            put(leaveObject, false)
+        end
+        local function clearMenu(playerColor)
+            leaveObject.clearContextMenu()
+        end
         leaveObject.addContextMenuItem('Place Agenda Top', putTop, false)
         leaveObject.addContextMenuItem('Place Agenda Bottom', putBottom, false)
+        leaveObject.addContextMenuItem('Clear Place Options', clearMenu, false)
     end
 end
 
@@ -87,46 +99,25 @@ function onObjectEnterContainer(container, enterObject)
     end
 end
 
-function onObjectDestroy(dyingObject)
-    local dele = {}
-    for playerColor, object in pairs(data.playerColorToLastAgendaHover) do
-        if object == dyingObject then
-            table.insert(dele, playerColor)
-        end
-    end
-    for _, playerColor in ipairs(dele) do
-        data.playerColorToLastAgendaHover[dele] = nil
-    end
-end
-
-function onObjectHover(playerColor, hoverObject)
-    if hoverObject and isAgendaCard(hoverObject) then
-        data.playerColorToLastAgendaHover[playerColor] = hoverObject
-    end
-end
-
 -------------------------------------------------------------------------------
 
-function putTop(playerColor)
-    local lastAgendaHover = data.playerColorToLastAgendaHover[playerColor]
-    if lastAgendaHover then
-        local transform = getAgendaDeckTransform()
-        transform.position.y = transform.position.y + 3
-        lastAgendaHover.setPositionSmooth(transform.position, false, true)
-        lastAgendaHover.setRotationSmooth(transform.rotation, false, true)
-        data.playerColorToLastAgendaHover[playerColor] = nil
-    end
-end
+function put(cardObject, onTop)
+    assert(type(cardObject) == 'userdata' and cardObject.tag == 'Card' and type(onTop) == 'boolean')
+    local transform = getAgendaDeckTransform()
 
-function putBottom(playerColor)
-    local lastAgendaHover = data.playerColorToLastAgendaHover[playerColor]
-    if lastAgendaHover then
-        local transform = getAgendaDeckTransform()
-        transform.position.y = transform.position.y
-        lastAgendaHover.setPositionSmooth(transform.position, false, true)
-        lastAgendaHover.setRotationSmooth(transform.rotation, false, true)
-        data.playerColorToLastAgendaHover[playerColor] = nil
+    -- Teleport to near (jump out of hand, if in hand).
+    local nearby = { x = transform.position.x * 0.8, y = transform.position.y + 5, z = transform.position.z * 0.8 }
+    cardObject.setPosition(nearby)
+    cardObject.setRotation(transform.rotation)
+
+    local function finishPut()
+        -- Smooth to final position.
+        transform.position.y = transform.position.y + (onTop and 3 or 0)
+        local isCollide = false
+        local isFast = false
+        cardObject.setPositionSmooth(transform.position, isCollide, isFast)
     end
+    Wait.frames(finishPut, 2)
 end
 
 -------------------------------------------------------------------------------

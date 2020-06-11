@@ -55,6 +55,11 @@ function onObjectSearchEnd(container)
 end
 
 function onObjectDestroy(dyingObject)
+    -- No regrets.
+    if dyingObject == self or string.find(dyingObject.getName(), 'TI4 Deleted Items') then
+        return
+    end
+
     -- Closing a game destroys objects, which can cause weird errors.
     -- It turns out TTS does not respect pcall, errors out without pcall return.
     -- Since we don't trust pcall, mark ourself as having an error, then AFTER

@@ -64,8 +64,7 @@ local CARDS = {
 
 function onLoad(save_state)
     CrLua.Log.d(TAG, 'onLoad')
-    Wait.frames(updateColorToMultiRoller, 4)
-    Wait.frames(updateUi, 6)
+    Wait.frames(updateUi, 2)
 end
 
 function onPlayerTurnStart(playerColorStart, playerColorPrevious)
@@ -138,20 +137,15 @@ function onButtonClick(player, option, id)
         'color=' .. clickerColor,
         'altClick=' .. tostring(altClick),
         'type=' .. (autoFillType or 'nil'),
-        'planetIndex=' .. (planetIndex or 'nil')
+        'planetIndex=' .. (planetIndex or 'nil'),
     }, ' '))
-    local multiRoller = data.colorToMultiRoller[clickerColor]
-    if multiRoller then
-        autoFill({
-            multiRoller = multiRoller,
-            clickerColor = clickerColor,
-            altClick = altClick and true or false,
-            autoFillType = autoFillType,
-            planetIndex = planetIndex > 0 and planetIndex or false,
-        })
-    else
-        print(TAG .. ': no MultiRoller for ' .. clickerColor)
-    end
+
+    autoFill({
+        clickerColor = clickerColor,
+        altClick = altClick and true or false,
+        autoFillType = autoFillType,
+        planetIndex = planetIndex > 0 and planetIndex or false,
+    })
 end
 
 -------------------------------------------------------------------------------
@@ -233,17 +227,11 @@ function updateUi()
             tag = 'Defaults',
             children = {
                 {
-                    tag = 'Toggle',
-                    attributes = {
-                        fontSize = 12,
-                        onValueChanged = 'onToggleValueChanged',
-                    }
-                },
-                {
                     tag = 'Button',
                     attributes = {
                         onClick = 'onButtonClick',
                         fontSize = 12,
+                        fontStyle = 'Bold',
                     }
                 },
                 {
@@ -389,7 +377,6 @@ end
 -------------------------------------------------------------------------------
 
 function autoFill(params)
-    assert(type(params.multiRoller) == 'userdata', 'multiRoller')
     assert(type(params.clickerColor) == 'string', 'clickerColor')
     assert(type(params.altClick) == 'boolean', 'altClick')
     assert(AUTOFILL_TYPE[params.autoFillType], 'autoFillType')
@@ -400,6 +387,12 @@ function autoFill(params)
     updateColorToMultiRoller()
     CrLua.TI4.Zone.update()
     CrLua.TI4.Faction.update()
+
+    local multiRoller = data.colorToMultiRoller[params.clickerColor]
+    if not multiRoller then
+        printToAll(TAG .. ': no MultiRoller for ' .. params.clickerColor, {1,0,0})
+        return
+    end
 
     if not data.lastActivatedPosition then
         printToAll(TAG .. ': no activated system', {1,0,0})
@@ -572,7 +565,7 @@ function autoFill(params)
     printToAll(message, params.clickerColor)
 
     injectValues{
-        multiRoller = assert(params.multiRoller),
+        multiRoller = assert(multiRoller),
         unitCount = assert(unitCount),
         hasAntimassDeflectors = cardSet['Antimass Deflectors'],
         suggestPdsUnitName = psUnit and psUnit.unitName,

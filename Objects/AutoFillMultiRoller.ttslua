@@ -140,13 +140,18 @@ function onButtonClick(player, option, id)
         'type=' .. (autoFillType or 'nil'),
         'planetIndex=' .. (planetIndex or 'nil')
     }, ' '))
-    autoFill({
-        multiRoller = assert(data.colorToMultiRoller[clickerColor]),
-        clickerColor = assert(clickerColor),
-        altClick = altClick and true or false,
-        autoFillType = autoFillType,
-        planetIndex = planetIndex > 0 and planetIndex or false,
-    })
+    local multiRoller = data.colorToMultiRoller[clickerColor]
+    if multiRoller then
+        autoFill({
+            multiRoller = multiRoller,
+            clickerColor = clickerColor,
+            altClick = altClick and true or false,
+            autoFillType = autoFillType,
+            planetIndex = planetIndex > 0 and planetIndex or false,
+        })
+    else
+        print(TAG .. ': no MultiRoller for ' .. clickerColor)
+    end
 end
 
 -------------------------------------------------------------------------------
@@ -160,28 +165,34 @@ function updateUi()
     local function getAutoFillButton(autoFillType, planetIndex)
         assert(AUTOFILL_TYPE[autoFillType])
         assert(not planetIndex or type(planetIndex) == 'number')
-        local function buttonLabel()
-            if planetIndex then
-                local planet = planets and planets[planetIndex]
-                return planet and planet.name or '---'
-            else
-                return AUTOFILL_TYPE[autoFillType].name
-            end
+
+        local tooltip = AUTOFILL_TYPE[autoFillType].name
+
+        local buttonLabel = AUTOFILL_TYPE[autoFillType].name
+        if planetIndex == 0 then
+            buttonLabel = '---'
+        elseif planetIndex then
+            buttonLabel = planets[planetIndex].name
         end
+
         return {
             tag = 'Button',
             attributes = {
-                id = getButtonId(autoFillType, planetIndex)
+                id = getButtonId(autoFillType, planetIndex),
+                --tooltip = tooltip,
+                --tooltipPosition = 'Above'
             },
-            value = buttonLabel()
+            value = buttonLabel
         }
     end
+
     local function getLabel(autoFillType)
         return {
             tag = 'Text',
             value = AUTOFILL_TYPE[autoFillType].name
         }
     end
+
     local function getAutoFillButtonRow(autoFillType)
         local row = {}
         for i = 1, math.max(1, #planets) do

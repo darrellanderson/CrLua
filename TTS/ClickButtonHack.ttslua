@@ -1,0 +1,113 @@
+-------------------------------------------------------------------------------
+--- Inject lua into an object to let outsiders click buttons.
+-- TTS Button click functions get (container, clickerColor, altClick) arguments,
+-- but Object.call(object, param) can only pass a single value.  This script
+-- injects an additional function into an object, then leverages that to be
+-- able to click buttons with all the arguments.  It *could* be made generic
+-- to call arbitrary functions, but restricting to button clicks feels safer.
+-- I hate this, it would be fantastic if TTS had button click function.
+-- @author Darrell
+-------------------------------------------------------------------------------
+
+local TAG = 'CrLua.TTS.ClickButtonHack'
+
+CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
+CrLua.TTS = CrLua.TTS or {}
+CrLua.TTS.ClickButtonHack = assert(not CrLua.TTS.ClickButtonHack) and {
+    _require = {}
+}
+
+-- Prefix some empty lines in case target does not have a trailing empty line.
+CrLua.TTS.ClickButtonHack.CLICK_BUTTON_HACK_LUA = [[
+
+
+-- Provide a single-argument method to let outsiders click a button.
+-- (Object.call takes at most one argument, button.click_function takes three).
+-- Injected by CrLua.TTS.ClickButtonHack (yuck, not my favorite work).
+function clickButtonHack(params)
+    local function getButtonByLabel(label)
+        for _, button in ipairs(self.getButtons() or {}) do
+            if button.label == label then
+                return button
+            end
+        end
+        error('clickButtonHack: no such button label "' .. label .. '"')
+    end
+    local button = getButtonByLabel(params.buttonLabel)
+    local owner = button.function_owner or self
+    local f = button.click_function
+    if type(f) == 'string' then
+        f = owner.getVar(f)
+    end
+    if not f then
+        error('clickButtonHack: invalid click function for button label "' .. label .. '"')
+    end
+    if params.debug then
+        print('clickButtonHack: ' .. table.concat({
+            'owner="' .. owner.getName() .. '"',
+            'label="' .. params.buttonLabel .. '"',
+            'clickerColor=' .. params.clickerColor,
+            'altClick=' .. tostring(params.altClick)
+        }, ', '))
+    end
+    f(owner, params.clickerColor, params.altClick)
+end
+]]
+
+-------------------------------------------------------------------------------
+--- Add the click button hack script to an object.
+-- Can only modify script at spawn time, so clone and modify clone.
+-- @param object : Game Object.
+-- @return object : replacement Game Object.
+-------------------------------------------------------------------------------
+function CrLua.TTS.ClickButtonHack.inject(object)
+    assert(type(object) == 'userdata')
+    if not object.getVar('clickButtonHack') then
+        local spawnParams = ({
+            json              = object.getJSON(),
+            position          = object.getPosition(),
+            rotation          = object.getRotation(),
+            scale             = object.getScale(),
+            callback_function = nil,
+            sound             = false,
+            snap_to_grid      = object.use_grid,
+        })
+        local isLocked = object.getLock()
+        local lua = object.getLuaScript() .. CrLua.TTS.ClickButtonHack.CLICK_BUTTON_HACK_LUA
+        destroyObject(object)
+        object = spawnObjectJSON(spawnParams)
+        object.setLuaScript(lua)
+        object.setLock(isLocked)
+    end
+    return object
+end
+
+-------------------------------------------------------------------------------
+--- Call the button's click function on the object.
+-- @param object : Game Object with injected click button hack.
+-- @buttonLabel string : click matching button.
+-- @param clickColor string : simulate click as if by this player color.
+-- @param altClick boolean : simulate right click?
+-- @param debug boolean : print what is happening.
+-------------------------------------------------------------------------------
+function CrLua.TTS.ClickButtonHack.invoke(object, buttonLabel, clickerColor, altClick, debug)
+    assert(type(object) == 'userdata' and type(buttonLabel) == 'string' and type(clickerColor) == 'string')
+    local params = {
+        buttonLabel = buttonLabel,
+        clickerColor = clickerColor,
+        altClick = altClick and true or false,
+        debug = debug and true or false
+    }
+    if debug then
+        print(TAG .. '.invoke: ' .. table.concat({
+            'target="' .. object.getName() .. '"',
+            'label="' .. params.buttonLabel .. '"',
+            'clickerColor=' .. params.clickerColor,
+            'altClick=' .. tostring(params.altClick),
+        }, ', '))
+    end
+    if not object.getVar('clickButtonHack') then
+        error(TAG .. '.invoke: need injectClickButtonHack first')
+    end
+    object.call('clickButtonHack', params)
+end

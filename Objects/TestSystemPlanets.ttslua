@@ -1,0 +1,29 @@
+function onLoad(save_state)
+    print('onLoad')
+
+    local lines = {}
+    for _, system in ipairs(CrLua.TI4.System.getAllSystems()) do
+        table.insert(lines, CrLua.TI4.System.vectorLine(system, {}))
+        for _, planet in ipairs(system.planets or {}) do
+            table.insert(lines, CrLua.TI4.System.planetVectorLine(system, planet.name, {}))
+        end
+    end
+    Global.setVectorLines(lines)
+end
+
+function onDrop(player_color)
+    local p = self.getPosition()
+    local system = CrLua.TI4.System.fromPosition(p)
+    local planet = system and CrLua.TI4.System.planetFromPosition(system, p, true)
+    print('onDrop ' .. (planet or 'nil'))
+end
+
+#include <~/CrLua/CrLua>
+#include <~/CrLua/TI4/System>
+#include <~/CrLua/LockTable>
+
+#include <~/CrLua/UnitTest>
+CrLua.UnitTest.runTests('xxx', CrLua, true)
+
+CrLua.assertRequired({ 'TI4.System' })
+CrLua.lock()

@@ -1,7 +1,7 @@
 -------------------------------------------------------------------------------
 --- Get points equidistant along a spiral.
 -- @see https://stackoverflow.com/questions/13894715/draw-equidistant-points-on-a-spiral
--- @author bonkersbgg on BoardGameGeek.com
+-- @author Darrell
 -------------------------------------------------------------------------------
 
 local TAG = 'CrLua.Kruft.Spiral'
@@ -39,4 +39,16 @@ function CrLua.Kruft.Spiral.nextPosition(data)
         y = data.y,
         z = data.r * math.sin(data.phi)
     }
+end
+
+--- Spiral generator.  Call to get a function, call that repeatedly for points.
+function spiral(dPos, dRing, y)
+    local b = dRing / (math.pi * 2.0)
+    local phi = dPos / b
+    local r = dPos
+    return function()
+        phi = phi + (pPos / r)
+        r = phi * b
+        return { x = r * math.cos(phi), y = y, z = r * math.sin(phi) }
+    end
 end

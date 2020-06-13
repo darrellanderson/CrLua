@@ -1,5 +1,5 @@
 --- Active/passed token.
--- @author bonkersbgg at boardgamegeek.com
+-- @author Darrell
 --
 -- Place one token near each player, each token assigns itself to the closest
 -- seated player.
@@ -60,6 +60,12 @@ function onPlayerTurnStart(playerColorStart, playerColorPrevious)
     -- same turn start values and maybe pass the turn after a few frames.
     if isMyTurn() then
         Wait.frames(maybePassTurn, 2)
+    end
+end
+
+function onPlayerChangeColor(playerColor)
+    if playerColor == myColor() and not isActive() then
+        self.flip()
     end
 end
 

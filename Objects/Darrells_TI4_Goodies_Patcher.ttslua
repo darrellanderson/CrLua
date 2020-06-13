@@ -29,13 +29,18 @@ local PATCH_RULES = {
     },
 
     ['Active/Passed (White)'] = {
-        replaceOnTable = {
+        removeFromTable = {
             '^Active/Passed %(%a+%)$',
         },
-        replaceInContainer = {
+        removeFromContainer = {
             { '.+ Box$', '^Active/Passed %(%a+%)$' },
             { '^Variant Pieces ', '^Frankenstein Bags$', '^Active/Passed %(%a+%)$' }
-        }
+        },
+        addOnColors = {
+            name = 'Active/Passed ($COLOR)',
+            offsetXZ = { x = -2, z = -0.5 },
+            rotation = { x = 0, y = 0, z = 180 }
+        },
     },
 
     ['TI4 Faction Borders'] = {
@@ -405,7 +410,7 @@ end
 local function replaceOnTable(nameMatches, newVersionObject)
     for _, object in ipairs(getAllObjects()) do
         if object ~= newVersionObject and _anyMatch(object.getName(), nameMatches) then
-            CrLua.Log.d(TAG, 'replaceOnTable: replacing "' .. object.getName() .. '"')
+            CrLua.Log.i(TAG, 'PATCH REPLACING ON TABLE "' .. object.getName() .. '"')
             destroyObject(object)
             local pos = object.getPosition()
             local clone = newVersionObject.clone({
@@ -428,27 +433,75 @@ end
 
 local function addOnTable(transforms, newVersionObject)
     for _, transform in ipairs(transforms) do
-        CrLua.Log.d(TAG, 'addOnTable: adding "' .. newVersionObject.getName() .. '"')
+        CrLua.Log.i(TAG, 'PATCH ADDING TO TABLE "' .. newVersionObject.getName() .. '"')
         local clone = newVersionObject.clone({
             position = transform.position or { x = 0, y = 0, z = 0 },
             snap_to_grid = transform.snap_to_grid and true or false
         })
         clone.setRotation(transform.rotation or { x = 0, y = 0, z = 0 })
         clone.setScale(transform.scale or { x = 1, y = 1, z = 1 })
-        coroutine.yield(0)
-        coroutine.yield(0)
         clone.setLock(transform.lock and true or false)
+        if transform.name then
+            clone.setName(transform.name)
+        end
+        coroutine.yield(0)
+        coroutine.yield(0)
     end
 end
 
 local function removeFromTable(nameMatches, newVersionObject)
     for _, object in ipairs(getAllObjects()) do
         if object ~= newVersionObject and _anyMatch(object.getName(), nameMatches) then
-            CrLua.Log.d(TAG, 'removeFromTable: removing "' .. object.getName() .. '"')
+            CrLua.Log.i(TAG, 'PATCH REMOVING FROM TABLE "' .. object.getName() .. '"')
             destroyObject(object)
             coroutine.yield(0)
             coroutine.yield(0)
         end
+    end
+end
+
+local function addOnColors(transform, newVersionObject)
+    CrLua.Log.i(TAG, 'PATCH ADDING TO COLORS "' .. newVersionObject.getName() .. '"')
+    if transform.name then
+        -- Rename src to avoid name/color conflits (active/passed token gotchas).
+        newVersionObject.setName('patch in progress')
+    end
+    local colorToCommandSheet = {}
+    for _, object in ipairs(getAllObjects()) do
+        local color = string.match(object.getName(), '^Command Sheet %((%a+)%)$')
+        if color then
+            colorToCommandSheet[color] = object
+        end
+    end
+    for color, sheet in pairs(colorToCommandSheet) do
+        local sp = sheet.getPosition()
+        local sr = sheet.getTransformRight()
+        local sf = sheet.getTransformForward()
+        local position = {
+            x = sp.x + (-sr.x * transform.offsetXZ.x) + (sf.x * transform.offsetXZ.z),
+            y = sp.y + (-sr.y * transform.offsetXZ.x) + (sf.y * transform.offsetXZ.z),
+            z = sp.z + (-sr.z * transform.offsetXZ.x) + (sf.z * transform.offsetXZ.z)
+        }
+        local sr = sheet.getRotation()
+        local tr = transform.rotation or { x = 0, y = 0, z = 0 }
+        local rotation = {
+            x = (sr.x + tr.x) % 360,
+            y = (sr.y + tr.y) % 360,
+            z = (sr.z + tr.z) % 360
+        }
+        local clone = newVersionObject.clone({
+            position = position,
+            snap_to_grid = transform.snap_to_grid and true or false
+        })
+        clone.setRotation(rotation)
+        clone.setScale(transform.scale or { x = 1, y = 1, z = 1 })
+        clone.setLock(transform.lock and true or false)
+        if transform.name then
+            local nameWithColor = string.gsub(transform.name, '$COLOR', color)
+            clone.setName(nameWithColor)
+        end
+        coroutine.yield(0)
+        coroutine.yield(0)
     end
 end
 
@@ -609,6 +662,8 @@ function doPatchLuaCoroutine()
                 addOnTable(value, object)
             elseif ruleType == 'removeFromTable' then
                 removeFromTable(value, object)
+            elseif ruleType == 'addOnColors' then
+                addOnColors(value, object)
             elseif ruleType == 'replaceInContainer' then
                 replaceInContainer(value, object)
             elseif ruleType == 'addToContainer' then

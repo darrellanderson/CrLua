@@ -57,6 +57,7 @@ end
 function onObjectDestroy(dyingObject)
     -- No regrets.
     if dyingObject == self or string.find(dyingObject.getName(), 'TI4 Deleted Items') then
+        objectEnteredContainerSet[dyingObject] = nil
         return
     end
 
@@ -135,9 +136,12 @@ function shouldZombie(object)
     end
 
     -- Is this object in a search-in-progress container?
+    -- Technically a guid match is not a guarantee that it is the same
+    -- object, but given the player is currently searching the container
+    -- it seems like a safe bet.
     for _, container in pairs(searchingContainers) do
         for _, entry in ipairs(container.getObjects()) do
-            if entry.guid == object.guid and entry.name == name then
+            if entry.guid == object.guid then
                 return false
             end
         end

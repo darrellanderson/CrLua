@@ -23,6 +23,12 @@ function onLoad()
         self.setName(defaultObjectName())
     end
 
+    -- When initially loading the game, flip token for the player.
+    local color = myColor()
+    if not isActive() and CrLua.TTS.Player.isSeated(color) then
+        self.flip()
+    end
+
     -- Wait to be at rest (might be flying from a container to intended
     -- destination), then attempt to assign to closest player's hand.  If there
     -- already exists a peer token for that color leave self unassigned.
@@ -199,7 +205,8 @@ end
 
 function setActivePeersWithIncludeSelf(peers)
     for _, peer in ipairs(peers) do
-        if peer.is_face_down then
+        local peerColor = objectNameToColor(peer.getName())
+        if peer.is_face_down and CrLua.TTS.Player.isSeated(peerColor) then
             peer.flip()
         end
     end

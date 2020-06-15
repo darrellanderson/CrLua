@@ -155,7 +155,7 @@ function CrLua.TI4.Unit.addFlagship(name, attributes)
         end
     end
 
-    local success, errorMessage = CrLua.TI4.System.isValidAttributes(attributes, true)
+    local success, errorMessage = CrLua.TI4.Unit.isValidAttributes(attributes, true)
     if not success then
         return false, errorMessage
     end

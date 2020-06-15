@@ -25,8 +25,8 @@
 local HOMEBREW_FLAGSHIPS = {
     -- Sample flagship from Tactic Blue's Blue Space homebrew.  REPLACE THIS!
     {
-        name = 'Khage',
-        faction = 'The Khet Drakkol Union',
+        name = 'Sample Flagship Name',
+        faction = 'Sample Faction Name',
         sustainDamage = true,
         bombardment = 5,
     },
@@ -48,12 +48,12 @@ local HOMEBREW_FLAGSHIPS = {
 local HOMEBREW_SYSTEMS = {
     -- Sample system from Tactic Blue's Blue Space homebrew.  REPLACE THIS!
     {
-        guid = '2e10be',
+        guid = '2f1fbf',
         tile = 0,  -- 0 reserved for homebrew
         home = true,
         planets = {
-            { name = 'Khet' },
-            { name = 'Drakkol' },
+            { name = 'Sample Planet 1' },
+            { name = 'Sample Planet 2' },
         }
     },
 }
@@ -67,9 +67,11 @@ function onLoad(saveState)
         local version = object.getVar('homebrewVersion')
         if version and version >= REQUIRES_HOMEBREW_VERSION then
             for _, flagship in ipairs(HOMEBREW_FLAGSHIPS) do
+                print('Homebrew: adding flagship "' .. flagship.name .. '" to "' .. object.getName() .. '"')
                 object.call('homebrewAddFlagship', flagship)
             end
             for _, system in ipairs(HOMEBREW_SYSTEMS) do
+                print('Homebrew: adding system "' .. system.guid .. '" to "' .. object.getName() .. '"')
                 object.call('homebrewAddSystem', system)
             end
         end

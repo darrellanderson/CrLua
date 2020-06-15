@@ -9,7 +9,7 @@ CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
 CrLua.TI4 = CrLua.TI4 or {}
 CrLua.TI4.Unit = assert(not CrLua.TI4.Unit) and {
     _require = { 'List', 'LockTable', 'Table', 'Util', 'TI4.Faction' },
-    _allowMissingKeys = { 'UNIT', 'FLAGSHIP', 'TOKEN' }
+    _allowMissingKeys = { 'UNIT', 'FLAGSHIP', 'TOKEN', 'FACTION_OVERRIDES' }
 }
 
 -- Expose keys by way of a (read-only, require keys) table.  External users
@@ -99,6 +99,15 @@ CrLua.TI4.Unit.TOKEN = {
     ['x1 Fighter Token'] = { unitName = 'Fighter', count = 1 },
     ['x3 Infantry'] = { unitName = 'Infantry', count = 3 },
     ['x1 Infantry'] = { unitName = 'Infantry', count = 1 },
+}
+
+CrLua.TI4.Unit.FACTION_OVERRIDES = {
+    ['The Veldyr Sovereignty'] = {
+        ['Dreadnought'] = { spaceCannon = 6 },
+    },
+    ['The Lazax'] = {
+        ['Fighter'] = { bombardment = 9 },
+    },
 }
 
 -------------------------------------------------------------------------------
@@ -330,6 +339,12 @@ function CrLua.TI4.Unit.attributes(unit)
         local objectName = unit.object.getName()
         local flagshipAttributes = CrLua.TI4.Unit.FLAGSHIP[objectName] or {}
         attributes = CrLua.Table.join(attributes, flagshipAttributes)
+    end
+
+    local faction = unit.color and CrLua.TI4.Faction.fromColor(unit.color)
+    local overrides = faction and CrLua.TI4.Unit.FACTION_OVERRIDES[faction.name]
+    if overrides and overrides[unit.unitName] then
+        attributes = CrLua.Table.join(attributes, overrides[unit.unitName])
     end
 
     return attributes

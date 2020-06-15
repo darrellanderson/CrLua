@@ -1,0 +1,77 @@
+--- Homebrew can use this to add custom stuff to the game!
+-- @author Darrell
+--
+-- 1. Copy this script to an object in your homebrew.
+-- 2. Fill in HOMEBREW_FLAGSHIPS and/or HOMEBREW_SYSTEMS.
+-- 3. Done!  The next time your object gets loaded into a game it will inject.
+
+-- After removing name, remaining values are CrLua.TI4.Unit.ATTR attributes.
+-- Flagship attributes:
+-- - cost = { type = 'number' },  -- production cost
+-- - ship = { type = 'boolean' },  -- participates in space combat?
+-- - ground = { type = 'boolean' },  -- participates in ground combat?
+-- - structure = { type = 'boolean' },  -- ground-based structure (control)
+-- - spaceCannon = { type = 'number' },  -- if set, Space Cannon hit value
+-- - antiFighterBarrage = { type = 'boolean' },  -- has AFB?
+-- - sustainDamage = { type = 'boolean' },  -- can sustain damage?
+-- - bombardment = { type = 'number' },  -- if set, Bombardment hit value
+-- - planetaryShield = { type = 'boolean' },  -- has Planetary Shield?
+-- - ignorePlanetaryShield = { type = 'boolean' },  -- system units may ignore PS?
+-- - faction = { type = 'string' },  -- owning faction name (matching "{Faction} Sheet")
+-- - wormhole = { type = 'string' },  -- if set, creates a wormhole (e.g. "delta")
+-- - fightersOnGround = { type = 'boolean' },  -- do fighers participate in ground combat?
+-- - infantryInSpace = { type = 'boolean' },  -- do infantry participate in space combat?
+-- - nonFighterDice = { type = 'boolean' },  -- rolls dice equal to the number of non-fighter ships?
+local HOMEBREW_FLAGSHIPS = {
+    -- Sample flagship from Tactic Blue's Blue Space homebrew.  REPLACE THIS!
+    {
+        name = 'Khage',
+        faction = 'The Khet Drakkol Union',
+        sustainDamage = true,
+        bombardment = 5,
+    },
+}
+
+-- After removing guid, remaining values are CrLua.TI4.System.SYSTEMS table.
+-- System attributes:
+-- - tile = { type = 'number' },  -- probably 0 for homebrew systems
+-- - home = { type = 'boolean' },  -- set true for home systems
+-- - wormholes = { type = 'table' },  -- list of wormhole strings (e.g. "alpha")
+-- - anomalies = { type = 'table' },  -- list of anomaly strings (e.g. "nebula")
+-- - planets = { type = 'table' },  -- list of planet tables
+-- - rotate = { type = 'number' },  -- optionally rotate if not standard layout
+-- - localY = { type = 'number' },  -- tile height if not standard (e.g. cruss bonus tile)
+-- Planet attributes:
+-- - name = { type = 'string' },
+-- - position = { type = 'table' },  -- local x,z override for planet position
+-- - radius = { type = 'number' },  -- local radius override
+local HOMEBREW_SYSTEMS = {
+    -- Sample system from Tactic Blue's Blue Space homebrew.  REPLACE THIS!
+    {
+        guid = '2e10be',
+        tile = 0,  -- 0 reserved for homebrew
+        home = true,
+        planets = {
+            { name = 'Khet' },
+            { name = 'Drakkol' },
+        }
+    },
+}
+
+-- Version control, only inject items with the version or greater.
+-- (In case new features get added, only inject those that have them!)
+local REQUIRES_HOMEBREW_VERSION = 1
+
+function onLoad(saveState)
+    for _, object in ipairs(getAllObjects()) do
+        local version = object.getVar('homebrewVersion')
+        if version and version >= REQUIRES_HOMEBREW_VERSION then
+            for _, flagship in ipairs(HOMEBREW_FLAGSHIPS) do
+                object.call('homebrewAddFlagship', flagship)
+            end
+            for _, system in ipairs(HOMEBREW_SYSTEMS) do
+                object.call('homebrewAddSystem', system)
+            end
+        end
+    end
+end

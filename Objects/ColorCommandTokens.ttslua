@@ -40,7 +40,7 @@ function onLoad()
     for _, object in ipairs(getAllObjects()) do
         local type, faction = parseTokenName(object.getName())
         local color = faction and getColor(faction)
-        if type and color then
+        if type == 'Command' and color then
             colorToken(object, type, color)
         end
     end
@@ -49,7 +49,7 @@ end
 function onDestroy()
     for _, object in ipairs(getAllObjects()) do
         local type, faction = parseTokenName(object.getName())
-        if type then
+        if type == 'Command' then
             object.setVectorLines({})
         end
     end
@@ -58,7 +58,7 @@ end
 function onObjectSpawn(object)
     local type, faction = parseTokenName(object.getName())
     local color = faction and getColor(faction)
-    if type and color then
+    if type == 'Command' and color then
         colorToken(object, type, color)
     end
 end

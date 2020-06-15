@@ -513,7 +513,7 @@ function autoFill(params)
         -- Respect non-fighter-dice ability.
         if unitName == 'Flagship' then
             local attrs = CrLua.TI4.Unit.attributes(unit)
-            if attrs[CrLua.TI4.Unit.ATTR.NON_FIGHTER_DICE] then
+            if attrs.nonFighterDice then
                 count = #CrLua.TI4.Unit.filterToNonFighterShips(enemyUnitsInHex) or 0
             end
         end

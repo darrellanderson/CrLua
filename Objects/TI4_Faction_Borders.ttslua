@@ -521,6 +521,7 @@ function updateCache()
         y = false,
     }
 
+    CrLua.TI4.Faction.update()
     CrLua.TI4.Zone.update()
     local hexToOwners = getSystemOwners()
 

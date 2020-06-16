@@ -1,0 +1,323 @@
+--- Show the produce and consume costs for contained objects.
+-- @author Darrell
+
+local TAG = 'BuildArea'
+
+local OBJECT_EFFECTS = {
+    -- Tokens
+    ['Commodities/Tradegoods x1'] = {
+        resources = 1
+    },
+    ['Commodities/Tradegoods x3'] = {
+        resources = 3
+    },
+
+    -- Technologies
+    ['Sarween Tools'] = {
+        anywhereInPlayerZone = true,
+        requireFaceUp = true,
+        situational = true,
+    },
+    ['Prototype War Sun II'] = {
+        anywhereInPlayerZone = true,
+        requireFaceUp = true,
+        unitAttributeOverrides = {
+            ['War Sun'] = { cost = 10 }
+        }
+    },
+
+    -- Agendas
+    ['Regulated Conscription'] = {
+        anywhereOnTable = true,
+        requireFaceUp = true,
+        unitAttributeOverrides = {
+            ['Fighter'] = { cost = 1 },
+            ['Infantry'] = { cost = 1 },
+        },
+    },
+    ['Core Mining'] = {
+        requireFaceUp = true,
+        resources = 2,
+    },
+    ['Terraforming Initiative'] = {
+        requireFaceUp = true,
+        resources = 1,
+    },
+}
+
+local _config = {
+    thickness = 0.4,
+    yOffset = 0,
+}
+
+local _data = {
+    draggableCorner = false,
+    boundingBox = false,
+    inside = {},
+    planets = false,
+}
+
+-------------------------------------------------------------------------------
+
+function onLoad(saveState)
+    local state = saveState and JSON.decode(saveState)
+    local guid = state and state.draggableCornerGuid
+    _data.draggableCorner = guid and getObjectFromGUID(guid)
+    Wait.frames(updateEverything, 1)
+end
+
+function onSave()
+    return JSON.encode({
+        draggableCornerGuid = _data.draggableCorner and _data.draggableCorner.getGUID()
+    })
+end
+
+function onObjectDrop(playerColor, droppedObject)
+    assert(type(playerColor) == 'string' and type(droppedObject) == 'userdata')
+    if droppedObject == self or droppedObject == _data.draggableCorner then
+        CrLua.Log.d(TAG, 'onObjectDrop: corner')
+        updateBoundingBox()
+        self.setVar('onUpdate', nil)
+    elseif isInsideBuildArea(droppedObject) then
+        _data.inside[droppedObject] = true
+        updateValues()
+    end
+end
+
+function onObjectPickUp(playerColor, pickedUpObject)
+    assert(type(playerColor) == 'string' and type(pickedUpObject) == 'userdata')
+    if pickedUpObject == self or pickedUpObject == _data.draggableCorner then
+        CrLua.Log.d(TAG, 'onObjectPickUp: corner')
+        self.setVar('onUpdate', updateBoundingBox)
+    elseif _data.inside[pickedUpObject] then
+        _data.inside[pickedUpObject] = nil
+        updateValues()
+    end
+end
+
+function onPlayerChangeColor(playerColor)
+    updateEverything()
+end
+
+function onObjectDestroy(dyingObject)
+    if dyingObject == _data.draggableCorner then
+        _data.draggableCorner = false
+    end
+end
+
+-------------------------------------------------------------------------------
+
+function updateEverything()
+    updateDraggableCorner()
+    updateBoundingBox()
+    updateInsideBuildArea()
+    updateValues()
+end
+
+-------------------------------------------------------------------------------
+
+function updateDraggableCorner()
+    if not _data.draggableCorner then
+        _data.draggableCorner = spawnObject({
+            type              = 'BlockSquare',
+            position          = self.getPosition(),
+            rotation          = { x = 0, y = 0, z = 0 },
+            scale             = { x = 1, y = 1, z = 1 },
+            sound             = false,
+            snap_to_grid      = false,
+        })
+    end
+    _data.draggableCorner.setColorTint(getPlayerColor())
+    _data.draggableCorner.use_grid = false
+    _data.draggableCorner.use_snap_points = false
+    _data.draggableCorner.sticky = false
+end
+
+function updateBoundingBox()
+    _data.boundingBox = getBoundingBox()
+    if not _data.boundingBox then
+        CrLua.Log.e(TAG, 'updateBoundingBox: no bounding box')
+        return
+    end
+
+    local bb = _data.boundingBox
+    local y = self.getPosition().y + _config.yOffset
+    self.setVectorLines({{
+        points = {
+            self.positionToLocal({ x = bb.min.x, y = y, z = bb.min.z }),
+            self.positionToLocal({ x = bb.min.x, y = y, z = bb.max.z }),
+            self.positionToLocal({ x = bb.max.x, y = y, z = bb.max.z }),
+            self.positionToLocal({ x = bb.max.x, y = y, z = bb.min.z }),
+        },
+        color = getPlayerColor() or 'Grey',
+        rotation = { x = 0, y = 0, z = 0 },
+        thickness = _config.thickness,
+        loop = true,
+        square = true,
+    }})
+end
+
+function updateInsideBuildArea()
+    _data.inside = {}
+    for _, object in ipairs(getAllObjects()) do
+        if isInsideBuildArea(object) then
+            _data.inside[object] = true
+        end
+    end
+end
+
+function updateValues()
+    local values = getValues()
+end
+
+-------------------------------------------------------------------------------
+
+function isInsideBuildArea(object)
+    assert(type(object) == 'userdata')
+    local p = object.getPosition()
+    local bb = _data.boundingBox
+    return bb and bb.min.x <= p.x and p.x <= bb.max.x and bb.min.z <= p.z and p.z <= bb.max.z
+end
+
+function getPlanet(object)
+    assert(type(object) == 'userdata')
+    _data.planets = _data.planets or CrLua.TI4.System.getAllPlanets()
+    return _data.planets[object.getName()]
+end
+
+function getPlayerColor()
+    local position = _data.boundingBox and _data.boundingBox.center or getBoundingBox().center
+    local zone = CrLua.TI4.Zone.insideWhich(position)
+    return zone and zone.color
+end
+
+function getBoundingBox()
+    if not _data.draggableCorner then
+        return false
+    end
+    local a = self.getBounds()
+    local b = _data.draggableCorner.getBounds()
+    local min = {
+        x = math.min(a.center.x - a.size.x, b.center.x - b.size.x),
+        y = math.min(a.center.y - a.size.y, b.center.y - b.size.y),
+        z = math.min(a.center.z - a.size.z, b.center.z - b.size.z),
+    }
+    local max = {
+        x = math.max(a.center.x + a.size.x, b.center.x + b.size.x),
+        y = math.max(a.center.y + a.size.y, b.center.y + b.size.y),
+        z = math.max(a.center.z + a.size.z, b.center.z + b.size.z),
+    }
+    return {
+        min = min,
+        max = max,
+        center = {
+            x = (min.x + max.x) / 2.0,
+            y = (min.y + max.y) / 2.0,
+            z = (min.z + max.z) / 2.0,
+        }
+    }
+end
+
+-------------------------------------------------------------------------------
+
+function getValues()
+    local playerColor = getPlayerColor()
+    if not playerColor then
+        return false
+    end
+
+    CrLua.TI4.Zone.update()
+    local zone = CrLua.TI4.Zone.fromColor(playerColor)
+
+    -- Get objects to consider.
+    local function useObject(object)
+        local objectEffects = OBJECT_EFFECTS[object.getName()]
+        if not objectEffects then
+            return false
+        end
+        if objectEffects.requireFaceUp and object.is_face_down then
+            return false
+        end
+        if objectEffects.anywhereInPlayerZone and zone then
+            return CrLua.TI4.Zone.inside(zone, object.getPosition())
+        end
+        return objectEffects.anywhereOnTable
+    end
+    local objects = CrLua.Table.join(_data.inside, {})
+    for _, object in ipairs(getAllObjects()) do
+        if useObject(object) then
+            objects[object] = true
+        end
+    end
+
+    -- First pass gathers overrides.
+    local unitAttributeOverrides = {}
+    for object, _ in pairs(objects) do
+        local objectEffects = OBJECT_EFFECTS[object.getName()]
+        if objectEffects and objectEffects.unitAttributeOverrides then
+            unitAttributeOverrides = CrLua.Table.join(unitAttributeOverrides, objectEffects.unitAttributeOverrides)
+        end
+    end
+
+    -- Second pass counts resources and costs.
+    local result = {
+        resources = 0,
+        cost = 0,
+        situational = {}
+    }
+    for object, _ in pairs(objects) do
+        local objectEffects = OBJECT_EFFECTS[object.getName()]
+
+        -- Keep track of situational, let the user decide when to apply them.
+        if objectEffects and objectEffects.situational then
+            table.insert(result.situational, object)
+        end
+
+        -- Unit cost.
+        local unit = CrLua.TI4.Unit.fromObject(object)
+        if unit then
+            local unitAttributes = CrLua.TI4.Unit.attributes(unit)
+            if unitAttributeOverrides[unit.unitName] then
+                unitAttributes = CrLua.Table.join(unitAttributes, unitAttributeOverrides[unit.unitName])
+            end
+            result.cost = result.cost + assert(unitAttributes.cost) * unit.count
+        end
+
+        -- Planet resources.
+        local planet = getPlanet(object)
+        if planet then
+            result.resources = result.resources + assert(planet.resources)
+        end
+
+        -- Other things.
+        if objectEffects then
+            result.resources = result.resources + (objectEffects.resources or 0)
+            result.cost = result.cost + (objectEffects.cost or 0)
+        end
+    end
+
+    CrLua.Log.d(TAG, 'getValues', result)
+    return result
+end
+
+-------------------------------------------------------------------------------
+
+#include <~/CrLua/CrLua>
+#include <~/CrLua/LockGlobals>
+
+#include <~/CrLua/List>
+#include <~/CrLua/LockTable>
+#include <~/CrLua/Log>
+#include <~/CrLua/Polygon>
+#include <~/CrLua/Table>
+#include <~/CrLua/Util>
+
+#include <~/CrLua/TI4/Faction>
+#include <~/CrLua/TI4/System>
+#include <~/CrLua/TI4/Unit>
+#include <~/CrLua/TI4/Zone>
+
+CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
+
+CrLua.assertRequired({ 'Log', 'TI4.System', 'TI4.Unit', 'TI4.Zone' })
+CrLua.lock()

@@ -6,8 +6,8 @@
 
 local _config = {
     y = {
-        top = 0.1,
-        bottom = 0.1
+        top = 0.199,
+        bottom = 0.01
     },
     thickness = 0.2,
 
@@ -100,6 +100,21 @@ end
 function colorToken(object, type, color)
     local up = object.getTransformUp()
     local down = { x = -up.x, y = -up.y, z = -up.z }
+
+    --[[
+    local outer = getBorder(type, 0)
+    outer = CrLua.Polygon.fromXYZ(outer)
+    outer = CrLua.Polygon.inset(outer, -_config.thickness / 2)
+    outer = CrLua.Polygon.toXYZ(outer, -(_config.y.top + _config.y.bottom) / 2.0)
+    for i, point in ipairs(outer) do
+        outer[i] = {
+            x = point.x,
+            y = point.z + (i * 0.01),
+            z = point.y + (i * 0.01)
+        }
+    end
+    --]]
+
     object.setVectorLines({
         {
             points = getBorder(type, _config.y.top),
@@ -117,6 +132,17 @@ function colorToken(object, type, color)
             loop = true,
             square = false
         },
+        -- Not able to get reliable sideways-facing lines.
+        --[[
+        {
+            points = outer,
+            color = {1,0,0},
+            thickness = math.abs(_config.y.top - _config.y.bottom),
+            rotation = { x = 90, y = 0, z = 0 },
+            loop = true,
+            square = false
+        }
+        --]]
     })
 end
 
@@ -173,3 +199,7 @@ function updateFactionColors()
         _factionColors[faction] = bestColor
     end
 end
+
+#include <~/CrLua/CrLua>
+#include <~/CrLua/LockGlobals>
+#include <~/CrLua/Polygon>

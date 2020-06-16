@@ -21,137 +21,137 @@ CrLua.TI4.System = assert(not CrLua.TI4.System) and {
 
 CrLua.TI4.System.SYSTEMS = {
     ['86e50a'] = { tile = 1, home = true, planets = {
-        { name = 'Jord' },
+        { name = 'Jord', resources = 4, influence = 2 },
     }},
     ['ac3193'] = { tile = 2, home = true, planets = {
-        { name = 'Moll Primus' },
+        { name = 'Moll Primus', resources = 4, influence = 1 },
     }},
     ['db8aac'] = { tile = 3, home = true, planets = {
-        { name = 'Darien' },
+        { name = 'Darien', resources = 4, influence = 4 },
     }},
     ['da7879'] = { tile = 4, home = true, planets = {
-        { name = 'Muaat' },
+        { name = 'Muaat', resources = 4, influence = 1 },
     }},
     ['fc6f7a'] = { tile = 5, home = true, planets = {
-        { name = 'Nestphar' },
+        { name = 'Nestphar', resources = 3, influence = 2 },
     }},
     ['420355'] = { tile = 6, home = true, planets = {
-        { name = '[0.0.0]' },
+        { name = '[0.0.0]', resources = 5, influence = 0 },
     }},
     ['087347'] = { tile = 7, home = true, planets = {
-        { name = 'Winnu' },
+        { name = 'Winnu', resources = 3, influence = 4 },
     }},
     ['ea676a'] = { tile = 8, home = true, planets = {
-        { name = 'Mordai II' },
+        { name = 'Mordai II', resources = 4, influence = 0 },
     }},
     ['0122f9'] = { tile = 9, home = true, planets = {
-        { name = 'Maaluuk' },
-        { name = 'Druaa' },
+        { name = 'Maaluuk', resources = 0, influence = 2 },
+        { name = 'Druaa', resources = 3, influence = 1 },
     }},
     ['e001b4'] = { tile = 10, home = true, planets = {
-        { name = 'Arc Prime' },
-        { name = 'Wren Terra' },
+        { name = 'Arc Prime', resources = 4, influence = 0 },
+        { name = 'Wren Terra', resources = 2, influence = 1 },
     }},
     ['d39876'] = { tile = 11, home = true, planets = {
-        { name = 'Lisis II' },
-        { name = 'Ragh' },
+        { name = 'Lisis II', resources = 1, influence = 0 },
+        { name = 'Ragh', resources = 2, influence = 1 },
     }},
     ['11598c'] = { tile = 12, home = true, planets = {
-        { name = 'Nar' },
-        { name = 'Jol' },
+        { name = 'Nar', resources = 2, influence = 3 },
+        { name = 'Jol', resources = 1, influence = 2 },
     }},
     ['6176bf'] = { tile = 13, home = true, planets = {
         { name = "Tren'lak" },
-        { name = 'Quinarra' },
+        { name = 'Quinarra', resources = 3, influence = 1 },
     }},
     ['c2509e'] = { tile = 14, home = true, planets = {
-        { name = 'Archon Ren' },
-        { name = 'Archon Tau' },
+        { name = 'Archon Ren', resources = 2, influence = 3 },
+        { name = 'Archon Tau', resources = 1, influence = 1 },
     }},
     ['9c373a'] = { tile = 15, home = true, planets = {
-        { name = 'Retillion' },
-        { name = 'Shalloq' },
+        { name = 'Retillion', resources = 2, influence = 3 },
+        { name = 'Shalloq', resources = 1, influence = 2 },
     }},
     ['6a4247'] = { tile = 16, home = true, planets = {
-        { name = 'Hercant' },
-        { name = 'Arretze' },
-        { name = 'Kamdorn' },
+        { name = 'Hercant', resources = 1, influence = 1 },
+        { name = 'Arretze', resources = 2, influence = 0 },
+        { name = 'Kamdorn', resources = 0, influence = 1 },
     }},
     ['c56a8a'] = { tile = 17, wormholes = { 'delta' } },
     ['04df02'] = { tile = 18, planets = {
-        { name = 'Mecatol Rex', radius = 1.7 },
+        { name = 'Mecatol Rex', resources = 1, influence = 6, radius = 1.7 },
     }},
     ['4216fd'] = { tile = 19, planets = {
-        { name = 'Wellon' },
+        { name = 'Wellon', resources = 1, influence = 2 },
     }},
     ['bc4bcc'] = { tile = 20, planets = {
-        { name = 'Vefut II' },
+        { name = 'Vefut II', resources = 2, influence = 2 },
     }},
     ['f2798a'] = { tile = 21, planets = {
-        { name = 'Thibah' },
+        { name = 'Thibah', resources = 1, influence = 1 },
     }},
     ['0ea77f'] = { tile = 22, planets = {
         { name = "Tar'mann" },
     }},
     ['7975f7'] = { tile = 23, planets = {
-        { name = 'Saudor' },
+        { name = 'Saudor', resources = 2, influence = 2 },
     }},
     ['48cc9f'] = { tile = 24, planets = {
-        { name = 'Mehar Xull' },
+        { name = 'Mehar Xull', resources = 1, influence = 3 },
     }},
     ['71e1bf'] = { tile = 25, wormholes = { 'beta' }, planets = {
-        { name = 'Quann' },
+        { name = 'Quann', resources = 2, influence = 1 },
     }},
     ['f11ef5'] = { tile = 26, wormholes = { 'alpha' }, planets = {
-        { name = 'Lodor' },
+        { name = 'Lodor', resources = 3, influence = 1 },
     }},
     ['fc239f'] = { tile = 27, planets = {
-        { name = 'New Albion' },
-        { name = 'Starpoint' },
+        { name = 'New Albion', resources = 1, influence = 1 },
+        { name = 'Starpoint', resources = 3, influence = 1 },
     }},
     ['f8caf6'] = { tile = 28, planets = {
         { name = "Tequ'ran" },
-        { name = 'Torkan' },
+        { name = 'Torkan', resources = 0, influence = 3 },
     }},
     ['0ac98b'] = { tile = 29, planets = {
-        { name = "Qucen'n" },
-        { name = 'Rarron' },
+        { name = "Qucen'n", resources = 1, influence = 2 },
+        { name = 'Rarron', resources = 0, influence = 3 },
     }},
     ['aaae9f'] = { tile = 30, planets = {
-        { name = 'Mellon' },
-        { name = 'Zohbat' },
+        { name = 'Mellon', resources = 0, influence = 2 },
+        { name = 'Zohbat', resources = 3, influence = 1 },
     }},
     ['d5ed63'] = { tile = 31, planets = {
-        { name = 'Lazar' },
-        { name = 'Sakulag' },
+        { name = 'Lazar', resources = 1, influence = 0 },
+        { name = 'Sakulag', resources = 2, influence = 1 },
     }},
     ['48ac87'] = { tile = 32, planets = {
-        { name = 'Dal Bootha' },
+        { name = 'Dal Bootha', resources = 0, influence = 2 },
         { name = 'Xxehan' },
     }},
     ['87a5a2'] = { tile = 33, planets = {
-        { name = 'Corneeq' },
-        { name = 'Resculon' },
+        { name = 'Corneeq', resources = 1, influence = 2 },
+        { name = 'Resculon', resources = 2, influence = 0 },
     }},
     ['eb99c0'] = { tile = 34, planets = {
-        { name = 'Centauri' },
-        { name = 'Gral' },
+        { name = 'Centauri', resources = 1, influence = 3 },
+        { name = 'Gral', resources = 1, influence = 1 },
     }},
     ['dd2ca7'] = { tile = 35, planets = {
-        { name = 'Bereg' },
-        { name = 'Lirta IV' },
+        { name = 'Bereg', resources = 3, influence = 1 },
+        { name = 'Lirta IV', resources = 2, influence = 3 },
     }},
     ['a284d1'] = { tile = 36, planets = {
-        { name = 'Arnor' },
-        { name = 'Lor' },
+        { name = 'Arnor', resources = 2, influence = 1 },
+        { name = 'Lor', resources = 1, influence = 2 },
     }},
     ['e0ff33'] = { tile = 37, planets = {
-        { name = 'Arinam' },
-        { name = 'Meer' },
+        { name = 'Arinam', resources = 1, influence = 2 },
+        { name = 'Meer', resources = 0, influence = 4 },
     }},
     ['b958aa'] = { tile = 38, planets = {
-        { name = 'Abyz' },
-        { name = 'Fria' },
+        { name = 'Abyz', resources = 3, influence = 0 },
+        { name = 'Fria', resources = 2, influence = 0 },
     }},
     ['0378a4'] = { tile = 39, wormholes = { 'alpha' } },
     ['ccd7ac'] = { tile = 40, wormholes = { 'beta' } },
@@ -166,7 +166,7 @@ CrLua.TI4.System.SYSTEMS = {
     ['0216be'] = { tile = 49 },
     ['97ee53'] = { tile = 50 },
     ['f38182'] = { tile = 51, home = true, localY = 0.101, wormholes = { 'delta' }, planets = {
-        { name = 'Creuss', position = { 0.35, 0.18 }, radius = 0.8 },
+        { name = 'Creuss', resources = 4, influence = 2, position = { 0.35, 0.18 }, radius = 0.8 },
     }},
 
     -- TI3 systems.
@@ -213,7 +213,7 @@ CrLua.TI4.System.SYSTEMS = {
         { name = 'Cormund' }
     }},
     ['a682b7'] = { tile = 0, planets = {
-        { name = 'Malice',  position = { -0.9, -0.4 } }
+        { name = 'Malice',  position = { -0., resources = 5, influence = 09, -0.4 } }
     }},
     ['35baa0'] = { tile = 0, planets = {
         { name = 'Everra',  position = { 0.7, -1.2 } }
@@ -285,71 +285,71 @@ CrLua.TI4.System.SYSTEMS = {
 
     -- Tactic Blue homebrew factions
     ['12d914'] = { tile = 0, planets = {
-        { name = 'Nevermore' },
+        { name = 'Nevermore', resources = 3, influence = 3 },
     }},
     ['975d0a'] = { tile = 0, planets = {
-        { name = 'Arrakis' },
+        { name = 'Arrakis', resources = 4, influence = 0 },
     }},
     ['2e10be'] = { tile = 0, planets = {
-        { name = 'Khet' },
-        { name = 'Drakkol' },
+        { name = 'Khet', resources = 1, influence = 2 },
+        { name = 'Drakkol', resources = 3, influence = 0 },
     }},
     ['5dcca6'] = { tile = 0, anomalies = { 'nebula' }, planets = {
-        { name = 'Rhune' },
+        { name = 'Rhune', resources = 3, influence = 4 },
     }},
     ['b69d23'] = { tile = 0, planets = {
-        { name = 'Mandalore' },
-        { name = 'Concordia' },
+        { name = 'Mandalore', resources = 3, influence = 2 },
+        { name = 'Concordia', resources = 1, influence = 1 },
     }},
     ['04c835'] = { tile = 0, planets = {
-        { name = 'Refuge' },
-        { name = 'Kharak' },
+        { name = 'Refuge', resources = 1, influence = 3 },
+        { name = 'Kharak', resources = 1, influence = 0 },
     }},
     ['284942'] = { tile = 0, planets = {
-        { name = 'Iodyn' },
-        { name = 'Kroll' },
-        { name = 'Cyrra' },
+        { name = 'Iodyn', resources = 1, influence = 1 },
+        { name = 'Kroll', resources = 0, influence = 1 },
+        { name = 'Cyrra', resources = 1, influence = 0 },
     }},
     ['dd9fd8'] = { tile = 0, planets = {
-        { name = 'Klyutoss' },
+        { name = 'Klyutoss', resources = 2, influence = 5 },
     }},
     ['f67eca'] = { tile = 0, planets = {
-        { name = 'Vorn' },
-        { name = 'Xyphen' },
+        { name = 'Vorn', resources = 1, influence = 0 },
+        { name = 'Xyphen', resources = 3, influence = 1 },
     }},
     ['c3785f'] = { tile = 0, planets = {
-        { name = 'Diphda' },
-        { name = 'Damocles' },
-        { name = 'Menkar' },
+        { name = 'Diphda', resources = 1, influence = 1 },
+        { name = 'Damocles', resources = 2, influence = 1 },
+        { name = 'Menkar', resources = 0, influence = 2 },
     }},
     ['108eb9'] = { tile = 0, planets = {
-        { name = 'Ogdun' },
-        { name = 'Brthkul' },
+        { name = 'Ogdun', resources = 2, influence = 0 },
+        { name = 'Brthkul', resources = 1, influence = 2 },
     }},
     ['0db991'] = { tile = 0, planets = {
-        { name = 'Pord' },
+        { name = 'Pord', resources = 3, influence = 1 },
     }},
     ['7fe6fc'] = { tile = 0, planets = {
-        { name = 'H-1' },
-        { name = 'H-2' },
+        { name = 'H-1', resources = 2, influence = 2 },
+        { name = 'H-2', resources = 2, influence = 0 },
     }},
     ['c9dd65'] = { tile = 0, planets = {
-        { name = 'Gheldahr' },
+        { name = 'Gheldahr', resources = 5, influence = 0 },
     }},
     ['eab832'] = { tile = 0, planets = {
-        { name = 'Kyr' },
-        { name = 'Pax' },
-        { name = 'Vess' },
+        { name = 'Kyr', resources = 1, influence = 0 },
+        { name = 'Pax', resources = 2, influence = 2 },
+        { name = 'Vess', resources = 1, influence = 0 },
     }},
     ['ff48e4'] = { tile = 0, planets = {
-        { name = 'Sanctuary' },
+        { name = 'Sanctuary', resources = 4, influence = 2 },
     }},
     ['9e6138'] = { tile = 0, planets = {
-        { name = 'Wod' },
-        { name = 'Lath' },
+        { name = 'Wod', resources = 3, influence = 1 },
+        { name = 'Lath', resources = 2, influence = 2 },
     }},
     ['6a667a'] = { tile = 0, planets = {
-        { name = 'Cymiae' },
+        { name = 'Cymiae', resources = 4, influence = 1 },
     }},
 }
 
@@ -481,6 +481,20 @@ function CrLua.TI4.System.getAllSystems()
         if system then
             CrLua.LockTable.setEvenIfLocked(system, 'object', object)
             table.insert(result, system)
+        end
+    end
+    return result
+end
+
+-------------------------------------------------------------------------------
+--- Get all planets.
+-- @return table : map from planet name to planet attributes.
+-------------------------------------------------------------------------------
+function CrLua.TI4.System.getAllPlanets()
+    local result = {}
+    for guid, system in ipairs(CrLua.TI4.System.SYSTEMS) do
+        for _, planet in ipairs(system.planets or {}) do
+            result[planet.name] = planet
         end
     end
     return result

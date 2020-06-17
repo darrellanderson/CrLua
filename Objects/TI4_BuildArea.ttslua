@@ -82,11 +82,15 @@ local _config = {
 }
 
 local _data = {
+    playerColor = 'Grey',
     width = _config.defaultWidth,
     height = _config.defaultHeight,
-    playerColor = 'Grey',
-    inside = {},
+
+    boundingBox = false,
     planets = false,
+
+    inside = {},
+
     dragOffset = {
         x = 0,
         z = 0
@@ -143,11 +147,20 @@ end
 -------------------------------------------------------------------------------
 
 function updateEverything()
-    _data.playerColor = getPlayerColor() or 'Grey'
-    self.setColorTint(_data.playerColor)
-    drawSize()
+    updatePlayerColor()
+    updateBoundingBox()
     updateInsideBuildArea()
     updateProduceConsumeValues()
+end
+
+function updatePlayerColor()
+    _data.playerColor = getPlayerColor() or 'Grey'
+    self.setColorTint(_data.playerColor)
+end
+
+function updateBoundingBox()
+    _data.boundingBox = getLocalBoundingBox()
+    drawBoundingBox()
 end
 
 function updateInsideBuildArea()
@@ -166,10 +179,29 @@ end
 
 -------------------------------------------------------------------------------
 
+function getLocalBoundingBox()
+    local bounds = self.getBoundsNormalized()
+    local min = {
+        x = -bounds.size.x / 2.0,
+        y = -bounds.size.y / 2.0,
+        z = -bounds.size.z / 2.0
+    }
+    local max = {
+        x = min.x + _data.width,
+        y = bounds.size.y / 2.0,
+        z = min.z + _data.height
+    }
+    return {
+        min = min,
+        max = max
+    }
+end
+
 function isInsideBuildArea(object)
     assert(type(object) == 'userdata')
     local p = self.positionToLocal(object.getPosition())
-    return p.x >= 0 and p.x <= _data.width and p.z >= 0 and p.z <= _data.height
+    local bb = _data.boundingBox
+    return bb.min.x <= p.x and p.x <= bb.max.x and bb.min.z <= p.z and p.z <= bb.max.z
 end
 
 function getPlanet(object)
@@ -303,20 +335,17 @@ end
 
 -------------------------------------------------------------------------------
 
-function drawSize()
-    local bounds = self.getBoundsNormalized()
-    local dx = (bounds.size.x / 2.0) - (_config.thickness / 2.0)
-    local dz = (bounds.size.z / 2.0) - (_config.thickness / 2.0)
-    local y = (bounds.size.y / 2) - 0.01
-    local points = {
-        { x = -dx, y = y, z = -dz },
-        { x = -dx + _data.width, y = y, z = -dz },
-        { x = -dx + _data.width, y = y, z = -dz + _data.height },
-        { x = -dx, y = y, z = -dz + _data.height },
-    }
-
+function drawBoundingBox()
+    local bb = _data.boundingBox
+    local d = _config.thickness / 2.0
+    local y = bb.max.y - 0.01
     self.setVectorLines({{
-        points = points,
+        points = {
+            { x = bb.min.x + d, y = y, z = bb.min.z + d },
+            { x = bb.min.x + d, y = y, z = bb.max.z - d },
+            { x = bb.max.x - d, y = y, z = bb.max.z - d },
+            { x = bb.max.x - d, y = y, z = bb.min.z + d },
+        },
         color = _data.playerColor,
         rotation = { x = 0, y = 0, z = 0 },
         thickness = _config.thickness,
@@ -336,14 +365,14 @@ function drawUi(values)
 
     -- Text panel size.
     local bounds = self.getBoundsNormalized()
-    local panelWidth = bounds.size.x
-    local panelHeight = bounds.size.z
+    local panelWidth = bounds.size.x - _config.thickness
+    local panelHeight = bounds.size.z - _config.thickness
 
     -- Draggable corner.
-    local cornerWidth = 1
-    local cornerHeight = 1
-    local cornerX = _data.width - panelWidth / 2.0
-    local cornerY = _data.height - panelHeight / 2.0
+    local cornerWidth = 0.5
+    local cornerHeight = cornerWidth
+    local cornerX = _data.width - (bounds.size.x / 2.0) - (cornerWidth / 2.0)
+    local cornerY = _data.height - (bounds.size.z / 2.0) - (cornerHeight / 2.0)
 
     -- UI uses x100 units.
     panelWidth = panelWidth * 100
@@ -355,6 +384,11 @@ function drawUi(values)
     local panelPosition = '0 0 ' .. trimFloat(bounds.size.y * 50.0 + 1)
     local cornerPosition = trimFloat(cornerX) .. ' ' .. trimFloat(cornerY) .. ' ' .. trimFloat(-bounds.size.y * 50.0 + 1)
 
+    local r1c1 = 'Build Cost: ' .. (values and values.cost or '-')
+    local r2c1 = 'Resources: ' .. (values and (values.resources .. (values.sarween and '+ST' or '')) or '-')
+    local r1c2 = '# Units: ' .. (values and values.unitCount or '-')
+    local r2c2 = 'Production: R+' .. (values and values.production or '-')
+
     self.UI.setXmlTable({
         {
             tag = 'Defaults',
@@ -362,9 +396,10 @@ function drawUi(values)
                 {
                     tag = 'Text',
                     attributes = {
-                        fontSize = 52,
+                        color = '#ffffff',
+                        fontSize = 46,
                         fontStyle = 'Bold',
-                        color = '#ffffffff',
+                        alignment = 'MiddleCenter',
                         horizontalOverflow = 'Overflow',
                         verticalOverflow = 'Overflow',
                     }
@@ -378,13 +413,44 @@ function drawUi(values)
                 rotation = '180 0 0',
                 width = panelWidth,
                 height = panelHeight,
-                color = '#333333ff'
+                color = '#222222ff'
             },
             children = {
                 {
-                    tag = 'Text',
-                    value = 'THIS IS TEXT'
-                },
+                    tag = 'TableLayout',
+                    attributes = {
+                        cellBackgroundColor = 'Clear',
+                        padding = '0 0 15 15',
+                    },
+                    children = {
+                        {
+                            tag = 'Row',
+                            children = {
+                                { tag = 'Cell', children = {{
+                                    tag = 'Text',
+                                    value = r1c1
+                                }}},
+                                { tag = 'Cell', children = {{
+                                    tag = 'Text',
+                                    value = r1c2
+                                }}},
+                            }
+                        },
+                        {
+                            tag = 'Row',
+                            children = {
+                                { tag = 'Cell', children = {{
+                                    tag = 'Text',
+                                    value = r2c1
+                                }}},
+                                { tag = 'Cell', children = {{
+                                    tag = 'Text',
+                                    value = r2c2
+                                }}},
+                            }
+                        }
+                    }
+                }
             }
         },
         {
@@ -419,8 +485,8 @@ function onEndDrag(player, option, id)
     local pp = self.positionToLocal(player.getPointerPosition())
     _data.width = pp.x + _data.dragOffset.x
     _data.height = pp.z + _data.dragOffset.z
-    _data.width = math.max(_data.width, _config.minWidth - _config.thickness)
-    _data.height = math.max(_data.height, _config.minHeight - _config.thickness)
+    _data.width = math.max(_data.width, _config.minWidth)
+    _data.height = math.max(_data.height, _config.minHeight)
     updateEverything()
 end
 
@@ -428,9 +494,9 @@ function onDrag(player, option, id)
     local pp = self.positionToLocal(player.getPointerPosition())
     _data.width = pp.x + _data.dragOffset.x
     _data.height = pp.z + _data.dragOffset.z
-    _data.width = math.max(_data.width, _config.minWidth - _config.thickness)
-    _data.height = math.max(_data.height, _config.minHeight - _config.thickness)
-    drawSize()
+    _data.width = math.max(_data.width, _config.minWidth)
+    _data.height = math.max(_data.height, _config.minHeight)
+    updateBoundingBox()
 end
 
 -------------------------------------------------------------------------------
@@ -450,7 +516,7 @@ end
 #include <~/CrLua/TI4/Unit>
 #include <~/CrLua/TI4/Zone>
 
-CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
+--CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
 
 CrLua.assertRequired({ 'Log', 'TI4.System', 'TI4.Unit', 'TI4.Zone' })
 CrLua.lock()

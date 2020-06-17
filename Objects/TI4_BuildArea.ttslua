@@ -3,6 +3,8 @@
 
 local TAG = 'BuildArea'
 
+local BASE_PRODUCTION = 2
+
 local OBJECT_EFFECTS = {
     -- Tokens
     ['Commodities/Tradegoods x1'] = {
@@ -16,7 +18,7 @@ local OBJECT_EFFECTS = {
     ['Sarween Tools'] = {
         anywhereInPlayerZone = true,
         requireFaceUp = true,
-        situational = true,
+        sarween = true,
     },
     ['Prototype War Sun II'] = {
         anywhereInPlayerZone = true,
@@ -41,6 +43,16 @@ local OBJECT_EFFECTS = {
         requireFaceUp = true,
         hegemonic = true,
     },
+    ['Space Dock II'] = {
+        anywhereInPlayerZone = true,
+        requireFaceUp = true,
+        baseProduction = 4,
+    },
+    ['Floating Factory II'] = {
+        anywhereInPlayerZone = true,
+        requireFaceUp = true,
+        baseProduction = 4,
+    },
 
     -- Agendas
     ['Regulated Conscription'] = {
@@ -62,12 +74,11 @@ local OBJECT_EFFECTS = {
 }
 
 local _config = {
-    defaultWidth = 5,
+    defaultWidth = 8.37,
     defaultHeight = 5,
-    minWidth = 3,
-    minHeight = 3,
+    minWidth = 8.37,
+    minHeight = 5,
     thickness = 0.3,
-    yOffset = -1,
 }
 
 local _data = {
@@ -134,9 +145,7 @@ end
 function updateEverything()
     _data.playerColor = getPlayerColor() or 'Grey'
     self.setColorTint(_data.playerColor)
-
     drawSize()
-
     updateInsideBuildArea()
     updateProduceConsumeValues()
 end
@@ -152,24 +161,7 @@ end
 
 function updateProduceConsumeValues()
     local values = getProduceConsumeValues()
-
-    local situational = false
-    for _, object in ipairs(values.situational or {}) do
-        situational = situational or {}
-        table.insert(situational, object.getName())
-    end
-    situational = situational and table.concat(situational, ', ')
-
-    local text = table.concat({
-        'BUILD AREA',
-        '\n',
-        'Cost: ' .. values.cost,
-        '\n',
-        'Resources: ' .. values.resources,
-        situational and (' + ' .. situational) or ''
-    }, '')
-    CrLua.Log.d(TAG, 'updateProduceConsumeValues: "' .. text .. '"')
-    drawUi(text)
+    drawUi(values)
 end
 
 -------------------------------------------------------------------------------
@@ -187,9 +179,11 @@ function getPlanet(object)
 end
 
 function getPlayerColor()
-    local position = self.positionToWorld({ x = _data.width / 2, y = 0, z = _data.height / 2 })
+    local position = self.getPosition()
     local zone = CrLua.TI4.Zone.insideWhich(position)
-    return zone and zone.color
+    local result = zone and zone.color
+    CrLua.Log.d(TAG, 'getPlayerColor: ' ..(result or 'nil'))
+    return result
 end
 
 function getProduceConsumeValues()
@@ -223,34 +217,42 @@ function getProduceConsumeValues()
     local unitNameToCount = {}
     local unitAttributeOverrides = {}
     local objectEffectsOverrides = {}
-    local hegemonic = false
     for object, _ in pairs(objects) do
         local unit = CrLua.TI4.Unit.fromObject(object)
         if unit then
             unitNameToCount[unit.unitName] = (unitNameToCount[unit.unitName] or 0) + unit.count
         end
         local objectEffects = OBJECT_EFFECTS[object.getName()]
-        if objectEffects and objectEffects.unitAttributeOverrides then
-            unitAttributeOverrides = CrLua.Table.join(unitAttributeOverrides, objectEffects.unitAttributeOverrides)
+        if objectEffects then
+            if objectEffects.unitAttributeOverrides then
+                unitAttributeOverrides = CrLua.Table.join(unitAttributeOverrides, objectEffects.unitAttributeOverrides)
+            end
+            if objectEffects.objectEffectsOverrides then
+                objectEffectsOverrides = CrLua.Table.join(objectEffectsOverrides, objectEffects.objectEffectsOverrides)
+            end
         end
-        if objectEffects and objectEffects.objectEffectsOverrides then
-            objectEffectsOverrides = CrLua.Table.join(objectEffectsOverrides, objectEffects.objectEffectsOverrides)
-        end
-        hegemonic = hegemonic or (objectEffects and objectEffects.hegemonic)
+    end
+
+    -- Apply object effect overrides to each entry.  This way overrides can
+    -- replace a single field in an entry while preserving others.
+    local overriddenObjectEvents = {}
+    for k, v in pairs(OBJECT_EFFECTS) do
+        overriddenObjectEvents[k] = CrLua.Table.join(v, objectEffectsOverrides[k] or {})
     end
 
     -- Get other costs/resources.
     local result = {
         resources = 0,
         cost = 0,
-        situational = {}
+        unitCount = 0,
+        production = BASE_PRODUCTION,
+        sarween = false,
+        hegemonic = false,
     }
-    local bestHegemonic = false
-    local overriddenObjectEvents = CrLua.Table.join(OBJECT_EFFECTS, objectEffectsOverrides)
     for object, _ in pairs(objects) do
         local objectEffects = overriddenObjectEvents[object.getName()]
 
-        -- Add units the first time we see them, with the total count.
+        -- Add unit type only the first time we see it, with the total count.
         local unit = CrLua.TI4.Unit.fromObject(object)
         local count = unit and unitNameToCount[unit.unitName]
         if unit and count then
@@ -260,49 +262,61 @@ function getProduceConsumeValues()
                 unitAttributes = CrLua.Table.join(unitAttributes, override)
             end
             result.cost = math.ceil(result.cost + unitAttributes.cost * count)
+            result.unitCount = result.unitCount + count
             unitNameToCount[unit.unitName] = nil
-        end
-
-        -- Keep track of situational, let the user decide when to apply them.
-        if objectEffects and objectEffects.situational then
-            table.insert(result.situational, object)
         end
 
         -- Planet resources.
         local planet = getPlanet(object)
         if planet then
             result.resources = result.resources + assert(planet.resources)
-            if hegemonic and (not bestHegemonic or bestHegemonic.influence < planet.influence) then
-                bestHegemonic = planet
-            end
         end
 
-        -- Other things.
+        -- Any object effects?
         if objectEffects then
+            result.sarween = result.sarween or objectEffects.sarween
+            result.hegemonic = result.hegemonic or objectEffects.hegemonic
+            result.production = math.max(result.production, objectEffects.baseProduction or 0)
             result.resources = result.resources + (objectEffects.resources or 0)
             result.cost = result.cost + (objectEffects.cost or 0)
         end
     end
 
-    if bestHegemonic then
-        result.resources = result.resources - bestHegemonic.resources
-        result.resources = result.resources + bestHegemonic.influence
+    -- If Hegemonic Trade Policy (swap resouce/influence values), replace
+    -- hegemonic with the chosen planet.
+    if result.hegemonic then
+        for object, _ in pairs(objects) do
+            local planet = getPlanet(object)
+            if planet and (not result.hegemonic or result.hegemonic.influence < planet.influence) then
+                result.hegemonic = planet
+            end
+        end
+        if result.hegemonic then
+            result.resources = result.resources - result.hegemonic
+            result.resources = result.resources + result.hegemonic
+        end
     end
 
+    CrLua.Log.d(TAG, 'getProduceConsumeValues', result)
     return result
 end
 
 -------------------------------------------------------------------------------
 
 function drawSize()
-    local y = self.getPosition().y + _config.yOffset
+    local bounds = self.getBoundsNormalized()
+    local dx = (bounds.size.x / 2.0) - (_config.thickness / 2.0)
+    local dz = (bounds.size.z / 2.0) - (_config.thickness / 2.0)
+    local y = (bounds.size.y / 2) - 0.01
+    local points = {
+        { x = -dx, y = y, z = -dz },
+        { x = -dx + _data.width, y = y, z = -dz },
+        { x = -dx + _data.width, y = y, z = -dz + _data.height },
+        { x = -dx, y = y, z = -dz + _data.height },
+    }
+
     self.setVectorLines({{
-        points = {
-            { x = 0, y = y, z = 0 },
-            { x = 0, y = y, z = _data.height },
-            { x = _data.width, y = y, z = _data.height },
-            { x = _data.width, y = y, z = 0 },
-        },
+        points = points,
         color = _data.playerColor,
         rotation = { x = 0, y = 0, z = 0 },
         thickness = _config.thickness,
@@ -311,34 +325,35 @@ function drawSize()
     }})
 end
 
-function drawUi(text)
+function drawUi(values)
     assert(type(_data.playerColor) == 'string')
     local colorTable = Color.fromString(_data.playerColor)
     local hexColor = '#' .. Color.toHex(colorTable)
 
+    local function trimFloat(value)
+        return math.floor(value * 1000.0) / 1000.0
+    end
+
     -- Text panel size.
-    local panelWidth = _data.width + _config.thickness
-    local panelHeight = 2
-    local centerX = (panelWidth - _config.thickness) / 2
-    local centerY = (panelHeight + _config.thickness) / 2
+    local bounds = self.getBoundsNormalized()
+    local panelWidth = bounds.size.x
+    local panelHeight = bounds.size.z
+
+    -- Draggable corner.
+    local cornerWidth = 1
+    local cornerHeight = 1
+    local cornerX = _data.width - panelWidth / 2.0
+    local cornerY = _data.height - panelHeight / 2.0
 
     -- UI uses x100 units.
     panelWidth = panelWidth * 100
     panelHeight = panelHeight * 100
-    centerX = centerX * 100
-    centerY = centerY * 100
-
-    local panelPosition = centerX .. ' ' .. -centerY .. ' ' .. 0
-
-    -- Draggable.
-    local cornerWidth = 1
-    local cornerHeight = 1
-    local cornerX, cornerY = _data.width, _data.height
     cornerWidth = cornerWidth * 100
     cornerHeight = cornerHeight * 100
     cornerX = cornerX * 100
     cornerY = cornerY * 100
-    local cornerPosition = cornerX .. ' ' .. cornerY .. ' ' .. 0
+    local panelPosition = '0 0 ' .. trimFloat(bounds.size.y * 50.0 + 1)
+    local cornerPosition = trimFloat(cornerX) .. ' ' .. trimFloat(cornerY) .. ' ' .. trimFloat(-bounds.size.y * 50.0 + 1)
 
     self.UI.setXmlTable({
         {
@@ -368,7 +383,7 @@ function drawUi(text)
             children = {
                 {
                     tag = 'Text',
-                    value = (text or '--')
+                    value = 'THIS IS TEXT'
                 },
             }
         },
@@ -404,8 +419,8 @@ function onEndDrag(player, option, id)
     local pp = self.positionToLocal(player.getPointerPosition())
     _data.width = pp.x + _data.dragOffset.x
     _data.height = pp.z + _data.dragOffset.z
-    _data.width = math.max(_data.width, _config.minWidth)
-    _data.height = math.max(_data.height, _config.minHeight)
+    _data.width = math.max(_data.width, _config.minWidth - _config.thickness)
+    _data.height = math.max(_data.height, _config.minHeight - _config.thickness)
     updateEverything()
 end
 
@@ -413,8 +428,8 @@ function onDrag(player, option, id)
     local pp = self.positionToLocal(player.getPointerPosition())
     _data.width = pp.x + _data.dragOffset.x
     _data.height = pp.z + _data.dragOffset.z
-    _data.width = math.max(_data.width, _config.minWidth)
-    _data.height = math.max(_data.height, _config.minHeight)
+    _data.width = math.max(_data.width, _config.minWidth - _config.thickness)
+    _data.height = math.max(_data.height, _config.minHeight - _config.thickness)
     drawSize()
 end
 

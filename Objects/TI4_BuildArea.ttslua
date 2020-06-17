@@ -25,6 +25,21 @@ local OBJECT_EFFECTS = {
             ['War Sun'] = { cost = 10 }
         }
     },
+    ['Mirror Computing'] = {
+        anywhereInPlayerZone = true,
+        requireFaceUp = true,
+        objectEffectsOverrides = {
+            ['Commodities/Tradegoods x1'] = {
+                resources = 2
+            },
+            ['Commodities/Tradegoods x3'] = {
+                resources = 6
+            },
+        }
+    },
+    ['Hegemonic Trade Policy'] = {
+        -- TODO XXX SWAP INFLUENCE AND RESOURCES
+    },
 
     -- Agendas
     ['Regulated Conscription'] = {
@@ -203,37 +218,50 @@ function getProduceConsumeValues()
         end
     end
 
-    -- First pass gathers overrides.
+    -- First pass gathers override and counts units (so one fighter, one infantry cost 2, not 1).
     local unitAttributeOverrides = {}
+    local objectEffectsOverrides = {}
+    local unitNameToCount = {}
     for object, _ in pairs(objects) do
         local objectEffects = OBJECT_EFFECTS[object.getName()]
         if objectEffects and objectEffects.unitAttributeOverrides then
             unitAttributeOverrides = CrLua.Table.join(unitAttributeOverrides, objectEffects.unitAttributeOverrides)
         end
+        if objectEffects and objectEffects.objectEffectsOverrides then
+            objectEffectsOverrides = CrLua.Table.join(objectEffectsOverrides, objectEffects.objectEffectsOverrides)
+        end
+        local unit = CrLua.TI4.Unit.fromObject(object)
+        if unit then
+            unitNameToCount[unit.unitName] = (unitNameToCount[unit.unitName] or 0) + unit.count
+        end
     end
 
-    -- Second pass counts resources and costs.
+    -- Get other costs/resources.
     local result = {
         resources = 0,
         cost = 0,
         situational = {}
     }
+    local overriddenObjectEvents = CrLua.Table.join(OBJECT_EFFECTS, objectEffectsOverrides)
     for object, _ in pairs(objects) do
-        local objectEffects = OBJECT_EFFECTS[object.getName()]
+        local objectEffects = overriddenObjectEvents[object.getName()]
+
+        -- Add units the first time we see them, with the total count.
+        local unit = CrLua.TI4.Unit.fromObject(object)
+        local count = unit and unitNameToCount[unit.unitName]
+        if unit and count then
+            local unitAttributes = CrLua.TI4.Unit.attributes(unit)
+            local override = unitAttributeOverrides[unit.unitName]
+            if override then
+                unitAttributes = CrLua.Table.join(unitAttributes, override)
+            end
+            result.cost = math.ceil(result.cost + unitAttributes.cost * count)
+            unitNameToCount[unit.unitName] = nil
+        end
 
         -- Keep track of situational, let the user decide when to apply them.
         if objectEffects and objectEffects.situational then
             table.insert(result.situational, object)
-        end
-
-        -- Unit cost.
-        local unit = CrLua.TI4.Unit.fromObject(object)
-        if unit then
-            local unitAttributes = CrLua.TI4.Unit.attributes(unit)
-            if unitAttributeOverrides[unit.unitName] then
-                unitAttributes = CrLua.Table.join(unitAttributes, unitAttributeOverrides[unit.unitName])
-            end
-            result.cost = result.cost + assert(unitAttributes.cost) * unit.count
         end
 
         -- Planet resources.

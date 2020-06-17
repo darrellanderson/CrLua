@@ -46,115 +46,83 @@ local OBJECT_EFFECTS = {
 }
 
 local _config = {
-    thickness = 0.4,
-    yOffset = 0,
+    defaultWidth = 5,
+    defaultHeight = 5,
+    minWidth = 3,
+    minHeight = 3,
+    thickness = 0.2,
+    yOffset = -1,
 }
 
 local _data = {
-    draggableCorner = false,
-    boundingBox = false,
+    width = _config.defaultWidth,
+    height = _config.defaultHeight,
+    playerColor = 'Grey',
     inside = {},
     planets = false,
+    dragOffset = {
+        x = 0,
+        z = 0
+    }
 }
 
 -------------------------------------------------------------------------------
 
 function onLoad(saveState)
-    local state = saveState and JSON.decode(saveState)
-    local guid = state and state.draggableCornerGuid
-    _data.draggableCorner = guid and getObjectFromGUID(guid)
-    Wait.frames(updateEverything, 1)
+    CrLua.Log.d(TAG, 'onLoad')
+    local saveState = saveState and JSON.decode(saveState)
+    _data.width = saveState and saveState.width or _data.width
+    _data.height = saveState and saveState.height or _data.height
+    _data.width = math.max(_data.width, _config.minWidth)
+    _data.height = math.max(_data.height, _config.minHeight)
+    _data.playerColor = saveState and saveState.playerColor or _data.playerColor
+    Wait.frames(updateEverything, 2)
 end
 
 function onSave()
     return JSON.encode({
-        draggableCornerGuid = _data.draggableCorner and _data.draggableCorner.getGUID()
+        width = _data.width,
+        height = _data.height,
+        playerColor = _data.playerColor,
     })
 end
 
 function onObjectDrop(playerColor, droppedObject)
     assert(type(playerColor) == 'string' and type(droppedObject) == 'userdata')
-    if droppedObject == self or droppedObject == _data.draggableCorner then
-        CrLua.Log.d(TAG, 'onObjectDrop: corner')
-        updateBoundingBox()
-        self.setVar('onUpdate', nil)
+    if droppedObject == self then
+        CrLua.Log.d(TAG, 'onObjectDrop: self')
+        updateEverything()
     elseif isInsideBuildArea(droppedObject) then
         _data.inside[droppedObject] = true
-        updateValues()
+        updateProduceConsumeValues()
     end
 end
 
 function onObjectPickUp(playerColor, pickedUpObject)
     assert(type(playerColor) == 'string' and type(pickedUpObject) == 'userdata')
-    if pickedUpObject == self or pickedUpObject == _data.draggableCorner then
-        CrLua.Log.d(TAG, 'onObjectPickUp: corner')
-        self.setVar('onUpdate', updateBoundingBox)
+    if pickedUpObject == self then
+        CrLua.Log.d(TAG, 'onObjectPickUp: self')
     elseif _data.inside[pickedUpObject] then
         _data.inside[pickedUpObject] = nil
-        updateValues()
+        updateProduceConsumeValues()
     end
 end
 
 function onPlayerChangeColor(playerColor)
-    updateEverything()
-end
-
-function onObjectDestroy(dyingObject)
-    if dyingObject == _data.draggableCorner then
-        _data.draggableCorner = false
-    end
+    CrLua.Log.d(TAG, 'onPlayerChangeColor')
+    Wait.frames(updateEverything, 2)
 end
 
 -------------------------------------------------------------------------------
 
 function updateEverything()
-    updateDraggableCorner()
-    updateBoundingBox()
+    _data.playerColor = getPlayerColor() or 'Grey'
+    self.setColorTint(_data.playerColor)
+
+    drawSize()
+
     updateInsideBuildArea()
-    updateValues()
-end
-
--------------------------------------------------------------------------------
-
-function updateDraggableCorner()
-    if not _data.draggableCorner then
-        _data.draggableCorner = spawnObject({
-            type              = 'BlockSquare',
-            position          = self.getPosition(),
-            rotation          = { x = 0, y = 0, z = 0 },
-            scale             = { x = 1, y = 1, z = 1 },
-            sound             = false,
-            snap_to_grid      = false,
-        })
-    end
-    _data.draggableCorner.setColorTint(getPlayerColor())
-    _data.draggableCorner.use_grid = false
-    _data.draggableCorner.use_snap_points = false
-    _data.draggableCorner.sticky = false
-end
-
-function updateBoundingBox()
-    _data.boundingBox = getBoundingBox()
-    if not _data.boundingBox then
-        CrLua.Log.e(TAG, 'updateBoundingBox: no bounding box')
-        return
-    end
-
-    local bb = _data.boundingBox
-    local y = self.getPosition().y + _config.yOffset
-    self.setVectorLines({{
-        points = {
-            self.positionToLocal({ x = bb.min.x, y = y, z = bb.min.z }),
-            self.positionToLocal({ x = bb.min.x, y = y, z = bb.max.z }),
-            self.positionToLocal({ x = bb.max.x, y = y, z = bb.max.z }),
-            self.positionToLocal({ x = bb.max.x, y = y, z = bb.min.z }),
-        },
-        color = getPlayerColor() or 'Grey',
-        rotation = { x = 0, y = 0, z = 0 },
-        thickness = _config.thickness,
-        loop = true,
-        square = true,
-    }})
+    updateProduceConsumeValues()
 end
 
 function updateInsideBuildArea()
@@ -166,17 +134,34 @@ function updateInsideBuildArea()
     end
 end
 
-function updateValues()
-    local values = getValues()
+function updateProduceConsumeValues()
+    local values = getProduceConsumeValues()
+
+    local situational = false
+    for _, object in ipairs(values.situational or {}) do
+        situational = situational or {}
+        table.insert(situational, object.getName())
+    end
+    situational = situational and table.concat(situational, ', ')
+
+    local text = table.concat({
+        'BUILD AREA',
+        '\n',
+        'Cost: ' .. values.cost,
+        '\n',
+        'Resources: ' .. values.resources,
+        situational and (' + ' .. situational) or ''
+    }, '')
+    CrLua.Log.d(TAG, 'updateProduceConsumeValues: "' .. text .. '"')
+    drawUi(text)
 end
 
 -------------------------------------------------------------------------------
 
 function isInsideBuildArea(object)
     assert(type(object) == 'userdata')
-    local p = object.getPosition()
-    local bb = _data.boundingBox
-    return bb and bb.min.x <= p.x and p.x <= bb.max.x and bb.min.z <= p.z and p.z <= bb.max.z
+    local p = self.positionToLocal(object.getPosition())
+    return p.x >= 0 and p.x <= _data.width and p.z >= 0 and p.z <= _data.height
 end
 
 function getPlanet(object)
@@ -186,45 +171,13 @@ function getPlanet(object)
 end
 
 function getPlayerColor()
-    local position = _data.boundingBox and _data.boundingBox.center or getBoundingBox().center
+    local position = self.positionToWorld({ x = _data.width / 2, y = 0, z = _data.height / 2 })
     local zone = CrLua.TI4.Zone.insideWhich(position)
     return zone and zone.color
 end
 
-function getBoundingBox()
-    if not _data.draggableCorner then
-        return false
-    end
-    local a = self.getBounds()
-    local b = _data.draggableCorner.getBounds()
-    local min = {
-        x = math.min(a.center.x - a.size.x, b.center.x - b.size.x),
-        y = math.min(a.center.y - a.size.y, b.center.y - b.size.y),
-        z = math.min(a.center.z - a.size.z, b.center.z - b.size.z),
-    }
-    local max = {
-        x = math.max(a.center.x + a.size.x, b.center.x + b.size.x),
-        y = math.max(a.center.y + a.size.y, b.center.y + b.size.y),
-        z = math.max(a.center.z + a.size.z, b.center.z + b.size.z),
-    }
-    return {
-        min = min,
-        max = max,
-        center = {
-            x = (min.x + max.x) / 2.0,
-            y = (min.y + max.y) / 2.0,
-            z = (min.z + max.z) / 2.0,
-        }
-    }
-end
-
--------------------------------------------------------------------------------
-
-function getValues()
-    local playerColor = getPlayerColor()
-    if not playerColor then
-        return false
-    end
+function getProduceConsumeValues()
+    local playerColor = _data.playerColor
 
     CrLua.TI4.Zone.update()
     local zone = CrLua.TI4.Zone.fromColor(playerColor)
@@ -296,8 +249,133 @@ function getValues()
         end
     end
 
-    CrLua.Log.d(TAG, 'getValues', result)
     return result
+end
+
+-------------------------------------------------------------------------------
+
+function drawSize()
+    local y = self.getPosition().y + _config.yOffset
+    self.setVectorLines({{
+        points = {
+            { x = 0, y = y, z = 0 },
+            { x = 0, y = y, z = _data.height },
+            { x = _data.width, y = y, z = _data.height },
+            { x = _data.width, y = y, z = 0 },
+        },
+        color = _data.playerColor,
+        rotation = { x = 0, y = 0, z = 0 },
+        thickness = _config.thickness,
+        loop = true,
+        square = true,
+    }})
+end
+
+function drawUi(text)
+    assert(type(_data.playerColor) == 'string')
+    local colorTable = Color.fromString(_data.playerColor)
+    local hexColor = '#' .. Color.toHex(colorTable)
+
+    -- Text panel size.
+    local panelWidth = _data.width + _config.thickness
+    local panelHeight = 2
+    local centerX = (panelWidth - _config.thickness) / 2
+    local centerY = (panelHeight + _config.thickness) / 2
+
+    -- UI uses x100 units.
+    panelWidth = panelWidth * 100
+    panelHeight = panelHeight * 100
+    centerX = centerX * 100
+    centerY = centerY * 100
+
+    local panelPosition = centerX .. ' ' .. -centerY .. ' ' .. 0
+
+    -- Draggable.
+    local cornerWidth = 1
+    local cornerHeight = 1
+    local cornerX, cornerY = _data.width, _data.height
+    cornerWidth = cornerWidth * 100
+    cornerHeight = cornerHeight * 100
+    cornerX = cornerX * 100
+    cornerY = cornerY * 100
+    local cornerPosition = cornerX .. ' ' .. cornerY .. ' ' .. 0
+
+    self.UI.setXmlTable({
+        {
+            tag = 'Defaults',
+            children = {
+                {
+                    tag = 'Text',
+                    attributes = {
+                        fontSize = 52,
+                        fontStyle = 'Bold',
+                        color = '#ffffffff',
+                        horizontalOverflow = 'Overflow',
+                        verticalOverflow = 'Overflow',
+                    }
+                },
+            }
+        },
+        {
+            tag = 'Panel',
+            attributes = {
+                position = panelPosition,
+                rotation = '180 0 0',
+                width = panelWidth,
+                height = panelHeight,
+                color = '#333333ff'
+            },
+            children = {
+                {
+                    tag = 'Text',
+                    value = (text or '--')
+                },
+            }
+        },
+        {
+            tag = 'Panel',
+            attributes = {
+                id = 'corner',
+                allowDragging = true,
+                restrictDraggingToParentBounds = false,
+                returnToOriginalPositionWhenReleased = false,
+                onDrag = 'onDrag',
+                onBeginDrag = 'onBeginDrag',
+                onEndDrag = 'onEndDrag',
+                position = cornerPosition,
+                rotation = '180 0 0',
+                width = cornerWidth,
+                height = cornerHeight,
+                color = hexColor
+            },
+        }
+    })
+end
+
+function onBeginDrag(player, option, id)
+    local pp = self.positionToLocal(player.getPointerPosition())
+    _data.dragOffset = {
+        x = _data.width - pp.x,
+        z = _data.height - pp.z
+    }
+end
+
+function onEndDrag(player, option, id)
+    local pp = self.positionToLocal(player.getPointerPosition())
+    _data.width = pp.x + _data.dragOffset.x
+    _data.height = pp.z + _data.dragOffset.z
+    _data.width = math.max(_data.width, _config.minWidth)
+    _data.height = math.max(_data.height, _config.minHeight)
+    updateEverything()
+end
+
+function onDrag(player, option, id)
+    local pp = self.positionToLocal(player.getPointerPosition())
+    _data.width = pp.x + _data.dragOffset.x
+    _data.height = pp.z + _data.dragOffset.z
+    _data.width = math.max(_data.width, _config.minWidth)
+    _data.height = math.max(_data.height, _config.minHeight)
+    drawSize()
 end
 
 -------------------------------------------------------------------------------

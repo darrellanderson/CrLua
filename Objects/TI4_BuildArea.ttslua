@@ -38,7 +38,8 @@ local OBJECT_EFFECTS = {
         }
     },
     ['Hegemonic Trade Policy'] = {
-        -- TODO XXX SWAP INFLUENCE AND RESOURCES
+        requireFaceUp = true,
+        hegemonic = true,
     },
 
     -- Agendas
@@ -219,10 +220,15 @@ function getProduceConsumeValues()
     end
 
     -- First pass gathers override and counts units (so one fighter, one infantry cost 2, not 1).
+    local unitNameToCount = {}
     local unitAttributeOverrides = {}
     local objectEffectsOverrides = {}
-    local unitNameToCount = {}
+    local hegemonic = false
     for object, _ in pairs(objects) do
+        local unit = CrLua.TI4.Unit.fromObject(object)
+        if unit then
+            unitNameToCount[unit.unitName] = (unitNameToCount[unit.unitName] or 0) + unit.count
+        end
         local objectEffects = OBJECT_EFFECTS[object.getName()]
         if objectEffects and objectEffects.unitAttributeOverrides then
             unitAttributeOverrides = CrLua.Table.join(unitAttributeOverrides, objectEffects.unitAttributeOverrides)
@@ -230,10 +236,7 @@ function getProduceConsumeValues()
         if objectEffects and objectEffects.objectEffectsOverrides then
             objectEffectsOverrides = CrLua.Table.join(objectEffectsOverrides, objectEffects.objectEffectsOverrides)
         end
-        local unit = CrLua.TI4.Unit.fromObject(object)
-        if unit then
-            unitNameToCount[unit.unitName] = (unitNameToCount[unit.unitName] or 0) + unit.count
-        end
+        hegemonic = hegemonic or (objectEffects and objectEffects.hegemonic)
     end
 
     -- Get other costs/resources.
@@ -242,6 +245,7 @@ function getProduceConsumeValues()
         cost = 0,
         situational = {}
     }
+    local bestHegemonic = false
     local overriddenObjectEvents = CrLua.Table.join(OBJECT_EFFECTS, objectEffectsOverrides)
     for object, _ in pairs(objects) do
         local objectEffects = overriddenObjectEvents[object.getName()]
@@ -268,6 +272,9 @@ function getProduceConsumeValues()
         local planet = getPlanet(object)
         if planet then
             result.resources = result.resources + assert(planet.resources)
+            if hegemonic and (not bestHegemonic or bestHegemonic.influence < planet.influence) then
+                bestHegemonic = planet
+            end
         end
 
         -- Other things.
@@ -275,6 +282,11 @@ function getProduceConsumeValues()
             result.resources = result.resources + (objectEffects.resources or 0)
             result.cost = result.cost + (objectEffects.cost or 0)
         end
+    end
+
+    if bestHegemonic then
+        result.resources = result.resources - bestHegemonic.resources
+        result.resources = result.resources + bestHegemonic.influence
     end
 
     return result

@@ -1,0 +1,492 @@
+--- Systems table.
+-- Map from guid to systems.
+--
+-- System attributes:
+-- - tile: number (0 for homebrew).
+-- - home: boolean, true if a home system.
+-- - planets: list of planet tables.
+-- - wormholes: list of strings.
+-- - anomalies: list of strings.
+-- - rotate: override, degrees number.
+--
+-- Planet attributes:
+-- - name: string.
+-- - resources: number.
+-- - influence: number.
+-- - trait: string {cultural|industrial|hazardous}.
+-- - tech: string {red|green|yellow|blue}.
+-- - position: override (local coordinates).
+-- - radius: override (local coordinates).
+--
+local _systems = {
+    ['86e50a'] = { tile = 1, home = true, planets = {
+        { name = 'Jord', resources = 4, influence = 2 },
+    }},
+    ['ac3193'] = { tile = 2, home = true, planets = {
+        { name = 'Moll Primus', resources = 4, influence = 1 },
+    }},
+    ['db8aac'] = { tile = 3, home = true, planets = {
+        { name = 'Darien', resources = 4, influence = 4 },
+    }},
+    ['da7879'] = { tile = 4, home = true, planets = {
+        { name = 'Muaat', resources = 4, influence = 1 },
+    }},
+    ['fc6f7a'] = { tile = 5, home = true, planets = {
+        { name = 'Nestphar', resources = 3, influence = 2 },
+    }},
+    ['420355'] = { tile = 6, home = true, planets = {
+        { name = '[0.0.0]', resources = 5, influence = 0 },
+    }},
+    ['087347'] = { tile = 7, home = true, planets = {
+        { name = 'Winnu', resources = 3, influence = 4 },
+    }},
+    ['ea676a'] = { tile = 8, home = true, planets = {
+        { name = 'Mordai II', resources = 4, influence = 0 },
+    }},
+    ['0122f9'] = { tile = 9, home = true, planets = {
+        { name = 'Maaluuk', resources = 0, influence = 2 },
+        { name = 'Druaa', resources = 3, influence = 1 },
+    }},
+    ['e001b4'] = { tile = 10, home = true, planets = {
+        { name = 'Arc Prime', resources = 4, influence = 0 },
+        { name = 'Wren Terra', resources = 2, influence = 1 },
+    }},
+    ['d39876'] = { tile = 11, home = true, planets = {
+        { name = 'Lisis II', resources = 1, influence = 0 },
+        { name = 'Ragh', resources = 2, influence = 1 },
+    }},
+    ['11598c'] = { tile = 12, home = true, planets = {
+        { name = 'Nar', resources = 2, influence = 3 },
+        { name = 'Jol', resources = 1, influence = 2 },
+    }},
+    ['6176bf'] = { tile = 13, home = true, planets = {
+        { name = "Tren'lak", resources = 1, influence = 0 },
+        { name = 'Quinarra', resources = 3, influence = 1 },
+    }},
+    ['c2509e'] = { tile = 14, home = true, planets = {
+        { name = 'Archon Ren', resources = 2, influence = 3 },
+        { name = 'Archon Tau', resources = 1, influence = 1 },
+    }},
+    ['9c373a'] = { tile = 15, home = true, planets = {
+        { name = 'Retillion', resources = 2, influence = 3 },
+        { name = 'Shalloq', resources = 1, influence = 2 },
+    }},
+    ['6a4247'] = { tile = 16, home = true, planets = {
+        { name = 'Hercant', resources = 1, influence = 1 },
+        { name = 'Arretze', resources = 2, influence = 0 },
+        { name = 'Kamdorn', resources = 0, influence = 1 },
+    }},
+    ['c56a8a'] = { tile = 17, wormholes = { 'delta' } },
+    ['04df02'] = { tile = 18, planets = {
+        { name = 'Mecatol Rex', resources = 1, influence = 6, radius = 1.7 },
+    }},
+    ['4216fd'] = { tile = 19, planets = {
+        { name = 'Wellon', resources = 1, influence = 2, trait = 'industrial', tech = 'yellow' },
+    }},
+    ['bc4bcc'] = { tile = 20, planets = {
+        { name = 'Vefut II', resources = 2, influence = 2, trait = 'hazardous' },
+    }},
+    ['f2798a'] = { tile = 21, planets = {
+        { name = 'Thibah', resources = 1, influence = 1, trait = 'industrial', tech = 'blue' },
+    }},
+    ['0ea77f'] = { tile = 22, planets = {
+        { name = "Tar'mann", resources = 1, influence = 1, trait = 'industrial', tech = 'green' },
+    }},
+    ['7975f7'] = { tile = 23, planets = {
+        { name = 'Saudor', resources = 2, influence = 2, trait = 'industrial' },
+    }},
+    ['48cc9f'] = { tile = 24, planets = {
+        { name = 'Mehar Xull', resources = 1, influence = 3, trait = 'hazardous', tech = 'red' },
+    }},
+    ['71e1bf'] = { tile = 25, wormholes = { 'beta' }, planets = {
+        { name = 'Quann', resources = 2, influence = 1, trait = 'cultural' },
+    }},
+    ['f11ef5'] = { tile = 26, wormholes = { 'alpha' }, planets = {
+        { name = 'Lodor', resources = 3, influence = 1, trait = 'cultural' },
+    }},
+    ['fc239f'] = { tile = 27, planets = {
+        { name = 'New Albion', resources = 1, influence = 1, trait = 'industrial', tech = 'green' },
+        { name = 'Starpoint', resources = 3, influence = 1, trait = 'hazardous' },
+    }},
+    ['f8caf6'] = { tile = 28, planets = {
+        { name = "Tequ'ran", resources = 2, influence = 0 , trait = 'hazardous'},
+        { name = 'Torkan', resources = 0, influence = 3, trait = 'cultural' },
+    }},
+    ['0ac98b'] = { tile = 29, planets = {
+        { name = "Qucen'n", resources = 1, influence = 2, trait = 'industrial' },
+        { name = 'Rarron', resources = 0, influence = 3, trait = 'cultural' },
+    }},
+    ['aaae9f'] = { tile = 30, planets = {
+        { name = 'Mellon', resources = 0, influence = 2, trait = 'cultural' },
+        { name = 'Zohbat', resources = 3, influence = 1, trait = 'hazardous' },
+    }},
+    ['d5ed63'] = { tile = 31, planets = {
+        { name = 'Lazar', resources = 1, influence = 0, trait = 'industrial', tech = 'yellow' },
+        { name = 'Sakulag', resources = 2, influence = 1, trait = 'hazardous' },
+    }},
+    ['48ac87'] = { tile = 32, planets = {
+        { name = 'Dal Bootha', resources = 0, influence = 2, trait = 'cultural' },
+        { name = 'Xxehan', resources = 1, influence = 1, trait = 'cultural' },
+    }},
+    ['87a5a2'] = { tile = 33, planets = {
+        { name = 'Corneeq', resources = 1, influence = 2, trait = 'cultural' },
+        { name = 'Resculon', resources = 2, influence = 0, trait = 'cultural' },
+    }},
+    ['eb99c0'] = { tile = 34, planets = {
+        { name = 'Centauri', resources = 1, influence = 3, trait = 'cultural' },
+        { name = 'Gral', resources = 1, influence = 1, trait = 'industrial', tech = 'blue' },
+    }},
+    ['dd2ca7'] = { tile = 35, planets = {
+        { name = 'Bereg', resources = 3, influence = 1, trait = 'hazardous' },
+        { name = 'Lirta IV', resources = 2, influence = 3, trait = 'hazardous' },
+    }},
+    ['a284d1'] = { tile = 36, planets = {
+        { name = 'Arnor', resources = 2, influence = 1 },
+        { name = 'Lor', resources = 1, influence = 2 },
+    }},
+    ['e0ff33'] = { tile = 37, planets = {
+        { name = 'Arinam', resources = 1, influence = 2, trait = 'industrial' },
+        { name = 'Meer', resources = 0, influence = 4, trait = 'hazardous', tech = 'red' },
+    }},
+    ['b958aa'] = { tile = 38, planets = {
+        { name = 'Abyz', resources = 3, influence = 0, trait = 'hazardous' },
+        { name = 'Fria', resources = 2, influence = 0, trait = 'hazardous' },
+    }},
+    ['0378a4'] = { tile = 39, wormholes = { 'alpha' } },
+    ['ccd7ac'] = { tile = 40, wormholes = { 'beta' } },
+    ['47a55d'] = { tile = 41, anomalies = { 'gravity rift' } },
+    ['d13aa2'] = { tile = 42, anomalies = { 'nebula'} },
+    ['dca098'] = { tile = 43, anomalies = { 'supernova' } },
+    ['cd58c7'] = { tile = 44, anomalies = { 'asteroid field' } },
+    ['7db8d8'] = { tile = 45, anomalies = { 'asteroid field' } },
+    ['9dce5a'] = { tile = 46 },
+    ['437f06'] = { tile = 47 },
+    ['ff8f60'] = { tile = 48 },
+    ['0216be'] = { tile = 49 },
+    ['97ee53'] = { tile = 50 },
+    ['f38182'] = { tile = 51, home = true, localY = 0.101, wormholes = { 'delta' }, planets = {
+        { name = 'Creuss', resources = 4, influence = 2, position = { 0.35, 0.18 }, radius = 0.8 },
+    }},
+
+    -- TI3 systems.
+    ['aa722a'] = { tile = 0, planets = {
+        { name = 'Sem-Lore', resources = 3, influence = 2, trait = 'cultural', tech = 'yellow' }
+    }},
+    ['68ff91'] = { tile = 0, planets = {
+        { name = 'Velnor', resources = 2, influence = 0, trait = 'cultural' }
+    }},
+    ['9e78a2'] = { tile = 0, planets = {
+        { name = 'Tempesta', resources = 1, influence = 1, tech = 'blue' }
+    }},
+    ['8b7570'] = { tile = 0, planets = {
+        { name = 'Lisis', resources = 2, influence = 2, trait = 'cultural' }
+    }},
+    ['c7664d'] = { tile = 0, planets = {
+        { name = 'Mirage', resources = 1, influence = 2, trait = 'cultural' }
+    }},
+    ['59a527'] = { tile = 0, planets = {
+        { name = 'Perimeter', resources = 2, influence = 2, trait = 'industrial' }
+    }},
+    ['683401'] = { tile = 0, planets = {
+        { name = 'Faunus', resources = 1, influence = 3, trait = 'industrial', tech = 'green' }
+    }},
+    ['9e0a4a'] = { tile = 0, planets = {
+        { name = "El'nath", resources = 2, influence = 0, trait = 'industrial', tech = 'blue' }
+    }},
+    ['23c5e9'] = { tile = 0, planets = {
+        { name = 'Capha', resources = 3, influence = 0, trait = 'hazardous' }
+    }},
+    ['73e4db'] = { tile = 0, planets = {
+        { name = 'Garbozia', resources = 2, influence = 1, trait = 'hazardous' }
+    }},
+    ['ab3334'] = { tile = 0, planets = {
+        { name = 'Lesab', resources = 2, influence = 1, trait = 'hazardous' }
+    }},
+    ['4e20b3'] = { tile = 0, planets = {
+        { name = 'Industrex', resources = 2, influence = 0, trait = 'industrial', tech = 'red' }
+    }},
+    ['ce68ae'] = { tile = 0, planets = {
+        { name = "Hope's End", resources = 3, influence = 0, trait = 'hazardous' }
+    }},
+    ['8b4ba2'] = { tile = 0, planets = {
+        { name = 'Cormund', resources = 2, influence = 0, trait = 'cultural' }
+    }},
+    ['a682b7'] = { tile = 0, planets = {
+        { name = 'Malice', resources = 0, influence = 2, trait = 'cultural', position = { -0.9, -0.4 } }
+    }},
+    ['35baa0'] = { tile = 0, planets = {
+        { name = 'Everra', resources = 3, influence = 1, trait = 'cultural', position = { 0.7, -1.2 } }
+    }},
+    ['ff5d4a'] = { tile = 0, planets = {
+        { name = 'Vega Major', resources = 2, influence = 1, trait = 'industrial' },
+        { name = 'Vega Minor', resources = 1, influence = 2, trait = 'industrial' }
+    }},
+    ['950735'] = { tile = 0, planets = {
+        { name = 'Helcalor', resources = 1, influence = 0, trait = 'hazardous', tech = 'yellow' },
+        { name = 'Tiamat', resources = 1, influence = 2, trait = 'cultural' }
+    }},
+    ['93ded7'] = { tile = 0, planets = {
+        { name = 'Sumerian', resources = 2, influence = 2 },
+        { name = 'Arcturus', resources = 1, influence = 1, trait = 'hazardous' }
+    }},
+    ['091456'] = { tile = 0, planets = {
+        { name = "T'sion", resources = 2, influence = 2 },
+        { name = 'Bellatrix', resources = 0, influence = 1, trait = 'industrial', tech = 'red' }
+    }},
+    ['0aafd9'] = { tile = 0, planets = {
+        { name = 'Ashtroth', resources = 2, influence = 0, trait = 'hazardous' },
+        { name = 'Abaddon', resources = 1, influence = 0, trait = 'industrial' },
+        { name = 'Loki', resources = 1, influence = 2, trait = 'cultural' }
+    }},
+    ['cf3242'] = { tile = 0, rotate = 60, planets = {
+        { name = 'Rigel I', resources = 0, influence = 1, tech = 'green' },
+        { name = 'Rigel II', resources = 1, influence = 2, trait = 'cultural' },
+        { name = 'Rigel III', resources = 1, influence = 1, trait = 'industrial' }
+    }},
+
+    -- Pick-A-Playent systems.
+    ['0dcdee'] = { tile = 0, planets = {{ name = 'A' }} },
+    ['c68187'] = { tile = 0, planets = {{ name = 'A' }} },
+    ['3c3949'] = { tile = 0, planets = {{ name = 'A' }} },
+    ['8e69fb'] = { tile = 0, planets = {{ name = 'A' }} },
+    ['75d1cd'] = { tile = 0, planets = {{ name = 'A' }} },
+    ['ea61c5'] = { tile = 0, planets = {{ name = 'A' }} },
+    ['8518e6'] = { tile = 0, planets = {{ name = 'A' }} },
+    ['eda114'] = { tile = 0, planets = {{ name = 'A' }} },
+    ['1300b8'] = { tile = 0, planets = {{ name = 'A' }} },
+    ['fd8349'] = { tile = 0, planets = {{ name = 'A' }} },
+    ['941405'] = { tile = 0, planets = {{ name = 'A' }} },
+    ['ef89f5'] = { tile = 0, planets = {{ name = 'A' }} },
+    ['eb1837'] = { tile = 0, planets = {{ name = 'A' }} },
+    ['8e7edf'] = { tile = 0, planets = {{ name = 'A' }} },
+    ['ffb0d9'] = { tile = 0, planets = {{ name = 'A' }} },
+    ['26820b'] = { tile = 0, planets = {{ name = 'A' }} },
+    ['9b66db'] = { tile = 0, planets = {{ name = 'A' }} },
+    ['943567'] = { tile = 0, planets = {{ name = 'A' }} },
+    ['ea6aa3'] = { tile = 0, planets = {{ name = 'A' }, { name = 'B' }} },
+    ['b81d49'] = { tile = 0, planets = {{ name = 'A' }, { name = 'B' }} },
+    ['042a91'] = { tile = 0, planets = {{ name = 'A' }, { name = 'B' }} },
+    ['3d388c'] = { tile = 0, planets = {{ name = 'A' }, { name = 'B' }} },
+    ['652379'] = { tile = 0, planets = {{ name = 'A' }, { name = 'B' }} },
+    ['636039'] = { tile = 0, planets = {{ name = 'A' }, { name = 'B' }} },
+    ['26d4e0'] = { tile = 0, planets = {{ name = 'A' }, { name = 'B' }} },
+    ['78011d'] = { tile = 0, planets = {{ name = 'A' }, { name = 'B' }} },
+    ['862968'] = { tile = 0, planets = {{ name = 'A' }, { name = 'B' }} },
+    ['a4a6bb'] = { tile = 0, planets = {{ name = 'A' }, { name = 'B' }} },
+    ['7679a9'] = { tile = 0, planets = {{ name = 'A' }, { name = 'B' }} },
+    ['ce4179'] = { tile = 0, planets = {{ name = 'A' }, { name = 'B' }} },
+    ['8ef29f'] = { tile = 0, planets = {{ name = 'A' }, { name = 'B' }} },
+    ['cfd3f1'] = { tile = 0, planets = {{ name = 'A' }, { name = 'B' }} },
+    ['cae6b7'] = { tile = 0, planets = {{ name = 'A' }, { name = 'B' }} },
+    ['ca6044'] = { tile = 0, planets = {{ name = 'A' }, { name = 'B' }} },
+    ['517d73'] = { tile = 0, planets = {{ name = 'A' }, { name = 'B' }} },
+    ['8c22eb'] = { tile = 0, planets = {{ name = 'A' }, { name = 'B' }} },
+
+    -- Tactic Blue homebrew factions
+    ['12d914'] = { tile = 0, planets = {
+        { name = 'Nevermore', resources = 3, influence = 3 },
+    }},
+    ['975d0a'] = { tile = 0, planets = {
+        { name = 'Arrakis', resources = 4, influence = 0 },
+    }},
+    ['2e10be'] = { tile = 0, planets = {
+        { name = 'Khet', resources = 1, influence = 2 },
+        { name = 'Drakkol', resources = 3, influence = 0 },
+    }},
+    ['5dcca6'] = { tile = 0, anomalies = { 'nebula' }, planets = {
+        { name = 'Rhune', resources = 3, influence = 4 },
+    }},
+    ['b69d23'] = { tile = 0, planets = {
+        { name = 'Mandalore', resources = 3, influence = 2 },
+        { name = 'Concordia', resources = 1, influence = 1 },
+    }},
+    ['04c835'] = { tile = 0, planets = {
+        { name = 'Refuge', resources = 1, influence = 3 },
+        { name = 'Kharak', resources = 1, influence = 0 },
+    }},
+    ['284942'] = { tile = 0, planets = {
+        { name = 'Iodyn', resources = 1, influence = 1 },
+        { name = 'Kroll', resources = 0, influence = 1 },
+        { name = 'Cyrra', resources = 1, influence = 0 },
+    }},
+    ['dd9fd8'] = { tile = 0, planets = {
+        { name = 'Klyutoss', resources = 2, influence = 5 },
+    }},
+    ['f67eca'] = { tile = 0, planets = {
+        { name = 'Vorn', resources = 1, influence = 0 },
+        { name = 'Xyphen', resources = 3, influence = 1 },
+    }},
+    ['c3785f'] = { tile = 0, planets = {
+        { name = 'Diphda', resources = 1, influence = 1 },
+        { name = 'Damocles', resources = 2, influence = 1 },
+        { name = 'Menkar', resources = 0, influence = 2 },
+    }},
+    ['108eb9'] = { tile = 0, planets = {
+        { name = 'Ogdun', resources = 2, influence = 0 },
+        { name = 'Brthkul', resources = 1, influence = 2 },
+    }},
+    ['0db991'] = { tile = 0, planets = {
+        { name = 'Pord', resources = 3, influence = 1 },
+    }},
+    ['7fe6fc'] = { tile = 0, planets = {
+        { name = 'H-1', resources = 2, influence = 2 },
+        { name = 'H-2', resources = 2, influence = 0 },
+    }},
+    ['c9dd65'] = { tile = 0, planets = {
+        { name = 'Gheldahr', resources = 5, influence = 0 },
+    }},
+    ['eab832'] = { tile = 0, planets = {
+        { name = 'Kyr', resources = 1, influence = 0 },
+        { name = 'Pax', resources = 2, influence = 2 },
+        { name = 'Vess', resources = 1, influence = 0 },
+    }},
+    ['ff48e4'] = { tile = 0, planets = {
+        { name = 'Sanctuary', resources = 4, influence = 2 },
+    }},
+    ['9e6138'] = { tile = 0, planets = {
+        { name = 'Wod', resources = 3, influence = 1 },
+        { name = 'Lath', resources = 2, influence = 2 },
+    }},
+    ['6a667a'] = { tile = 0, planets = {
+        { name = 'Cymiae', resources = 4, influence = 1 },
+    }},
+}
+
+function systemToString(system)
+    assert(type(system) == 'table' and system.tile)
+    local message = {
+        'System ' .. system.tile
+    }
+    for i, planet in ipairs(system.planets or {}) do
+        table.insert(message, i == 1 and ': ' or ', ')
+        table.insert(message, '“' .. planet.name .. '”')
+    end
+    return table.concat(message, '')
+end
+
+--- Get system at position.
+-- @postition table: {xyz} position.
+-- @return system table.
+function systemFromPosition(position)
+    assert(type(position) == 'table' and type(position.x) == 'number')
+    -- Ray cast not always reliable, use box.
+    local hits = Physics.cast({
+        origin = { x = position.x, y = position.y, z = position.z },
+        direction = { x = 0, y = -1, z = 0 },
+        type = 3, -- box
+        size = { 0.1, 10, 0.1 }
+    })
+    for _, hit in ipairs(hits) do
+        local object = hit.hit_object
+        local system = _systems[object.getGUID()]
+        if system then
+            return system
+        end
+    end
+end
+
+--- Get all systems.
+-- @return table: map from tile GUID to system table.
+function systems()
+    return _systems
+end
+
+--- Get all planets.
+-- @return table: map from planet name to planet table.
+function planets()
+    local result = {}
+    for _, system in pairs(_systems) do
+        for _, planet in ipairs(system.planets or {}) do
+            result[planet.name] = planet
+        end
+    end
+    return result
+end
+
+--- Verify system follows expectations.
+-- @parameters table: system.
+-- @return success boolean, string error message.
+function systemIsValid(system)
+    local tile = system.tile
+    if not tile or type(tile) ~= 'number' then
+        return false, 'system.tile must be a number (zero can be used for homebrew)'
+    end
+    local home = system.home
+    if home and type(home) ~= 'boolean' then
+        return false, 'system.home must be nil or a boolean'
+    end
+
+    local planets = system.planets
+    if planets and (type(planets) ~= 'table') then
+        return false, 'system.planets must be nil or a list'
+    elseif planets then
+        for _, planet in ipairs(planets) do
+            local name = planet.name
+            if not name or type(name) ~= 'string' or string.len(name) == 0 then
+                return false, 'planet.name must be a non-empty string'
+            end
+            local radius = planet.radius
+            if radius and (type(radius) ~= 'number' or radius <= 0) then
+                return false, 'planet.radius must be nil or a positive number'
+            end
+            local position = planet.position
+            if position and (type(position) ~= 'table' or type(position[1]) ~= 'number' or type(position[2]) ~= 'number') then
+                return false, 'planet.position must be nil or a local {x, z} list'
+            end
+            local resources = planet.resources
+            if resources and type(resources) ~= 'number' or resources < 0 then
+                return false, 'planet.resources must be nil or a non-negative number'
+            end
+            local influence = planet.influence
+            if influence and type(influence) ~= 'number' or influence < 0 then
+                return false, 'planet.influence must be nil or a non-negative number'
+            end
+            local tech = planet.tech
+            if tech and tech ~= 'red' and tech ~= 'green' and tech ~= 'yellow' and tech ~= 'blue' then
+                return false, 'planet.tech must be {red|green|yellow|blue}'
+            end
+            local trait = planet.trait
+            if trait and trait ~= 'cultural' and trait ~= 'industrial' and trait ~= 'hazardous' then
+                return false, 'planet.trait must be {cultural|industrial|hazardous}'
+            end
+        end
+    end
+
+    local wormholes = system.wormholes
+    if wormholes then
+        if type(wormholes) ~= 'table' or not wormholes[1] then
+            return false, 'system.wormholes must be nil or a non-empty list'
+        end
+        for _, wormhole in ipairs(wormholes) do
+            if not type(wormhole) == 'string' or string.len(wormhole) == 0 then
+                return false, 'wormhole must be a non-empty string'
+            end
+        end
+    end
+
+    local anomalies = system.anomalies
+    if anomalies then
+        if type(anomalies) ~= 'table' or not anomalies[1] then
+            return false, 'system.anomalies must be nil or a non-empty list'
+        end
+        for _, anomaly in ipairs(anomalies) do
+            if not type(anomaly) == 'string' or string.len(anomaly) == 0 then
+                return false, 'anomaly must be a non-empty string'
+            end
+        end
+    end
+
+    return true
+end
+
+--- Let homebrew add custom systems via runtime injection.
+-- @param systems: table mapping from guid to system table.
+function injectHomebrewSystems(systems)
+    for guid, system in pairs(systems) do
+        local success, errorMessage = systemIsValid(system)
+        if not success then
+            error('injectSystems: ' .. guid .. ' ' .. errorMessage)
+        end
+        _systems[guid] = system
+    end
+end

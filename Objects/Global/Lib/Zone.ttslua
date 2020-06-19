@@ -1,0 +1,164 @@
+--- Player zones table.
+local _zones = {
+    -- Defaults for 6p and 8p tables.  Map default zone color to XZ border points.
+    defaults = {
+        [6] = {
+            zones = {
+                Yellow = {{21, -50}, {21, -6}, {51, -6}, {51, -50}},
+                Red = {{-21, -50}, {-21, -6}, {-1.5, -21}, {1.5, -21}, {21, -6}, {21, -50}},
+                Green = {{-51, -50}, {-51, -6}, {-21, -6}, {-21, -50}},
+                Purple = {{21, 6}, {21, 49}, {51, 49}, {51, 6}},
+                Blue = {{-21, 6}, {-21, 49}, { 21, 49}, {21, 6}, {1.5, 21}, {-1.5, 21}},
+                White = {{-51, 6}, {-51, 49}, {-21, 49}, {-21, 6}},
+            },
+            tableXZ = {{-48, -28}, {-48, 28}, {48, 28}, {48, -28}},
+            y = 1,
+        },
+        [8] = {
+            zones = {
+                Pink = {{40.5, -100}, {40.5, -15}, {78, -15}, {78, -100}},
+                White = {{0, -100}, {0, -15}, {40.5, -15}, {40.5, -100}},
+                Red = {{-40.5, -100}, {-40.5, -15}, {0, -15}, {0, -100}},
+                Orange = {{-78, -100}, {-78, -15}, {-40.5, -15}, {-40.5, -100}},
+                Yellow = {{-78, 15}, {-78, 100}, {-40.5, 100}, {-40.5, 15}},
+                Green = {{-40.5, 15}, {-40.5, 100}, {0, 100}, {0, 15}},
+                Blue = {{0, 15}, {0, 100}, {40.5, 100}, {40.5, 15}},
+                Purple = {{40.5, 15}, {40.5, 100}, {78, 100}, {78, 15}},
+            },
+            tableXZ = {{-78, -15}, {-78, 15}, {78, 15}, {78, -15}},
+            y = 1,
+        },
+    },
+
+    -- Current zones.
+    y = false,
+    zones = {},
+    tableXZ = {},
+
+    lastUpdate = false,
+    periodicUpdateSeconds = 3,
+}
+
+--- Is the point inside the polygon (2D)?
+-- Uses the "ray casting method".
+-- @see https://love2d.org/wiki/PointWithinShape
+--
+-- @param polygonXZ table : list of 2d points, each point is a list of two numbers.
+-- @param point table : list of 2 numbers.
+-- @return boolean : true if point is inside polygon.
+local function polygonContains(polygonXZ, position)
+    assert(type(polygonXZ) == 'table' and type(position) == 'table')
+
+    local x, z = 1, 2
+    local numverts = #polygonXZ
+    local tx, tz = position.x, position.z
+    local p0 = polygonXZ[numverts]
+
+    -- get test bit for above/below X axis
+    local zflag0 = p0[z] >= tz
+    local insideFlag = false
+
+    for _, p1 in ipairs(polygonXZ) do
+        local zflag1 = p1[z] >= tz
+
+        -- Check if endpoints straddle (are on opposite sides) of X axis
+        -- (i.e. the Zs differ); if so, +X ray could intersect this edge.
+        if zflag0 ~= zflag1 then
+            -- Check intersection of pgon segment with +X ray.
+            -- Note if >= point's X; if so, the ray hits it.
+            if ((p1[z] - tz) * (p0[x] - p1[x]) >= (p1[x] - tx) * (p0[z] - p1[z])) == zflag1 then
+                insideFlag = not insideFlag
+            end
+        end
+
+        -- Move to the next pair of vertices, retaining info as possible.
+        zflag0 = zflag1
+        p0 = p1
+    end
+
+    return insideFlag
+end
+
+function _zones.maybeUpdate()
+    if not _zones.lastUpdate or (Time.time - _zones.lastUpdate) > _zones.periodicUpdateSeconds then
+        _zones.lastUpdate = Time.time
+
+        local colorToCommandSheet = {}
+        numCommandSheets = 0
+        for _, object in ipairs(getAllObjects()) do
+            local color = string.match(name, '^Command Sheet %((%a+)%)$')
+            if color then
+                colorToCommandSheet[color] = object
+                numCommandSheets = numCommandSheets + 1
+            end
+        end
+
+        local default = _zones.defaults[numCommandSheets] or _zones.defaults[6]
+        _zones.y = default.y
+        _zones.tableXZ = default.tableXZ
+        _zones.zones = {}
+        for color, commandSheet in pairs(colorToCommandSheet) do
+            for defaultColor, border in pairs(default.zones) do
+                if polygonContains(border, commandSheet.getPosition()) then
+                    _zones.zones[color] = border
+                    break
+                end
+            end
+        end
+    end
+end
+
+--- Get objects in a zone, or all zones.
+-- @param zoneColor string : zone color, or get for all zones if nil.
+-- @return table : list of { guid, name, position, zoneColor } entries in zone.
+function zoneObjects(zoneColor)
+    assert(not zoneColor or type(zoneColor) == 'string')
+    _zones.maybeUpdate()
+    local result = {}
+    for _, object in ipairs(getAllObjects()) do
+        local objectZoneColor = zoneFromPosition(object.getPosition())
+        if not zoneColor or objectZoneColor == zoneColor then
+            table.insert(result, {
+                guid = object.getGUID(),
+                name = object.getName(),
+                position = object.getPosition(),
+                zoneColor = objectZoneColor,
+            })
+        end
+    end
+    return result
+end
+
+--- Get zone color from position.
+-- @param position table : {xyz} position.
+-- @return string : zone color, or nil if not in zone.
+function zoneFromPosition(position)
+    assert(type(position) == 'table' and type(position.x) == 'number')
+    _zones.maybeUpdate()
+    for zoneColor, border in pairs(_zones.zones) do
+        if polygonContains(border, position) then
+            return zoneColor
+        end
+    end
+end
+
+--- Is position on the main table?
+-- @param position table : {xyz} position.
+-- @return boolean : true if on main table.
+function zoneIsTable(position)
+    assert(type(position) == 'table' and type(position.x) == 'number')
+    _zones.maybeUpdate()
+    return polygonContains(_zones.tableXZ, position)
+end
+
+--- Get XYZ border about a zone (suitable for vector lines).
+-- @param zoneColor string : zone color.
+-- @return table : list of {xyz} points.
+function zoneBorder(zoneColor)
+    assert(type(zoneColor) == 'string')
+    _zones.maybeUpdate()
+    local result = {}
+    for _, xz in ipairs(_zones.zones[zoneColor] or {}) do
+        table.insert(result, { x = xz[0], y = _zones.y, z = xz[1] })
+    end
+end

@@ -370,8 +370,8 @@ function CrLua.TI4.System.isValid(system)
     end
 
     local planets = system.planets
-    if planets and (type(planets) ~= 'table' or not planets[1]) then
-        return false, 'system.planets must be nil or a non-empty list'
+    if planets and (type(planets) ~= 'table') then
+        return false, 'system.planets must be nil or a list'
     elseif planets then
         for _, planet in ipairs(planets) do
             local name = planet.name
@@ -402,7 +402,6 @@ function CrLua.TI4.System.isValid(system)
             if trait and trait ~= 'cultural' and trait ~= 'industrial' and trait ~= 'hazardous' then
                 return false, 'planet.trait must be {cultural|industrial|hazardous}'
             end
-
         end
     end
 

@@ -8,10 +8,10 @@ local BASE_PRODUCTION = 2
 local OBJECT_EFFECTS = {
     -- Tokens
     ['Commodities/Tradegoods x1'] = {
-        resources = 1
+        resources = 1,
     },
     ['Commodities/Tradegoods x3'] = {
-        resources = 3
+        resources = 3,
     },
 
     -- Technologies
@@ -144,6 +144,46 @@ function onPlayerChangeColor(playerColor)
     Wait.frames(updateEverything, 2)
 end
 
+function onObjectDestroy(dyingObject)
+    if _data.inside[dyingObject] then
+        _data.inside[dyingObject] = nil
+        updateEverything()
+    end
+end
+
+-------------------------------------------------------------------------------
+
+function onButtonClick(player, option, id)
+    announce(_data.produceConsumeValues)
+    commit(_data.produceConsumeValues)
+end
+
+function onBeginDrag(player, option, id)
+    local pp = self.positionToLocal(player.getPointerPosition())
+    _data.dragOffset = {
+        x = _data.width - pp.x,
+        z = _data.height - pp.z
+    }
+end
+
+function onEndDrag(player, option, id)
+    local pp = self.positionToLocal(player.getPointerPosition())
+    _data.width = pp.x + _data.dragOffset.x
+    _data.height = pp.z + _data.dragOffset.z
+    _data.width = math.max(_data.width, _config.minWidth)
+    _data.height = math.max(_data.height, _config.minHeight)
+    updateEverything()
+end
+
+function onDrag(player, option, id)
+    local pp = self.positionToLocal(player.getPointerPosition())
+    _data.width = pp.x + _data.dragOffset.x
+    _data.height = pp.z + _data.dragOffset.z
+    _data.width = math.max(_data.width, _config.minWidth)
+    _data.height = math.max(_data.height, _config.minHeight)
+    updateBoundingBox()
+end
+
 -------------------------------------------------------------------------------
 
 function updateEverything()
@@ -173,8 +213,8 @@ function updateInsideBuildArea()
 end
 
 function updateProduceConsumeValues()
-    local values = getProduceConsumeValues()
-    drawUi(values)
+    _data.produceConsumeValues = getProduceConsumeValues()
+    drawUi(_data.produceConsumeValues)
 end
 
 -------------------------------------------------------------------------------
@@ -276,18 +316,21 @@ function getProduceConsumeValues()
     local result = {
         resources = 0,
         cost = 0,
+        unitNameToCount = unitNameToCount,
         unitCount = 0,
         production = BASE_PRODUCTION,
         sarween = false,
         hegemonic = false,
     }
+    local seenUnitNameSet = {}
     for object, _ in pairs(objects) do
         local objectEffects = overriddenObjectEvents[object.getName()]
 
         -- Add unit type only the first time we see it, with the total count.
         local unit = CrLua.TI4.Unit.fromObject(object)
         local count = unit and unitNameToCount[unit.unitName]
-        if unit and count then
+        if unit and count and not seenUnitNameSet[unit.unitName] then
+            seenUnitNameSet[unit.unitName] = true
             local unitAttributes = CrLua.TI4.Unit.attributes(unit)
             local override = unitAttributeOverrides[unit.unitName]
             if override then
@@ -295,7 +338,6 @@ function getProduceConsumeValues()
             end
             result.cost = math.ceil(result.cost + unitAttributes.cost * count)
             result.unitCount = result.unitCount + count
-            unitNameToCount[unit.unitName] = nil
         end
 
         -- Planet resources.
@@ -389,6 +431,13 @@ function drawUi(values)
     local r1c2 = '# Units: ' .. (values and values.unitCount or '-')
     local r2c2 = 'Production: R+' .. (values and values.production or '-')
 
+    local w = panelWidth - 30
+    local w1 = w * 0.45
+    local w2 = w - (2 * w1)
+    local fontSize = 40
+
+    local columnWidths = trimFloat(w1) .. ' ' .. trimFloat(w1) .. ' ' .. trimFloat(w2)
+
     self.UI.setXmlTable({
         {
             tag = 'Defaults',
@@ -397,11 +446,19 @@ function drawUi(values)
                     tag = 'Text',
                     attributes = {
                         color = '#ffffff',
-                        fontSize = 46,
+                        fontSize = fontSize,
                         fontStyle = 'Bold',
                         alignment = 'MiddleCenter',
                         horizontalOverflow = 'Overflow',
                         verticalOverflow = 'Overflow',
+                    }
+                },
+                {
+                    tag = 'Button',
+                    attributes = {
+                        fontSize = fontSize,
+                        fontStyle = 'Bold',
+                        onClick = 'onButtonClick',
                     }
                 },
             }
@@ -420,7 +477,8 @@ function drawUi(values)
                     tag = 'TableLayout',
                     attributes = {
                         cellBackgroundColor = 'Clear',
-                        padding = '0 0 15 15',
+                        padding = '15 15 15 15',
+                        columnWidths = columnWidths,
                     },
                     children = {
                         {
@@ -433,6 +491,14 @@ function drawUi(values)
                                 { tag = 'Cell', children = {{
                                     tag = 'Text',
                                     value = r1c2
+                                }}},
+                                { tag = 'Cell', children = {{
+                                    tag = 'Button',
+                                    attributes = {
+                                        id = 'done',
+                                        height = panelHeight,
+                                    },
+                                    value = '\u{25BA}'
                                 }}},
                             }
                         },
@@ -473,30 +539,33 @@ function drawUi(values)
     })
 end
 
-function onBeginDrag(player, option, id)
-    local pp = self.positionToLocal(player.getPointerPosition())
-    _data.dragOffset = {
-        x = _data.width - pp.x,
-        z = _data.height - pp.z
-    }
+-------------------------------------------------------------------------------
+
+function announce(values)
+    local units = {}
+    for unitName, count in pairs(values.unitNameToCount) do
+        if count > 1 then
+            if unitName ~= 'Infantry' then
+                unitName = unitName .. 's'
+            end
+        end
+        table.insert(units, count .. ' ' .. unitName)
+    end
+    local message = table.concat({
+        _data.playerColor,
+        ' producing ',
+        table.concat(units, ', '),
+        '.'
+    }, '')
+    printToAll(message, _data.playerColor)
 end
 
-function onEndDrag(player, option, id)
-    local pp = self.positionToLocal(player.getPointerPosition())
-    _data.width = pp.x + _data.dragOffset.x
-    _data.height = pp.z + _data.dragOffset.z
-    _data.width = math.max(_data.width, _config.minWidth)
-    _data.height = math.max(_data.height, _config.minHeight)
-    updateEverything()
-end
-
-function onDrag(player, option, id)
-    local pp = self.positionToLocal(player.getPointerPosition())
-    _data.width = pp.x + _data.dragOffset.x
-    _data.height = pp.z + _data.dragOffset.z
-    _data.width = math.max(_data.width, _config.minWidth)
-    _data.height = math.max(_data.height, _config.minHeight)
-    updateBoundingBox()
+function commit()
+    for object, _ in pairs(_data.inside) do
+        if getPlanet(object) and not object.is_face_down then
+            object.flip()
+        end
+    end
 end
 
 -------------------------------------------------------------------------------

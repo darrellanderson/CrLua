@@ -8,6 +8,7 @@
 -- - wormholes: list of strings.
 -- - anomalies: list of strings.
 -- - rotate: override, degrees number.
+-- - localY: override tile height (ghosts home system).
 --
 -- Planet attributes:
 -- - name: string.
@@ -15,8 +16,14 @@
 -- - influence: number.
 -- - trait: string {cultural|industrial|hazardous}.
 -- - tech: string {red|green|yellow|blue}.
--- - position: override (local coordinates).
--- - radius: override (local coordinates).
+-- - position: table with {xz}: override, local space.
+-- - radius: number: override, local space.
+--
+-- Also computed:
+-- - system.guid: tile GUID.
+-- - system.zoneEdgePositions: local edge positions carving per-planet zones.
+-- - system.planets[].position: local {xyz} position.
+-- - system.planets[].radius: local space.
 --
 local _systems = {
     ['86e50a'] = { tile = 1, home = true, planets = {
@@ -165,7 +172,7 @@ local _systems = {
     ['0216be'] = { tile = 49 },
     ['97ee53'] = { tile = 50 },
     ['f38182'] = { tile = 51, home = true, localY = 0.101, wormholes = { 'delta' }, planets = {
-        { name = 'Creuss', resources = 4, influence = 2, position = { 0.35, 0.18 }, radius = 0.8 },
+        { name = 'Creuss', resources = 4, influence = 2, position = { x = 0.35, z = 0.18 }, radius = 0.8 },
     }},
 
     -- TI3 systems.
@@ -212,10 +219,10 @@ local _systems = {
         { name = 'Cormund', resources = 2, influence = 0, trait = 'cultural' }
     }},
     ['a682b7'] = { tile = 0, planets = {
-        { name = 'Malice', resources = 0, influence = 2, trait = 'cultural', position = { -0.9, -0.4 } }
+        { name = 'Malice', resources = 0, influence = 2, trait = 'cultural', position = { x = -0.9, z = -0.4 } }
     }},
     ['35baa0'] = { tile = 0, planets = {
-        { name = 'Everra', resources = 3, influence = 1, trait = 'cultural', position = { 0.7, -1.2 } }
+        { name = 'Everra', resources = 3, influence = 1, trait = 'cultural', position = { x = 0.7, z = -1.2 } }
     }},
     ['ff5d4a'] = { tile = 0, planets = {
         { name = 'Vega Major', resources = 2, influence = 1, trait = 'industrial' },
@@ -352,16 +359,30 @@ local _systems = {
     }},
 }
 
-function systemToString(system)
-    assert(type(system) == 'table' and system.tile)
-    local message = {
-        'System ' .. system.tile
-    }
-    for i, planet in ipairs(system.planets or {}) do
-        table.insert(message, i == 1 and ': ' or ', ')
-        table.insert(message, '“' .. planet.name .. '”')
+local LOCAL_DISTANCE_TO_PLANET = 1.1
+local LOCAL_PLANET_RADIUS = 0.9
+local LOCAL_SYSTEM_TILE_RADIUS = 2.26
+local LOCAL_SYSTEM_TILE_Y = 0.32
+
+--- Get all systems.
+-- @return table: map from tile GUID to system table.
+function systems()
+    for guid, system in pairs(_systems) do
+        _fillMissingSystemData(guid, system)
     end
-    return table.concat(message, '')
+    return _systems
+end
+
+--- Get all planets.
+-- @return table: map from planet name to planet table.
+function planets()
+    local result = {}
+    for _, system in pairs(_systems) do
+        for _, planet in ipairs(system.planets or {}) do
+            result[planet.name] = planet
+        end
+    end
+    return result
 end
 
 --- Get system at position.
@@ -380,33 +401,60 @@ function systemFromPosition(position)
         local object = hit.hit_object
         local system = _systems[object.getGUID()]
         if system then
+            _fillMissingSystemData(guid, system)
             return system
         end
     end
 end
 
---- Get all systems.
--- @return table: map from tile GUID to system table.
-function systems()
-    return _systems
-end
-
---- Get all planets.
--- @return table: map from planet name to planet table.
-function planets()
-    local result = {}
-    for _, system in pairs(_systems) do
+--- Get planet at position.
+-- Optionally require position to be inside planet radius (params.exact).
+-- @params table: { systemGuid, position{xyz}, exact boolean }
+-- @return planet table.
+function planetFromPosition(params)
+    assert(type(params) == 'table')
+    local systemGuid = assert(params.systemGuid)
+    local position = assert(params.position)
+    local exact = params.exact
+    assert(type(systemGuid) == 'string')
+    assert(type(position) == 'table' and type(position.x) == 'number')
+    local system = systemFromPosition(position)
+    local best = false
+    if system then
+        local object = getObjectFromGUID(system.guid)
+        local p1 = object.positionToLocal(position)
+        local bestDistanceSq = false
         for _, planet in ipairs(system.planets or {}) do
-            result[planet.name] = planet
+            local p2 = planet.position
+            local distanceSq = (p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2
+            if not bestDistanceSq or distanceSq < bestDistanceSq then
+                best = planet
+                distanceSq = bestDistanceSq
+            end
+        end
+        if best and exact and math.sqrt(bestDistanceSq) > best.radius then
+            best = false
         end
     end
-    return result
+    return best
+end
+
+--- Let homebrew add custom systems via runtime injection.
+-- @param systems: table mapping from guid to system table.
+function injectHomebrewSystems(systems)
+    for guid, system in pairs(systems) do
+        local success, errorMessage = _systemIsValid(system)
+        if not success then
+            error('injectSystems: ' .. guid .. ' ' .. errorMessage)
+        end
+        _systems[guid] = system
+    end
 end
 
 --- Verify system follows expectations.
 -- @parameters table: system.
 -- @return success boolean, string error message.
-function systemIsValid(system)
+function _systemIsValid(system)
     local tile = system.tile
     if not tile or type(tile) ~= 'number' then
         return false, 'system.tile must be a number (zero can be used for homebrew)'
@@ -479,14 +527,143 @@ function systemIsValid(system)
     return true
 end
 
---- Let homebrew add custom systems via runtime injection.
--- @param systems: table mapping from guid to system table.
-function injectHomebrewSystems(systems)
-    for guid, system in pairs(systems) do
-        local success, errorMessage = systemIsValid(system)
-        if not success then
-            error('injectSystems: ' .. guid .. ' ' .. errorMessage)
+function _systemToString(system)
+    assert(type(system) == 'table' and system.tile)
+    local message = {
+        'System ' .. system.tile
+    }
+    for i, planet in ipairs(system.planets or {}) do
+        table.insert(message, i == 1 and ': ' or ', ')
+        table.insert(message, '“' .. planet.name .. '”')
+    end
+    return table.concat(message, '')
+end
+
+function _bearingToPosition(bearing, distance, y)
+    assert(type(bearing) == 'number' and 0 <= bearing and bearing < 360 and type(distance) == 'number')
+    local bearing = -bearing * math.pi / 180.0
+    return {
+        x = distance * math.sin(bearing),
+        y = y or 0,
+        z = -distance * math.cos(bearing)
+    }
+end
+
+function _getZoneBorders(system)
+    local numPlanets = system.planets and #system.planets or 0
+    local numWormholes = system.wormholes and #system.wormholes or 0
+    local numZones = numPlanets + numWormholes
+
+    -- The local coordinate space for a tile shows {x=1,z=1} to be lower left.
+    -- Set zone borders to track planets starting left going clockwise.
+    local zoneBorders
+    if numZones <= 1 then
+        zoneBorders = { 0, 360 }
+    elseif numZones == 2 then
+        zoneBorders = { 240, 60, 240 }
+    elseif numZones == 3 then
+        zoneBorders = { 210, 330, 90, 210 }
+    else
+        error(TAG .. ': too many zones (' .. numZones .. ')')
+    end
+
+    -- Support non-standard rotations (applies to a TI3 tile).
+    for i, v in ipairs(zoneBorders) do
+        zoneBorders[i] = (v + (system.rotate or 0)) % 360
+    end
+    return zoneBorders
+end
+
+function _planetPosition(system, zoneBorders, planetIndex)
+    local planet = system.planets[planetIndex]
+    local localRadius = planet.radius or LOCAL_PLANET_RADIUS
+    local localY = system.localY or LOCAL_SYSTEM_TILE_Y
+
+    -- If planet already has a position, use it.
+    if planet.position then
+        return { x = planet.position.x, y = localY, z = planet.position.y }, localRadius
+    end
+
+    -- Compute the default bearing and distance.
+    local distanceToPlanet = 0
+    local bearingToPlanet = 0
+    if #zoneBorders > 2 then
+        local a = zoneBorders[planetIndex]
+        local b = zoneBorders[planetIndex + 1]
+        if a < b then
+            bearingToPlanet = (a + b) / 2
+        else
+            bearingToPlanet = ((a + 360 + b) / 2) % 360
         end
-        _systems[guid] = system
+        distanceToPlanet = LOCAL_DISTANCE_TO_PLANET
+    end
+
+    -- Planets bearings are almost but not exactly in the center of their zones.
+    -- Home system planets are slightly offset.  Different same-number-of-planets
+    -- systems vary slightly, so unless want to hard code each tile this is close.
+    local numZones = #zoneBorders - 1
+    if numZones == 1 then
+        if system.home then
+            distanceToPlanet = 0.35
+            bearingToPlanet = 345
+        else
+            distanceToPlanet = 0.05
+            bearingToPlanet = 270
+        end
+    elseif numZones == 2 then
+        if planetIndex == 1 then
+            if system.home then
+                distanceToPlanet = distanceToPlanet + 0.1
+                bearingToPlanet = bearingToPlanet - 4
+            else
+                distanceToPlanet = distanceToPlanet + 0.05
+                bearingToPlanet = bearingToPlanet - 3
+            end
+        elseif planetIndex == 2 then
+            if system.home then
+                distanceToPlanet = distanceToPlanet - 0.05
+                bearingToPlanet = bearingToPlanet - 15
+            else
+                distanceToPlanet = distanceToPlanet - 0.2
+                bearingToPlanet = bearingToPlanet + 5
+            end
+        end
+    elseif numZones == 3 then
+        if planetIndex == 1 then  -- hercant
+            distanceToPlanet = distanceToPlanet + 0.25
+            bearingToPlanet = bearingToPlanet + 9
+        elseif planetIndex == 2 then
+            distanceToPlanet = distanceToPlanet + 0.07
+            bearingToPlanet = bearingToPlanet - 5
+        elseif planetIndex == 3 then
+            distanceToPlanet = distanceToPlanet + 0.22
+            bearingToPlanet = bearingToPlanet - 6
+        end
+    end
+
+    return _bearingToPosition(bearingToPlanet, distanceToPlanet, localY), localRadius
+end
+
+function _fillMissingSystemData(guid, system)
+    if not system.guid then
+        system.guid = guid
+        system.string = _systemToString(system)
+
+        -- Fill zone edge positions, points on edge diving per-planet zones.
+        local zoneBorders = zoneBorders or _getZoneBorders(system)
+        if #zoneBorders > 2 then
+            system.zoneEdgePositions = {}
+            local r = LOCAL_SYSTEM_TILE_RADIUS
+            local y = system.localY or LOCAL_SYSTEM_TILE_Y
+            for i = 1, #zoneBorders - 1 do
+                local bearing = zoneBorders[i]
+                table.insert(system.zoneEdgePositions, _bearingToPosition(bearing, r, y))
+            end
+        end
+
+        -- Fill in local planet position, radius.
+        for i, planet in ipairs(system.planets or {}) do
+            planet.position, planet.radius = _planetPosition(system, zoneBorders, i)
+        end
     end
 end

@@ -440,6 +440,39 @@ function CrLua.TI4.System._testDefaultSystems()
     end
 end
 
+function CrLua.TI4.System._testPlanetsExist()
+    local cardNameSet = {}
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        if name and string.len(name) > 0 then
+            if object.tag == 'Card' then
+                cardNameSet[string.lower(name)] = true
+            elseif object.tag == 'Deck' then
+                for _, entry in ipairs(object.getObjects()) do
+                    cardNameSet[string.lower(entry.name)] = true
+                end
+            end
+        end
+    end
+
+    local missing = {}
+    for _, system in pairs(CrLua.TI4.System.SYSTEMS) do
+        for _, planet in ipairs(system.planets or {}) do
+            if not cardNameSet[string.lower(planet.name)] then
+                table.insert(missing, {
+                    system = system,
+                    planet = planet
+                })
+            end
+        end
+    end
+
+    for _, missing in ipairs(missing) do
+        local system, planet = missing.system, missing.planet
+        print('missing ' .. system.tile .. ' ' .. planet.name)
+    end
+end
+
 -------------------------------------------------------------------------------
 --- Inject a new system (homebrew support).
 -- @parameters table
@@ -504,13 +537,13 @@ end
 
 -------------------------------------------------------------------------------
 --- Get all planets.
--- @return table : map from planet name to planet attributes.
+-- @return table : map from LOWERCASE planet name to planet attributes.
 -------------------------------------------------------------------------------
 function CrLua.TI4.System.getAllPlanets()
     local result = {}
     for guid, system in pairs(CrLua.TI4.System.SYSTEMS) do
         for _, planet in ipairs(system.planets or {}) do
-            result[planet.name] = planet
+            result[string.lower(planet.name)] = planet
         end
     end
     return result

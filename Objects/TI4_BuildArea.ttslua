@@ -247,7 +247,7 @@ end
 function getPlanet(object)
     assert(type(object) == 'userdata')
     _data.planets = _data.planets or CrLua.TI4.System.getAllPlanets()
-    return _data.planets[object.getName()]
+    return _data.planets[string.lower(object.getName())]
 end
 
 function getPlayerColor()
@@ -423,7 +423,7 @@ function drawUi(values)
     cornerHeight = cornerHeight * 100
     cornerX = cornerX * 100
     cornerY = cornerY * 100
-    local panelPosition = '0 0 ' .. trimFloat(bounds.size.y * 50.0 + 1)
+    local panelPosition = '0 0 ' .. trimFloat(bounds.size.y * 50.0 + 2)
     local cornerPosition = trimFloat(cornerX) .. ' ' .. trimFloat(cornerY) .. ' ' .. trimFloat(-bounds.size.y * 50.0 + 1)
 
     local r1c1 = 'Build Cost: ' .. (values and values.cost or '-')
@@ -586,6 +586,8 @@ end
 #include <~/CrLua/TI4/Zone>
 
 --CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
+--#include <~/CrLua/UnitTest>
+--CrLua.UnitTest.runTests('CrLua.TI4.System', CrLua.TI4.System, true)
 
 CrLua.assertRequired({ 'Log', 'TI4.System', 'TI4.Unit', 'TI4.Zone' })
 CrLua.lock()

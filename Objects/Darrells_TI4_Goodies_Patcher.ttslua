@@ -29,18 +29,8 @@ local PATCH_RULES = {
     },
 
     ['Active/Passed (White)'] = {
-        removeFromTable = {
+        replaceOnTable = {
             '^Active/Passed %(%a+%)$',
-        },
-        removeFromContainer = {
-            { '.+ Box$', '^Active/Passed %(%a+%)$' },
-            { '^Variant Pieces ', '^Frankenstein Bags$', '^Active/Passed %(%a+%)$' }
-        },
-        addOnColors = {
-            name = 'Active/Passed ($COLOR)',
-            offsetXZ = { x = -2, z = -0.5 },
-            rotation = { x = 0, y = 0, z = 180 },
-            scale = { x = 1.33, y = 1, z = 1.33 },
         },
     },
 
@@ -49,12 +39,8 @@ local PATCH_RULES = {
     },
 
     ['Variant Colors & Color Picker'] = {
-        addToContainer = {
-            { '^Variant Pieces ' },
-        },
-        removeFromContainer = {
-            { '^Variant Pieces ', '^Player Color Picker$' },
-            { '^Variant Pieces ', '^%a+ Player Pieces$' },
+        replaceInContainer = {
+            { '^Variant Pieces ', 'Variant Colors & Color Picker' },
         },
     },
 
@@ -87,6 +73,21 @@ local PATCH_RULES = {
             { '^Variant Pieces ' },
         },
     },
+
+    -- Tactic Blue stuff
+    ['TI4 MultiRoller 3.47'] = {
+        replaceOnTable = { 'TI4 MultiRoller 3.46' }
+    },
+    ['Savages of Cymiae'] = {
+        replaceInContainer = {
+            { '^Variant Pieces ', 'Savages of Cymiae' }
+        }
+    },
+    ['Quick Reference and Draft Deck'] = {
+        replaceInContainer = {
+            { '^Variant Pieces ', 'Quick Reference and Draft Deck' }
+        }
+    }
 }
 
 -------------------------------------------------------------------------------
@@ -581,6 +582,8 @@ local function _descendMultiple(pathMatches, onLeafCallback)
 end
 
 local function replaceInContainer(pathMatches, newVersionObject)
+    assert(type(pathMatches) == 'table' and type(pathMatches[1]) == 'table')
+    assert(type(newVersionObject) == 'userdata')
     local function onLeafCallback(containerList)
         CrLua.Log.i(TAG, 'PATCH REPLACE "' .. _containerPath(containerList) .. '"')
         local object = containerList[#containerList]
@@ -600,6 +603,8 @@ local function replaceInContainer(pathMatches, newVersionObject)
 end
 
 local function addToContainer(pathMatches, newVersionObject)
+    assert(type(pathMatches) == 'table' and type(pathMatches[1]) == 'table')
+    assert(type(newVersionObject) == 'userdata')
     local function onLeafCallback(containerList)
         CrLua.Log.i(TAG, 'PATCH ADDING TO "' .. _containerPath(containerList) .. '"')
         local container = containerList[#containerList]
@@ -622,6 +627,8 @@ local function addToContainer(pathMatches, newVersionObject)
 end
 
 local function removeFromContainer(pathMatches, newVersionObject)
+    assert(type(pathMatches) == 'table' and type(pathMatches[1]) == 'table')
+    assert(type(newVersionObject) == 'userdata')
     local function onLeafCallback(containerList)
         CrLua.Log.i(TAG, 'PATCH REMOVING "' .. _containerPath(containerList) .. '"')
         local object = containerList[#containerList]

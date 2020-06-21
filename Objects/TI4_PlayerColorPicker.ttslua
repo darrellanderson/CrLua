@@ -64,6 +64,8 @@ local SWAP = {
 local ANONYMOUS_FLAGSHIP_NAME = '$COLOR Flagship'
 local ANONYMOUS_PIECES_BAG_NAME = '$COLOR Player Pieces'
 
+-------------------------------------------------------------------------------
+
 function onLoad(saveState)
     CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
     Wait.time(resetUi, 0.2)
@@ -231,14 +233,19 @@ end
 
 -------------------------------------------------------------------------------
 
+local _lastSwapTime = 0
+
 function onButtonClick(player, wha, id)
     if id == 'swapColors' then
         -- self.UI.getAttribute('prevColor', 'text') does not work?
         local prevColor = _values['prevColor']
         local nextColor = _values['nextColor']
         CrLua.Log.d(TAG, 'onButtonClick: prev=' .. tostring(prevColor) .. ' next=' .. tostring(nextColor))
-        if prevColor and nextColor then
-            swap(prevColor, nextColor)
+
+        local dt = Time.time - _lastSwapTime
+        if prevColor and nextColor and dt > 3 then
+            _lastSwapTime = Time.time
+            startSwapCoroutine(prevColor, nextColor)
         end
     end
 end
@@ -249,8 +256,112 @@ function onValueChanged(player, value, id)
 end
 
 -------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 
-function swap(prevColor, nextColor)
+--- Remove units from bags, fix the scale, put them back.
+-- Do this assuming a coroutine as need to wait between unpack and pack to
+-- avoid TTS generating deleted items.
+local function fixUnitScale(unitRuleToUnitBag)
+    for _, unitBag in pairs(unitRuleToUnitBag) do
+        local scale = unitBag.getScale()
+        local position = unitBag.getPosition()
+
+        while not unitBag.resting do
+            coroutine.yield(0)
+        end
+
+        local objects = {}
+        for i, entry in ipairs(unitBag.getObjects()) do
+            local object = unitBag.takeObject({
+                guid = entry.guid,
+                position = { x = position.x, y = position.y + 5 + i, z = position.z }
+            })
+            object.setScale(scale)
+            object.setLock(true)
+            table.insert(objects, object)
+        end
+        coroutine.yield(0)
+
+        for _, object in ipairs(objects) do
+            while object.spawning do
+                coroutine.yield(0)
+            end
+        end
+        coroutine.yield(0)
+
+        for _, object in ipairs(objects) do
+            object.setLock(false)
+            unitBag.putObject(object)
+        end
+        coroutine.yield(0)
+    end
+end
+
+--- Make sure all items are found!
+local function verifyRuleToItems(ruleToItems)
+    assert(type(ruleToItems) == 'table')
+
+    for _, anonymousName in ipairs(SWAP.SINGLETONS) do
+        local items = ruleToItems[anonymousName]
+        if not items then
+            return false, 'missing "' .. anonymousName .. '"'
+        end
+    end
+
+    for anonymousDeck, anonymousCards in pairs(SWAP.DECKS) do
+        -- Only look for cards, they were pulled from decks during scan.
+        for _, anonymousCard in ipairs(anonymousCards) do
+            local items = ruleToItems[anonymousCard]
+            if not items then
+                return false, 'missing "' .. anonymousCard .. '"'
+            elseif #items > 1 then
+                return false, 'multiple "' .. anonymousCard .. '"'
+            end
+        end
+    end
+
+    for _, anonymousName in ipairs(SWAP.UNITS) do
+        local items = ruleToItems[anonymousName]
+        local bag = false
+        for _, item in ipairs(items or {}) do
+            if item.live and item.live.tag == 'Bag' then
+                if bag then
+                    return false, 'multiple unit bags "' .. anonymousName .. '"'
+                end
+                bag = item.live.object
+            end
+        end
+        if not bag then
+            return false, 'missing unit bag "' .. anonymousName .. '"'
+        end
+    end
+    return true
+end
+
+local function isEntrySpawning(listOrTable)
+    assert(type(listOrTable) == 'table')
+    for _, entry in pairs(listOrTable) do
+        if entry.spawning then
+            return true
+        end
+    end
+end
+local function isGuidActive(list)
+    assert(type(list) == 'table')
+    for _, guid in ipairs(list) do
+        if getObjectFromGUID(guid) then
+            return true
+        end
+    end
+end
+
+--- Runs from a lua coroutine, yield 0 to stall one frame, return 1 to finish.
+-- TTS needs a frame to finish pack/unpack to let objects settle.  Do the
+-- swap in a coroutine, yielding after each take/put and other major state
+-- change (such as Player.changeColor).
+-- Rather than managing callback_function for barriers, just inspect state.
+local function swapCoroutine(prevColor, nextColor)
     assert(type(prevColor) == 'string' and type(nextColor) == 'string')
 
     local flagshipName = getFlagshipName(prevColor)
@@ -258,178 +369,175 @@ function swap(prevColor, nextColor)
 
     -- Get to-pack items, make sure they are all there before swapping!
     local ruleToItems = getSwapRuleToItems(prevColor, nextColor, flagshipName)
-    verifyRuleToItems(ruleToItems)
-
-    -- TTS needs a frame to finish pack/unpack to let objects settle.  Do the
-    -- swap in a coroutine, yielding after each take/put and other major state
-    -- change (such as Player.changeColor).
-    -- Rather than managing callback_function for barriers, just inspect state.
-    local function swapCoroutineFunction()
-        -- Do coroutine management manually vs startLuaCoroutine version.
-        local swapCoroutine = coroutine.running()
-        local function resumeSwapCoroutine()
-            local success, errorMessage = coroutine.resume(swapCoroutine)
-            if not success then
-                error(TAG .. ': error in swap coroutine: ' .. (errorMessage or 'nil'))
-            end
-        end
-        local function waitAndAutoResume()
-            Wait.frames(resumeSwapCoroutine, 2)
-            coroutine.yield(1)
-        end
-
-        local function isEntrySpawning(listOrTable)
-            assert(type(listOrTable) == 'table')
-            for _, entry in pairs(listOrTable) do
-                if entry.spawning then
-                    return true
-                end
-            end
-        end
-        local function isGuidActive(list)
-            assert(type(list) == 'table')
-            for _, guid in ipairs(list) do
-                if getObjectFromGUID(guid) then
-                    return true
-                end
-            end
-        end
-
-        local prevBag = getPiecesBag(prevColor, true, {-3, 3, 0})
-        waitAndAutoResume()
-        while prevBag.spawning do waitAndAutoResume() end
-
-        local putGuids = packSingletons(ruleToItems, prevBag)
-        while isGuidActive(putGuids) do waitAndAutoResume() end
-        waitAndAutoResume()
-
-        local deckRuleToCardObjects = retrieveCards(ruleToItems)
-        while isEntrySpawning(deckRuleToCardObjects) do waitAndAutoResume() end
-        waitAndAutoResume()
-
-        local deckRuleToDeckObject, putGuids = packCardsIntoDecks(prevColor, deckRuleToCardObjects)
-        deckRuleToCardObjects = nil
-        while isGuidActive(putGuids) do waitAndAutoResume() end
-        waitAndAutoResume()
-
-        local putGuids = packDecks(deckRuleToDeckObject, prevBag)
-        deckRuleToDeckObject = nil
-        while isGuidActive(putGuids) do waitAndAutoResume() end
-        waitAndAutoResume()
-
-        local unitBags, putGuids = packUnitsIntoUnitBags(ruleToItems)
-        while isGuidActive(putGuids) do waitAndAutoResume() end
-        waitAndAutoResume()
-
-        local flagships, flagshipBag = startRenameFlagshipToGeneric(unitBags, prevColor, flagshipName)
-        while isEntrySpawning(flagships) do waitAndAutoResume() end
-        waitAndAutoResume()
-
-        local putGuids = finishRenameFlagshipToGeneric(flagships, flagshipBag)
-        flagships = nil
-        flagshipBag = nil
-        while isGuidActive(putGuids) do waitAndAutoResume() end
-        waitAndAutoResume()
-
-        local putGuids = packUnitBags(unitBags, prevBag)
-        unitBags = nil
-        while isGuidActive(putGuids) do waitAndAutoResume() end
-        waitAndAutoResume()
-
-        prevBag.setLock(false)
-        self.putObject(prevBag)
-        prevBag = nil
-        waitAndAutoResume()
-
-        doSimpleRename(ruleToItems)
-        waitAndAutoResume()
-
-        local turnState = getTurnState()
-        Player[prevColor].changeColor(nextColor)
-        waitAndAutoResume()
-
-        setTurnState(turnState, prevColor, nextColor)
-        turnState = nil
-        waitAndAutoResume()
-
-        local handState, handObjects = getHandState(prevColor, nextColor)
-
-        -- Transfer objects from the old hand to the new.  First move the new
-        -- hand to the middle (so deal does not hit another hand on the way),
-        -- then deal to change hands.  Moving out of the hand via setPosition
-        -- does not work reliably.
-        Player[nextColor].setHandTransform({
-            position = { x = 0, y = 10, z = 0 },
-            scale = { x = 1, y = 1, z = 1 }
-        }, 1)
-        waitAndAutoResume()
-        for i, object in ipairs(handObjects) do
-            object.deal(1, nextColor)
-            object.setLock(true)
-        end
-        local function isBusy()
-            local player = Player[prevColor]
-            for i = 1, player.getHandCount() do
-                if #player.getHandObjects(i) > 0 then
-                    return true
-                end
-            end
-        end
-        while isBusy() do waitAndAutoResume() end
-        waitAndAutoResume()
-
-        swapHandState(handState, prevColor, nextColor)
-        handState = nil
-        waitAndAutoResume()
-
-        -- Move prev hand objects to next hand a second time, in case warping
-        -- the hand transform did not take all the contents.  This should also
-        -- fix any orientation problems such as cards being upside down.
-        for i, object in ipairs(handObjects) do
-            object.setLock(false)
-            object.deal(1, nextColor)
-        end
-
-        local nextBag = getPiecesBag(nextColor, true, {3, 3, 0})
-        waitAndAutoResume()
-        while nextBag.spawning do waitAndAutoResume() end
-
-        unpackSingletons(ruleToItems, nextBag)
-        waitAndAutoResume()
-
-        local deckRuleToDeckObject = unpackDecks(nextColor, ruleToItems, nextBag)
-        while isEntrySpawning(deckRuleToDeckObject) do waitAndAutoResume() end
-        waitAndAutoResume()
-
-        local spawning = unpackCardsFromDecks(ruleToItems, deckRuleToDeckObject)
-        deckRuleToDeckObject = nil
-        while isEntrySpawning(spawning) do waitAndAutoResume() end
-        waitAndAutoResume()
-
-        local unitRuleToUnitBag = unpackUnitBags(nextColor, ruleToItems, nextBag)
-        while isEntrySpawning(unitRuleToUnitBag) do waitAndAutoResume() end
-        waitAndAutoResume()
-
-        local flagships, flagshipBag = startRenameFlagshipFromGeneric(unitRuleToUnitBag, flagshipName)
-        while isEntrySpawning(flagships) do waitAndAutoResume() end
-        waitAndAutoResume()
-
-        local putGuids = finishRenameFlagshipFromGeneric(flagships, flagshipBag)
-        flagships = nil
-        flagshipBag = nil
-        while isGuidActive(putGuids) do waitAndAutoResume() end
-        waitAndAutoResume()
-
-        unpackUnitsFromUnitBags(ruleToItems, unitRuleToUnitBag)
-        unitRuleToUnitBag = nil
-        waitAndAutoResume()
-
-        self.putObject(nextBag)
-        print(TAG .. ': finished')
-
+    local success, errorMessage = verifyRuleToItems(ruleToItems)
+    if not success then
+        error(errorMessage)
         return 1
     end
-    coroutine.resume(coroutine.create(swapCoroutineFunction))
+
+    -- PACK OLD
+
+    local prevBag = getPiecesBag(prevColor, true, {-3, 3, 0})
+    coroutine.yield(0)
+    while prevBag.spawning do coroutine.yield(0) end
+
+    local putGuids = packSingletons(ruleToItems, prevBag)
+    while isGuidActive(putGuids) do coroutine.yield(0) end
+    coroutine.yield(0)
+
+    local deckRuleToCardObjects = retrieveCards(ruleToItems)
+    while isEntrySpawning(deckRuleToCardObjects) do coroutine.yield(0) end
+    coroutine.yield(0)
+
+    local deckRuleToDeckObject, putGuids = packCardsIntoDecks(prevColor, deckRuleToCardObjects)
+    deckRuleToCardObjects = nil
+    while isGuidActive(putGuids) do coroutine.yield(0) end
+    coroutine.yield(0)
+
+    local putGuids = packDecks(deckRuleToDeckObject, prevBag)
+    deckRuleToDeckObject = nil
+    while isGuidActive(putGuids) do coroutine.yield(0) end
+    coroutine.yield(0)
+
+    local unitBags, putGuids = packUnitsIntoUnitBags(ruleToItems)
+    while isGuidActive(putGuids) do coroutine.yield(0) end
+    coroutine.yield(0)
+
+    local flagships, flagshipBag = startRenameFlagshipToGeneric(unitBags, prevColor, flagshipName)
+    while isEntrySpawning(flagships) do coroutine.yield(0) end
+    coroutine.yield(0)
+
+    local putGuids = finishRenameFlagshipToGeneric(flagships, flagshipBag)
+    flagships = nil
+    flagshipBag = nil
+    while isGuidActive(putGuids) do coroutine.yield(0) end
+    coroutine.yield(0)
+
+    local putGuids = packUnitBags(unitBags, prevBag)
+    unitBags = nil
+    while isGuidActive(putGuids) do coroutine.yield(0) end
+    coroutine.yield(0)
+
+    prevBag.setLock(false)
+    self.putObject(prevBag)
+    prevBag = nil
+    coroutine.yield(0)
+
+    -- RENAME CURRENT
+
+    doSimpleRename(ruleToItems)
+    coroutine.yield(0)
+
+    -- UNPACK NEW
+
+    local nextBag = getPiecesBag(nextColor, true, {3, 3, 0})
+    coroutine.yield(0)
+    while nextBag.spawning do coroutine.yield(0) end
+
+    unpackSingletons(ruleToItems, nextBag)
+    coroutine.yield(0)
+
+    local deckRuleToDeckObject = unpackDecks(nextColor, ruleToItems, nextBag)
+    while isEntrySpawning(deckRuleToDeckObject) do coroutine.yield(0) end
+    coroutine.yield(0)
+
+    local spawning = unpackCardsFromDecks(ruleToItems, deckRuleToDeckObject)
+    deckRuleToDeckObject = nil
+    while isEntrySpawning(spawning) do coroutine.yield(0) end
+    coroutine.yield(0)
+
+    local unitRuleToUnitBag = unpackUnitBags(nextColor, ruleToItems, nextBag)
+    while isEntrySpawning(unitRuleToUnitBag) do coroutine.yield(0) end
+    coroutine.yield(0)
+
+    fixUnitScale(unitRuleToUnitBag)
+    coroutine.yield(0)
+
+    local flagships, flagshipBag = startRenameFlagshipFromGeneric(unitRuleToUnitBag, flagshipName)
+    while isEntrySpawning(flagships) do coroutine.yield(0) end
+    coroutine.yield(0)
+
+    local putGuids = finishRenameFlagshipFromGeneric(flagships, flagshipBag)
+    flagships = nil
+    flagshipBag = nil
+    while isGuidActive(putGuids) do coroutine.yield(0) end
+    coroutine.yield(0)
+
+    unpackUnitsFromUnitBags(ruleToItems, unitRuleToUnitBag)
+    unitRuleToUnitBag = nil
+    coroutine.yield(0)
+
+    self.putObject(nextBag)
+
+    -- PLAYER AND HAND COLOR
+
+    local turnState = getTurnState()
+    Player[prevColor].changeColor(nextColor)
+    coroutine.yield(0)
+
+    setTurnState(turnState, prevColor, nextColor)
+    turnState = nil
+    coroutine.yield(0)
+
+    local handState, handObjects = getHandState(prevColor, nextColor)
+
+    -- Transfer objects from the old hand to the new.  First move the new
+    -- hand to the middle (so deal does not hit another hand on the way),
+    -- then deal to change hands.  Moving out of the hand via setPosition
+    -- does not work reliably.
+    Player[nextColor].setHandTransform({
+        position = { x = 0, y = 10, z = 0 },
+        scale = { x = 1, y = 1, z = 1 }
+    }, 1)
+    coroutine.yield(0)
+    for i, object in ipairs(handObjects) do
+        object.deal(1, nextColor)
+        object.setLock(true)
+    end
+    local function isBusy()
+        local player = Player[prevColor]
+        for i = 1, player.getHandCount() do
+            if #player.getHandObjects(i) > 0 then
+                return true
+            end
+        end
+    end
+    while isBusy() do coroutine.yield(0) end
+    coroutine.yield(0)
+
+    swapHandState(handState, prevColor, nextColor)
+    handState = nil
+    coroutine.yield(0)
+
+    -- Move prev hand objects to next hand a second time, in case warping
+    -- the hand transform did not take all the contents.  This should also
+    -- fix any orientation problems such as cards being upside down.
+    for i, object in ipairs(handObjects) do
+        object.setLock(false)
+        object.deal(1, nextColor)
+    end
+    coroutine.yield(0)
+
+    print(TAG .. ': finished')
+    return 1
+end
+
+-------------------------------------------------------------------------------
+
+local _prevColor = false
+local _nextColor = false
+
+function startSwapCoroutine(prevColor, nextColor)
+    assert(type(prevColor) == 'string' and type(nextColor) == 'string')
+
+    _prevColor = prevColor
+    _nextColor = nextColor
+
+    startLuaCoroutine(self, 'swapCoroutineWrapper')
+end
+
+function swapCoroutineWrapper()
+    return swapCoroutine(_prevColor, _nextColor)
 end
 
 -------------------------------------------------------------------------------
@@ -437,7 +545,7 @@ end
 --- Find entry in a container.
 -- @container: game Object.
 -- @name string: object name.
--- @return string: container entry guid (may changer after unpacking!).
+-- @return string: container entry guid (may change after unpacking!).
 function getContainerEntryGuid(container, name)
     assert(container.tag == 'Deck' or container.tag == 'Bag' or container.tag == 'Generic')
     for _, entry in ipairs(container.getObjects()) do
@@ -632,47 +740,6 @@ function getSwapRuleToItems(prevColor, nextColor, flagshipName)
     lockRecursive('ruleToItems', ruleToItems)
 
     return ruleToItems
-end
-
---- Make sure all items are found!
-function verifyRuleToItems(ruleToItems)
-    assert(type(ruleToItems) == 'table')
-
-    for _, anonymousName in ipairs(SWAP.SINGLETONS) do
-        local items = ruleToItems[anonymousName]
-        if not items then
-            error(TAG .. ': missing "' .. anonymousName .. '"')
-        end
-    end
-
-    for anonymousDeck, anonymousCards in pairs(SWAP.DECKS) do
-        -- Only look for cards, they were pulled from decks during scan.
-        for _, anonymousCard in ipairs(anonymousCards) do
-            local items = ruleToItems[anonymousCard]
-            if not items then
-                error(TAG .. ': missing "' .. anonymousCard .. '"')
-            elseif #items > 1 then
-                error(TAG .. ': multiple "' .. anonymousCard .. '"')
-            end
-        end
-    end
-
-    for _, anonymousName in ipairs(SWAP.UNITS) do
-        local items = ruleToItems[anonymousName]
-        local bag = false
-        for _, item in ipairs(items or {}) do
-            if item.live and item.live.tag == 'Bag' then
-                if bag then
-                    error(TAG .. ': multiple unit bags "' .. anonymousName .. '"')
-                end
-                bag = item.live.object
-            end
-        end
-        if not bag then
-            error(TAG .. ': missing unit bag "' .. anonymousName .. '"')
-        end
-    end
-    return true
 end
 
 -------------------------------------------------------------------------------

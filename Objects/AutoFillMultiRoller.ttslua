@@ -263,7 +263,7 @@ function updateUi()
         {
             tag = 'Panel',
             attributes = {
-                position = '0 0 0.05',
+                position = '0 0 2',  -- 0.05
                 rotation = '0 180 90',
                 width = 200,
                 height = 280,
@@ -500,6 +500,11 @@ function autoFill(params)
                 break
             end
         end
+    end
+
+    -- Clear psUnit if no plasma scoring.
+    if not cardSet['Plasma Scoring'] then
+        psUnit = false
     end
 
     -- Consolidate units to a single entry per type.

@@ -130,7 +130,7 @@ function _createUI()
     local top = {
         tag = 'VerticalLayout',
         attributes = {
-            position = '0 0 0.05',
+            position = '0 0 2',  -- 0.05
             rotation = '0 180 90',
             width = 200,
             height = 280,
@@ -278,7 +278,7 @@ function _createUI()
     local bottom = {
         tag = 'Panel',
         attributes = {
-            position = '0 0 -20.05',
+            position = '0 0 -22',  -- -20.05
             rotation = '0 0 90',
             width = 200,
             height = 280

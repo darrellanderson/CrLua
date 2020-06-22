@@ -450,8 +450,9 @@ local function swapCoroutine(prevColor, nextColor)
     while isEntrySpawning(unitRuleToUnitBag) do coroutine.yield(0) end
     coroutine.yield(0)
 
-    fixUnitScale(unitRuleToUnitBag)
-    coroutine.yield(0)
+    -- No, rely on scale to be accurate as bags are sometimes slightly larger.
+    --fixUnitScale(unitRuleToUnitBag)
+    --coroutine.yield(0)
 
     local flagships, flagshipBag = startRenameFlagshipFromGeneric(unitRuleToUnitBag, flagshipName)
     while isEntrySpawning(flagships) do coroutine.yield(0) end

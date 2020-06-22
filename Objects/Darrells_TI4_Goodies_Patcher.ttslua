@@ -74,20 +74,6 @@ local PATCH_RULES = {
         },
     },
 
-    -- Tactic Blue stuff
-    ['TI4 MultiRoller 3.47'] = {
-        replaceOnTable = { 'TI4 MultiRoller 3.46' }
-    },
-    ['Savages of Cymiae'] = {
-        replaceInContainer = {
-            { '^Variant Pieces ', 'Savages of Cymiae' }
-        }
-    },
-    ['Quick Reference and Draft Deck'] = {
-        replaceInContainer = {
-            { '^Variant Pieces ', 'Quick Reference and Draft Deck' }
-        }
-    }
 }
 
 -------------------------------------------------------------------------------

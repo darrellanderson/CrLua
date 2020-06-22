@@ -8,9 +8,11 @@ local BASE_PRODUCTION = 2
 local OBJECT_EFFECTS = {
     -- Tokens
     ['Commodities/Tradegoods x1'] = {
+        tradegoods = true,
         resources = 1,
     },
     ['Commodities/Tradegoods x3'] = {
+        tradegoods = true,
         resources = 3,
     },
 
@@ -23,21 +25,21 @@ local OBJECT_EFFECTS = {
     ['Prototype War Sun II'] = {
         anywhereInPlayerZone = true,
         requireFaceUp = true,
-        unitAttributeOverrides = {
-            ['War Sun'] = { cost = 10 }
-        }
+        unitAttributesOverrides = {
+            ['War Sun'] = { cost = 10 },
+        },
     },
     ['Mirror Computing'] = {
         anywhereInPlayerZone = true,
         requireFaceUp = true,
         objectEffectsOverrides = {
             ['Commodities/Tradegoods x1'] = {
-                resources = 2
+                resources = 2,
             },
             ['Commodities/Tradegoods x3'] = {
-                resources = 6
+                resources = 6,
             },
-        }
+        },
     },
     ['Hegemonic Trade Policy'] = {
         requireFaceUp = true,
@@ -58,7 +60,7 @@ local OBJECT_EFFECTS = {
     ['Regulated Conscription'] = {
         anywhereOnTable = true,
         requireFaceUp = true,
-        unitAttributeOverrides = {
+        unitAttributesOverrides = {
             ['Fighter'] = { cost = 1 },
             ['Infantry'] = { cost = 1 },
         },
@@ -154,8 +156,8 @@ end
 -------------------------------------------------------------------------------
 
 function onButtonClick(player, option, id)
-    announce(_data.produceConsumeValues)
-    commit(_data.produceConsumeValues)
+    announce(_data.items, _data.resourcesAndCost)
+    commit()
 end
 
 function onBeginDrag(player, option, id)
@@ -213,8 +215,9 @@ function updateInsideBuildArea()
 end
 
 function updateProduceConsumeValues()
-    _data.produceConsumeValues = getProduceConsumeValues()
-    drawUi(_data.produceConsumeValues)
+    _data.items = getProduceConsumeItems()
+    _data.resourcesAndCost = getProduceConsumeResourcesAndCost(_data.items)
+    drawUi(_data.items, _data.resourcesAndCost)
 end
 
 -------------------------------------------------------------------------------
@@ -244,10 +247,10 @@ function isInsideBuildArea(object)
     return bb.min.x <= p.x and p.x <= bb.max.x and bb.min.z <= p.z and p.z <= bb.max.z
 end
 
-function getPlanet(object)
-    assert(type(object) == 'userdata')
+function getPlanet(objectName)
+    assert(type(objectName) == 'string')
     _data.planets = _data.planets or CrLua.TI4.System.getAllPlanets()
-    return _data.planets[string.lower(object.getName())]
+    return _data.planets[string.lower(objectName)]
 end
 
 function getPlayerColor()
@@ -258,14 +261,16 @@ function getPlayerColor()
     return result
 end
 
-function getProduceConsumeValues()
+function getProduceConsumeItems()
+    CrLua.Log.d(TAG, 'getProduceConsumeItems')
     local playerColor = _data.playerColor
 
     CrLua.TI4.Zone.update()
     local zone = CrLua.TI4.Zone.fromColor(playerColor)
 
     -- Get objects to consider.
-    local function useObject(object)
+    local objects = CrLua.Table.join(_data.inside, {})
+    local function useOutsizeBuildAreaObject(object)
         local objectEffects = OBJECT_EFFECTS[object.getName()]
         if not objectEffects then
             return false
@@ -278,100 +283,109 @@ function getProduceConsumeValues()
         end
         return objectEffects.anywhereOnTable
     end
-    local objects = CrLua.Table.join(_data.inside, {})
     for _, object in ipairs(getAllObjects()) do
-        if useObject(object) then
+        if useOutsizeBuildAreaObject(object) then
             objects[object] = true
         end
     end
 
-    -- First pass gathers override and counts units (so one fighter, one infantry cost 2, not 1).
-    local unitNameToCount = {}
-    local unitAttributeOverrides = {}
-    local objectEffectsOverrides = {}
-    for object, _ in pairs(objects) do
-        local unit = CrLua.TI4.Unit.fromObject(object)
-        if unit then
-            unitNameToCount[unit.unitName] = (unitNameToCount[unit.unitName] or 0) + unit.count
-        end
-        local objectEffects = OBJECT_EFFECTS[object.getName()]
-        if objectEffects then
-            if objectEffects.unitAttributeOverrides then
-                unitAttributeOverrides = CrLua.Table.join(unitAttributeOverrides, objectEffects.unitAttributeOverrides)
-            end
-            if objectEffects.objectEffectsOverrides then
-                objectEffectsOverrides = CrLua.Table.join(objectEffectsOverrides, objectEffects.objectEffectsOverrides)
-            end
-        end
-    end
-
-    -- Apply object effect overrides to each entry.  This way overrides can
-    -- replace a single field in an entry while preserving others.
-    local overriddenObjectEvents = {}
-    for k, v in pairs(OBJECT_EFFECTS) do
-        overriddenObjectEvents[k] = CrLua.Table.join(v, objectEffectsOverrides[k] or {})
-    end
-
-    -- Get other costs/resources.
     local result = {
-        resources = 0,
-        cost = 0,
-        unitNameToCount = unitNameToCount,
-        unitCount = 0,
+        consumeObjectNameToCount = {},
+        produceUnitNameToUnitWithCount = {},
+        objectEffectsOverrides = {},
+        unitAttributesOverrides = {},
         production = BASE_PRODUCTION,
         sarween = false,
         hegemonic = false,
     }
-    local seenUnitNameSet = {}
     for object, _ in pairs(objects) do
-        local objectEffects = overriddenObjectEvents[object.getName()]
-
-        -- Add unit type only the first time we see it, with the total count.
-        local unit = CrLua.TI4.Unit.fromObject(object)
-        local count = unit and unitNameToCount[unit.unitName]
-        if unit and count and not seenUnitNameSet[unit.unitName] then
-            seenUnitNameSet[unit.unitName] = true
-            local unitAttributes = CrLua.TI4.Unit.attributes(unit)
-            local override = unitAttributeOverrides[unit.unitName]
-            if override then
-                unitAttributes = CrLua.Table.join(unitAttributes, override)
-            end
-            result.cost = math.ceil(result.cost + unitAttributes.cost * count)
-            result.unitCount = result.unitCount + count
-        end
-
-        -- Planet resources.
-        local planet = getPlanet(object)
+        local name = object.getName()
+        local planet = getPlanet(name)
         if planet then
-            result.resources = result.resources + assert(planet.resources)
+            result.consumeObjectNameToCount[name] = (result.consumeObjectNameToCount[name] or 0) + 1
         end
-
-        -- Any object effects?
+        local unit = CrLua.TI4.Unit.fromObject(object)
+        if unit then
+            if result.produceUnitNameToUnitWithCount[unit.unitName] then
+                unit.count = unit.count + result.produceUnitNameToUnitWithCount[unit.unitName].count
+            end
+            result.produceUnitNameToUnitWithCount[unit.unitName] = unit
+        end
+        local objectEffects = OBJECT_EFFECTS[name]
         if objectEffects then
+            if objectEffects.resources then
+                result.consumeObjectNameToCount[name] = (result.consumeObjectNameToCount[name] or 0) + 1
+            end
+            if objectEffects.objectEffectsOverrides then
+                result.objectEffectsOverrides = CrLua.Table.join(result.objectEffectsOverrides, objectEffects.objectEffectsOverrides)
+            end
+            if objectEffects.unitAttributesOverrides then
+                result.unitAttributesOverrides = CrLua.Table.join(result.unitAttributesOverrides, objectEffects.unitAttributesOverrides)
+            end
             result.sarween = result.sarween or objectEffects.sarween
             result.hegemonic = result.hegemonic or objectEffects.hegemonic
             result.production = math.max(result.production, objectEffects.baseProduction or 0)
-            result.resources = result.resources + (objectEffects.resources or 0)
-            result.cost = result.cost + (objectEffects.cost or 0)
         end
+    end
+
+    CrLua.Log.d(TAG, 'getProduceConsumeItems', result)
+    return result
+end
+
+function getProduceConsumeResourcesAndCost(produceConsumeItems)
+    assert(type(produceConsumeItems) == 'table')
+    CrLua.Log.d(TAG, 'getProduceConsumeResourcesAndCost')
+
+    local result = {
+        resources = 0,
+        cost = 0,
+        numUnits = 0,
+    }
+
+    for objectName, count in pairs(produceConsumeItems.consumeObjectNameToCount) do
+        local objectEffects = OBJECT_EFFECTS[objectName]
+        local objectEffectsOverrides = produceConsumeItems.objectEffectsOverrides[objectName]
+        objectEffects = CrLua.Table.join(objectEffects or {}, objectEffectsOverrides or {})
+        if objectEffects.resources then
+            result.resources = result.resources + objectEffects.resources
+        end
+
+        local planet = getPlanet(objectName)
+        if planet and planet.resources then
+            result.resources = result.resources + planet.resources
+        end
+    end
+
+    for unitName, unit in pairs(produceConsumeItems.produceUnitNameToUnitWithCount) do
+        local unitAttributes = CrLua.TI4.Unit.attributes(unit)
+        local unitAttributesOverrides = produceConsumeItems.unitAttributesOverrides[unitName]
+        unitAttributes = CrLua.Table.join(unitAttributes, unitAttributesOverrides or {})
+        result.cost = result.cost + math.ceil(unit.count * unitAttributes.cost)
+        result.numUnits = result.numUnits + unit.count
     end
 
     -- If Hegemonic Trade Policy (swap resouce/influence values), replace
     -- hegemonic with the chosen planet.
-    if result.hegemonic then
-        for object, _ in pairs(objects) do
-            local planet = getPlanet(object)
-            if planet and (not result.hegemonic or result.hegemonic.influence < planet.influence) then
-                result.hegemonic = planet
+    if produceConsumeItems.hegemonic then
+        local best = false
+        for objectName, _ in pairs(produceConsumeItems.consumeObjectNameToCount) do
+            local planet = getPlanet(objectName)
+            local useThis = true
+            useThis = useThis and planet
+            useThis = useThis and planet.influence > planet.resources
+            useThis = useThis and (not best or planet.influence > best.influence)
+            if useThis then
+                best = planet
             end
         end
-        if result.hegemonic then
-            result.resources = result.resources - result.hegemonic
-            result.resources = result.resources + result.hegemonic
+        if best then
+            CrLua.Log.d(TAG, 'hegemonic')
+            result.resources = result.resources - best.resources
+            result.resources = result.resources + best.influence
         end
     end
 
-    CrLua.Log.d(TAG, 'getProduceConsumeValues', result)
+    CrLua.Log.d(TAG, 'getProduceConsumeResourcesAndCost', result)
     return result
 end
 
@@ -396,7 +410,9 @@ function drawBoundingBox()
     }})
 end
 
-function drawUi(values)
+function drawUi(items, resourcesAndCost)
+    assert(type(items) == 'table' and type(resourcesAndCost) == 'table')
+    CrLua.Log.d(TAG, 'drawUi')
     assert(type(_data.playerColor) == 'string')
     local colorTable = Color.fromString(_data.playerColor)
     local hexColor = '#' .. Color.toHex(colorTable)
@@ -426,10 +442,10 @@ function drawUi(values)
     local panelPosition = '0 0 ' .. trimFloat(bounds.size.y * 50.0 + 2)
     local cornerPosition = trimFloat(cornerX) .. ' ' .. trimFloat(cornerY) .. ' ' .. trimFloat(-bounds.size.y * 50.0 + 1)
 
-    local r1c1 = 'Build Cost: ' .. (values and values.cost or '-')
-    local r2c1 = 'Resources: ' .. (values and (values.resources .. (values.sarween and '+ST' or '')) or '-')
-    local r1c2 = '# Units: ' .. (values and values.unitCount or '-')
-    local r2c2 = 'Production: R+' .. (values and values.production or '-')
+    local r1c1 = 'Build Cost: ' .. (resourcesAndCost and resourcesAndCost.cost or '-')
+    local r2c1 = 'Resources: ' .. (resourcesAndCost and (resourcesAndCost.resources .. (items.sarween and '+ST' or '')) or '-')
+    local r1c2 = '# Units: ' .. (resourcesAndCost and resourcesAndCost.unitCount or '-')
+    local r2c2 = 'Production: R+' .. (items and items.production or '-')
 
     local w = panelWidth - 30
     local w1 = w * 0.45
@@ -541,28 +557,55 @@ end
 
 -------------------------------------------------------------------------------
 
-function announce(values)
-    local units = {}
-    for unitName, count in pairs(values.unitNameToCount) do
-        if count > 1 then
+function announce(items, resourcesAndCost)
+    assert(type(items) == 'table' and type(resourcesAndCost) == 'table')
+    CrLua.Log.d(TAG, 'announce')
+    local produce = {}
+    for unitName, unit in pairs(items.produceUnitNameToUnitWithCount) do
+        if unit.count > 1 then
             if unitName ~= 'Infantry' then
                 unitName = unitName .. 's'
             end
         end
-        table.insert(units, count .. ' ' .. unitName)
+        table.insert(produce, unit.count .. ' ' .. unitName)
     end
+
+    local tradegoods = 0
+    local consume = {}
+    for objectName, count in pairs(items.consumeObjectNameToCount) do
+        local objectEffects = OBJECT_EFFECTS[objectName]
+        local objectEffectsOverrides = items.objectEffectsOverrides[objectName]
+        objectEffects = CrLua.Table.join(objectEffects or {}, objectEffectsOverrides or {})
+        if objectEffects.tradegoods then
+            tradegoods = tradegoods + objectEffects.resources
+        else
+            table.insert(consume, objectName)
+        end
+    end
+    if tradegoods > 0 then
+        table.insert(consume, tradegoods .. ' tradegood' .. (tradegoods > 1 and 's' or ''))
+    end
+
     local message = table.concat({
         _data.playerColor,
-        ' producing ',
-        table.concat(units, ', '),
-        '.'
+        ' producing ' .. resourcesAndCost.numUnits .. ' units',
+        ' { ' .. table.concat(produce, ', ') .. ' }',
+        ' with production R+' .. items.production,
+        ' and total cost ' .. resourcesAndCost.cost,
+        ',',
+        ' consuming ' .. resourcesAndCost.resources,
+        items.sarween and '+ST' or '',
+        ' resources',
+        ' { ' .. table.concat(consume, ', ') .. ' }',
+        '.',
     }, '')
     printToAll(message, _data.playerColor)
 end
 
 function commit()
+    CrLua.Log.d(TAG, 'commit')
     for object, _ in pairs(_data.inside) do
-        if getPlanet(object) and not object.is_face_down then
+        if getPlanet(object.getName()) and not object.is_face_down then
             object.flip()
         end
     end

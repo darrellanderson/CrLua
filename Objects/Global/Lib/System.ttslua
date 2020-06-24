@@ -374,12 +374,12 @@ function systems()
 end
 
 --- Get all planets.
--- @return table: map from planet name to planet table.
+-- @return table: map from LOWERCASE planet name to planet table.
 function planets()
     local result = {}
     for _, system in pairs(_systems) do
         for _, planet in ipairs(system.planets or {}) do
-            result[planet.name] = planet
+            result[string.lower(planet.name)] = planet
         end
     end
     return result

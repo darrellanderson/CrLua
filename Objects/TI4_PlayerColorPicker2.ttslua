@@ -147,7 +147,7 @@ function onButtonClick(player, wha, id)
     if id == 'swapColors' then
         -- Workaround for self.UI.getAttribute('prevColor', 'text') not working.
         local prevColor = _values['prevColor'] or 'Purple'
-        local nextColor = _values['nextColor'] or 'Orange'
+        local nextColor = _values['nextColor'] or 'Blue'
         CrLua.Log.d(TAG, 'onButtonClick: prev=' .. tostring(prevColor) .. ' next=' .. tostring(nextColor))
 
         local dt = Time.time - _lastSwapTime
@@ -571,11 +571,15 @@ end
 
 --- Get item table from live object.
 function SwapPlan._objectToItem(object, nameTable)
-    assert(type(object) == 'userdata' and type(nameTable) == 'table')
-    assert(nameTable.anon and nameTable.prev and nameTable.next)
+    assert(type(object) == 'userdata')
+    if object.tag ~= 'Deck' then
+        -- Relax deck name requirements, they can be blank or random.
+        assert(type(nameTable) == 'table')
+        assert(nameTable.anon and nameTable.prev and nameTable.next)
+    end
     return {
         guid = object.getGUID(),
-        name = CrLua.Table.copy(nameTable),
+        name = nameTable and CrLua.Table.copy(nameTable),
         live = {
             tag = object.tag,
             transform = {
@@ -682,7 +686,7 @@ function SwapPlan._getItems(prevColor, nextColor)
                 local cardNameTable = prevNameToNameTable[entry.name]
                 if cardNameTable then
                     local items = getItems(cardNameTable.anon)
-                    local deckItem = SwapPlan._objectToItem(object, nameTable)
+                    local deckItem = SwapPlan._objectToItem(object, false)
                     local item = SwapPlan._deckEntryToItem(entry, cardNameTable, deckItem)
                     table.insert(items, item)
                 end
@@ -764,7 +768,7 @@ end
 function SwapPlan.get(prevColor, nextColor, nextTint)
     assert(type(prevColor) == 'string' and type(nextColor) == 'string')
     assert(type(nextTint) == 'string')
-    CrLua.Log.d(TAG, 'SwapPlan.get')
+    CrLua.Log.d(TAG, 'SwapPlan.get ' .. prevColor .. ' -> ' .. nextColor)
 
     local anonNameToItems = SwapPlan._getItems(prevColor, nextColor)
     local success, errorMessage = SwapPlan._verifyNothingMissing(anonNameToItems)

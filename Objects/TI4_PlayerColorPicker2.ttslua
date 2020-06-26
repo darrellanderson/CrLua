@@ -96,6 +96,16 @@ local DEFAULT_TINT = {
     Black = '050505',
 }
 
+local TINTS = {
+    White = { '191919','333333','666666','4C4C4C','7F7F7F','999999','B2B2B2','CCCCCC' },
+    Blue = { '019fff','06cef6','1E87FF','21B1B9','00C8C8','2874CC','1E5799','65ADFF' },
+    Purple = { '7600B7','CC51CC','8A0F89','670088','582D73','8B2664','EF1E74','F46FCD' },
+    Yellow = { 'A5A300','A5A452','BAB706','AE8C09','CDB14A','E5E572','665D00','CCCC00' },
+    Red = { 'DA1917','950100','782B2B','BF3F00','CC6600','9A3200','F3631C','DA5817' },
+    Green = { '007406','00A508','005904','00C864','6DB22A','5E833A','2D4A12','649664' },
+    Brown = { '703A16','645032','6E4E38','4A1D00','A2816C','794B45','3F2A1F','A76746' }
+}
+
 -- Keep in 'contstant' rather than placing the string in code.
 local ANONYMOUS_FLAGSHIP_NAME = '$COLOR Flagship'
 local ANONYMOUS_PIECES_BAG_NAME = '$COLOR Player Pieces'
@@ -145,18 +155,19 @@ end
 
 function onButtonClick(player, wha, id)
     if id == 'swapColors' then
-        -- Workaround for self.UI.getAttribute('prevColor', 'text') not working.
-        local prevColor = _values['prevColor'] or 'Purple'
-        local nextColor = _values['nextColor'] or 'Blue'
-        CrLua.Log.d(TAG, 'onButtonClick: prev=' .. tostring(prevColor) .. ' next=' .. tostring(nextColor))
-
+        CrLua.Log.d(TAG, 'onButtonClick: prev=' .. tostring(_prevColor) .. ' next=' .. tostring(_nextColor))
         local dt = Time.time - _lastSwapTime
-        if prevColor and nextColor and dt > 3 then
+        if _prevColor and _nextColor and dt > 3 then
             _lastSwapTime = Time.time
-            local prevTint = false
-            local nextTint = false
-            startSwapCoroutine(prevColor, prevTint, nextColor, nextTint)
+            startSwapCoroutine(_prevColor, _prevTint, _nextColor, _nextTint)
+            clearToggles()
         end
+    elseif id == 'showSwapColorsPanel' then
+        clearToggles()
+        self.UI.show('swapColorsPanel')
+    elseif id == 'cancel' then
+        clearToggles()
+        self.UI.hide('swapColorsPanel')
     end
 end
 
@@ -165,66 +176,32 @@ function onValueChanged(player, value, id)
     _values[id] = value
 end
 
+function onToggleValueChanged(player, value, id)
+    CrLua.Log.d(TAG, 'onToggleValueChanged: id=' .. tostring(id) .. ' value=' .. tostring(value))
+    local prevOrNext, color, tint = string.match(id, '^(.*):(.*):(.*)$')
+    if prevOrNext == 'prev' then
+        if _prevColor then
+            local prevId = 'prev:' .. _prevColor .. ':' .. _prevTint
+            self.UI.setAttribute(prevId, 'isOn', false)
+        end
+        _prevColor = color
+        _prevTint = tint
+    elseif prevOrNext == 'next' then
+        if _nextColor then
+            local nextId = 'next:' .. _nextColor .. ':' .. _nextTint
+            self.UI.setAttribute(nextId, 'isOn', false)
+        end
+        _nextColor = color
+        _nextTint = tint
+    end
+end
+
 function resetUi()
     _values = {}
     self.UI.setXmlTable(buildXmlTable())
 end
 
 function buildXmlTable()
-    -- get seated players will not find black.
-    local prevColors = {}
-    for _, object in ipairs(getAllObjects()) do
-        local color = string.match(object.getName(), '^Command Sheet %((%a+)%)$')
-        if color then
-            table.insert(prevColors, color)
-        end
-    end
-    table.sort(prevColors)
-    local prevOptions = {
-        {
-            tag = 'Option',
-            value = '---',
-            selected = true,
-        }
-    }
-    for _, color in ipairs(prevColors) do
-        table.insert(prevOptions, {
-            tag = 'Option',
-            value = color,
-        })
-    end
-    local nextColors = {}
-    for _, entry in ipairs(self.getObjects()) do
-        local color = string.match(entry.name, '(%u%l+) Player Pieces$')
-        assert(color)
-        table.insert(nextColors, color)
-    end
-    for _, color in ipairs(prevColors) do
-        table.insert(nextColors, color)
-    end
-    table.sort(nextColors)
-    local nextOptions = {
-        {
-            tag = 'Option',
-            value = '---',
-            selected = true,
-        }
-    }
-    for _, color in ipairs(nextColors) do
-        if color ~= 'Grey' and color ~= 'Black' then
-            table.insert(nextOptions, {
-                tag = 'Option',
-                value = color,
-            })
-        end
-    end
-
-    local fontSize = 20
-    local dropdownWidth = 180
-    local dropdownHeight = 30
-    local buttonHeight = 50
-    local buttonWidth = 100
-
     return {
         {
             tag = 'Panel',
@@ -239,69 +216,186 @@ function buildXmlTable()
                 {
                     tag = 'VerticalLayout',
                     attributes = {
-                        padding = '10 10 10 10',
-                        spacing = 10,
-                        childForceExpandHeight = false,
-                        childForceExpandWidth = false,
-                        childAlignment = 'MiddleCenter',
+                        padding = '0 0 50 50',
                     },
                     children = {
                         {
                             tag = 'Text',
                             attributes = {
-                                fontSize = fontSize,
+                                fontSize = 30,
                             },
-                            value = 'Switch from color:'
-                        },
-                        {
-                            tag = 'Dropdown',
-                            attributes = {
-                                id = 'prevColor',
-                                onValueChanged = 'onValueChanged',
-                                preferredWidth = dropdownWidth,
-                                preferredHeight = dropdownHeight,
-                            },
-                            children = prevOptions
-                        },
-                        {
-                            tag = 'Text',
-                            attributes = {
-                                fontSize = fontSize,
-                            },
-                            value = 'to color (scrollable):'
-                        },
-                        {
-                            tag = 'Dropdown',
-                            attributes = {
-                                id = 'nextColor',
-                                onValueChanged = 'onValueChanged',
-                                preferredWidth = dropdownWidth,
-                                preferredHeight = dropdownHeight,
-                            },
-                            children = nextOptions
-                        },
-                        {
-                            tag = 'Text',
-                            attributes = {
-                                preferredHeight = 5,
-                            }
+                            value = 'Change Player Color'
                         },
                         {
                             tag = 'Button',
                             attributes = {
-                                id = 'swapColors',
+                                id = 'showSwapColorsPanel',
                                 onClick = 'onButtonClick',
-                                preferredWidth = buttonWidth,
-                                preferredHeight = buttonHeight,
-                                fontSize = fontSize,
                             },
-                            value = 'Switch!'
+                            value = '\u{25BA}'
                         }
                     }
                 }
             }
+        },
+        swapColorsPanel()
+    }
+end
+
+function swapColorsPanel()
+    return {
+        tag = 'Panel',
+        attributes = {
+            id = 'swapColorsPanel',
+            active = 'false',
+            position = '-10 0 -100',
+            rotation = '0 0 90',
+            width = 600,
+            height = 400,
+            color = '#ffffff',
+        },
+        children = {
+            swapColorsUi()
         }
     }
+end
+
+function swapColorsUi()
+    CrLua.TI4.Zone.update()
+
+    local prevColorSet = {}
+    for _, zone in ipairs(CrLua.TI4.Zone.all()) do
+        prevColorSet[zone.color] = true
+    end
+    local nextColorSet = {}
+    for color, _ in pairs(TINTS) do
+        nextColorSet[color] = true
+    end
+    local colorList = CrLua.List.fromKeys(CrLua.Table.join(prevColorSet, nextColorSet))
+    table.sort(colorList)
+
+    -- A toggle group would need to span both rows and columns.
+    -- Handle toggle group functionality manually.
+    local function getColorCell(idPrefix, color, tint)
+        assert(type(idPrefix) == 'string')
+        assert(not color or type(color) == 'string', 'color')
+        assert(not tint or type(tint) == 'string', 'tint')
+        return {
+            tag = 'Cell',
+            attributes = {
+                dontUseTableCellBackground = true,
+                color = tint and ('#' .. tint) or nil,
+            },
+            children = color and {
+                {
+                    tag = 'Toggle',
+                    attributes = {
+                        id = idPrefix .. ':' .. color .. ':' .. tint,
+                        onValueChanged = 'onToggleValueChanged',
+                    },
+                }
+            } or nil,
+        }
+    end
+    local function getLabelCell(text, alignment, columnSpan, isTitle)
+        return {
+            tag = 'Cell',
+            attributes = {
+                columnSpan = columnSpan,
+            },
+            children = text and {
+                {
+                    tag = 'Text',
+                    attributes = {
+                        alignment = alignment,
+                        fontSize = isTitle and 24 or nil,
+                        fontStyle = 'Bold',
+                    },
+                    value = text,
+                }
+            } or nil,
+        }
+    end
+    local function getButtonCell(id, text, columnSpan)
+        return {
+            tag = 'Cell',
+            attributes = {
+                columnSpan = columnSpan,
+            },
+            children = id and {
+                {
+                    tag = 'Button',
+                    value = text,
+                    attributes = {
+                        id = id,
+                        fontStyle = 'Bold',
+                        onClick = 'onButtonClick',
+                    }
+                }
+            } or nil,
+        }
+    end
+    local function getRow(color)
+        assert(type(color) == 'string')
+        local prevColor = prevColorSet[color] and color
+        local prevTint = prevColor and DEFAULT_TINT[prevColor]
+        local nextColor = assert(nextColorSet[color]) and color
+        local nextTints = TINTS[color] or {}
+        local cells = {
+            getColorCell('prev', prevColor, prevTint),
+            getLabelCell(color, 'MiddleCenter', 2),
+        }
+        for _, nextTint in ipairs(nextTints) do
+            table.insert(cells, getColorCell('next', nextColor, nextTint))
+        end
+        return {
+            tag = 'Row',
+            children = cells
+        }
+    end
+
+    local rows = {
+        {
+            tag = 'Row',
+            children = {
+                getLabelCell('FROM:', 'MiddleLeft', 3),
+                getLabelCell('TO COLOR (PICK A TINT):', 'MiddleLeft', 8),
+            }
+        },
+    }
+    for _, color in ipairs(colorList) do
+        table.insert(rows, getRow(color))
+    end
+    table.insert(rows, {
+        tag = 'Row',
+        children = {
+            getButtonCell(false, false, 3),
+            getButtonCell('swapColors', 'CHANGE COLOR', 6),
+            getButtonCell('cancel', 'CANCEL', 2),
+        }
+    })
+
+    return {
+        tag = 'TableLayout',
+        attributes = {
+            padding = '30 10 10 10',
+            cellSpacing = 3,
+            cellBackgroundColor = 'Clear',
+        },
+        children = rows
+    }
+end
+
+function clearToggles()
+    for color, tints in pairs(TINTS) do
+        tints = CrLua.List.join(tints, { DEFAULT_TINT[color] })
+        for _, tint in ipairs(tints) do
+            for _, prevNext in ipairs({ 'prev', 'next' }) do
+                local id = prevNext .. ':' .. color .. ':' .. tint
+                self.UI.setAttribute(id, 'isOn', false)
+            end
+        end
+    end
 end
 
 -------------------------------------------------------------------------------

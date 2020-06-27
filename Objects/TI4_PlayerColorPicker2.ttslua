@@ -633,10 +633,11 @@ end
 --- Retrieve or create a bag for color pieces.
 function getOrCreateBag(bagName, offset)
     local guid = getContainerEntryGuid(self, bagName)
+    -- Place in middle.  If too close to a hand items get pulled in.
     local position = {
-        x = self.getPosition().x + (offset.x or offset[1] or 0),
+        x = 0 + (offset.x or offset[1] or 0),
         y = self.getPosition().y + (offset.y or offset[2] or 0),
-        z = self.getPosition().z + (offset.z or offset[3] or 0)
+        z = 0 + (offset.z or offset[3] or 0)
     }
     local bag = guid and self.takeObject({
         guid = guid,
@@ -730,12 +731,16 @@ function SwapPlan._getFlagshipName(color)
     CrLua.TI4.Faction.update()
     local faction = CrLua.TI4.Faction.fromColor(color)
     if faction then
+        CrLua.Log.i(TAG, 'SwapPlan._getFlagshipName: ' .. color .. ' faction "' .. faction.name .. '"')
         local lowerFactionName = string.lower(faction.name)
         for flagshipName, attributes in pairs(CrLua.TI4.Unit.FLAGSHIP) do
             if string.lower(attributes.faction) == lowerFactionName then
+                CrLua.Log.i(TAG, 'SwapPlan._getFlagshipName: ' .. color .. ' flagship "' .. flagshipName .. '"')
                 return flagshipName
             end
         end
+    else
+        CrLua.Log.i(TAG, 'SwapPlan._getFlagshipName: ' .. color .. ' no faction')
     end
 end
 

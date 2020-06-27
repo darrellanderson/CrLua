@@ -92,11 +92,23 @@ local DEFAULT_TINT = {
     Orange = 'F3631C',
     Brown = '703A16',
     Pink = 'F46FCD',
-    Grey = '7F7F7F',
-    Black = '050505',
+    --Grey = '7F7F7F',
+    --Black = '050505',
 }
 
 local TINTS = {
+    White = { 'FFFFFF', 'CCCCCC', '8C8C8C', '666666', '333333', '000000' },
+    Blue = { '0C98D7', '0000FF', '4169E1', '00BFFF', '87CEFA', 'B0E0E6' },
+    Purple = { '7500B7', '800080', '4B0082', '9932CC', '8A2BE2', '9370DB' },
+    Yellow = { 'A5A300', 'FFFF00', 'CCCC00', 'F0E68C', 'FFFF66', 'EEE8AA' },
+    Red = { 'CB0000', 'FF0000', 'B22222', '8B0000', 'DC143C', 'CD5C5C' },
+    Green = { '007406', '7CFC00', '006400', '9ACD32', '808000', '6B8E23' },
+    Orange = { 'F3631C', 'FF8C00', 'FFA500', 'FF4500', 'FF6347', 'FF7F50' },
+    Brown = { '703A16', 'A52A2A', 'A0522D', '8B4513', 'CD853F', 'D2B48C' },
+    Pink = { 'F46FCD', 'FFB6C1', 'FF69B4', 'FF1493', 'DB7093', 'C71585' },
+}
+
+local TACTIC_BLUE_TINTS = {
     White = { '191919','333333','666666','4C4C4C','7F7F7F','999999','B2B2B2','CCCCCC' },
     Blue = { '019fff','06cef6','1E87FF','21B1B9','00C8C8','2874CC','1E5799','65ADFF' },
     Purple = { '7600B7','CC51CC','8A0F89','670088','582D73','8B2664','EF1E74','F46FCD' },
@@ -153,6 +165,21 @@ end
 
 -------------------------------------------------------------------------------
 
+function getTints(color)
+    assert(type(color) == 'string')
+
+    local result = CrLua.Table.copy(TINTS[color])
+
+    local function tintValue(tint)
+        local rgb = Color.fromHex('#' .. tint .. 'ff')
+        return 1
+    end
+    --table.sort(result, function(a, b) return tintValue(a) < tintValue(b) end)
+    return result
+end
+
+-------------------------------------------------------------------------------
+
 function onButtonClick(player, wha, id)
     if id == 'swapColors' then
         CrLua.Log.d(TAG, 'onButtonClick: prev=' .. tostring(_prevColor) .. ' next=' .. tostring(_nextColor))
@@ -161,6 +188,7 @@ function onButtonClick(player, wha, id)
             _lastSwapTime = Time.time
             startSwapCoroutine(_prevColor, _prevTint, _nextColor, _nextTint)
             clearToggles()
+            self.UI.hide('swapColorsPanel')
         end
     elseif id == 'showSwapColorsPanel' then
         clearToggles()
@@ -216,7 +244,7 @@ function buildXmlTable()
                 {
                     tag = 'VerticalLayout',
                     attributes = {
-                        padding = '0 0 50 50',
+                        padding = '0 0 0 90',
                     },
                     children = {
                         {
@@ -251,7 +279,7 @@ function swapColorsPanel()
             position = '-10 0 -100',
             rotation = '0 0 90',
             width = 600,
-            height = 400,
+            height = 600,
             color = '#ffffff',
         },
         children = {
@@ -261,16 +289,17 @@ function swapColorsPanel()
 end
 
 function swapColorsUi()
-    CrLua.TI4.Zone.update()
-
     local prevColorSet = {}
+    CrLua.TI4.Zone.update()
     for _, zone in ipairs(CrLua.TI4.Zone.all()) do
         prevColorSet[zone.color] = true
     end
+
     local nextColorSet = {}
-    for color, _ in pairs(TINTS) do
+    for color, _ in pairs(DEFAULT_TINT) do
         nextColorSet[color] = true
     end
+
     local colorList = CrLua.List.fromKeys(CrLua.Table.join(prevColorSet, nextColorSet))
     table.sort(colorList)
 
@@ -340,7 +369,7 @@ function swapColorsUi()
         local prevColor = prevColorSet[color] and color
         local prevTint = prevColor and DEFAULT_TINT[prevColor]
         local nextColor = assert(nextColorSet[color]) and color
-        local nextTints = TINTS[color] or {}
+        local nextTints = getTints(color) or {}
         local cells = {
             getColorCell('prev', prevColor, prevTint),
             getLabelCell(color, 'MiddleCenter', 2),
@@ -359,7 +388,7 @@ function swapColorsUi()
             tag = 'Row',
             children = {
                 getLabelCell('FROM:', 'MiddleLeft', 3),
-                getLabelCell('TO COLOR (PICK A TINT):', 'MiddleLeft', 8),
+                getLabelCell('TO COLOR (PICK A TINT):', 'MiddleLeft', 6),
             }
         },
     }
@@ -370,7 +399,7 @@ function swapColorsUi()
         tag = 'Row',
         children = {
             getButtonCell(false, false, 3),
-            getButtonCell('swapColors', 'CHANGE COLOR', 6),
+            getButtonCell('swapColors', 'CHANGE COLOR', 4),
             getButtonCell('cancel', 'CANCEL', 2),
         }
     })
@@ -387,9 +416,9 @@ function swapColorsUi()
 end
 
 function clearToggles()
-    for color, tints in pairs(TINTS) do
-        tints = CrLua.List.join(tints, { DEFAULT_TINT[color] })
-        for _, tint in ipairs(tints) do
+    for color, _ in pairs(DEFAULT_TINT) do
+        local tints = CrLua.List.join(getTints(color), { DEFAULT_TINT[color] })
+        for _, tint in pairs(tints) do
             for _, prevNext in ipairs({ 'prev', 'next' }) do
                 local id = prevNext .. ':' .. color .. ':' .. tint
                 self.UI.setAttribute(id, 'isOn', false)
@@ -415,6 +444,15 @@ function swapCoroutine()
     assert(type(_prevTint) == 'string')
     assert(type(_nextColor) == 'string')
     assert(type(_nextTint) == 'string')
+
+    -- Just change tint?
+    if _prevColor == _nextColor then
+        CrLua.Log.d(TAG, 'only changing tint')
+        local swapPlan = SwapPlan.get(_prevColor, _nextColor, _nextTint)
+        local unitObjects = Pack.getUnitBagsAndUnits(swapPlan.anonNameToItems)
+        tintUnits(unitObjects, _nextColor, _nextTint)
+        return 1
+    end
 
     -- Gather swap plans, source ("prev") is always an in-use color.  "Next"
     -- may be inside this container in which case the single plan is enough.
@@ -894,7 +932,7 @@ function Pack.getUnitBagsAndUnits(anonNameToItems)
             assert(item.live)
             local object = getObjectFromGUID(item.guid)
             assert(object)
-            table.insert(unitObjects)
+            table.insert(unitObjects, object)
         end
     end
     return unitObjects
@@ -1470,6 +1508,7 @@ end
 #include <~/CrLua/CrLua>
 #include <~/CrLua/LockGlobals>
 
+#include <~/CrLua/Color>
 #include <~/CrLua/List>
 #include <~/CrLua/LockTable>
 #include <~/CrLua/Log>
@@ -1481,7 +1520,7 @@ end
 #include <~/CrLua/TI4/Unit>
 #include <~/CrLua/TI4/Zone>
 
-CrLua.assertRequired({ 'Log', 'TI4.Unit', 'TI4.Zone' })
+CrLua.assertRequired({ 'Color', 'Log', 'TI4.Unit', 'TI4.Zone' })
 CrLua.lock()
 
 SWAP = CrLua.LockTable.readOnlyRequireKey('SWAP', SWAP)

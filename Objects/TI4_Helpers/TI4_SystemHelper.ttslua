@@ -1,7 +1,29 @@
---- Systems table.
--- Map from guid to systems.
+--- Shared system (and generic resource/influence cards) helper object.
 -- @author Darrell
 -- @author
+
+-- Users should copy this getHelperClient function, and use via:
+--
+-- local systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
+-- local system = systemHelper.systemFromPosition({x,y,z})
+--
+-- Where one can call any main function in this file via the helper.
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        return function(parameters) return helperObject.call(functionName, parameters) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+
+-- Systems table, from guid to systems.
 --
 -- System attributes:
 -- - tile: number (0 for homebrew).
@@ -416,8 +438,8 @@ function systemFromPosition(position)
         size = { 0.1, 10, 0.1 }
     })
     for _, hit in ipairs(hits) do
-        local object = hit.hit_object
-        local system = _systems[object.getGUID()]
+        local guid = hit.hit_object.getGUID()
+        local system = _systems[guid]
         if system then
             _fillMissingSystemData(guid, system)
             return system
@@ -448,7 +470,7 @@ function planetFromPosition(params)
             local distanceSq = (p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2
             if not bestDistanceSq or distanceSq < bestDistanceSq then
                 best = planet
-                distanceSq = bestDistanceSq
+                bestDistanceSq = distanceSq
             end
         end
         if best and exact and math.sqrt(bestDistanceSq) > best.radius then
@@ -574,6 +596,7 @@ end
 
 --- Split a system into zones, one for each planet/wormhole.
 function _getZoneBorders(system)
+    assert(type(system) == 'table' and system.tile)
     local numPlanets = system.planets and #system.planets or 0
     local numWormholes = system.wormholes and #system.wormholes or 0
     local numZones = numPlanets + numWormholes
@@ -600,6 +623,7 @@ end
 
 --- Get planet location in local space.  Account for tile variations.
 function _planetPosition(system, zoneBorders, planetIndex)
+    assert(type(system) == 'table' and system.tile)
     local planet = system.planets[planetIndex]
     local localRadius = planet.radius or LOCAL_PLANET_RADIUS
     local localY = system.localY or LOCAL_SYSTEM_TILE_Y
@@ -671,6 +695,7 @@ end
 
 --- Fill in system fields (only done on the first access, then reused).
 function _fillMissingSystemData(guid, system)
+    assert(type(guid) == 'string' and type(system) == 'table' and system.tile)
     if not system.guid then
         system.guid = guid
         system.string = _systemToString(system)

@@ -1,0 +1,35 @@
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        return function(parameters) return helperObject.call(functionName, parameters) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+
+local systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
+
+function onLoad(save_state)
+    print(self.getName() .. '.onLoad')
+
+    local mecatol = systemHelper.systemFromPosition({ x = 0, y = 1, z = 0 })
+    assert(mecatol)
+    assert(#mecatol.planets == 1)
+    print('mecatol: ' .. mecatol.string)
+
+    local planet = systemHelper.planetFromPosition({
+        systemGuid = assert(mecatol.guid),
+        position = { x = 0, y = 0, z = 0 },
+        exact = true
+    })
+    assert(planet)
+    print('planet: ' .. planet.name)
+
+
+end

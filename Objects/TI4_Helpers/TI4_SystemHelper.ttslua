@@ -322,21 +322,21 @@ local _systems = {
     }},
     ['2e10be'] = { tile = 0, planets = {
         { name = 'Khet', resources = 1, influence = 2 },
-        { name = 'Drakkol', resources = 3, influence = 0, position = { -0.75, 0.7 } },
+        { name = 'Drakkol', resources = 3, influence = 0, position = { x = -0.75, z = 0.7 } },
     }},
     ['5dcca6'] = { tile = 0, anomalies = { 'nebula' }, planets = {
         { name = 'Rhune', resources = 3, influence = 4 },
     }},
     ['b69d23'] = { tile = 0, planets = {
         { name = 'Mandalore', resources = 3, influence = 2 },
-        { name = 'Concordia', resources = 1, influence = 1, position = { -0.75, 0.7 } },
+        { name = 'Concordia', resources = 1, influence = 1, position = { x = -0.75, z = 0.7 } },
     }},
     ['04c835'] = { tile = 0, planets = {
         { name = 'Refuge', resources = 1, influence = 3 },
-        { name = 'Kharak', resources = 1, influence = 0, position = { -0.75, 0.7 } },
+        { name = 'Kharak', resources = 1, influence = 0, position = { x = -0.75, z = 0.7 } },
     }},
     ['284942'] = { tile = 0, planets = {
-        { name = 'Iodyn', resources = 1, influence = 1, position = { 1.35, -0.05 } },
+        { name = 'Iodyn', resources = 1, influence = 1, position = { x = 1.35, z = -0.05 } },
         { name = 'Kroll', resources = 0, influence = 1 },
         { name = 'Cyrra', resources = 1, influence = 0 },
     }},
@@ -345,29 +345,29 @@ local _systems = {
     }},
     ['f67eca'] = { tile = 0, planets = {
         { name = 'Vorn', resources = 1, influence = 0 },
-        { name = 'Xyphen', resources = 3, influence = 1, position = { -0.75, 0.7 } },
+        { name = 'Xyphen', resources = 3, influence = 1, position = { x = -0.75, z = 0.7 } },
     }},
     ['c3785f'] = { tile = 0, planets = {
-        { name = 'Diphda', resources = 1, influence = 1, position = { 1.35, -0.05 } },
+        { name = 'Diphda', resources = 1, influence = 1, position = { x = 1.35, z = -0.05 } },
         { name = 'Damocles', resources = 2, influence = 1 },
         { name = 'Menkar', resources = 0, influence = 2 },
     }},
     ['108eb9'] = { tile = 0, planets = {
         { name = 'Ogdun', resources = 2, influence = 0 },
-        { name = 'Brthkul', resources = 1, influence = 2, position = { -0.75, 0.7 } },
+        { name = 'Brthkul', resources = 1, influence = 2, position = { x = -0.75, z = 0.7 } },
     }},
     ['0db991'] = { tile = 0, planets = {
         { name = 'Pord', resources = 3, influence = 1 },
     }},
     ['7fe6fc'] = { tile = 0, planets = {
         { name = 'H-1', resources = 2, influence = 2 },
-        { name = 'H-2', resources = 2, influence = 0, position = { -0.75, 0.7 } },
+        { name = 'H-2', resources = 2, influence = 0, position = { x = -0.75, z = 0.7 } },
     }},
     ['c9dd65'] = { tile = 0, planets = {
         { name = 'Gheldahr', resources = 5, influence = 0 },
     }},
     ['eab832'] = { tile = 0, planets = {
-        { name = 'Kyr', resources = 1, influence = 0, position = { 1.35, -0.05 } },
+        { name = 'Kyr', resources = 1, influence = 0, position = { x = 1.35, z = -0.05 } },
         { name = 'Pax', resources = 2, influence = 2 },
         { name = 'Vess', resources = 1, influence = 0 },
     }},
@@ -376,7 +376,7 @@ local _systems = {
     }},
     ['9e6138'] = { tile = 0, planets = {
         { name = 'Wod', resources = 3, influence = 1 },
-        { name = 'Lath', resources = 2, influence = 2, position = { -0.75, 0.7 } },
+        { name = 'Lath', resources = 2, influence = 2, position = { x = -0.75, z = 0.7 } },
     }},
     ['6a667a'] = { tile = 0, planets = {
         { name = 'Cymiae', resources = 4, influence = 1 },
@@ -492,6 +492,20 @@ function injectHomebrewSystems(systems)
     end
 end
 
+function verifyAllSystems()
+    local errors = false
+    for guid, system in pairs(_systems) do
+        local success, errorMessage = _systemIsValid(system)
+        if not success then
+            errors = errors or {}
+            table.insert(errors, guid .. ': ' .. errorMessage)
+        end
+    end
+    if errors then
+        error('verifyAllSystems ' .. table.concat(errors, ', '))
+    end
+end
+
 --- Verify system follows expectations.
 -- @parameters table: system.
 -- @return success boolean, string error message.
@@ -519,15 +533,15 @@ function _systemIsValid(system)
                 return false, 'planet.radius must be nil or a positive number'
             end
             local position = planet.position
-            if position and (type(position) ~= 'table' or type(position[1]) ~= 'number' or type(position[2]) ~= 'number') then
-                return false, 'planet.position must be nil or a local {x, z} list'
+            if position and (type(position) ~= 'table' or type(position.x) ~= 'number' or type(position.x) ~= 'number') then
+                return false, 'planet.position must be nil or a local {x, z} table'
             end
             local resources = planet.resources
-            if resources and type(resources) ~= 'number' or resources < 0 then
+            if resources and (type(resources) ~= 'number' or resources < 0) then
                 return false, 'planet.resources must be nil or a non-negative number'
             end
             local influence = planet.influence
-            if influence and type(influence) ~= 'number' or influence < 0 then
+            if influence and (type(influence) ~= 'number' or influence < 0) then
                 return false, 'planet.influence must be nil or a non-negative number'
             end
             local tech = planet.tech

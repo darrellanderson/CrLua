@@ -18,18 +18,34 @@ local systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 function onLoad(save_state)
     print(self.getName() .. '.onLoad')
 
-    local mecatol = systemHelper.systemFromPosition({ x = 0, y = 1, z = 0 })
-    assert(mecatol)
-    assert(#mecatol.planets == 1)
-    print('mecatol: ' .. mecatol.string)
+    -- Walk the system table looking for any bad entries.
+    systemHelper.verifyAllSystems()
 
+    -- Get system.
+    local system = systemHelper.systemFromPosition({ x = 0, y = 1, z = 0 })
+    assert(system)
+    assert(system.guid == '04df02')
+    assert(#system.planets == 1)
+    assert(system.planets[1].resources == 1)
+    assert(system.planets[1].influence == 6)
+    assert(system.planets[1].name == 'Mecatol Rex')
+    print('system.string: ' .. system.string)
+
+    -- Get planet inside system.
     local planet = systemHelper.planetFromPosition({
-        systemGuid = assert(mecatol.guid),
+        systemGuid = assert(system.guid),
         position = { x = 0, y = 0, z = 0 },
-        exact = true
+        exact = true  -- optional
     })
     assert(planet)
-    print('planet: ' .. planet.name)
+    assert(planet.name == 'Mecatol Rex')
 
+    local systems = systemHelper.systems()
+    assert(systems['04df02'])  -- guid keys
 
+    local planets = systemHelper.planets()
+    assert(planets['mecatol rex'])  -- lowercase planet name keys
+
+    local others = systemHelper.nonPlanetResourceInfluenceCards()
+    assert(others['core mining'])  -- lowercase card name keys
 end

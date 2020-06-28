@@ -1,5 +1,7 @@
 --- Systems table.
 -- Map from guid to systems.
+-- @author Darrell
+-- @author
 --
 -- System attributes:
 -- - tile: number (0 for homebrew).
@@ -359,6 +361,12 @@ local _systems = {
     }},
 }
 
+local _nonPlanetResourceInfluenceCards = {
+    { name = 'Core Mining', resources = 2, influence = 0 },
+    { name = 'Terraforming Initiative', resources = 1, influence = 1 },
+    { name = 'Senate Sanctuary', resources = 0, influence = 2 },
+}
+
 local LOCAL_DISTANCE_TO_PLANET = 1.1
 local LOCAL_PLANET_RADIUS = 0.9
 local LOCAL_SYSTEM_TILE_RADIUS = 2.26
@@ -381,6 +389,16 @@ function planets()
         for _, planet in ipairs(system.planets or {}) do
             result[string.lower(planet.name)] = planet
         end
+    end
+    return result
+end
+
+--- Get non-planet items that affect resources and/or influence.
+-- @return table: map from LOWERCASE object name to {name,resources,influence} table.
+function nonPlanetResourceInfluenceCards()
+    local result = {}
+    for _, item in ipairs(_nonPlanetResourceInfluenceCards) do
+        result[string.lower(item.name)] = item
     end
     return result
 end
@@ -408,7 +426,8 @@ function systemFromPosition(position)
 end
 
 --- Get planet at position.
--- Optionally require position to be inside planet radius (params.exact).
+-- Normally finds the closest planet after carving the system tile into zones,
+-- optionally require position to be inside planet radius (via params.exact).
 -- @params table: { systemGuid, position{xyz}, exact boolean }
 -- @return planet table.
 function planetFromPosition(params)
@@ -418,7 +437,7 @@ function planetFromPosition(params)
     local exact = params.exact
     assert(type(systemGuid) == 'string')
     assert(type(position) == 'table' and type(position.x) == 'number')
-    local system = systemFromPosition(position)
+    local system = _systems[systemGuid]
     local best = false
     if system then
         local object = getObjectFromGUID(system.guid)
@@ -527,6 +546,9 @@ function _systemIsValid(system)
     return true
 end
 
+--- Get system as printable string (stored in system.string)
+-- @param system table.
+-- @return string.
 function _systemToString(system)
     assert(type(system) == 'table' and system.tile)
     local message = {
@@ -539,6 +561,7 @@ function _systemToString(system)
     return table.concat(message, '')
 end
 
+--- Convert local bearing coordinate to local XYZ.
 function _bearingToPosition(bearing, distance, y)
     assert(type(bearing) == 'number' and 0 <= bearing and bearing < 360 and type(distance) == 'number')
     local bearing = -bearing * math.pi / 180.0
@@ -549,6 +572,7 @@ function _bearingToPosition(bearing, distance, y)
     }
 end
 
+--- Split a system into zones, one for each planet/wormhole.
 function _getZoneBorders(system)
     local numPlanets = system.planets and #system.planets or 0
     local numWormholes = system.wormholes and #system.wormholes or 0
@@ -574,6 +598,7 @@ function _getZoneBorders(system)
     return zoneBorders
 end
 
+--- Get planet location in local space.  Account for tile variations.
 function _planetPosition(system, zoneBorders, planetIndex)
     local planet = system.planets[planetIndex]
     local localRadius = planet.radius or LOCAL_PLANET_RADIUS
@@ -644,6 +669,7 @@ function _planetPosition(system, zoneBorders, planetIndex)
     return _bearingToPosition(bearingToPlanet, distanceToPlanet, localY), localRadius
 end
 
+--- Fill in system fields (only done on the first access, then reused).
 function _fillMissingSystemData(guid, system)
     if not system.guid then
         system.guid = guid

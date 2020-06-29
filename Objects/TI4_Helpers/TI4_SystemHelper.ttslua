@@ -1,11 +1,12 @@
 --- Shared system (and generic resource/influence cards) helper object.
--- @author Darrell
--- @author
+-- @author GarnetBear added the original influence/resource list.
+-- @author Darrell June 2020 more attributes, planet positions.
 
 -- Users should copy this getHelperClient function, and use via:
 --
 -- local systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 -- local system = systemHelper.systemFromPosition({x,y,z})
+-- local cardNameToAttributes = systemHelper.nonPlanetResourceInfluenceCards()
 --
 -- Where one can call any main function in this file via the helper.
 function getHelperClient(helperObjectName)

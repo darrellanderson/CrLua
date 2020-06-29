@@ -70,15 +70,18 @@ function zoneFromPosition(position)
     end
 end
 
---- Given map from opaque keys to positions, return map from same keys to zones.
+--- Given map from guids to positions, return map from same guids to zones.
 -- @param keyToPosition table : arbitrary keys (e.g. guids) to {xyz} tables.
 -- @return table : map from keys to zones.
-function zonesFromPositions(keyToPosition)
+function zonesFromPositions(guidToPosition)
     assert(type(keyToPosition) == 'table')
     _maybeUpdateZones()
     local result = {}
-    for k, position in pairs(keyToPosition) do
-        result[k] = zoneFromPosition(position)
+    for guid, position in pairs(guidToPosition) do
+        result[k] = {
+            color = zoneFromPosition(position),
+            inHand = inHand(guid),
+        }
     end
     return result
 end
@@ -98,8 +101,6 @@ function inHand(guid)
     return _inHand.guidToColor[guid]
 end
 
-function inHands(guids)
-end
 --- Is position on the main table?
 -- @param position table : {xyz} position.
 -- @return boolean : true if on main table.

@@ -716,7 +716,7 @@ function _fillMissingSystemData(guid, system)
         system.string = _systemToString(system)
 
         -- Fill zone edge positions, points on edge diving per-planet zones.
-        local zoneBorders = zoneBorders or _getZoneBorders(system)
+        local zoneBorders = _getZoneBorders(system)
         if #zoneBorders > 2 then
             system.zoneEdgePositions = {}
             local r = LOCAL_SYSTEM_TILE_RADIUS

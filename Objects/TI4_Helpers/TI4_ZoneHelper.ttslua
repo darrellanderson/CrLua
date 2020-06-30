@@ -1,6 +1,28 @@
 --- Player zones.
 -- @author Darrell
 
+-- Users should copy this getHelperClient function, and use via:
+--
+-- local zoneHelper = getHelperClient('TI4_ZONE_HELPER')
+-- local color = zoneHelper.zoneFromPosition(object.getPosition())
+-- local guidToZone = zoneHelper.zonesFromPositions(guidToPosition)
+--
+-- Where one can call any main function in this file via the helper.
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        return function(parameters) return helperObject.call(functionName, parameters) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+
 -- Player zones table.
 local _zones = {
     -- Defaults for 6p and 8p tables.  Map default zone color to XZ border points.
@@ -48,7 +70,7 @@ local _inHand = {
     guidToColor = false,
 }
 
-function zones()
+function zoneColors()
     _maybeUpdateZones()
     local result = {}
     for zoneColor, zone in pairs(_zones.zones) do
@@ -60,7 +82,7 @@ end
 --- Get zone color from position.
 -- @param position table : {xyz} position.
 -- @return string : zone color, or nil if not in zone.
-function zoneFromPosition(position)
+function zoneColorFromPosition(position)
     assert(type(position) == 'table' and type(position.x) == 'number')
     _maybeUpdateZones()
     for zoneColor, zone in pairs(_zones.zones) do
@@ -70,27 +92,14 @@ function zoneFromPosition(position)
     end
 end
 
---- Given map from guids to positions, return map from same guids to zones.
--- @param keyToPosition table : arbitrary keys (e.g. guids) to {xyz} tables.
--- @return table : map from keys to zones.
-function zonesFromPositions(guidToPosition)
-    assert(type(keyToPosition) == 'table')
-    _maybeUpdateZones()
-    local result = {}
-    for guid, position in pairs(guidToPosition) do
-        result[k] = {
-            color = zoneFromPosition(position),
-            inHand = inHand(guid),
-        }
-    end
-    return result
-end
-
-function inHand(guid)
+--- Get the hand color if object is in player hand.
+-- @param guid string.
+-- @return string : player color holding object in hand, if held.
+function handColorFromGuid(guid)
     if _inHand.lastUpdateFrame ~= Time.frame_count then
         _inHand.lastUpdateFrame = Time.frame_count
         _inHand.guidToColor = {}
-        for _, player in Player.getPlayers() do
+        for _, player in ipairs(Player.getPlayers()) do
             for i = 1, player.getHandCount() do
                 for _, object in ipairs(player.getHandObjects(i)) do
                     _inHand.guidToColor[object.guid] = player.color
@@ -101,13 +110,30 @@ function inHand(guid)
     return _inHand.guidToColor[guid]
 end
 
+--- Given map from guids to positions, return map from guids to zone/hand.
+-- This is a bulk operation to reduce call overhead.
+-- @param keyToPosition table : arbitrary keys (e.g. guids) to {xyz} tables.
+-- @return table : map from keys to zone colors.
+function zoneAndHandColorsFromGuidsAndPositions(guidToPosition)
+    assert(type(guidToPosition) == 'table')
+    _maybeUpdateZones()
+    local result = {}
+    for guid, position in pairs(guidToPosition) do
+        result[guid] = {
+            zoneColor = zoneColorFromPosition(position),
+            handColor = handColorFromGuid(guid)
+        }
+    end
+    return result
+end
+
 --- Is position on the main table?
 -- @param position table : {xyz} position.
 -- @return boolean : true if on main table.
 function inTableZone(position)
     assert(type(position) == 'table' and type(position.x) == 'number')
     _maybeUpdateZones()
-    return polygonContains(_zones.tableXZ, position)
+    return _boundingBoxContains(_zones.table.boundingBox, position) and _polygonContains(_zones.table.polygon, position)
 end
 
 --- Get XYZ border about a zone (suitable for vector lines).
@@ -120,32 +146,46 @@ function zoneBorder(zoneColor)
     for _, xz in ipairs(_zones.zones[zoneColor] or {}) do
         table.insert(result, { x = xz[0], y = _zones.y, z = xz[1] })
     end
+    return result
 end
 
 function _boundingBox(polygonXZ)
     assert(type(polygonXZ) == 'table')
 
-    local x, z = 1, 2
     local min, max
     for i, vertex in ipairs(polygonXZ) do
-        if i == i then
-            min = { x = vertex[x], z = vertex[z] }
-            max = { x = vertex[x], z = vertex[z] }
+        local x, z = vertex[1], vertex[2]
+        if i == 1 then
+            min = { x = x, z = z }
+            max = { x = x, z = z }
         else
-            min.x = math.min(min.x, vertex[x])
-            min.z = math.min(min.z, vertex[z])
-            max.x = math.max(max.x, vertex[x])
-            max.z = math.max(max.z, vertex[z])
+            min.x = math.min(min.x, x)
+            min.z = math.min(min.z, z)
+            max.x = math.max(max.x, x)
+            max.z = math.max(max.z, z)
         end
     end
     return { min = min, max = max }
 end
 
-function _boundingBoxContains(boundingBoxXZ, position)
-    assert(type(boundingBoxXZ) == 'table' and box.min and type(position) == 'table' and position.x)
-    local gteMin = position.x >= box.min.x and position.z >= box.min.z
-    local lteMax = position.x <= box.max.x and position.z <= box.max.z
+function _testBoundingBox()
+    local polygon = { {0, 0}, {-1, 2}, {1, 0}, {0, -2} }
+    local box = _boundingBox(polygon)
+    assert(box.min.x == -1 and box.min.z == -2)
+    assert(box.max.x == 1 and box.max.z == 2)
+end
+
+function _boundingBoxContains(boxXZ, position)
+    assert(type(boxXZ) == 'table' and boxXZ.min and type(position) == 'table' and position.x)
+    local gteMin = position.x >= boxXZ.min.x and position.z >= boxXZ.min.z
+    local lteMax = position.x <= boxXZ.max.x and position.z <= boxXZ.max.z
     return gteMin and lteMax
+end
+
+function _testBoundingBoxContains()
+    local box = _boundingBox({ {0, 0}, {2, 2} })
+    assert(_boundingBoxContains(box, { x = 1, z = 1 }))
+    assert(not _boundingBoxContains(box, { x = 3, z = 3 }))
 end
 
 --- Is the point inside the polygon (2D)?
@@ -188,14 +228,20 @@ function _polygonContains(polygonXZ, position)
     return insideFlag
 end
 
+function _testPolygonContains()
+    local polygon = { {0,0}, {0,2}, {2,2}, {2,0} }
+    assert(_polygonContains(polygon, {1,1}))
+    assert(not _polygonContains(polygon, {3,3}))
+end
+
 function _maybeUpdateZones()
     if not _zones.lastUpdate or (Time.time - _zones.lastUpdate) > _zones.periodicUpdateSeconds then
         _zones.lastUpdate = Time.time
 
         local colorToCommandSheet = {}
-        numCommandSheets = 0
+        local numCommandSheets = 0
         for _, object in ipairs(getAllObjects()) do
-            local color = string.match(name, '^Command Sheet %((%a+)%)$')
+            local color = string.match(object.getName(), '^Command Sheet %((%a+)%)$')
             if color then
                 colorToCommandSheet[color] = object
                 numCommandSheets = numCommandSheets + 1
@@ -204,13 +250,16 @@ function _maybeUpdateZones()
 
         local default = _zones.defaults[numCommandSheets] or _zones.defaults[6]
         _zones.y = default.y
-        _zones.tableXZ = default.tableXZ
+        _zones.table = {
+            polygon = default.tableXZ,
+            boundingBox = _boundingBox(default.tableXZ)
+        }
         _zones.zones = {}
         for color, commandSheet in pairs(colorToCommandSheet) do
             for _, polygon in pairs(default.zones) do
                 if _polygonContains(polygon, commandSheet.getPosition()) then
                     _zones.zones[color] = {
-                        polygon = border,
+                        polygon = polygon,
                         boundingBox = _boundingBox(polygon)
                     }
                     break

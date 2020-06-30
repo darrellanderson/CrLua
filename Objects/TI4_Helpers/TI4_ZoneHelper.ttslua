@@ -57,72 +57,72 @@ local _zones = {
 
     -- Current zones.
     y = false,
-    zones = {},
+    colorToZone = {},
     tableXZ = {},
 
-    lastUpdate = false,
+    lastUpdateTime = false,
     periodicUpdateSeconds = 3,
 }
 
--- Objects in players' hands.
-local _inHand = {
-    lastUpdateFrame = false,
-    guidToColor = false,
-}
-
-function zoneColors()
+--- Get all zones.
+-- @return table : list of {color,faction} tables.
+function zones()
     _maybeUpdateZones()
     local result = {}
-    for zoneColor, zone in pairs(_zones.zones) do
-        table.insert(result, zoneColor)
+    for color, zone in pairs(_zones.colorToZone) do
+        table.insert(result, {
+            color = color,
+            faction = zone.factionName
+        })
     end
     return result
 end
 
 --- Get zone color from position.
 -- @param position table : {xyz} position.
--- @return string : zone color, or nil if not in zone.
-function zoneColorFromPosition(position)
+-- @return table : zone {color,faction}, or nil if not in zone.
+function zoneFromPosition(position)
     assert(type(position) == 'table' and type(position.x) == 'number')
     _maybeUpdateZones()
-    for zoneColor, zone in pairs(_zones.zones) do
+    for color, zone in pairs(_zones.colorToZone) do
         if _boundingBoxContains(zone.boundingBox, position) and _polygonContains(zone.polygon, position) then
-            return zoneColor
+            return {
+                color = color,
+                faction = zone.factionName
+            }
         end
     end
 end
 
---- Get the hand color if object is in player hand.
--- @param guid string.
--- @return string : player color holding object in hand, if held.
-function handColorFromGuid(guid)
-    if _inHand.lastUpdateFrame ~= Time.frame_count then
-        _inHand.lastUpdateFrame = Time.frame_count
-        _inHand.guidToColor = {}
-        for _, player in ipairs(Player.getPlayers()) do
-            for i = 1, player.getHandCount() do
-                for _, object in ipairs(player.getHandObjects(i)) do
-                    _inHand.guidToColor[object.guid] = player.color
-                end
-            end
-        end
-    end
-    return _inHand.guidToColor[guid]
-end
-
---- Given map from guids to positions, return map from guids to zone/hand.
+--- Given map from guids to positions, return map from guids to zone.
 -- This is a bulk operation to reduce call overhead.
--- @param keyToPosition table : arbitrary keys (e.g. guids) to {xyz} tables.
--- @return table : map from keys to zone colors.
-function zoneAndHandColorsFromGuidsAndPositions(guidToPosition)
+-- @param guidToPosition table : guid to {xyz} tables.
+-- @return table : map from guid to zone.
+function zonesFromPositions(guidToPosition)
     assert(type(guidToPosition) == 'table')
     _maybeUpdateZones()
     local result = {}
     for guid, position in pairs(guidToPosition) do
-        result[guid] = {
-            zoneColor = zoneColorFromPosition(position),
-            handColor = handColorFromGuid(guid)
-        }
+        result[guid] = zoneFromPosition(position)
+    end
+    return result
+end
+
+--- Get guids for objects in the given player's hand.
+-- @param playerColor string.
+-- @return table : set from guid string to true.
+function inHand(playerColor)
+    assert(type(playerColor) == 'string')
+    local result = {}
+    for _, player in ipairs(Player.getPlayers()) do
+        if player.color == playerColor then
+            for i = 1, player.getHandCount() do
+                for _, object in ipairs(player.getHandObjects(i)) do
+                    result[object.guid] = true
+                end
+            end
+            break
+        end
     end
     return result
 end
@@ -143,8 +143,10 @@ function zoneBorder(zoneColor)
     assert(type(zoneColor) == 'string')
     _maybeUpdateZones()
     local result = {}
-    for _, xz in ipairs(_zones.zones[zoneColor] or {}) do
-        table.insert(result, { x = xz[0], y = _zones.y, z = xz[1] })
+    local zone = _zones.colorToZone[zoneColor]
+    local polygon = zone and zone.polygon or {}
+    for _, xz in ipairs(polygon) do
+        table.insert(result, { x = xz[1], y = _zones.y, z = xz[2] })
     end
     return result
 end
@@ -235,16 +237,21 @@ function _testPolygonContains()
 end
 
 function _maybeUpdateZones()
-    if not _zones.lastUpdate or (Time.time - _zones.lastUpdate) > _zones.periodicUpdateSeconds then
-        _zones.lastUpdate = Time.time
+    if not _zones.lastUpdateTime or (Time.time - _zones.lastUpdateTime) > _zones.periodicUpdateSeconds then
+        _zones.lastUpdateTime = Time.time
 
         local colorToCommandSheet = {}
         local numCommandSheets = 0
+        local factionNameToFactionSheet = {}
         for _, object in ipairs(getAllObjects()) do
             local color = string.match(object.getName(), '^Command Sheet %((%a+)%)$')
             if color then
                 colorToCommandSheet[color] = object
                 numCommandSheets = numCommandSheets + 1
+            end
+            local factionName = string.match(object.getName(), ' Sheet$')
+            if factionName and object.tag == 'Tile' then
+                factionNameToFactionSheet[factionName] = object
             end
         end
 
@@ -258,12 +265,20 @@ function _maybeUpdateZones()
         for color, commandSheet in pairs(colorToCommandSheet) do
             for _, polygon in pairs(default.zones) do
                 if _polygonContains(polygon, commandSheet.getPosition()) then
-                    _zones.zones[color] = {
+                    _zones.colorToZone[color] = {
                         polygon = polygon,
                         boundingBox = _boundingBox(polygon)
                     }
                     break
                 end
+            end
+        end
+
+        -- Inject faction names into zone entry.
+        for factionName, factionSheet in pairs(factionNameToFactionSheet) do
+            local zone = zoneFromPosition(factionSheet.getPosition())
+            if zone then
+                _zones.colorToZone[zone.color].factionName = factionName
             end
         end
     end

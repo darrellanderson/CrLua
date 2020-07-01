@@ -1,0 +1,299 @@
+--- Faction attributes.
+-- @author Darrell
+--
+-- Get faction tables with:
+-- - factionName string, matches a key in the faction attributes table.
+-- - tokenName string, "TOKEN_NAME Command Token" or "TOKEN_NAME Owner Token".
+-- - color string (from command sheet in case no seated player).
+-- - actionCards number.
+-- - commandTokens number.
+
+-- Users should copy this getHelperClient function, and use via:
+--
+-- local factionHelper = getHelperClient('TI4_FACTION_HELPER')
+-- local faction = factionHelper.fromColor('Red')
+-- print(faction.name)
+--
+-- Where one can call any main function in this file via the helper.
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        return function(parameters) return helperObject.call(functionName, parameters) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+
+local _defaultAttributes = {
+    actionCards = 1,
+    commandTokens = 2,
+}
+
+local _factionAttributes = {
+    ['The Arborec'] = {
+        flagship = 'Duha Menaimon',
+    },
+    ['The Barony of Letnev'] = {
+        flagship = 'Arc Secundus',
+    },
+    ['The Clan of Saar'] = {
+        flagship = 'Son of Ragh',
+    },
+    ['The Embers of Muaat'] = {
+        flagship = 'The Inferno',
+    },
+    ['The Emirates of Hacan'] = {
+        flagship = 'Wrath of Kenara',
+    },
+    ['The Federation of Sol'] = {
+        flagship = 'Genesis',
+        commandTokens = 3,
+    },
+    ['The Ghosts of Creuss'] = {
+        flagship = 'Hil Colish',
+    },
+    ['The L1Z1X Mindnet'] = {
+        flagship = '[0.0.1]',
+    },
+    ['The Mentak Coalition'] = {
+        flagship = 'Fourth Moon',
+    },
+    ['The Naalu Collective'] = {
+        flagship = 'Matriarch',
+    },
+    ['The Nekro Virus'] = {
+        flagship = 'The Alastor',
+    },
+    ["The Sardakk N'orr"] = {
+        flagship = "C'morran N'orr",
+    },
+    ['The Universities of Jol-Nar'] = {
+        flagship = 'J.N.S. Hylarim',
+    },
+    ['The Winnu'] = {
+        flagship = 'Salai Sai Corian',
+    },
+    ['The Xxcha Kingdom'] = {
+        flagship = 'Loncara Ssodu',
+    },
+    ['The Yin Brotherhood'] = {
+        flagship = 'Van Hauge',
+    },
+    ['The Yssaril Tribes'] = {
+        flagship = "Y'sia Y'ssrila",
+        actionCards = 2,
+    },
+
+    -- Tactic Blue's homebrew
+    ['The Drahn Consortium'] = {
+        flagship = 'Nightingale II',
+    },
+    ['The Fremen'] = {
+        flagship = 'Shai-Hulud',
+    },
+    ['The Khet Drakkol Union'] = {
+        flagship = 'Khage',
+    },
+    ['The Veldyr Sovereignty'] = {
+        flagship = 'Richtyrian',
+    },
+    ['The Mandalorian Clans'] = {
+        flagship = "Kyr'tsad",
+    },
+    ['The Advent'] = {
+        flagship = 'Advent Flagship',
+    },
+    ['The Free Systems Alliance'] = {
+        flagship = 'Vox',
+    },
+    ["The Navigators' Guild"] = {
+        flagship = 'Chogra Tuhn',
+    },
+    ['The Vasari Empire'] = {
+        flagship = 'Vasari Flagship',
+    },
+    ['The Trader Emergency Coalition'] = {
+        flagship = 'Trader Flagship',
+    },
+    ['The Kortali Horde'] = {
+        flagship = "For'xdar",
+    },
+    ['The Rhodyn Migrant Fleet'] = {
+        flagship = 'Mho Rhodyn',
+    },
+    ['The HCEN Defense System'] = {
+        flagship = 'Locus',
+    },
+    ['The Gheldor Authority'] = {
+        flagship = "Gheld'Atar",
+    },
+    ['The Zeth Contingency'] = {
+        flagship = "Eru'Ishon",
+    },
+    ['The Lazax'] = {
+        flagship = 'Regulus',
+    },
+    ['The Mahact Sorcerer Kings'] = {
+        flagship = "Noctul H'rgan",
+    },
+    ['The Savages of Cymiae'] = {
+        flagship = 'Robotic Reprocessing Center',
+    },
+}
+
+local _colorToFaction = {}
+
+local _update = {
+    time = false,
+    periodicUpdateSeconds = 10,
+}
+
+function allFactions()
+    _maybeUpdate()
+    return _colorToFaction
+end
+
+function fromColor(color)
+    assert(type(color) == 'string')
+    _maybeUpdate()
+    return _colorToFaction[color]
+end
+
+function _maybeUpdate()
+    if not _update.time or (Time.time - _update.time) > _update.periodicUpdateSeconds then
+        _update.time = Time.time
+
+        local factionLowerToFactionName = {}
+        for factionName, _ in pairs(_factionAttributes) do
+            factionLowerToFactionName[string.lower(factionName)] = factionName
+        end
+
+        -- Find command sheets (indexed by color), faction sheets (indexed by
+        -- faction name), and command token bags (indexed by "token faction" name,
+        -- which may differ slightly from the faction sheet faction name).
+        local colorToCommandSheet = {}
+        local factionNameToFactionSheet = {}
+        local tokenFactionNameToBag = {}
+        for _, object in ipairs(getAllObjects()) do
+            local name = object.getName()
+
+            -- "Command Sheet (COLOR)"
+            local color = string.match(name, '^Command Sheet %((%a+)%)$')
+            if color then
+                colorToCommandSheet[color] = object
+            end
+
+            -- "FACTION Sheet" (only accept if FACTION in whitelist!)
+            -- Replace name with "expected" case, sometimes "of" vs "Of" depending on object.
+            local factionName = string.match(name, '^(.+) Sheet$')
+            factionName = factionName and factionLowerToFactionName[string.lower(factionName)]
+            if factionName then
+                factionNameToFactionSheet[factionName] = object
+            end
+
+            -- "TOKEN_FACTION Command Tokens Bag"
+            local tokenFactionName, tokenType = string.match(name, '^(.*) (%u%a+) Tokens Bag$')
+            if tokenType == 'Command' then
+                tokenFactionNameToBag[tokenFactionName] = object
+            end
+        end
+
+        -- Given a key/object-value table, return a map from command sheet color
+        -- to the key whose object is closest to the command sheet AND VICE VERSA.
+        -- For example, consider a table with an empty seat that has a command sheet
+        -- but no faction sheet.  In that case, that orphaned command sheet does
+        -- have a closest faction sheet, but that faction sheet is closer to another.
+        -- Likewise consider an extra faction sheet placed on the table for some
+        -- reason.  That faction sheet has a closest command sheet, but that
+        -- command sheet is closer to another.
+        local function distanceSq(p1, p2)
+            return (p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2
+        end
+        local function minKV(map, f)
+            local bestF = false
+            local bestK = false
+            for k, v in pairs(map) do
+                local thisF = f(v)
+                if not bestF or thisF < bestF then
+                    bestF = thisF
+                    bestK = k
+                end
+            end
+            return bestK, map[bestK]
+        end
+        local function colorToClosestKey(keyToObjectTable)
+            local result = {}
+            -- Assign each object to its closest command sheet.
+            local colorToKeys = {}
+            for key, object in pairs(keyToObjectTable) do
+                local objectPosition = object.getPosition()
+                local function distance(commandSheet)
+                    local commandSheetPosition = commandSheet.getPosition()
+                    return distanceSq(objectPosition, commandSheetPosition)
+                end
+                local color, _ = minKV(colorToCommandSheet, distance)
+                if color then
+                    local entry = colorToKeys[color]
+                    if not entry then
+                        entry = {}
+                        colorToKeys[color] = entry
+                    end
+                    table.insert(entry, key)
+                end
+            end
+            -- For each color, get the closest candidate object.
+            for color, keys in pairs(colorToKeys) do
+                local colorPosition = colorToCommandSheet[color].getPosition()
+                local function distance(key)
+                    local objectPosition = keyToObjectTable[key].getPosition()
+                    return distanceSq(objectPosition, colorPosition)
+                end
+                local _, key = minKV(keys, distance)
+                result[color] = key
+            end
+            return result
+        end
+
+        -- Map command sheet color to nearest faction, tokenFaction, and seated player.
+        local colorToFactionName = colorToClosestKey(factionNameToFactionSheet)
+        local colorToTokenFactionName = colorToClosestKey(tokenFactionNameToBag)
+
+        _colorToFaction = {}
+        for color, factionName in pairs(colorToFactionName) do
+            local attributes = {
+                name = factionName,
+                tokenName = colorToTokenFactionName[color],
+                color = color,
+            }
+            for k, v in pairs(_defaultAttributes) do
+                attributes[k] = v
+            end
+            for k, v in pairs(_factionAttributes[factionName]) do
+                attributes[k] = v
+            end
+            _colorToFaction[color] = attributes
+        end
+    end
+end
+
+function onLoad(saveState)
+    self.setColorTint({ r = 0.25, g = 0.25, b = 0.25 })
+    self.setScale({ x = 2, y = 0.01, z = 2 })
+    self.setName('TI4_FACTION_HELPER')
+    self.setDescription('Shared helper functions used by other objects, PLEASE LEAVE ON TABLE! This object is only visible to the black (GM) player.')
+
+    -- Only the GM/black player can see this object.  Others can still interact!
+    local invisibleTo = {}
+    for _, color in ipairs(Player.getColors()) do
+        if color ~= 'Black' then
+            table.insert(invisibleTo, color)
+        end
+    end
+    self.setInvisibleTo(invisibleTo)
+end

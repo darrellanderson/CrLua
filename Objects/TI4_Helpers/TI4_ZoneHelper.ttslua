@@ -4,8 +4,8 @@
 -- Users should copy this getHelperClient function, and use via:
 --
 -- local zoneHelper = getHelperClient('TI4_ZONE_HELPER')
--- local color = zoneHelper.zoneFromPosition(object.getPosition())
--- local guidToZone = zoneHelper.zonesFromPositions(guidToPosition)
+-- local zoneColor = zoneHelper.zoneFromPosition(object.getPosition())
+-- local guidToZoneColor = zoneHelper.zonesFromPositions(guidToPosition)
 --
 -- Where one can call any main function in this file via the helper.
 function getHelperClient(helperObjectName)
@@ -59,37 +59,33 @@ local _zones = {
     y = false,
     colorToZone = {},
     tableXZ = {},
+}
 
-    lastUpdateTime = false,
-    periodicUpdateSeconds = 3,
+local _update = {
+    time = false,
+    periodicUpdateSeconds = 10,
 }
 
 --- Get all zones.
--- @return table : list of {color,faction} tables.
+-- @return table : list of color strings.
 function zones()
     _maybeUpdateZones()
     local result = {}
     for color, zone in pairs(_zones.colorToZone) do
-        table.insert(result, {
-            color = color,
-            faction = zone.factionName
-        })
+        table.insert(result, color)
     end
     return result
 end
 
 --- Get zone color from position.
 -- @param position table : {xyz} position.
--- @return table : zone {color,faction}, or nil if not in zone.
+-- @return string : zone color, or nil if not in zone.
 function zoneFromPosition(position)
     assert(type(position) == 'table' and type(position.x) == 'number')
     _maybeUpdateZones()
     for color, zone in pairs(_zones.colorToZone) do
         if _boundingBoxContains(zone.boundingBox, position) and _polygonContains(zone.polygon, position) then
-            return {
-                color = color,
-                faction = zone.factionName
-            }
+            return color
         end
     end
 end
@@ -97,7 +93,7 @@ end
 --- Given map from guids to positions, return map from guids to zone.
 -- This is a bulk operation to reduce call overhead.
 -- @param guidToPosition table : guid to {xyz} tables.
--- @return table : map from guid to zone.
+-- @return table : map from guid to zone color string.
 function zonesFromPositions(guidToPosition)
     assert(type(guidToPosition) == 'table')
     _maybeUpdateZones()
@@ -237,21 +233,16 @@ function _testPolygonContains()
 end
 
 function _maybeUpdateZones()
-    if not _zones.lastUpdateTime or (Time.time - _zones.lastUpdateTime) > _zones.periodicUpdateSeconds then
-        _zones.lastUpdateTime = Time.time
+    if not _update.time or (Time.time - _update.time) > _update.periodicUpdateSeconds then
+        _update.time = Time.time
 
         local colorToCommandSheet = {}
         local numCommandSheets = 0
-        local factionNameToFactionSheet = {}
         for _, object in ipairs(getAllObjects()) do
             local color = string.match(object.getName(), '^Command Sheet %((%a+)%)$')
             if color then
                 colorToCommandSheet[color] = object
                 numCommandSheets = numCommandSheets + 1
-            end
-            local factionName = string.match(object.getName(), ' Sheet$')
-            if factionName and object.tag == 'Tile' then
-                factionNameToFactionSheet[factionName] = object
             end
         end
 
@@ -271,14 +262,6 @@ function _maybeUpdateZones()
                     }
                     break
                 end
-            end
-        end
-
-        -- Inject faction names into zone entry.
-        for factionName, factionSheet in pairs(factionNameToFactionSheet) do
-            local zone = zoneFromPosition(factionSheet.getPosition())
-            if zone then
-                _zones.colorToZone[zone.color].factionName = factionName
             end
         end
     end

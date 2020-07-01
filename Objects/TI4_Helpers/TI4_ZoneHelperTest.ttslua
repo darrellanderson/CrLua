@@ -18,8 +18,9 @@ local zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 function onLoad(save_state)
     print(self.getName() .. '.onLoad')
 
-    local zones = zoneHelper.zones()
-    assert(#zones == 6)
+    local zoneColors = zoneHelper.zones()
+    assert(#zoneColors == 6)
+    print('zone colors: ' .. table.concat(zoneColors, ', '))
 
     local commandSheetToColor = {}
     for _, object in ipairs(getAllObjects()) do
@@ -31,9 +32,9 @@ function onLoad(save_state)
 
     -- Verify single position zone lookup.
     for commandSheet, color in pairs(commandSheetToColor) do
-        local zone = zoneHelper.zoneFromPosition(commandSheet.getPosition())
-        assert(color == zone.color, (color or 'nil') .. ' vs ' .. (zone.color or 'nil'))
-        print('"'.. commandSheet.getName() .. '" in zone ' .. zone.color)
+        local zoneColor = zoneHelper.zoneFromPosition(commandSheet.getPosition())
+        assert(color == zoneColor, (color or 'nil') .. ' vs ' .. (zoneColor or 'nil'))
+        print('"'.. commandSheet.getName() .. '" in zone ' .. zoneColor)
     end
 
     -- Verify bulk zone lookup.
@@ -43,7 +44,8 @@ function onLoad(save_state)
     end
     local guidToZone = zoneHelper.zonesFromPositions(guidToPosition)
     for commandSheet, color in pairs(commandSheetToColor) do
-        assert(guidToZone[commandSheet.guid].color == color)
+        local zoneColor = guidToZone[commandSheet.guid]
+        assert(zoneColor == color)
     end
 
     -- Is a position in the table area?

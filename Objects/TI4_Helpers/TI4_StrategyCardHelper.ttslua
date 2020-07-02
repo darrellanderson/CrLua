@@ -219,17 +219,6 @@ end
 function _countInfluence(voteCounter, lowerNameToCards, lowerNameToInZoneCards)
     assert(type(voteCounter) == 'userdata' and type(lowerNameToCards) == 'table' and type(lowerNameToInZoneCards) == 'table')
 
-    -- This card can be anywhere on the table.
-    local cards = lowerNameToCards['representative government']
-    if cards then
-        for _, card in ipairs(cards) do
-            if not card.is_face_down and not _isAgendaDiscard(card) then
-                voteCounter.setValue(1)
-                return
-            end
-        end
-    end
-
     if not _lowerNameToInfluence then
         _lowerNameToInfluence = {}
         for lowerName, planet in pairs(_systemHelper.planets()) do
@@ -251,6 +240,19 @@ function _countInfluence(voteCounter, lowerNameToCards, lowerNameToInZoneCards)
             influence = influence + (cardInfluence * #inZoneCards)
         end
     end
+
+    -- This card can be anywhere on the table except agenda discard pile.
+    local cards = lowerNameToCards['representative government']
+    if cards then
+        for _, card in ipairs(cards) do
+            if not card.is_face_down and not _isAgendaDiscard(card) then
+                broadcastToColor('Representative Government active.', playerColor, {0.1,0.5,0.1})
+                influence = 1
+                break
+            end
+        end
+    end
+
     voteCounter.setValue(influence)
 end
 
@@ -512,7 +514,3 @@ function onLoad(saveState)
     end
     self.setInvisibleTo(invisibleTo)
 end
-
-#include <~/CrLua/CrLua>
-#include <~/CrLua/LockGlobals>
-#include <~/CrLua/Log>

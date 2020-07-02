@@ -30,11 +30,6 @@ function getHelperClient(helperObjectName)
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
 
-local _defaultAttributes = {
-    actionCards = 1,
-    commandTokens = 2,
-}
-
 local _factionAttributes = {
     ['The Arborec'] = {
         flagship = 'Duha Menaimon',
@@ -53,7 +48,7 @@ local _factionAttributes = {
     },
     ['The Federation of Sol'] = {
         flagship = 'Genesis',
-        commandTokens = 3,
+        extraCommandTokens = 1,
     },
     ['The Ghosts of Creuss'] = {
         flagship = 'Hil Colish',
@@ -87,7 +82,7 @@ local _factionAttributes = {
     },
     ['The Yssaril Tribes'] = {
         flagship = "Y'sia Y'ssrila",
-        actionCards = 2,
+        extraActionCards = 1,
     },
 
     -- Tactic Blue's homebrew
@@ -271,9 +266,6 @@ function _maybeUpdate()
                 tokenName = colorToTokenFactionName[color],
                 color = color,
             }
-            for k, v in pairs(_defaultAttributes) do
-                attributes[k] = v
-            end
             for k, v in pairs(_factionAttributes[factionName]) do
                 attributes[k] = v
             end

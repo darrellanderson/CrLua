@@ -31,8 +31,6 @@ function onLoad(save_state)
         assert(type(faction.name) == 'string')
         assert(type(faction.tokenName) == 'string')
         assert(type(faction.color) == 'string', 'color')
-        assert(type(faction.actionCards) == 'number', 'actionCards')
-        assert(type(faction.commandTokens) == 'number', 'commandTokens')
 
         local faction2 = factionHelper.fromColor(color)
         assert(faction.name == faction2.name)

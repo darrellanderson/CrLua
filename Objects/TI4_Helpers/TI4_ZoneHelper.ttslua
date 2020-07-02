@@ -316,10 +316,17 @@ function _maybeUpdateZones()
                 local color = seatColor[1] or seatColor[2] or seatColor[3]
                 addZone(color, DEFAULT_ZONES[6].zones[123])
             elseif seat[1] + seat[2] + seat[3] == 2 then
-                local color12 = seatColor[1] or seatColor[2]
-                local color23 = seatColor[3] or seatColor[2]
-                addZone(color12, DEFAULT_ZONES[6].zones[12])
-                addZone(color23, DEFAULT_ZONES[6].zones[23])
+                if seatColor[2] then
+                    addZone(seatColor[2], DEFAULT_ZONES[6].zones[2])
+                    if seatColor[1] then
+                        addZone(seatColor[1], DEFAULT_ZONES[6].zones[1])
+                    else
+                        addZone(seatColor[3], DEFAULT_ZONES[6].zones[3])
+                    end
+                else
+                    addZone(seatColor[1], DEFAULT_ZONES[6].zones[12])
+                    addZone(seatColor[3], DEFAULT_ZONES[6].zones[23])
+                end
             elseif seat[1] + seat[2] + seat[3] == 3 then
                 addZone(seatColor[1], DEFAULT_ZONES[6].zones[1])
                 addZone(seatColor[2], DEFAULT_ZONES[6].zones[2])
@@ -330,10 +337,17 @@ function _maybeUpdateZones()
                 local color = seatColor[4] or seatColor[5] or seatColor[6]
                 addZone(color, DEFAULT_ZONES[6].zones[456])
             elseif seat[4] + seat[5] + seat[6] == 2 then
-                local color45 = seatColor[4] or seatColor[5]
-                local color56 = seatColor[6] or seatColor[5]
-                addZone(color45, DEFAULT_ZONES[6].zones[45])
-                addZone(color56, DEFAULT_ZONES[6].zones[56])
+                if seatColor[5] then
+                    addZone(seatColor[5], DEFAULT_ZONES[6].zones[5])
+                    if seatColor[4] then
+                        addZone(seatColor[4], DEFAULT_ZONES[6].zones[4])
+                    else
+                        addZone(seatColor[6], DEFAULT_ZONES[6].zones[6])
+                    end
+                else
+                    addZone(seatColor[4], DEFAULT_ZONES[6].zones[45])
+                    addZone(seatColor[6], DEFAULT_ZONES[6].zones[56])
+                end
             elseif seat[4] + seat[5] + seat[6] == 3 then
                 addZone(seatColor[4], DEFAULT_ZONES[6].zones[4])
                 addZone(seatColor[5], DEFAULT_ZONES[6].zones[5])

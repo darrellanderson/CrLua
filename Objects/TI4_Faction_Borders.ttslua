@@ -521,8 +521,15 @@ function updateCache()
         y = false,
     }
 
+    local colors = {}
+    for _, object in ipairs(getAllObjects()) do
+        local color = string.match(object.getName(), '^Command Sheet %((%a+)%)$')
+        if color then
+            table.insert(colors, color)
+        end
+    end
+
     CrLua.TI4.Faction.update()
-    CrLua.TI4.Zone.update()
     local hexToOwners = getSystemOwners()
 
     _cache.originalPolygons.planets = {}
@@ -540,8 +547,7 @@ function updateCache()
 
     _cache.originalPolygons.ground = {}
     _cache.originalPolygons.space = {}
-    for _, zone in ipairs(CrLua.TI4.Zone.all()) do
-        local color = assert(zone.color)
+    for _, color in ipairs(colors) do
         local ownFullySet, ownPartialSet, ownSpaceSet = getOwned(hexToOwners, color)
 
         -- Control ground, with partial hexes.
@@ -1301,5 +1307,5 @@ end
 --#include <~/CrLua/UnitTest>
 --CrLua.UnitTest.runTests(TAG, CrLua, true)
 
-CrLua.assertRequired({ 'TI4.Hex', 'TI4.System', 'TI4.Unit', 'TI4.Zone', 'List', 'Log', 'Table' })
+CrLua.assertRequired({ 'TI4.Hex', 'TI4.System', 'TI4.Unit', 'List', 'Log', 'Table' })
 CrLua.lock()

@@ -17,12 +17,30 @@ STRATEGY_CARD_INITIATIVE = {
     ['Imperial'] = 8
 }
 
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
+        return function(parameters) return helperObject.call(functionName, parameters) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+
+local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
+
 function onLoad(save_state)
     self.createButton({
         click_function = 'placeTradeGoodsAndSetTurns',
         function_owner = self,
         label          = 'Place Trade\nGoods and\nSet Turns',
-        position       = {x=0, y=0.2, z=0},
+        position       = {x=0, y=0.21, z=0},
         width          = 1200,
         height         = 800,
         font_size      = 200,
@@ -57,8 +75,6 @@ function placeTradeGood(tradeGoodBag, strategyCard)
 end
 
 function placeTradeGoodsAndSetTurns(obj, playerClickerColor, altClick)
-    CrLua.TI4.Zone.update()
-
     -- Get per color lowest initiative, unpicked strategy cards, and trade good bags.
     local colorToInitiative = {}
     local unpickedStrategyCards = {}
@@ -66,10 +82,10 @@ function placeTradeGoodsAndSetTurns(obj, playerClickerColor, altClick)
     for _, object in ipairs(getAllObjects()) do
         local initiative = STRATEGY_CARD_INITIATIVE[object.getName()]
         if initiative then
-            local zone = CrLua.TI4.Zone.insideWhich(object.getPosition())
-            if zone then
-                local vsValue = colorToInitiative[zone.color] or initiative
-                colorToInitiative[zone.color] = math.min(initiative, vsValue)
+            local zoneColor = _zoneHelper.zoneFromPosition(object.getPosition())
+            if zoneColor then
+                local vsValue = colorToInitiative[zoneColor] or initiative
+                colorToInitiative[zoneColor] = math.min(initiative, vsValue)
             elseif initiative > 0 then
                 table.insert(unpickedStrategyCards, object)
             end
@@ -104,6 +120,3 @@ function placeTradeGoodsAndSetTurns(obj, playerClickerColor, altClick)
     Turns.order = turnOrder
     Turns.turn_color = turnOrder[1]
 end
-
-#include <~/CrLua/TI4/Zone>
-#include <~/CrLua/Polygon>

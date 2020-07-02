@@ -59,7 +59,7 @@ function onLoad(save_state)
         assert(position.x and position.y and position.z)
     end
 
-    -- Get all objects in hand.
-    local inHandSet = zoneHelper.inHand('White')
+    -- Get all objects in hands.
+    local inHandSet = zoneHelper.inHand()
     assert(inHandSet)
 end

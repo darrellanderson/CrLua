@@ -104,20 +104,16 @@ function zonesFromPositions(guidToPosition)
     return result
 end
 
---- Get guids for objects in the given player's hand.
+--- Get guids for objects in any player's hand.
 -- @param playerColor string.
 -- @return table : set from guid string to true.
-function inHand(playerColor)
-    assert(type(playerColor) == 'string')
+function inHand()
     local result = {}
     for _, player in ipairs(Player.getPlayers()) do
-        if player.color == playerColor then
-            for i = 1, player.getHandCount() do
-                for _, object in ipairs(player.getHandObjects(i)) do
-                    result[object.guid] = true
-                end
+        for i = 1, player.getHandCount() do
+            for _, object in ipairs(player.getHandObjects(i)) do
+                result[object.guid] = true
             end
-            break
         end
     end
     return result

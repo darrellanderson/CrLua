@@ -1,0 +1,340 @@
+--- Manage shared stategy card actions.
+-- @author GarnetBear did the original influence counting
+-- @author Darrell June 2020
+
+-- Users should copy this getHelperClient function, and in onLoad via:
+--
+-- local strategyCardHelper = getHelperClient('TI4_STRATEGY_CARD_HELPER')
+-- strategyCardHelper.register({
+--     guid = self.getGUID(),
+--     position = { x = ..., y = ..., z = ... },
+--     rotation = { x = ..., y = ..., z = ... },
+--     onPlayCallback = 'clickedOnPlay'  -- gets clicking player color as argument
+-- })
+--
+-- Where one can call any main function in this file via the helper.
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        return function(parameters) return helperObject.call(functionName, parameters) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+
+local factionHelper = getHelperClient('TI4_FACTION_HELPER')
+local systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
+local zoneHelper = getHelperClient('TI4_ZONE_HELPER')
+
+local lowerNameToInfluence = false
+
+local bWidth = 500
+local bHeight = 200
+local bFontSize = 100
+
+function register(parameters)
+    assert(type(parameters) == 'table')
+    assert(type(parameters.guid) == 'string')
+    assert(type(parameters.position) == 'table' and type(parameters.position.x) == 'number')
+    assert(type(parameters.rotation) == 'table' and type(parameters.rotation.x) == 'number')
+    assert(type(parameters.onPlayCallback) == 'string')
+
+    CrLua.Log.d('XXX', 'register', parameters)
+
+    local strategyCard = assert(getObjectFromGUID(parameters.guid))
+    strategyCard.clearButtons()
+
+    self.setVar('play_' .. parameters.guid, function(_, playerColor) _onClickPlay(strategyCard, parameters, playerColor) end)
+    strategyCard.createButton({
+        click_function = 'play_' .. parameters.guid,
+        function_owner = self,
+        label = 'Play',
+        position = { -0.2, 0.11, -1.25 },
+        rotation = { 0, 0, 0 },
+        width = bWidth,
+        height = bHeight,
+        font_size = bFontSize,
+        tooltip = 'Show UI'
+    })
+
+    self.setVar('return_' .. parameters.guid, function(_, playerColor) _onClickReturn(strategyCard, parameters, playerColor) end)
+    strategyCard.createButton({
+        click_function = 'return_' .. parameters.guid,
+        function_owner = self,
+        label = 'Return',
+        position = { 0, 0.11, 0.2 },
+        rotation = { 0, 0, 0 },
+        width = bWidth,
+        height = bHeight,
+        font_size = bFontSize,
+        tooltip = 'Return Card Only'
+    })
+
+    self.setVar('endStatusPhase_' .. parameters.guid, function(_, playerColor) _onClickEndOfStatusPhase(strategyCard, parameters, playerColor) end)
+    strategyCard.createButton({
+        click_function = 'endStatusPhase_' .. parameters.guid,
+        function_owner = self,
+        label = 'End of\nStatus Phase',
+        position = { 0, 0.11, 0.7 },
+        rotation = { 0, 0, 0 },
+        width = 700,
+        height = 300,
+        font_size = bFontSize,
+        tooltip = 'Will Draw Action Cards, Return\n and Gain Tokens, Ready Cards,\n Repair Units, and Return\n Strategy Card'
+    })
+end
+
+function _onClickPlay(strategyCard, parameters, playerColor)
+    assert(type(strategyCard) == 'userdata' and type(parameters) == 'table' and type('playerColor') == 'string')
+    strategyCard.call(parameters.onPlayCallback, playerColor)
+end
+
+function _onClickEndOfStatusPhase(strategyCard, parameters, playerColor)
+    assert(type(strategyCard) == 'userdata' and type(parameters) == 'table' and type('playerColor') == 'string')
+    local function getConfirmButton()
+        for _, button in ipairs(strategyCard.getButtons()) do
+            if button.label == 'Confirm' then
+                return button
+            end
+        end
+    end
+    local confirmButton = getConfirmButton()
+    if confirmButton then
+        strategyCard.removeButton(confirmButton.index)
+    else
+        self.setVar('confirm_' .. parameters.guid, function(_, playerColor) _onClickConfirmEndOfStatusPhase(strategyCard, parameters, playerColor) end)
+        strategyCard.createButton({
+            click_function = 'confirm_' .. parameters.guid,
+            function_owner = self,
+            label = 'Confirm',
+            position = { 0.2, 0.11, 1.4 },
+            rotation = { 0, 0, 0 },
+            width = 500,
+            height = 150,
+            font_size = bFontSize,
+            tooltip = 'Confirm End\n of Status Phase'
+        })
+    end
+end
+
+function _onClickReturn(strategyCard, parameters, playerColor)
+    assert(type(strategyCard) == 'userdata' and type(parameters) == 'table' and type('playerColor') == 'string')
+    _returnStrategyCard(strategyCard, parameters)
+end
+
+function _onClickConfirmEndOfStatusPhase(strategyCard, parameters, playerColor)
+    assert(type(strategyCard) == 'userdata' and type(parameters) == 'table' and type('playerColor') == 'string')
+
+    local faction = factionHelper.fromColor(playerColor)
+    local commandTokenName = faction and faction.tokenName .. ' Command Token'
+    local commandTokenBagName = faction and faction.tokenName .. ' Command Tokens Bag'
+    local unitNamePattern = '^' .. playerColor .. ' '
+    local flagshipName = faction and faction.flagship
+    local commandSheetName = 'Command Sheet (' .. playerColor .. ')'
+    local voteCounterName = playerColor .. ' Player Votes'
+
+    local commandTokens = {}
+    local commandTokensBag = false
+    local actionDeck = false
+    local commandSheet = false
+    local voteCounter = false
+    local units = {}
+    local lowerNameToCards = {}
+
+    -- Gather other relevant objects in a single pass.
+    local inHandGuidSet = zoneHelper.inHand()
+    for _, object in ipairs(getAllObjects()) do
+        if not inHandGuidSet[object.getGUID()] then
+            local name = object.getName()
+            if name == commandTokenName then
+                table.insert(commandTokens, object)
+            elseif object.tag == 'Bag' and name == commandTokenBagName then
+                commandTokensBag = object
+            elseif object.tag == 'Deck' and name == 'Actions' then
+                actionDeck = object
+            elseif name == commandSheetName then
+                commandSheet = object
+            elseif name == voteCounterName then
+                voteCounter = object
+            elseif string.match(name, unitNamePattern) or name == flagshipName then
+                table.insert(units, object)
+            elseif object.tag == 'Card' then
+                local lowerName = string.lower(name)
+                local cards = lowerNameToCards[lowerName]
+                if not cards then
+                    cards = {}
+                    lowerNameToCards[lowerName] = cards
+                end
+                table.insert(cards, object)
+            end
+        end
+    end
+
+    -- Get just the cards in this player's zone.
+    local guidToPosition = {}
+    for _, cards in pairs(lowerNameToCards) do
+        for _, object in ipairs(cards) do
+            guidToPosition[object.getGUID()] = object.getPosition()
+        end
+    end
+    local guidToZone = zoneHelper.zonesFromPositions(guidToPosition)
+
+    local lowerNameToInZoneCards = {}
+    for lowerName, cards in pairs(lowerNameToCards) do
+        for _, object in ipairs(cards) do
+            if guidToZone[object.getGUID()] == playerColor then
+                local inZoneCards = lowerNameToInZoneCards[lowerName]
+                if not inZoneCards then
+                    inZoneCards = {}
+                    lowerNameToInZoneCards[lowerName] = inZoneCards
+                end
+                table.insert(inZoneCards, object)
+            end
+        end
+    end
+
+    _returnStrategyCard(strategyCard, parameters)
+    _returnCommandTokens(playerColor, commandTokens, commandTokensBag)
+    _readyCards(lowerNameToInZoneCards)
+    _repairUnits(units)
+
+    _dealActionCards(playerColor, actionDeck)
+    _allocateCommandTokens(playerColor, commandSheet, commandTokensBag)
+
+    _countInfluence(voteCounter, lowerNameToCards, lowerNameToInZoneCards)
+end
+
+-------------------------------------------------------------------------------
+
+function _returnStrategyCard(strategyCard, parameters)
+    assert(type(strategyCard) == 'userdata' and type(parameters) == 'table')
+    local collide = false
+    local fast = true
+    local abovePos = { x = parameters.position.x, y = parameters.position.y + 1, z = parameters.position.z}
+    strategyCard.setPositionSmooth(abovePos, collide, fast)
+    strategyCard.setRotationSmooth(parameters.rotation, collide, fast)
+end
+
+function _returnCommandTokens(playerColor, commandTokens, commandTokensBag)
+    assert(type(playerColor) == 'string' and type(commandTokens) == 'table')
+    if not commandTokensBag then
+        print('ERROR NO COMMAND TOKENS BAG')
+        return
+    end
+    assert(type(commandTokensBag) == 'userdata')
+
+    -- Get player zone for each token.
+    local guidToPosition = {}
+    for _, commandToken in ipairs(commandTokens) do
+        guidToPosition[commandToken.getGUID()] = commandToken.getPosition()
+    end
+    local guidToZone = zoneHelper.zonesFromPositions(guidToPosition)
+
+    -- Only return command tokens outside the player zone.
+    for _, commandToken in ipairs(commandTokens) do
+        if guidToZone[commandToken.getGUID()] ~= playerColor then
+            commandTokensBag.putObject(commandToken)
+        end
+    end
+end
+
+function _readyCards(lowerNameToInZoneCards)
+    assert(type(lowerNameToInZoneCards) == 'table')
+    for lowerName, inZoneCards in pairs(lowerNameToInZoneCards) do
+        for _, card in ipairs(inZoneCards) do
+            if card.is_face_down then
+                card.flip()
+            end
+        end
+    end
+end
+
+function _repairUnits(units)
+    assert(type(units) == 'table')
+    for _, unit in ipairs(units) do
+        local rotation = unit.getRotation()
+        if rotation.z > 90 and rotation.z < 270 then
+            unit.flip()
+        end
+    end
+end
+
+function _dealActionCards(playerColor, actionCardDeck)
+    assert(type(playerColor) == 'string')
+end
+
+function _allocateCommandTokens(playerColor, commandSheet, commandTokensBag)
+    assert(type(playerColor) == 'string' and type(commandSheet) == 'userdata')
+    if not commandTokensBag then
+        print('ERROR NO COMMAND TOKENS BAG')
+        return
+    end
+    assert(type(commandTokensBag) == 'userdata')
+    -- Watch out for an empty bag!
+end
+
+function _countInfluence(voteCounter, lowerNameToCards, lowerNameToInZoneCards)
+    assert(type(voteCounter) == 'userdata' and type(lowerNameToCards) == 'table' and type(lowerNameToInZoneCards) == 'table')
+
+    -- This card can be anywhere on the table.
+    local cards = lowerNameToCards['representative government']
+    if cards then
+        for _, card in ipairs(cards) do
+            if not card.is_face_down then
+                voteCounter.setValue(1)
+                return
+            end
+        end
+    end
+
+    if not lowerNameToInfluence then
+        lowerNameToInfluence = {}
+        for lowerName, planet in pairs(systemHelper.planets()) do
+            if (planet.influence or 0) > 0 then
+                lowerNameToInfluence[lowerName] = planet.influence
+            end
+        end
+        for lowerName, attributes in pairs(systemHelper.nonPlanetResourceInfluenceCards()) do
+            if (attributes.influence or 0) > 0 then
+                lowerNameToInfluence[lowerName] = attributes.influence
+            end
+        end
+    end
+
+    local influence = 0
+    for lowerName, inZoneCards in pairs(lowerNameToInZoneCards) do
+        local cardInfluence = lowerNameToInfluence[lowerName]
+        if cardInfluence then
+            influence = influence + (cardInfluence * #inZoneCards)
+        end
+    end
+    voteCounter.setValue(influence)
+end
+
+-------------------------------------------------------------------------------
+
+function onLoad(saveState)
+    self.setColorTint({ r = 0.25, g = 0.25, b = 0.25 })
+    self.setScale({ x = 2, y = 0.01, z = 2 })
+    self.setName('TI4_STRATEGY_CARD_HELPER')
+    self.setDescription('Shared helper functions used by other objects, PLEASE LEAVE ON TABLE! This object is only visible to the black (GM) player.')
+
+    -- Only the GM/black player can see this object.  Others can still interact!
+    local invisibleTo = {}
+    for _, color in ipairs(Player.getColors()) do
+        if color ~= 'Black' then
+            table.insert(invisibleTo, color)
+        end
+    end
+    self.setInvisibleTo(invisibleTo)
+end
+
+#include <~/CrLua/CrLua>
+#include <~/CrLua/LockGlobals>
+#include <~/CrLua/Log>

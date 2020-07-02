@@ -40,16 +40,16 @@ local _debugVisualize = false
 
 function onLoad(saveState)
     CrLua.Log.d(TAG, 'onLoad: |data|=' .. (saveState and string.len(saveState) or -1))
-    local success, value = pcall(function() return JSON.decode(saveState) end)
-    if success then
-        _config = value or _config
-    end
-    if not _config then
-        _config = CrLua.Table.copy(DEFAULT_CONFIG)
-    end
 
+    -- Schedule setup, THEN try to decode settings.
+    _config = CrLua.Table.copy(DEFAULT_CONFIG)
     Wait.frames(_createUI, 2)
     Wait.frames(updateUiFromConfig, 4)
+
+    local success, value = pcall(function() return JSON.decode(saveState) end)
+    if success and value then
+        _config = type(value) == 'table' and value or _config
+    end
 
     -- Require manaul update to show again.  If something when HORRIBLY WRONG,
     -- do not jump into doing it again unless asked!  Also, keep onLoad fast!

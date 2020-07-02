@@ -65,14 +65,6 @@ local OBJECT_EFFECTS = {
             ['Infantry'] = { cost = 1 },
         },
     },
-    ['Core Mining'] = {
-        requireFaceUp = true,
-        resources = 2,
-    },
-    ['Terraforming Initiative'] = {
-        requireFaceUp = true,
-        resources = 1,
-    },
 }
 
 local _config = {
@@ -89,7 +81,7 @@ local _data = {
     height = _config.defaultHeight,
 
     boundingBox = false,
-    planets = false,
+    lowerNameToResources = false,
 
     inside = {},
 
@@ -98,6 +90,27 @@ local _data = {
         z = 0
     }
 }
+
+-------------------------------------------------------------------------------
+
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
+        return function(parameters) return helperObject.call(functionName, parameters) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+
+local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
+local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 
 -------------------------------------------------------------------------------
 
@@ -247,26 +260,35 @@ function isInsideBuildArea(object)
     return bb.min.x <= p.x and p.x <= bb.max.x and bb.min.z <= p.z and p.z <= bb.max.z
 end
 
-function getPlanet(objectName)
+function getResourcesAndInfluence(objectName)
     assert(type(objectName) == 'string')
-    _data.planets = _data.planets or CrLua.TI4.System.getAllPlanets()
-    return _data.planets[string.lower(objectName)]
+    if not _data.lowerNameToResources then
+        _data.lowerNameToResources = {}
+        for lowerName, planet in pairs(_systemHelper.planets()) do
+            _data.lowerNameToResources[lowerName] = {
+                resources = planet.resources or 0,
+                influence = planet.influence or 0
+            }
+        end
+        for lowerName, other in pairs(_systemHelper.nonPlanetResourceInfluenceCards()) do
+            _data.lowerNameToResources[lowerName] = {
+                resources = other.resources or 0,
+                influence = other.influence or 0
+            }
+        end
+    end
+    return _data.lowerNameToResources[string.lower(objectName)]
 end
 
 function getPlayerColor()
-    local position = self.getPosition()
-    local zone = CrLua.TI4.Zone.insideWhich(position)
-    local result = zone and zone.color
-    CrLua.Log.d(TAG, 'getPlayerColor: ' ..(result or 'nil'))
-    return result
+    local zoneColor = _zoneHelper.zoneFromPosition(self.getPosition())
+    CrLua.Log.d(TAG, 'getPlayerColor: ' ..(zoneColor or 'nil'))
+    return zoneColor
 end
 
 function getProduceConsumeItems()
     CrLua.Log.d(TAG, 'getProduceConsumeItems')
     local playerColor = _data.playerColor
-
-    CrLua.TI4.Zone.update()
-    local zone = CrLua.TI4.Zone.fromColor(playerColor)
 
     -- Get objects to consider.
     local objects = CrLua.Table.join(_data.inside, {})
@@ -278,8 +300,8 @@ function getProduceConsumeItems()
         if objectEffects.requireFaceUp and object.is_face_down then
             return false
         end
-        if objectEffects.anywhereInPlayerZone and zone then
-            return CrLua.TI4.Zone.inside(zone, object.getPosition())
+        if objectEffects.anywhereInPlayerZone then
+            return playerColor and _zoneHelper.zoneFromPosition(object.getPosition()) == playerColor
         end
         return objectEffects.anywhereOnTable
     end
@@ -300,8 +322,8 @@ function getProduceConsumeItems()
     }
     for object, _ in pairs(objects) do
         local name = object.getName()
-        local planet = getPlanet(name)
-        if planet then
+        local resourcesAndInfluence = getResourcesAndInfluence(name)
+        if resourcesAndInfluence then
             result.consumeObjectNameToCount[name] = (result.consumeObjectNameToCount[name] or 0) + 1
         end
         local unit = CrLua.TI4.Unit.fromObject(object)
@@ -350,9 +372,9 @@ function getProduceConsumeResourcesAndCost(produceConsumeItems)
             result.resources = result.resources + objectEffects.resources
         end
 
-        local planet = getPlanet(objectName)
-        if planet and planet.resources then
-            result.resources = result.resources + planet.resources
+        local resourcesAndInfluence = getResourcesAndInfluence(objectName)
+        if resourcesAndInfluence and resourcesAndInfluence.resources then
+            result.resources = result.resources + resourcesAndInfluence.resources
         end
     end
 
@@ -369,13 +391,13 @@ function getProduceConsumeResourcesAndCost(produceConsumeItems)
     if produceConsumeItems.hegemonic then
         local best = false
         for objectName, _ in pairs(produceConsumeItems.consumeObjectNameToCount) do
-            local planet = getPlanet(objectName)
+            local resourcesAndInfluence = getResourcesAndInfluence(objectName)
             local useThis = true
-            useThis = useThis and planet
-            useThis = useThis and planet.influence > planet.resources
-            useThis = useThis and (not best or planet.influence > best.influence)
+            useThis = useThis and resourcesAndInfluence
+            useThis = useThis and resourcesAndInfluence.influence > resourcesAndInfluence.resources
+            useThis = useThis and (not best or resourcesAndInfluence.influence > best.influence)
             if useThis then
-                best = planet
+                best = resourcesAndInfluence
             end
         end
         if best then
@@ -427,7 +449,7 @@ function drawUi(items, resourcesAndCost)
     local panelHeight = bounds.size.z - _config.thickness
 
     -- Draggable corner.
-    local cornerWidth = 0.5
+    local cornerWidth = 0.75
     local cornerHeight = cornerWidth
     local cornerX = _data.width - (bounds.size.x / 2.0) - (cornerWidth / 2.0)
     local cornerY = _data.height - (bounds.size.z / 2.0) - (cornerHeight / 2.0)
@@ -605,7 +627,7 @@ end
 function commit()
     CrLua.Log.d(TAG, 'commit')
     for object, _ in pairs(_data.inside) do
-        if getPlanet(object.getName()) and not object.is_face_down then
+        if object.tag == 'Card' and not object.is_face_down then
             object.flip()
         end
     end
@@ -619,18 +641,15 @@ end
 #include <~/CrLua/List>
 #include <~/CrLua/LockTable>
 #include <~/CrLua/Log>
-#include <~/CrLua/Polygon>
 #include <~/CrLua/Table>
 #include <~/CrLua/Util>
 
 #include <~/CrLua/TI4/Faction>
-#include <~/CrLua/TI4/System>
 #include <~/CrLua/TI4/Unit>
-#include <~/CrLua/TI4/Zone>
 
 --CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
 --#include <~/CrLua/UnitTest>
 --CrLua.UnitTest.runTests('CrLua.TI4.System', CrLua.TI4.System, true)
 
-CrLua.assertRequired({ 'Log', 'TI4.System', 'TI4.Unit', 'TI4.Zone' })
+CrLua.assertRequired({ 'Log', 'TI4.Unit' })
 CrLua.lock()

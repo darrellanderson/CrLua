@@ -20,8 +20,8 @@ function onLoad(save_state)
     print(self.getName() .. '.onLoad')
 
     local zoneColors = zoneHelper.zones()
-    assert(#zoneColors == 6)
     print('zone colors: ' .. table.concat(zoneColors, ', '))
+    assert(#zoneColors == 6)
 
     local commandSheetToColor = {}
     for _, object in ipairs(getAllObjects()) do

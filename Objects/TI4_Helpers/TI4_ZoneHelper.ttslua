@@ -24,39 +24,43 @@ function getHelperClient(helperObjectName)
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
 
--- Player zones table.
-local _zones = {
-    -- Defaults for 6p and 8p tables.  Map default zone color to XZ border points.
-    defaults = {
-        [6] = {
-            zones = {
-                Yellow = {{21, -50}, {21, -6}, {51, -6}, {51, -50}},
-                Red = {{-21, -50}, {-21, -6}, {-1.5, -21}, {1.5, -21}, {21, -6}, {21, -50}},
-                Green = {{-51, -50}, {-51, -6}, {-21, -6}, {-21, -50}},
-                Purple = {{21, 6}, {21, 49}, {51, 49}, {51, 6}},
-                Blue = {{-21, 6}, {-21, 49}, { 21, 49}, {21, 6}, {1.5, 21}, {-1.5, 21}},
-                White = {{-51, 6}, {-51, 49}, {-21, 49}, {-21, 6}},
-            },
-            tableXZ = {{-48, -28}, {-48, 28}, {48, 28}, {48, -28}},
-            y = 1,
-        },
-        [8] = {
-            zones = {
-                Pink = {{40.5, -100}, {40.5, -15}, {78, -15}, {78, -100}},
-                White = {{0, -100}, {0, -15}, {40.5, -15}, {40.5, -100}},
-                Red = {{-40.5, -100}, {-40.5, -15}, {0, -15}, {0, -100}},
-                Orange = {{-78, -100}, {-78, -15}, {-40.5, -15}, {-40.5, -100}},
-                Yellow = {{-78, 15}, {-78, 100}, {-40.5, 100}, {-40.5, 15}},
-                Green = {{-40.5, 15}, {-40.5, 100}, {0, 100}, {0, 15}},
-                Blue = {{0, 15}, {0, 100}, {40.5, 100}, {40.5, 15}},
-                Purple = {{40.5, 15}, {40.5, 100}, {78, 100}, {78, 15}},
-            },
-            tableXZ = {{-78, -15}, {-78, 15}, {78, 15}, {78, -15}},
-            y = 5,
-        },
-    },
+local DEFAULT_ZONES = {
+    [6] = {
+        zones = {
+            [1] = {{-51, 6}, {-51, 49}, {-21, 49}, {-21, 6}},
+            [2] = {{-21, 6}, {-21, 49}, { 21, 49}, {21, 6}, {1.5, 21}, {-1.5, 21}},
+            [3] = {{21, 6}, {21, 49}, {51, 49}, {51, 6}},
+            [4] = {{21, -50}, {21, -6}, {51, -6}, {51, -50}},
+            [5] = {{-21, -50}, {-21, -6}, {-1.5, -21}, {1.5, -21}, {21, -6}, {21, -50}},
+            [6] = {{-51, -50}, {-51, -6}, {-21, -6}, {-21, -50}},
 
-    -- Current zones.
+            -- If not all seats are taken, use bigger zones.
+            [12] = {{-51, 6}, {-51, 49}, {-1.5, 49}, {-1.5, 21}, {-21, 6}},
+            [23] = {{21, 6}, {1.5, 21}, {1.5, 49}, {51, 49}, {51, 6}},
+            [123] = {{-51, 6}, {-51, 49}, {51, 49}, {51, 6}, {21, 6}, {1.5, 21}, {-1.5, 21}, {-21, 6}},
+            [45] = {{51, -6}, {51, -49}, {1.5, -49}, {1.5, -21}, {21, -6}},
+            [56] = {{-21, -6}, {-1.5, -21}, {-1.5, -49}, {-51, -49}, {-51, -6}},
+            [456] = {{51, -6}, {51, -49}, {-51, -49}, {-51, -6}, {-21, -6}, {-1.5, -21}, {1.5, -21}, {21, -6} },
+        },
+        tableXZ = {{-48, -28}, {-48, 28}, {48, 28}, {48, -28}},
+        y = 1,
+    },
+    [8] = {
+        [1] = {{40.5, -100}, {40.5, -15}, {78, -15}, {78, -100}},
+        [2] = {{0, -100}, {0, -15}, {40.5, -15}, {40.5, -100}},
+        [3] = {{-40.5, -100}, {-40.5, -15}, {0, -15}, {0, -100}},
+        [4] = {{-78, -100}, {-78, -15}, {-40.5, -15}, {-40.5, -100}},
+        [5] = {{-78, 15}, {-78, 100}, {-40.5, 100}, {-40.5, 15}},
+        [6] = {{-40.5, 15}, {-40.5, 100}, {0, 100}, {0, 15}},
+        [7] = {{0, 15}, {0, 100}, {40.5, 100}, {40.5, 15}},
+        [8] = {{40.5, 15}, {40.5, 100}, {78, 100}, {78, 15}},
+    },
+    tableXZ = {{-78, -15}, {-78, 15}, {78, 15}, {78, -15}},
+    y = 5,
+}
+
+-- Current zones.
+local _zones = {
     y = false,
     colorToZone = {},
     tableXZ = {},
@@ -225,8 +229,8 @@ end
 
 function _testPolygonContains()
     local polygon = { {0,0}, {0,2}, {2,2}, {2,0} }
-    assert(_polygonContains(polygon, {1,1}))
-    assert(not _polygonContains(polygon, {3,3}))
+    assert(_polygonContains(polygon, {x=1,z=1}))
+    assert(not _polygonContains(polygon, {x=3,z=3}))
 end
 
 function _maybeUpdateZones()
@@ -235,30 +239,105 @@ function _maybeUpdateZones()
 
         local colorToCommandSheet = {}
         local numCommandSheets = 0
+        local factionNameToFactionSheet = {}
         for _, object in ipairs(getAllObjects()) do
-            local color = string.match(object.getName(), '^Command Sheet %((%a+)%)$')
+            local name = object.getName()
+            local color = string.match(name, '^Command Sheet %((%a+)%)$')
             if color then
                 colorToCommandSheet[color] = object
                 numCommandSheets = numCommandSheets + 1
             end
+            local factionName = string.match(name, '^(.+) Sheet$')
+            if factionName then
+                factionNameToFactionSheet[factionName] = object
+            end
         end
 
-        local default = _zones.defaults[numCommandSheets] or _zones.defaults[6]
-        _zones.y = default.y
-        _zones.table = {
-            polygon = default.tableXZ,
-            boundingBox = _boundingBox(default.tableXZ)
-        }
-        _zones.zones = {}
-        for color, commandSheet in pairs(colorToCommandSheet) do
-            for _, polygon in pairs(default.zones) do
-                if _polygonContains(polygon, commandSheet.getPosition()) then
-                    _zones.colorToZone[color] = {
-                        polygon = polygon,
-                        boundingBox = _boundingBox(polygon)
-                    }
-                    break
+        local function hasFactionSheet(polygon)
+            assert(type(polygon) == 'table')
+            for _, factionSheet in pairs(factionNameToFactionSheet) do
+                if _polygonContains(polygon, factionSheet.getPosition()) then
+                    return true
                 end
+            end
+        end
+        local function getSeatColor(polygon)
+            assert(type(polygon) == 'table')
+            for color, commandSheet in pairs(colorToCommandSheet) do
+                if _polygonContains(polygon, commandSheet.getPosition()) then
+                    return color
+                end
+            end
+            error('no seat color')
+        end
+
+        _zones.colorToZone = {}
+        local function addZone(color, polygon)
+            assert(type(color) == 'string' and type(polygon) == 'table')
+            _zones.colorToZone[color] = {
+                polygon = polygon,
+                boundingBox = _boundingBox(polygon)
+            }
+        end
+
+        local polygons = false
+        if numCommandSheets == 8 then
+            _zones.y = DEFAULT_ZONES[8].y
+            _zones.table = {
+                polygon = DEFAULT_ZONES[8].tableXZ,
+                boundingBox = _boundingBox(DEFAULT_ZONES[8].tableXZ)
+            }
+            for i = 1, 8 do
+                local polygon = DEFAULT_ZONES[8].zones[i]
+                if hasFactionSheet(polygon) then
+                    addZone(getSeatColor(polygon), polygon)
+                end
+            end
+            polygons = DEFAULT_ZONES[8].zones
+        else
+            _zones.y = DEFAULT_ZONES[6].y
+            _zones.table = {
+                polygon = DEFAULT_ZONES[6].tableXZ,
+                boundingBox = _boundingBox(DEFAULT_ZONES[6].tableXZ)
+            }
+
+            -- 6p tables use different zones depending on where faction sheets
+            -- are placed.  If all 6 seats are full everything is easy.
+            local seat = {}
+            local seatColor = {}
+            for i = 1, 6 do
+                local polygon = DEFAULT_ZONES[6].zones[i]
+                local isSeat = hasFactionSheet(polygon)
+                seat[i] = isSeat and 1 or 0
+                seatColor[i] = isSeat and getSeatColor(polygon)
+            end
+
+            if seat[1] + seat[2] + seat[3] == 1 then
+                local color = seatColor[1] or seatColor[2] or seatColor[3]
+                addZone(color, DEFAULT_ZONES[6].zones[123])
+            elseif seat[1] + seat[2] + seat[3] == 2 then
+                local color12 = seatColor[1] or seatColor[2]
+                local color23 = seatColor[3] or seatColor[2]
+                addZone(color12, DEFAULT_ZONES[6].zones[12])
+                addZone(color23, DEFAULT_ZONES[6].zones[23])
+            elseif seat[1] + seat[2] + seat[3] == 3 then
+                addZone(seatColor[1], DEFAULT_ZONES[6].zones[1])
+                addZone(seatColor[2], DEFAULT_ZONES[6].zones[2])
+                addZone(seatColor[3], DEFAULT_ZONES[6].zones[3])
+            end
+
+            if seat[4] + seat[5] + seat[6] == 1 then
+                local color = seatColor[4] or seatColor[5] or seatColor[6]
+                addZone(color, DEFAULT_ZONES[6].zones[456])
+            elseif seat[4] + seat[5] + seat[6] == 2 then
+                local color45 = seatColor[4] or seatColor[5]
+                local color56 = seatColor[6] or seatColor[5]
+                addZone(color45, DEFAULT_ZONES[6].zones[45])
+                addZone(color56, DEFAULT_ZONES[6].zones[56])
+            elseif seat[4] + seat[5] + seat[6] == 3 then
+                addZone(seatColor[4], DEFAULT_ZONES[6].zones[4])
+                addZone(seatColor[5], DEFAULT_ZONES[6].zones[5])
+                addZone(seatColor[6], DEFAULT_ZONES[6].zones[6])
             end
         end
     end

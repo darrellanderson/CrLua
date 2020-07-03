@@ -320,18 +320,16 @@ function getProduceConsumeItems()
         sarween = false,
         hegemonic = false,
     }
-    for object, _ in pairs(objects) do
-        local name = object.getName()
+    local function addUnit(unit)
+        if result.produceUnitNameToUnitWithCount[unit.unitName] then
+            unit.count = unit.count + result.produceUnitNameToUnitWithCount[unit.unitName].count
+        end
+        result.produceUnitNameToUnitWithCount[unit.unitName] = unit
+    end
+    local function addItem(name)
         local resourcesAndInfluence = getResourcesAndInfluence(name)
         if resourcesAndInfluence then
             result.consumeObjectNameToCount[name] = (result.consumeObjectNameToCount[name] or 0) + 1
-        end
-        local unit = CrLua.TI4.Unit.fromObject(object)
-        if unit then
-            if result.produceUnitNameToUnitWithCount[unit.unitName] then
-                unit.count = unit.count + result.produceUnitNameToUnitWithCount[unit.unitName].count
-            end
-            result.produceUnitNameToUnitWithCount[unit.unitName] = unit
         end
         local objectEffects = OBJECT_EFFECTS[name]
         if objectEffects then
@@ -347,6 +345,20 @@ function getProduceConsumeItems()
             result.sarween = result.sarween or objectEffects.sarween
             result.hegemonic = result.hegemonic or objectEffects.hegemonic
             result.production = math.max(result.production, objectEffects.baseProduction or 0)
+        end
+    end
+
+    for object, _ in pairs(objects) do
+        local name = object.getName()
+        local unit = CrLua.TI4.Unit.fromObject(object)
+        if unit then
+            addUnit()
+        elseif object.tag == 'Deck' then
+            for _, entry in object.getObjects() do
+                addItem(entry.name)
+            end
+        else
+            addItem(name)
         end
     end
 

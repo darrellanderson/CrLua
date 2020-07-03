@@ -435,10 +435,10 @@ function autoFill(params)
             for _, unit in ipairs(unitsInHex) do
                 local p = _systemHelper.planetFromPosition({
                     systemGuid = system.guid,
-                    posistion = unit.object.getPosition(),
+                    position = unit.object.getPosition(),
                     exact = false
                 })
-                if p == planet then
+                if p and p.name == planet then
                     table.insert(onPlanet, unit)
                 elseif unit.unitName == 'Fighter' or unit.unitName == 'Flagship' then
                     -- Also include fighters and flagship in order to include
@@ -649,7 +649,6 @@ end
 -------------------------------------------------------------------------------
 
 #include <~/CrLua/CrLua>
-#include <~/CrLua/TI4/Homebrew>
 #include <~/CrLua/LockGlobals>
 
 #include <~/CrLua/TI4/Faction>

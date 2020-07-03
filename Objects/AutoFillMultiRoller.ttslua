@@ -62,6 +62,26 @@ local CARDS = {
 
 -------------------------------------------------------------------------------
 
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
+        return function(parameters) return helperObject.call(functionName, parameters) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
+local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
+
+-------------------------------------------------------------------------------
+
 function onLoad(save_state)
     CrLua.Log.d(TAG, 'onLoad')
     Wait.frames(updateUi, 2)
@@ -82,7 +102,7 @@ function onObjectDrop(playerColor, droppedObject)
     if not isCommandToken then
         return
     end
-    local system = CrLua.TI4.System.fromPosition(droppedObject.getPosition())
+    local system = _systemHelper.systemFromPosition(droppedObject.getPosition())
     if not system then
         return  -- ignore tokens not dropped on a system
     end
@@ -151,7 +171,7 @@ end
 -------------------------------------------------------------------------------
 
 function updateUi()
-    local system = data.lastActivatedPosition and CrLua.TI4.System.fromPosition(data.lastActivatedPosition)
+    local system = data.lastActivatedPosition and _systemHelper.systemFromPosition(data.lastActivatedPosition)
     local planets = system and system.planets or {}
 
     local result = {}
@@ -352,9 +372,6 @@ end
 
 --- Get cards if held by appropriate player.
 function getCards(selfColor, enemyColor)
-    local selfZone = selfColor and CrLua.TI4.Zone.fromColor(selfColor)
-    local enemyZone = enemyColor and CrLua.TI4.Zone.fromColor(enemyColor)
-
     local objectNames = CrLua.List.fromKeys(CARDS)
     local objectsByName = CrLua.TTS.Object.getByName(objectNames)
 
@@ -363,8 +380,8 @@ function getCards(selfColor, enemyColor)
         for _, cardObject in ipairs(cardObjects) do
             if not cardObject.is_face_down then
                 local owner = CARDS[cardName].owner
-                local zone = owner == 'us' and selfZone or enemyZone
-                if zone and CrLua.TI4.Zone.inside(zone, cardObject.getPosition()) then
+                local zone = owner == 'us' and selfColor or enemyColor
+                if zone and _zoneHelper.zoneFromPosition(cardObject.getPosition()) == zone then
                     table.insert(result, cardName)
                     break
                 end
@@ -385,7 +402,6 @@ function autoFill(params)
     local autofillTypeAttributes = assert(AUTOFILL_TYPE[params.autoFillType])
 
     updateColorToMultiRoller()
-    CrLua.TI4.Zone.update()
     CrLua.TI4.Faction.update()
 
     local multiRoller = data.colorToMultiRoller[params.clickerColor]
@@ -412,12 +428,17 @@ function autoFill(params)
     -- If per-planet, restrict to units in hex to those on the given planet.
     local planet = false
     if params.planetIndex then
-        local system = CrLua.TI4.System.fromPosition(data.lastActivatedPosition)
+        local system = _systemHelper.systemFromPosition(data.lastActivatedPosition)
         if system and system.planets and #system.planets >= params.planetIndex then
             planet = system.planets[params.planetIndex].name
             local onPlanet = {}
             for _, unit in ipairs(unitsInHex) do
-                if CrLua.TI4.System.planetFromPosition(system, unit.object.getPosition()) == planet then
+                local p = _systemHelper.planetFromPosition({
+                    systemGuid = system.guid,
+                    posistion = unit.object.getPosition(),
+                    exact = false
+                })
+                if p == planet then
                     table.insert(onPlanet, unit)
                 elseif unit.unitName == 'Fighter' or unit.unitName == 'Flagship' then
                     -- Also include fighters and flagship in order to include
@@ -633,10 +654,8 @@ end
 
 #include <~/CrLua/TI4/Faction>
 #include <~/CrLua/TI4/Hex>
-#include <~/CrLua/TI4/System>
 #include <~/CrLua/TI4/Unit>
 #include <~/CrLua/TI4/Wormhole>
-#include <~/CrLua/TI4/Zone>
 
 #include <~/CrLua/TTS/ClickButtonHack>
 #include <~/CrLua/TTS/Object>
@@ -656,10 +675,8 @@ end
 
 CrLua.assertRequired({
     'TI4.Hex',
-    'TI4.System',
     'TI4.Unit',
     'TI4.Wormhole',
-    'TI4.Zone',
     'TTS.Player',
     'TTS.ClickButtonHack',
     'List',

@@ -57,8 +57,14 @@ local CARDS = {
     ['PDS II'] = { owner = 'us' },
     ['Antimass Deflectors'] = { owner = 'them' },
     ['Plasma Scoring'] = { owner = 'us' },
-    ['Experimental Battlestation'] = { owner = 'us' }
+    ['Experimental Battlestation'] = { owner = 'us' },
+    ['Perdition Array II'] = { owner = 'us' },  -- Blue Space HCEN
+    ['Tachyon Lance II'] = { owner = 'us' },  -- Blue Space Veldyr
 }
+
+local function hasPDS2(cardSet)
+    return cardSet['PDS II'] or cardSet['Perdition Array II'] or cardSet['Tachyon Lance II']
+end
 
 -------------------------------------------------------------------------------
 
@@ -487,8 +493,24 @@ function autoFill(params)
     if autofillTypeAttributes == AUTOFILL_TYPE.SPACE_CANNON_OFFENSE then
         fillUnits = CrLua.TI4.Unit.filterToSpaceCannon(selfUnitsInHex)
         local adjacentSpaceCannons = CrLua.TI4.Unit.filterToSpaceCannon(selfUnitsAdacent)
+
+        if cardSet['Tachyon Lance II'] then
+            -- Only include Dreadnoughts when in the same hex as a PDS.
+            local pdsHexSet = {}
+            for _, unit in ipairs(adjacentSpaceCannons) do
+                if unit.unitName == 'PDS' then
+                    pdsHexSet[unit.hex] = true
+                end
+            end
+            for i = #adjacentSpaceCannons, 1, -1 do
+                if not pdsHexSet[adjacentSpaceCannons[i].hex] then
+                    table.remove(adjacentSpaceCannons, i)
+                end
+            end
+        end
+
         for _, unit in ipairs(adjacentSpaceCannons) do
-            if unit.unitName == 'Flagship' or cardSet['PDS II'] then
+            if unit.unitName == 'Flagship' or hasPDS2(cardSet) then
                 table.insert(fillUnits, unit)
             end
         end

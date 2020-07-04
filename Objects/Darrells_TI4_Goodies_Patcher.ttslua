@@ -69,8 +69,8 @@ local PATCH_RULES = {
     },
 
     ['TI4 Build Area'] = {
-        addToContainer = {
-            { '^Variant Pieces ' },
+        replaceInContainer = {
+            { '^Variant Pieces ', 'TI4 Build Area' },
         },
     },
 

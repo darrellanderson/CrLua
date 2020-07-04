@@ -120,6 +120,10 @@ function shouldZombie(object)
         debugMessage('shouldZombie: ignored object tag')
         return false
     end
+    if object.tag == 'Fog' then
+        debugMessage('shouldZombie: ignored object tag')
+        return false
+    end
 
     if object.tag == 'Deck' and object.remainder then
         return false

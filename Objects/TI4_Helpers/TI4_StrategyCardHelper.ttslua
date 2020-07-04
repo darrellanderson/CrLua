@@ -270,7 +270,7 @@ function _returnCommandTokens(playerColor, commandTokens, commandTokensBag)
     broadcastToColor('Returned Command Tokens.', playerColor, {1,1,1})
 end
 
-function _getAllocateCommandTokensCount(playerColor, faction, lowerNameToInZoneCards)
+function _getAllocateCommandTokensCount(playerColor, faction, lowerNameToInZoneCards, versatile)
     assert(type(playerColor) == 'string' and type(lowerNameToInZoneCards) == 'table')
     local result = 2
     if faction and faction.extraCommandTokens then
@@ -279,6 +279,10 @@ function _getAllocateCommandTokensCount(playerColor, faction, lowerNameToInZoneC
     end
     if lowerNameToInZoneCards['hyper metabolism'] then
         broadcastToColor('Hyper Metabolism active.', playerColor, {0.1,0.5,0.1})
+        result = result + 1
+    end
+    if versatile then
+        broadcastToColor('Versatile active.', playerColor, {0.1,0.5,0.1})
         result = result + 1
     end
     return result
@@ -302,7 +306,7 @@ function _allocateCommandTokens(playerColor, commandSheet, commandTokensBag, num
     broadcastToColor('Gained Command Tokens.', playerColor, {1,1,1})
 end
 
-function _getDealActionCardsCount(playerColor, faction, lowerNameToInZoneCards)
+function _getDealActionCardsCount(playerColor, faction, lowerNameToInZoneCards, scheming)
     assert(type(playerColor) == 'string' and type(lowerNameToInZoneCards) == 'table')
     local result = 1
     if faction and faction.extraActionCards then
@@ -311,6 +315,10 @@ function _getDealActionCardsCount(playerColor, faction, lowerNameToInZoneCards)
     end
     if lowerNameToInZoneCards['neural motivator'] then
         broadcastToColor('Neural Motivator active.', playerColor, {0.1,0.5,0.1})
+        result = result + 1
+    end
+    if scheming then
+        broadcastToColor('Scheming active.', playerColor, {0.1,0.5,0.1})
         result = result + 1
     end
     return result
@@ -359,6 +367,9 @@ function _doEndOfStatusPhaseCoroutine()
     local units = {}
     local lowerNameToCards = {}
 
+    local scheming = false  -- Franken
+    local versatile = false  -- Franken
+
     -- Gather other relevant objects in a single pass.
     local inHandGuidSet = _zoneHelper.inHand()
     for _, object in ipairs(getAllObjects()) do
@@ -372,6 +383,10 @@ function _doEndOfStatusPhaseCoroutine()
                 commandSheet = object
             elseif name == voteCounterName then
                 voteCounter = object
+            elseif name == 'Scheming' then
+                scheming = true
+            elseif name == 'Versatile' then
+                versatile = true
             elseif string.match(name, unitNamePattern) or name == flagshipName then
                 table.insert(units, object)
             elseif object.tag == 'Card' then
@@ -412,13 +427,18 @@ function _doEndOfStatusPhaseCoroutine()
 
     _readyCards(playerColor, lowerNameToInZoneCards)
     _repairUnits(playerColor, units)
-    _countInfluence(voteCounter, lowerNameToCards, lowerNameToInZoneCards)
+
+    if voteCounter then
+        _countInfluence(voteCounter, lowerNameToCards, lowerNameToInZoneCards)
+    else
+        broadcastToColor('No vote counter detected.', playerColor, {0.8,0.2,0.2})
+    end
 
     if not faction then
         broadcastToColor('No faction sheet detected.', playerColor, {0.8,0.2,0.2})
     end
 
-    local numCommandTokens = _getAllocateCommandTokensCount(playerColor, faction, lowerNameToInZoneCards)
+    local numCommandTokens = _getAllocateCommandTokensCount(playerColor, faction, lowerNameToInZoneCards, versatile)
     if commandTokensBag then
         _returnCommandTokens(playerColor, commandTokens, commandTokensBag)
         coroutine.yield(0)
@@ -429,7 +449,7 @@ function _doEndOfStatusPhaseCoroutine()
     end
 
     local actionDeck = _getActionDeck() or _getActionDeckFromDiscard()
-    local numActionCards = _getDealActionCardsCount(playerColor, faction, lowerNameToInZoneCards)
+    local numActionCards = _getDealActionCardsCount(playerColor, faction, lowerNameToInZoneCards, scheming)
     while numActionCards > 0 do
         if actionDeck then
             local dealCount = _dealActionCards(playerColor, actionDeck, numActionCards)

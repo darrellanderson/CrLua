@@ -1,0 +1,17 @@
+Franken:
+- Right click Franken bag for setup / remove zone menu items.
+- "Normal" strategy cards now support Franken (Scheming, Versatile).
+- Rename Franken multiroller and add exteral button click handler so auto-fill can use it (plasma scoring may not be set properly, unit counting should work).
+
+Deleted Items:
+- Ignore deleted hidden zones.
+
+Build Area:
+- Allow decks as well as card (looks inside decks, Alister suggestion).
+
+Autofill MultiRoller:
+- Fix PDS2 handling for some Blue Space factions.
+
+Strategy Cards:
+- Report error instead of failing if not able to find the vote counter.
+- Only return tokens in the table area (one Blue Space faction places them on foreign faction sheets).  Also fixes potentially not reclaiming tokens on Ghosts home system depending on where it is on the table.

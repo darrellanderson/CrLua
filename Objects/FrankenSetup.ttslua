@@ -1,0 +1,280 @@
+--- Prepare table for Franken!
+-- @author Darrell
+
+-- Per-zone:
+-- Frankenstein Checklist
+-- 2 bags
+
+-- TI4 Frankenstein MultiRoller
+
+local UNPACK_TRANSFORMS = {
+    ['Faction Sheets/Tokens'] = {
+        position = {70, 2, 18},
+    },
+    ['Base Unit Tiles'] = {
+        position = {70, 2, 15},
+    },
+    ['Non Draft Parts'] = {
+        position = {70, 2, 12},
+    },
+    ['Promissory Notes'] = {
+        position = {73, 2, 18},
+    },
+    ['Home Systems'] = {
+        position = {73, 2, 15},
+    },
+    ['Flagships'] = {
+        position = {73, 2, 12},
+    },
+    ['Starting Techs'] = {
+        position = {73, 2, 9},
+    },
+    ['Commodity Tiles'] = {
+        position = {73, 2, 6},
+    },
+    ['Faction Abilities'] = {
+        position = {73, 2, 3},
+    },
+    ['Starting Units'] = {
+        position = {73, 2, 0},
+    },
+    ['Faction Techs'] = {
+        position = {73, 2, -3},
+    },
+
+    ['A. Draft'] = {
+        position = {79, 2, -17},
+        rotation = {0, 90, 0},
+    },
+    ['B. Build Galaxy'] = {
+        position = {76, 3, -17},
+        rotation = {0, 90, 0},
+    },
+    ['C. Reveal'] = {
+        position = {73, 4, -17},
+        rotation = {0, 90, 0},
+    },
+    ['D. Build Factions'] = {
+        position = {70, 5, -17},
+        rotation = {0, 90, 0},
+    },
+
+    ['Home Planet Cards'] = {
+        position = {61.23, 1.85, 2.05},
+        rotation = {0, 90, 0},
+    },
+    ['6p FrankenBag Builder'] = {
+        position = {63.91, 1.71, -6.42},
+        rotation = {0, 90, 0},
+    },
+}
+
+local CLONE_TO_HIDDEN = {
+    'Frankenstein Checklist',
+}
+
+local HIDDEN_ZONE_SCALE = {20, 6, 10}
+
+local HIDDEN_ZONE_TRANSFORMS = {
+    White = {
+        position = {-38, 3, 18},
+        rotation = {0, 0, 0},
+    },
+    Blue = {
+        position = {-12, 3, 18},
+        rotation = {0, 0, 0},
+    },
+    Purple = {
+        position = {37, 3, 18},
+        rotation = {0, 0, 0},
+    },
+    Yellow = {
+        position = {38, 3, -18},
+        rotation = {0, 180, 0},
+    },
+    Red = {
+        position = {12, 3, -18},
+        rotation = {0, 180, 0},
+    },
+    Green = {
+        position = {-37, 3, -18},
+        rotation = {0, 180, 0},
+    },
+}
+
+local HIDDEN_ZONE_NAME = 'FrankenZone'
+
+local function getEntryGuid(container, name)
+    for _, entry in ipairs(container.getObjects()) do
+        if entry.name == name then
+            return entry.guid
+        end
+    end
+    error('no entry "' .. name .. '"')
+end
+
+local function takeToAbove(container, name)
+    local guid = getEntryGuid(container, name)
+    local pos = container.getPosition()
+    local object = self.takeObject({
+        position = { pos.x, pos.y + 5, pos.z },
+        guid = guid
+    })
+    assert(object)
+    return object
+end
+
+local function packFactions()
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Bag' and object.getName() == 'Factions' and object.getVar('packBoxes') then
+            object.call('packBoxes')
+            break
+        end
+    end
+end
+
+local function createHiddenZones()
+    for color, transform in pairs(HIDDEN_ZONE_TRANSFORMS) do
+        local hiddenZone = spawnObject({
+            type              = 'FogOfWarTrigger',
+            position          = transform.position,
+            rotation          = transform.rotation,
+            scale             = HIDDEN_ZONE_SCALE,
+            callback_fucntion = nil,
+            sound             = false,
+            params            = {},
+            snap_to_grid      = false,
+        })
+        hiddenZone.setValue(color)
+        hiddenZone.setName(HIDDEN_ZONE_NAME)
+        coroutine.yield(0)
+    end
+end
+
+local function cloneToHidden(name)
+    local object = takeToAbove(self, name)
+    coroutine.yield(0)
+    local json = object.getJSON()
+    destroyObject(object)
+
+    for _, transform in pairs(HIDDEN_ZONE_TRANSFORMS) do
+        local clone = spawnObjectJSON({
+            json = json,
+            position = transform.position,
+            rotation = transform.rotation,
+            sound             = false,
+            snap_to_grid      = false,
+        })
+        clone.use_grid = false
+        clone.use_snap_points = false
+        clone.sticky = false
+        coroutine.yield(0)
+    end
+end
+
+local function createHiddenBags()
+    for _, transform in pairs(HIDDEN_ZONE_TRANSFORMS) do
+        local p = transform.position
+        for i = 1, 2 do
+            local bag = spawnObject({
+                type = 'Bag',
+                position = { p[1] + 2 + (i * 3), p[2], p[3] },
+                sound = false,
+                snap_to_grid = false,
+            })
+            bag.use_grid = false
+            bag.use_snap_points = false
+            bag.sticky = false
+            coroutine.yield(0)
+        end
+        coroutine.yield(0)
+    end
+end
+
+local function unpack()
+    for name, transform in pairs(UNPACK_TRANSFORMS) do
+        local guid = getEntryGuid(self, name)
+        self.takeObject({
+            position = transform.position,
+            rotation = transform.rotation,
+            guid = guid,
+        })
+        coroutine.yield(0)
+    end
+end
+
+local function replaceMultiRollers(name)
+    local toReplace = {}
+    for _, object in ipairs(getAllObjects()) do
+        if string.match(object.getName(), '^TI4 MultiRoller') then
+            table.insert(toReplace, object)
+        end
+    end
+
+    local object = takeToAbove(self, name)
+    coroutine.yield(0)
+    local json = object.getJSON()
+    destroyObject(object)
+    coroutine.yield(0)
+
+    for _, object in ipairs(toReplace) do
+        local params = {
+            json = json,
+            position = object.getPosition(),
+            rotation = object.getRotation(),
+            scale = object.getScale(),
+            sound = false,
+            snap_to_grid = false,
+        }
+        destroyObject(object)
+        coroutine.yield(0)
+
+        local clone = spawnObjectJSON(params)
+        clone.use_grid = false
+        clone.use_snap_points = false
+        clone.sticky = false
+        coroutine.yield(0)
+        clone.setLock(true)
+    end
+end
+
+function setupCoroutine()
+    packFactions()
+    coroutine.yield(0)
+
+    createHiddenZones()
+    coroutine.yield(0)
+
+    createHiddenBags()
+    coroutine.yield(0)
+
+    unpack()
+    coroutine.yield(0)
+
+    local pos = self.getPosition()
+    for _, name in ipairs(CLONE_TO_HIDDEN) do
+        cloneToHidden(name)
+        coroutine.yield(0)
+    end
+
+    replaceMultiRollers('TI4 MultiRoller (Frankenstein)')
+    coroutine.yield(0)
+
+    return 1
+end
+
+function removeHiddenZones()
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Fog' and object.getName() == HIDDEN_ZONE_NAME then
+            destroyObject(object)
+        end
+    end
+end
+
+function onLoad(saveState)
+    local function go()
+        startLuaCoroutine(self, 'setupCoroutine')
+    end
+    self.addContextMenuItem('Setup Franken', go)
+    self.addContextMenuItem('Remove hidden zones', removeHiddenZones)
+end

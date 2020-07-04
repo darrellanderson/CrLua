@@ -352,9 +352,9 @@ function getProduceConsumeItems()
         local name = object.getName()
         local unit = CrLua.TI4.Unit.fromObject(object)
         if unit then
-            addUnit()
+            addUnit(unit)
         elseif object.tag == 'Deck' then
-            for _, entry in object.getObjects() do
+            for _, entry in ipairs(object.getObjects()) do
                 addItem(entry.name)
             end
         else

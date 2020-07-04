@@ -260,16 +260,9 @@ end
 function _returnCommandTokens(playerColor, commandTokens, commandTokensBag)
     assert(type(playerColor) == 'string' and type(commandTokens) == 'table' and type(commandTokensBag) == 'userdata')
 
-    -- Get player zone for each token.
-    local guidToPosition = {}
+    -- Only return command tokens in the table area.
     for _, commandToken in ipairs(commandTokens) do
-        guidToPosition[commandToken.getGUID()] = commandToken.getPosition()
-    end
-    local guidToZone = _zoneHelper.zonesFromPositions(guidToPosition)
-
-    -- Only return command tokens outside the player zone.
-    for _, commandToken in ipairs(commandTokens) do
-        if guidToZone[commandToken.getGUID()] ~= playerColor then
+        if _zoneHelper.inTableZone(commandToken.getPosition()) then
             commandTokensBag.putObject(commandToken)
         end
     end

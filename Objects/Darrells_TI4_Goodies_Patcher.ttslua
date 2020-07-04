@@ -63,9 +63,7 @@ local PATCH_RULES = {
     },
 
     ['Auto-fill TI4 MultiRoller'] = {
-        addToContainer = {
-            { '^Variant Pieces ' },
-        },
+        replaceOnTable = { 'Auto-fill TI4 MultiRoller' }
     },
 
     ['TI4 Build Area'] = {

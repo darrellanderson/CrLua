@@ -544,20 +544,37 @@ local function _doEndOfStatusPhaseCoroutineBody(playerColor)
         _safeBroadcastToColor('No token bag detected.', playerColor, {0.8,0.2,0.2})
     end
 
-    local actionDeck = _getActionDeck() or _getActionDeckFromDiscard()
+    local function waitOneSecond()
+        local waitUntil = Time.time + 1
+        while Time.time < waitUntil do
+            coroutine.yield(0)
+        end
+    end
+
     local numActionCards = _getDealActionCardsCount(playerColor, faction, lowerNameToInZoneCards, scheming)
     while numActionCards > 0 do
+        local actionDeck = _getActionDeck()
+        if not actionDeck then
+            actionDeck = _getActionDeckFromDiscard()
+            if actionDeck then
+                waitOneSecond()
+            end
+        end
+        local quantity = actionDeck and actionDeck.getQuantity()
         if actionDeck then
             local dealCount = _dealActionCards(playerColor, actionDeck, numActionCards)
             numActionCards = numActionCards - dealCount
-            if numActionCards > 0 then
+            if dealCount == quantity then
                 actionDeck = _getActionDeckFromDiscard()
-                coroutine.yield(0)
+                if actionDeck then
+                    waitOneSecond()
+                end
             end
         else
             _safeBroadcastToColor('No action deck.', playerColor, {0.8,0.2,0.2})
             break
         end
+        coroutine.yield(0)
     end
 
     -- Return the number of action cards still needed by player.

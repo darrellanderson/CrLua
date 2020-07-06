@@ -2,21 +2,6 @@
 -- @author ? original (not given in the file, not sure)
 -- @author Darrell update May 2020, work with 6p/8p tables, optionally ignore unseated players
 
-STRATEGY_CARD_INITIATIVE = {
-    ['Zero Strategy Token'] = 0,
-    ['Leadership'] = 1,
-    ['Diplomacy'] = 2,
-    ['Diplomacy (Revised)'] = 2,
-    ['Politics'] = 3,
-    ['Construction'] = 4,
-    ['Industry'] = 4.5,
-    ['Trade'] = 5,
-    ['Warfare'] = 6,
-    ['Logistics'] = 6.5,
-    ['Technology'] = 7,
-    ['Imperial'] = 8
-}
-
 function getHelperClient(helperObjectName)
     local function getHelperObject()
         for _, object in ipairs(getAllObjects()) do
@@ -33,7 +18,7 @@ function getHelperClient(helperObjectName)
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
 
-local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
+local _strategyCardHelper = getHelperClient('TI4_STRATEGY_CARD_HELPER')
 
 function onLoad(save_state)
     self.createButton({
@@ -44,6 +29,17 @@ function onLoad(save_state)
         width          = 1200,
         height         = 800,
         font_size      = 200,
+    })
+    self.createButton({
+        click_function = 'endStatusPhaseAll',
+        function_owner = self,
+        label          = 'End Status\nPhase',
+        position       = {x=0, y=-0.01, z=0},
+        rotation       = {x=0, y=0, z=180},
+        width          = 1200,
+        height         = 800,
+        font_size      = 200,
+        tooltip        = 'Return Strategy Cards and end status phase in initiative order.  Draws Action Cards, returns and gain tokens, readies cards, repairs units.'
     })
 end
 
@@ -75,26 +71,21 @@ function placeTradeGood(tradeGoodBag, strategyCard)
 end
 
 function placeTradeGoodsAndSetTurns(obj, playerClickerColor, altClick)
-    -- Get per color lowest initiative, unpicked strategy cards, and trade good bags.
-    local colorToInitiative = {}
+    local initiativeOrder = _strategyCardHelper.getInitiativeOrder()
     local unpickedStrategyCards = {}
-    local tradeGoodBags = {}
-    for _, object in ipairs(getAllObjects()) do
-        local initiative = STRATEGY_CARD_INITIATIVE[object.getName()]
-        if initiative then
-            local zoneColor = _zoneHelper.zoneFromPosition(object.getPosition())
-            if zoneColor then
-                local vsValue = colorToInitiative[zoneColor] or initiative
-                colorToInitiative[zoneColor] = math.min(initiative, vsValue)
-            elseif initiative > 0 then
-                table.insert(unpickedStrategyCards, object)
-            end
-        elseif object.tag == 'Infinite' and string.find(object.getName(), 'Tradegoods x1 Bag') then
-            table.insert(tradeGoodBags, object)
+    for guid, color in pairs(initiativeOrder.strategyCardGuidToPlayerColor) do
+        if not color then
+            table.insert(unpickedStrategyCards, getObjectFromGUID(guid))
         end
     end
 
     -- Place trade goods.
+    local tradeGoodBags = {}
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Infinite' and string.find(object.getName(), 'Tradegoods x1 Bag') then
+            table.insert(tradeGoodBags, object)
+        end
+    end
     for _, unpickedStrategyCard in ipairs(unpickedStrategyCards) do
         local bag = closestBag(tradeGoodBags, unpickedStrategyCard)
         placeTradeGood(bag, unpickedStrategyCard)
@@ -102,13 +93,13 @@ function placeTradeGoodsAndSetTurns(obj, playerClickerColor, altClick)
 
     -- Generate turn order, ONLY INCLUDE PLAYERS WITH INITIATIVE VALUES!
     -- (Skip non-grey "spectators", non-players that can interact with table.)
-    local turnOrder = {}
-    for color, _ in pairs(colorToInitiative) do
-        table.insert(turnOrder, color)
-    end
-    table.sort(turnOrder, function(a, b) return colorToInitiative[a] < colorToInitiative[b] end)
+    local turnOrder = initiativeOrder.order
 
     -- If alt (right) click, add clicking color player as new last turn (moderator?).
+    local colorToInitiative = {}
+    for i, color in ipairs(turnOrder) do
+        color = i
+    end
     if altClick and not colorToInitiative[playerClickerColor] then
         table.insert(turnOrder, playerClickerColor)
     end
@@ -119,4 +110,9 @@ function placeTradeGoodsAndSetTurns(obj, playerClickerColor, altClick)
     Turns.type = 2
     Turns.order = turnOrder
     Turns.turn_color = turnOrder[1]
+end
+
+function endStatusPhaseAll()
+    self.flip()
+    _strategyCardHelper.endStatusPhaseInInitiativeOrder()
 end

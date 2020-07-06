@@ -57,6 +57,22 @@ local AGENDA_DECK = {
         position = { x = -66.97, y = 2, z = 15.42 },
     }
 }
+STRATEGY_CARD_INITIATIVE = {
+    ['Zero Strategy Token'] = 0,
+    ['Leadership'] = 1,
+    ['Diplomacy'] = 2,
+    ['Diplomacy (Revised)'] = 2,
+    ['Politics'] = 3,
+    ['Construction'] = 4,
+    ['Industry'] = 4.5,
+    ['Trade'] = 5,
+    ['Warfare'] = 6,
+    ['Logistics'] = 6.5,
+    ['Technology'] = 7,
+    ['Imperial'] = 8
+}
+
+local _guidToParameters = {}
 
 function register(parameters)
     assert(type(parameters) == 'table')
@@ -64,6 +80,8 @@ function register(parameters)
     assert(type(parameters.position) == 'table' and type(parameters.position.x) == 'number')
     assert(type(parameters.rotation) == 'table' and type(parameters.rotation.x) == 'number')
     assert(type(parameters.onPlayCallback) == 'string')
+
+    _guidToParameters[parameters.guid] = parameters
 
     local strategyCard = assert(getObjectFromGUID(parameters.guid))
     strategyCard.clearButtons()
@@ -177,22 +195,109 @@ function _onClickConfirmEndOfStatusPhase(strategyCard, parameters, playerColor)
     assert(type(strategyCard) == 'userdata' and type(parameters) == 'table' and type('playerColor') == 'string')
     _hideConfirmButtom(strategyCard)
     _returnStrategyCard(playerColor, strategyCard, parameters)
-    _doEndOfStatusPhase(playerColor)
+    _doEndOfStatusPhase({ playerColor })
+end
+
+-------------------------------------------------------------------------------
+
+function getInitiativeOrder()
+    local guidToInitiative = {}
+    local guidToPosition = {}
+    for _, object in ipairs(getAllObjects()) do
+        local initiative = STRATEGY_CARD_INITIATIVE[object.getName()]
+        if initiative then
+            local guid = object.getGUID()
+            guidToInitiative[guid] = initiative
+            guidToPosition[guid] = object.getPosition()
+        end
+    end
+
+    local guidToZoneColor = _zoneHelper.zonesFromPositions(guidToPosition)
+
+    local colorToInitiative = {}
+    local strategyCardGuidToPlayerColor = {}
+    for guid, initiative in pairs(guidToInitiative) do
+        local color = guidToZoneColor[guid]
+        if color then
+            local vsValue = colorToInitiative[color] or initiative
+            colorToInitiative[color] = math.min(initiative, vsValue)
+        end
+        if initiative > 0 then
+            strategyCardGuidToPlayerColor[guid] = color or false  -- false so included in map
+        end
+    end
+
+    -- Generate turn order, ONLY INCLUDE PLAYERS WITH INITIATIVE VALUES!
+    -- (Skip non-grey "spectators", non-players that can interact with table.)
+    local turnOrder = {}
+    for color, _ in pairs(colorToInitiative) do
+        table.insert(turnOrder, color)
+    end
+    table.sort(turnOrder, function(a, b) return colorToInitiative[a] < colorToInitiative[b] end)
+
+    return {
+        order = turnOrder,
+        strategyCardGuidToPlayerColor = strategyCardGuidToPlayerColor
+    }
+end
+
+-- Expose in case external wants to control end of phase.
+function endStatusPhaseInInitiativeOrder()
+    local initiativeOrder = getInitiativeOrder()
+
+    for guid, color in pairs(initiativeOrder.strategyCardGuidToPlayerColor) do
+        if color then
+            local strategyCard = getObjectFromGUID(guid)
+            local parameters = _guidToParameters[guid]
+            if strategyCard and parameters then
+                _returnStrategyCard(color, strategyCard, parameters)
+            else
+                broadcastToAll('Missing strategy card or parameters for ' .. returnParameters.guid, {0.8,0.2,0.2})
+            end
+        end
+    end
+
+    _doEndOfStatusPhase(initiativeOrder.order)
 end
 
 -------------------------------------------------------------------------------
 
 function _returnStrategyCard(playerColor, strategyCard, parameters)
     assert(type(strategyCard) == 'userdata' and type(parameters) == 'table')
+
+    -- Look for political stability.  Would be nice to combine this with the
+    -- other single-pass scan but keeping it separate makes it simpler.
+    local function hasPoliticalStability()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == 'Political Stability' and not object.is_face_down then
+                return playerColor == _zoneHelper.zoneFromPosition(object.getPosition())
+            end
+        end
+    end
+    if hasPoliticalStability() then
+        broadcastToAll(playerColor .. ' has Political Stability, not returning strategy card(s)', {0.1,0.5,0.1})
+        return
+    end
+
     local collide = false
     local fast = true
     local abovePos = { x = parameters.position.x, y = parameters.position.y + 1, z = parameters.position.z}
     strategyCard.setPositionSmooth(abovePos, collide, fast)
     strategyCard.setRotationSmooth(parameters.rotation, collide, fast)
-    broadcastToColor('Returned Strategy Card.', playerColor, {1,1,1})
+    _safeBroadcastToColor('Returned Strategy Card.', playerColor, {1,1,1})
 end
 
 -------------------------------------------------------------------------------
+
+function _safeBroadcastToColor(message, playerColor, messageColor)
+    for _, player in ipairs(Player.getPlayers()) do
+        if player.color == playerColor then
+            broadcastToColor(message, playerColor, messageColor)
+            return
+        end
+    end
+    broadcastToAll(message, messageColor)
+end
 
 function _readyCards(playerColor, lowerNameToInZoneCards)
     assert(type(playerColor) == 'string' and type(lowerNameToInZoneCards) == 'table')
@@ -203,7 +308,7 @@ function _readyCards(playerColor, lowerNameToInZoneCards)
             end
         end
     end
-    broadcastToColor('Readied Cards.', playerColor, {1,1,1})
+    _safeBroadcastToColor('Readied Cards.', playerColor, {1,1,1})
 end
 
 function _repairUnits(playerColor, units)
@@ -214,7 +319,7 @@ function _repairUnits(playerColor, units)
             unit.flip()
         end
     end
-    broadcastToColor('Repaired Units.', playerColor, {1,1,1})
+    _safeBroadcastToColor('Repaired Units.', playerColor, {1,1,1})
 end
 
 function _countInfluence(voteCounter, lowerNameToCards, lowerNameToInZoneCards)
@@ -247,7 +352,7 @@ function _countInfluence(voteCounter, lowerNameToCards, lowerNameToInZoneCards)
     if cards then
         for _, card in ipairs(cards) do
             if not card.is_face_down and not _isAgendaDiscard(card) then
-                broadcastToColor('Representative Government active.', playerColor, {0.1,0.5,0.1})
+                _safeBroadcastToColor('Representative Government active.', playerColor, {0.1,0.5,0.1})
                 influence = 1
                 break
             end
@@ -267,22 +372,22 @@ function _returnCommandTokens(playerColor, commandTokens, commandTokensBag)
         end
     end
 
-    broadcastToColor('Returned Command Tokens.', playerColor, {1,1,1})
+    _safeBroadcastToColor('Returned Command Tokens.', playerColor, {1,1,1})
 end
 
 function _getAllocateCommandTokensCount(playerColor, faction, lowerNameToInZoneCards, versatile)
     assert(type(playerColor) == 'string' and type(lowerNameToInZoneCards) == 'table')
     local result = 2
     if faction and faction.extraCommandTokens then
-        broadcastToColor('Faction extra command token active.', playerColor, {0.1,0.5,0.1})
+        _safeBroadcastToColor('Faction extra command token active.', playerColor, {0.1,0.5,0.1})
         result = result + faction.extraCommandTokens
     end
     if lowerNameToInZoneCards['hyper metabolism'] then
-        broadcastToColor('Hyper Metabolism active.', playerColor, {0.1,0.5,0.1})
+        _safeBroadcastToColor('Hyper Metabolism active.', playerColor, {0.1,0.5,0.1})
         result = result + 1
     end
     if versatile then
-        broadcastToColor('Versatile active.', playerColor, {0.1,0.5,0.1})
+        _safeBroadcastToColor('Versatile active.', playerColor, {0.1,0.5,0.1})
         result = result + 1
     end
     return result
@@ -296,29 +401,29 @@ function _allocateCommandTokens(playerColor, commandSheet, commandTokensBag, num
     local dx = ALLOCATE_COMMAND_TOKENS.localDX
     for i = 1, numCommandTokens do
         if commandTokensBag.getQuantity() == 0 then
-            broadcastToColor('You are out of Command Tokens.', playerColor, {0.8,0.2,0.2})
+            _safeBroadcastToColor('You are out of Command Tokens.', playerColor, {0.8,0.2,0.2})
             break
         end
         commandTokensBag.takeObject({
             position = commandSheet.positionToWorld({ x = pos.x + (i * dx), y = pos.y + 1 + (i * 0.25), z = pos.z })
         })
     end
-    broadcastToColor('Gained Command Tokens.', playerColor, {1,1,1})
+    _safeBroadcastToColor('Gained Command Tokens.', playerColor, {1,1,1})
 end
 
 function _getDealActionCardsCount(playerColor, faction, lowerNameToInZoneCards, scheming)
     assert(type(playerColor) == 'string' and type(lowerNameToInZoneCards) == 'table')
     local result = 1
     if faction and faction.extraActionCards then
-        broadcastToColor('Faction extra action cards active.', playerColor, {0.1,0.5,0.1})
+        _safeBroadcastToColor('Faction extra action cards active.', playerColor, {0.1,0.5,0.1})
         result = result + faction.extraActionCards
     end
     if lowerNameToInZoneCards['neural motivator'] then
-        broadcastToColor('Neural Motivator active.', playerColor, {0.1,0.5,0.1})
+        _safeBroadcastToColor('Neural Motivator active.', playerColor, {0.1,0.5,0.1})
         result = result + 1
     end
     if scheming then
-        broadcastToColor('Scheming active.', playerColor, {0.1,0.5,0.1})
+        _safeBroadcastToColor('Scheming active.', playerColor, {0.1,0.5,0.1})
         result = result + 1
     end
     return result
@@ -326,7 +431,7 @@ end
 
 function _dealActionCards(playerColor, actionDeck, numActionCards)
     assert(type(playerColor) == 'string' and type(actionDeck) == 'userdata' and type(numActionCards) == 'number')
-    broadcastToColor('Dealt Action cards.', playerColor, {1,1,1})
+    _safeBroadcastToColor('Dealt Action cards.', playerColor, {1,1,1})
     local dealCount
     if actionDeck.tag == 'Card' then
         dealCount = 1
@@ -339,22 +444,13 @@ end
 
 -------------------------------------------------------------------------------
 
-local _endOfStatusPhasePlayerColor = false
-
-function _doEndOfStatusPhase(playerColor)
-    assert(type(playerColor) == 'string')
-    _endOfStatusPhasePlayerColor = playerColor
-    startLuaCoroutine(self, '_doEndOfStatusPhaseCoroutine')
-end
-
-function _doEndOfStatusPhaseCoroutine()
-    local playerColor = _endOfStatusPhasePlayerColor
-    _endOfStatusPhasePlayerColor = false
+local function _doEndOfStatusPhaseCoroutineBody(playerColor)
     assert(type(playerColor) == 'string')
 
     local faction = _factionHelper.fromColor(playerColor)
-    local commandTokenName = faction and faction.tokenName .. ' Command Token'
-    local commandTokenBagName = faction and faction.tokenName .. ' Command Tokens Bag'
+    local tokenName = faction and faction.tokenName
+    local commandTokenName = tokenName and (tokenName .. ' Command Token')
+    local commandTokenBagName = tokenName and (tokenName .. ' Command Tokens Bag')
     local unitNamePattern = '^' .. playerColor .. ' '
     local flagshipName = faction and faction.flagship
     local commandSheetName = 'Command Sheet (' .. playerColor .. ')'
@@ -431,11 +527,11 @@ function _doEndOfStatusPhaseCoroutine()
     if voteCounter then
         _countInfluence(voteCounter, lowerNameToCards, lowerNameToInZoneCards)
     else
-        broadcastToColor('No vote counter detected.', playerColor, {0.8,0.2,0.2})
+        _safeBroadcastToColor('No vote counter detected.', playerColor, {0.8,0.2,0.2})
     end
 
     if not faction then
-        broadcastToColor('No faction sheet detected.', playerColor, {0.8,0.2,0.2})
+        _safeBroadcastToColor('No faction sheet detected.', playerColor, {0.8,0.2,0.2})
     end
 
     local numCommandTokens = _getAllocateCommandTokensCount(playerColor, faction, lowerNameToInZoneCards, versatile)
@@ -445,7 +541,7 @@ function _doEndOfStatusPhaseCoroutine()
         coroutine.yield(0)
         _allocateCommandTokens(playerColor, commandSheet, commandTokensBag, numCommandTokens)
     else
-        broadcastToColor('No token bag detected.', playerColor, {0.8,0.2,0.2})
+        _safeBroadcastToColor('No token bag detected.', playerColor, {0.8,0.2,0.2})
     end
 
     local actionDeck = _getActionDeck() or _getActionDeckFromDiscard()
@@ -459,9 +555,49 @@ function _doEndOfStatusPhaseCoroutine()
                 coroutine.yield(0)
             end
         else
-            broadcastToColor('No action deck.', playerColor, {0.8,0.2,0.2})
+            _safeBroadcastToColor('No action deck.', playerColor, {0.8,0.2,0.2})
             break
         end
+    end
+
+    -- Return the number of action cards still needed by player.
+    return numActionCards
+end
+
+-------------------------------------------------------------------------------
+
+local _endOfStatusPhasePlayerColors = false
+
+function _doEndOfStatusPhase(playerColors)
+    _endOfStatusPhasePlayerColors = playerColors
+    startLuaCoroutine(self, '_doEndOfStatusPhaseCoroutine')
+end
+
+function _doEndOfStatusPhaseCoroutine()
+    local playerColors = _endOfStatusPhasePlayerColors
+    _endOfStatusPhasePlayerColors = false
+    assert(type(playerColors) == 'table')
+
+    -- Do all end of status phase actions.
+    local needActionCards = false
+    for _, playerColor in ipairs(playerColors) do
+        assert(type(playerColor) == 'string')
+        local count = _doEndOfStatusPhaseCoroutineBody(playerColor)
+        if count > 0 then
+            needActionCards = needActionCards or {}
+            table.insert(needActionCards, { color = playerColor, count = count })
+        end
+        coroutine.yield(0)
+    end
+
+    -- Report a single summary of missing action cards.
+    if needActionCards then
+        local message = {}
+        for _, entry in ipairs(needActionCards) do
+            table.insert(message, entry.color .. ':' .. entry.count)
+        end
+        message = 'PLAYERS NEED ACTION CARDS: ' .. table.concat(message, ', ')
+        broadcastToAll(message, 'Red')
     end
 
     return 1 -- REQUIRED to exit coroutine

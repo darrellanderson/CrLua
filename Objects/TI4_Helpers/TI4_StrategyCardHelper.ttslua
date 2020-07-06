@@ -270,6 +270,10 @@ function _returnStrategyCard(playerColor, strategyCard, parameters)
     local function hasPoliticalStability()
         for _, object in ipairs(getAllObjects()) do
             if object.getName() == 'Political Stability' and not object.is_face_down then
+                local inHandGuidSet = _zoneHelper.inHand()
+                if inHandGuidSet[object.getGUID()] then
+                    return false
+                end
                 return playerColor == _zoneHelper.zoneFromPosition(object.getPosition())
             end
         end

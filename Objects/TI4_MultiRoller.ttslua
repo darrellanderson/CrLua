@@ -1,0 +1,1061 @@
+--TI4 Roller
+-- @author the_Mantis
+-- @author MrStump for dice rolling functions
+-- @author Darrell use shared zone helper
+
+--Distance the dice are placed from the tool
+radius = 5
+--How high (relative to the tool) the dice are placed
+height = 4
+
+--position of inputs/buttons
+xpos = {-0.8, -0.45, -0.1, 0.2, 0.5, 0.8}
+ypos = 0.2
+zpos = {-0.9, -0.733, -0.566, -0.399, -0.232, -0.065, 0.102, 0.269, 0.436, 0.603, 0.85}
+
+--button parameters
+bFontSize = 40
+bFontSize = 40
+
+--input parameters
+iFontSize = 50
+
+--unit list
+unitList = {"Flagship", "War Sun", "Cruiser", "Dreadnought", "Destroyer", "Carrier", "Fighter", "Infantry", "PDS", "Space Dock"}
+unitListParams = {}
+listAFB = {1,5}
+listCMBT = {1,2,3,4,5,6,7,8}
+listSPC = {1,4,9,10}
+listBOMB = {1,2,4,7}
+listPS = {1,2,4,7,9,10}
+plasmaActive = 0
+
+local watchingDice = false
+
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
+        return function(parameters) return helperObject.call(functionName, parameters) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
+local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
+
+function onLoad()
+    createButtons()
+    for u, object in ipairs(unitList) do
+        unitListParams[unitList[u]] = {}
+    end
+end
+
+function detectCards(playerColor)
+    unitName = {}
+    resetMods()
+    local faction = _factionHelper.fromColor(playerColor)
+    if faction == nil then
+        broadcastToColor("No faction sheet detected.", playerColor, {0.8,0.2,0.2})
+    else
+        baseUnits(faction.name)
+        checkCards(playerColor)
+        updateHitValues()
+    end
+end
+
+function checkCards(playerColor)
+    local inputs = self.getInputs()
+    local flagshipValue = tonumber(inputs[findInputIndex("UNIT:Flagship")].value or 0)
+    if flagshipValue > 0 then
+        if unitName["Flagship"] == "C'morran N'orr" then
+            rollMod["C'morran N'orr"] = true
+        end
+    end
+
+    local inHandGuidSet = _zoneHelper.inHand()
+    local function getZone(object)
+        if inHandGuidSet[object.getGUID()] then
+            return false
+        end
+        if object.tag == 'Card' and object.is_face_down then
+            return false
+        end
+        return _zoneHelper.zoneFromPosition(object.getPosition())
+    end
+
+    local ignoreRollModNameSet = {
+        ["Antimass Deflectors"] = true,  -- card does not trigger, only the button
+        ["C'morran N'orr"] = true,  -- apply flagship mod elsewhere
+    }
+
+    -- If using one of these names keep it.
+    local priorityUnitNameSet = {
+        ["Experimental Battlestation"] = true,
+        ["Coronata"] = true,
+        ["Eradica"] = true,
+        ["Vorastra"] = true,
+        ["Kultorask"] = true,
+        ["Anklyon"] = true,
+        ["Ragnarov"] = true,
+    }
+
+    for _, object in ipairs(getAllObjects()) do
+        local objectName = object.getName()
+        local zone = getZone(object)
+        if zone == playerColor then
+            -- Object in this player zone.
+            -- If not already a priority name, set name.
+            local objectUnitType = unitType[objectName]
+            local objectUnitName = objectUnitType and unitName[objectUnitType]
+            if objectUnitType and not priorityUnitNameSet[objectUnitName] then
+                unitName[objectUnitType] = objectName
+            end
+
+            -- Find any roll modifiers in zone.
+            if string.find(objectName, "Morale Boost") then
+                objectName = "Morale Boost"
+            end
+            if not ignoreRollModNameSet[objectName] and rollMod[objectName] ~= nil then
+                rollMod[objectName] = true
+            end
+        elseif zone then
+            -- Object in different player zone.
+            if objectName == "Tekklar Legion" then
+                rollMod["Tekklar Legion (Opponent)"] = true
+            end
+        end
+    end
+
+    if unitName["Flagship"] == "C'morran N'orr" then
+        -- Sardakk cannot benefit from their own promissory note.
+        rollMod["Tekklar Legion"] = false
+    else
+        -- Tekklar opponent only applies if this is Sardakk
+        rollMod["Tekklar Legion (Opponent)"] = false
+    end
+end
+
+function updateHitValues()
+    local inputs = self.getInputs()
+    for i=1,10 do
+        if inputs[findInputIndex("UNIT:" .. unitList[i])].value + 0 > 0 then
+            local uType = unitList[i]
+            local uName = unitName[uType]
+            local unit = unitName[unitList[i]]
+
+            --reset crit parameter
+            unitListParams[uType]["critCMBT"] = nil
+            local unitString = 0
+            if unitParams[uName].hitAFB ~= nil then
+                unitListParams[uType]["hitAFB"] = unitParams[uName].hitAFB
+                unitListParams[uType]["rollsAFB"] = unitParams[uName].rollsAFB
+                unitString = unitParams[uName].hitAFB .. "x" .. unitParams[uName].rollsAFB
+            else
+                unitListParams[uType]["hitAFB"] = 0
+                unitListParams[uType]["rollsAFB"] = 0
+            end
+            if findInputIndex("AFB:" .. uType) ~= nil then self.editInput({index=findInputIndex("AFB:" .. uType)-1, value=unitString}) end
+            unitString = 0
+            if unitParams[uName].hitCMBT ~= nil then
+                unitListParams[uType]["hitCMBT"] = unitParams[uName].hitCMBT
+                unitListParams[uType]["rollsCMBT"] = unitParams[uName].rollsCMBT
+                if unitParams[uName].critCMBT ~= nil then
+                    unitListParams[uType]["critCMBT"] = unitParams[uName].critCMBT
+                end
+                unitString = unitParams[uName].hitCMBT .. "x" .. unitParams[uName].rollsCMBT
+            else
+                unitListParams[uType]["hitCMBT"] = 0
+                unitListParams[uType]["rollsCMBT"] = 0
+            end
+            if findInputIndex("CMBT:" .. uType) ~= nil then self.editInput({index=findInputIndex("CMBT:" .. uType)-1, value=unitString}) end
+            unitString = 0
+            if unitParams[uName].hitSPC ~= nil then
+                unitListParams[uType]["hitSPC"] = unitParams[uName].hitSPC
+                unitListParams[uType]["rollsSPC"] = unitParams[uName].rollsSPC
+                unitString = unitParams[uName].hitSPC .. "x" .. unitParams[uName].rollsSPC
+            else
+                unitListParams[uType]["hitSPC"] = 0
+                unitListParams[uType]["rollsSPC"] = 0
+            end
+            if findInputIndex("SPC:" .. uType) ~= nil then self.editInput({index=findInputIndex("SPC:" .. uType)-1, value=unitString}) end
+            unitString = 0
+            if unitParams[uName].hitBOMB ~= nil then
+                unitListParams[uType]["hitBOMB"] = unitParams[uName].hitBOMB
+                unitListParams[uType]["rollsBOMB"] = unitParams[uName].rollsBOMB
+                unitString = unitParams[uName].hitBOMB .. "x" .. unitParams[uName].rollsBOMB
+            else
+                unitListParams[uType]["hitBOMB"] = 0
+                unitListParams[uType]["rollsBOMB"] = 0
+            end
+            if findInputIndex("BOMB:" .. uType) ~= nil then self.editInput({index=findInputIndex("BOMB:" .. uType)-1, value=unitString}) end
+        end
+    end
+end
+
+function findInputIndex(inputLabel)
+    local inputs = self.getInputs()
+    for i, input in ipairs(inputs) do
+        if inputs[i].label == inputLabel then return i end
+    end
+end
+
+function findButtonIndex(buttonLabel)
+    local buttons = self.getButtons()
+    for b, button in ipairs(buttons) do
+        if buttons[b].label == buttonLabel then return b end
+    end
+end
+
+function hitMods(unit, mode)
+    local hitModValue = 0
+    for i, value in pairs(rollMod) do
+        if rollMod[i] == true then
+            if modValue[mode] ~= nil then
+                if modValue[mode][i] ~= nil then
+                    if modValue[mode][i][unit] ~= nil then
+                        hitModValue = hitModValue + modValue[mode][i][unit]
+                    end
+                end
+            end
+        end
+    end
+    return hitModValue
+end
+
+function resetCounters()
+    local inputs = self.getInputs()
+    for i, input in ipairs(inputs) do
+        self.editInput({index=i-1, value=0})
+    end
+    local buttons = self.getButtons()
+    for b, button in ipairs(buttons) do
+        self.editButton({index=b-1, color={r=1, g=1, b=1}})
+    end
+    plasmaActive = 0
+    rollMod["Antimass Deflectors"] = false
+    deleteCurrentDice()
+end
+
+function applyMods(color, mode)
+    detectCards(color)
+    local modsActive = "none"
+    for i, value in pairs(rollMod) do
+        if rollMod[i] == true and modValue[mode][i] ~= nil then
+            if modsActive == "none" then
+                modsActive = i .. " (" .. rollModDesc[i] .. ")"
+            else
+                modsActive = modsActive .. ", " .. i .. " (" .. rollModDesc[i] .. ")"
+            end
+        end
+    end
+    broadcastToAll("Roll modifiers detected: " .. modsActive, stringColorToRGB(color))
+end
+
+function shipPlus(i,color)
+    local inputs = self.getInputs()
+    self.editInput({index=i-1, value=inputs[i].value+1})
+    detectCards(color)
+end
+
+function shipMinus(i,color)
+    local inputs = self.getInputs()
+    if inputs[i].value + 0 > 0 then self.editInput({index=i-1, value=inputs[i].value-1}) end
+    detectCards(color)
+end
+
+modeList = {CMBT="COMBAT", AFB="ANTI-FIGHTER BARRAGE", SPC="SPACE CANNON", BOMB="BOMBARDMENT"}
+
+function rollDice(color, mode)
+    updateHitValues()
+    applyMods(color, mode)
+    local inputs = self.getInputs()
+    unitRollStart = {}
+    unitRollCount = {}
+    unitCritOn = {}
+    local num = 0
+    for u = 1, 10 do
+        local uType = unitList[u]
+        local unitCount = inputs[findInputIndex("UNIT:" .. uType)].value
+        local multiplier = unitListParams[uType]["rolls"..mode]
+        local plasmaScoringRoll = 0
+        local numRolls = 0
+        if plasmaActive == u and (mode == "SPC" or mode == "BOMB") then plasmaScoringRoll = 1 end
+        if unitCount ~= nil and multiplier ~= nil then numRolls = unitCount * multiplier end
+        if numRolls + 0 > 0 then
+            numRolls = numRolls + plasmaScoringRoll
+            local unitMod = hitMods(uType, mode)
+            unitHitOn[uType] = unitListParams[uType]["hit"..mode] - unitMod
+            if mode == "CMBT" and unitListParams[uType]["critCMBT"] ~= nil then
+                unitCritOn[uType] = unitListParams[uType]["critCMBT"]
+            end
+            unitRollStart[uType] = num + 1
+            unitRollCount[uType] = numRolls
+            num = num + unitRollCount[uType]
+        end
+    end
+    if num > 0 then
+        local s = Player[color].steam_name .. " rolling for " .. modeList[mode]
+        broadcastToAll(s, stringColorToRGB(color))
+        numberButtonPressed(num, color)
+    else
+        broadcastToColor("No valid units for " .. modeList[mode], color, {0.8,0.2,0.2})
+    end
+end
+
+local _diceBagGuid = false
+function getDiceBag()
+    local diceBag = _diceBagGuid and getObjectFromGUID(_diceBagGuid)
+    if not diceBag then
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == "Dice Bag" then
+                diceBag = object
+                _diceBagGuid = diceBag.getGUID()
+                break
+            end
+        end
+    end
+    if not diceBag then
+        error('missing "Dice Bag"')
+    end
+    return diceBag
+end
+
+--Activated by button press, pulls dice and starts process
+function numberButtonPressed(num, color)
+    local diceBag = getDiceBag()
+    if watchingDice == false then
+        --Delete old dice if they exist
+        if #diceActive > 0 then
+            deleteCurrentDice()
+        end
+        watchingDice = true
+        math.randomseed(os.time())
+        local bagPos, bagRot = self.getPosition(), self.getRotation()
+        for i=1, num do
+            --Create Position
+            local pos = getRadialPosition(i, num, bagPos, bagRot)
+            --Create random rotation
+            local rot = randomRotation()
+            --Assign unit to die
+            local unit = getUnit(i)
+            --Removes objects from bag
+            diceBag.takeObject({
+                position=pos, rotation=rot,
+                callback="afterSpawn", callback_owner=self, params={color=color, num=num, unit=unit}
+            })
+        end
+
+    else
+        --Error if you try to roll dice again before the first set finishes
+        broadcastToColor("Dice are already being rolled.", color, {0.8,0.2,0.2})
+    end
+end
+
+function getUnit(num)
+    for unit in pairs(unitRollCount) do
+        if unitRollStart[unit] <= num and unitRollStart[unit] + unitRollCount[unit] > num then
+            return unit
+        end
+    end
+    return 'none'
+end
+
+--Callback, runs after dice are spawned
+function afterSpawn(die, params)
+    local unit = params.unit
+    die.setColorTint(stringColorToRGB(unitDie[unit]))
+    local dieDesc = unit .. " Die.  Hits on: " .. unitHitOn[unit]
+    if unitCritOn[unit] ~= nil then
+        dieDesc = dieDesc .. " (x3 on: " .. unitCritOn[unit] .. ")"
+    end
+    die.setDescription(dieDesc)
+    table.insert(diceActive, die.getGUID())
+    table.insert(diceActiveUnit[unit], die.getGUID())
+    die.roll()
+    if #diceActive == params.num then
+        self.setVar("colorForCoroutine", params.color)
+        startLuaCoroutine(self, "watchDice")
+    end
+end
+
+--Coroutine, watching for all the dice to come to rest.
+function watchDice()
+    local color = self.getVar("colorForCoroutine")
+    local startTime = os.time()
+    repeat
+        local restingCount = 0
+        for i, dieGUID in ipairs(diceActive) do
+            local die = getObjectFromGUID(dieGUID)
+            if not die or die.resting == true then
+                restingCount = restingCount + 1
+            end
+        end
+        coroutine.yield(0)
+    until restingCount == #diceActive or os.time() > startTime + 3
+    watchingDice = false
+    formatRollResults(color)
+    return 1
+end
+
+--Used to delete dice from previous rolls
+function deleteCurrentDice()
+    for _, dieGUID in ipairs(diceActive) do
+        local die = getObjectFromGUID(dieGUID)
+        if die then
+            destroyObject(die)
+        end
+    end
+    diceActive = {}
+    diceActiveUnit = {}
+    diceActiveUnit["Dreadnought"] = {}
+    diceActiveUnit["Flagship"] = {}
+    diceActiveUnit["Destroyer"] = {}
+    diceActiveUnit["War Sun"] = {}
+    diceActiveUnit["Carrier"] = {}
+    diceActiveUnit["Fighter"] = {}
+    diceActiveUnit["Infantry"] = {}
+    diceActiveUnit["Cruiser"] = {}
+    diceActiveUnit["PDS"] = {}
+    diceActiveUnit["Space Dock"] = {}
+    watchingDice = false
+end
+
+--Obtains values for rolls and orders them
+function formatRollResults(color)
+    local hits = 0
+    local rollResults = {}
+    for unit in pairs(unitRollCount) do
+        local result = unitName[unit] .. " [HIT:" .. unitHitOn[unit]
+        if unitCritOn[unit] ~= nil then
+            result =  result .. ", CRIT(x3):" .. unitCritOn[unit]
+        end
+        result = result .. "]:"
+        local firstEntry = true
+        for _, dieGUID in ipairs(diceActiveUnit[unit]) do
+            local die = getObjectFromGUID(dieGUID)
+            if die then
+                local value = die.getValue()
+
+                local suffix = ""
+                if value >= unitHitOn[unit] then
+                    die.setName("Hit")
+                    hits = hits + 1
+                    suffix = "#"
+                else
+                    die.setName("Miss")
+                end
+                if unitCritOn[unit] ~= nil then
+                    if value >= unitCritOn[unit] then
+                        die.setName("Hit x3")
+                        hits = hits + 2
+                        suffix = "###"
+                    end
+                end
+                if firstEntry == false then result = result .. "," end
+                result = result .. " " .. value .. suffix
+                firstEntry = false
+            end
+        end
+        if unitRollCount[unit] > 0 then
+            table.insert(rollResults, result)
+        end
+    end
+    convertRollResultsToString(color, rollResults, hits)
+end
+
+--Converts the table of roll result numbers into a string and prints
+function convertRollResultsToString(color, rollResults, hits)
+    local s = Player[color].steam_name .. " rolled: "
+    for i, result in ipairs(rollResults) do
+        if i < #rollResults then
+            s = s .. "[ffffff]" .. result.."[-], "
+        else
+            s = s .. "[ffffff]" .. result.."[-]"
+        end
+    end
+    broadcastToAll(s, stringColorToRGB(color))
+    local s = Player[color].steam_name .. " landed " .. hits .. " hit"
+    if hits ~= 1 then s = s .. "s." else s = s .. "." end
+    broadcastToAll(s, stringColorToRGB(color))
+end
+
+--Get a radial position to place item
+function getRadialPosition(i, i_max, pos, rot)
+    local spokes = 360/i_max
+    local posX = pos.x + math.sin( math.rad((spokes*i)+rot.y) ) * radius
+    local posY = pos.y + height
+    local posZ = pos.z + math.cos( math.rad((spokes*i)+rot.y) ) * radius
+    return {x=posX, y=posY, z=posZ}
+end
+
+--Gets a random rotation vector
+function randomRotation()
+    --Credit for this function goes to Revinor (forums)
+    --Get 3 random numbers
+    local u1 = math.random();
+    local u2 = math.random();
+    local u3 = math.random();
+    --Convert them into quats to avoid gimbal lock
+    local u1sqrt = math.sqrt(u1);
+    local u1m1sqrt = math.sqrt(1-u1);
+    local qx = u1m1sqrt *math.sin(2*math.pi*u2);
+    local qy = u1m1sqrt *math.cos(2*math.pi*u2);
+    local qz = u1sqrt *math.sin(2*math.pi*u3);
+    local qw = u1sqrt *math.cos(2*math.pi*u3);
+    --Apply rotation
+    local ysqr = qy * qy;
+    local t0 = -2.0 * (ysqr + qz * qz) + 1.0;
+    local t1 = 2.0 * (qx * qy - qw * qz);
+    local t2 = -2.0 * (qx * qz + qw * qy);
+    local t3 = 2.0 * (qy * qz - qw * qx);
+    local t4 = -2.0 * (qx * qx + ysqr) + 1.0;
+    --Correct
+    if t2 > 1.0 then t2 = 1.0 end
+    if t2 < -1.0 then ts = -1.0 end
+    --Convert back to X/Y/Z
+    local xr = math.asin(t2);
+    local yr = math.atan2(t3, t4);
+    local zr = math.atan2(t1, t0);
+    --Return result
+    return {math.deg(xr),math.deg(yr),math.deg(zr)}
+end
+
+function input_func()
+    --do nothing
+end
+
+function addButton(click_function, label, position, width, height)
+    self.createButton({
+        click_function = click_function,
+        function_owner = self,
+        label          = label,
+        position       = position,
+        width          = width,
+        height         = height,
+        font_size      = bFontSize,
+    })
+end
+
+function addInput(position, label, width, height)
+    self.createInput({
+        input_function = "input_func",
+        function_owner = self,
+        value          = 0,
+        alignment      = 4,
+        position       = position,
+        width          = width,
+        height         = height,
+        font_size      = iFontSize,
+        --validation   = 2,
+        label          = label
+    })
+end
+
+function createButtons()
+    addButton("resetCounters", "RESET", {x=xpos[1], y=ypos, z=zpos[11]}, 160, 80)
+    for i, value in ipairs(unitList) do
+        addInput({x=xpos[1], y=ypos, z=zpos[i]}, "UNIT:" .. unitList[i], 72, 72)
+        addButton("minus"..i, "-", {x=xpos[1]-0.12, y=ypos, z=zpos[i]}, 50, 50)
+        local minusfunc = function(_,color) shipMinus(i,color) end
+        self.setVar("minus"..i, minusfunc)
+        addButton("plus"..i, "+", {x=xpos[1]+0.12, y=ypos, z=zpos[i]}, 50, 50)
+        local plusfunc = function(_,color) shipPlus(i,color) end
+        self.setVar("plus"..i, plusfunc)
+    end
+
+    addButton("updateButton", "UPDATE", {x=xpos[2], y=ypos, z=zpos[11]}, 160, 80)
+    local updateButton = function(_,color) detectCards(color) end
+    self.setVar("updateButton", updateButton)
+
+    addButton("clickAFB","AFB",{x=xpos[3], y=ypos, z=zpos[11]},160,80)
+    local clickAFB = function(_,color) rollDice(color, "AFB") end
+    self.setVar("clickAFB", clickAFB)
+    for i, value in ipairs(listAFB) do
+        local u = listAFB[i]
+        addInput({x=xpos[3], y=ypos, z=zpos[u]},"AFB:" .. unitList[u], 140, 72)
+    end
+
+    addButton("clickCMBT","CMBT",{x=xpos[4], y=ypos, z=zpos[11]},160,80)
+    local clickCMBT = function(_,color) rollDice(color, "CMBT") end
+    self.setVar("clickCMBT", clickCMBT)
+    for i, value in ipairs(listCMBT) do
+        local u = listCMBT[i]
+        addInput({x=xpos[4], y=ypos, z=zpos[u]},"CMBT:" .. unitList[u], 140, 72)
+    end
+
+    addButton("clickSPC","SPC",{x=xpos[5], y=ypos, z=zpos[11]},160,80)
+    local clickSPC = function(_,color) rollDice(color, "SPC") end
+    self.setVar("clickSPC", clickSPC)
+    for i, value in ipairs(listSPC) do
+        local u = listSPC[i]
+        addInput({x=xpos[5], y=ypos, z=zpos[u]},"SPC:" .. unitList[u], 140, 72)
+    end
+
+    addButton("clickBOMB","BOMB",{x=xpos[6], y=ypos, z=zpos[11]},160,80)
+    local clickBOMB = function(_,color) rollDice(color, "BOMB") end
+    self.setVar("clickBOMB", clickBOMB)
+    for i, value in ipairs(listBOMB) do
+        local u = listBOMB[i]
+        addInput({x=xpos[6], y=ypos, z=zpos[u]},"BOMB:" .. unitList[u], 140, 72)
+    end
+
+    addButton("clickAMD","AMD",{x=xpos[6], y=ypos, z=zpos[9]},160,80)
+
+    for i, value in ipairs(listPS) do
+        local u = listPS[i]
+        addButton("PS"..u, "PS", {x=xpos[2]+0.10, y=ypos, z=zpos[u]}, 70, 50)
+        local PSfunc = function(_,color) plasmaScoring(listPS[i]) end
+        self.setVar("PS"..u, PSfunc)
+    end
+end
+
+unitParams = {}
+unitParams["None"] = {type="War Sun"}
+unitParams["War Sun"] = {type="War Sun",hitCMBT=3,rollsCMBT=3,hitBOMB=3,rollsBOMB=3}
+unitParams["Prototype War Sun I"] = {type="War Sun",hitCMBT=3,rollsCMBT=3,hitBOMB=3,rollsBOMB=3}
+unitParams["Prototype War Sun II"] = {type="War Sun",hitCMBT=3,rollsCMBT=3,hitBOMB=3,rollsBOMB=3}
+unitParams["Cruiser I"] = {type="Cruiser",hitCMBT=7,rollsCMBT=1}
+unitParams["Cruiser II"] = {type="Cruiser",hitCMBT=6,rollsCMBT=1}
+unitParams["Battlecruiser I"] = {type="Cruiser",hitCMBT=7,rollsCMBT=1}
+unitParams["Battlecruiser II"] = {type="Cruiser",hitCMBT=6,rollsCMBT=1}
+unitParams["Dreadnought I"] = {type="Dreadnought",hitCMBT=5,rollsCMBT=1,hitBOMB=5,rollsBOMB=1}
+unitParams["Dreadnought II"] = {type="Dreadnought",hitCMBT=5,rollsCMBT=1,hitBOMB=5,rollsBOMB=1}
+unitParams["Super-Dreadnought I"] = {type="Dreadnought",hitCMBT=5,rollsCMBT=1,hitBOMB=5,rollsBOMB=1}
+unitParams["Super-Dreadnought II"] = {type="Dreadnought",hitCMBT=4,rollsCMBT=1,hitBOMB=4,rollsBOMB=1}
+unitParams["Exotrireme I"] = {type="Dreadnought",hitCMBT=5,rollsCMBT=1,hitBOMB=4,rollsBOMB=2}
+unitParams["Exotrireme II"] = {type="Dreadnought",hitCMBT=5,rollsCMBT=1,hitBOMB=4,rollsBOMB=2}
+unitParams["Lancer Dreadnought I"] = {type="Dreadnought",hitCMBT=5,rollsCMBT=1,hitBOMB=5,rollsBOMB=1,hitSPC=6,rollsSPC=1}
+unitParams["Lancer Dreadnought II"] = {type="Dreadnought",hitCMBT=5,rollsCMBT=1,hitBOMB=5,rollsBOMB=1,hitSPC=5,rollsSPC=1}
+unitParams["Destroyer I"] = {type="Destroyer",hitCMBT=9,rollsCMBT=1,hitAFB=9,rollsAFB=2}
+unitParams["Destroyer II"] = {type="Destroyer",hitCMBT=8,rollsCMBT=1,hitAFB=6,rollsAFB=3}
+unitParams["Wraith Corvette I"] = {type="Destroyer",hitCMBT=8,rollsCMBT=1,hitAFB=9,rollsAFB=3}
+unitParams["Wraith Corvette II"] = {type="Destroyer",hitCMBT=7,rollsCMBT=1,hitAFB=6,rollsAFB=4}
+unitParams["Carrier I"] = {type="Carrier",hitCMBT=9,rollsCMBT=1}
+unitParams["Carrier II"] = {type="Carrier",hitCMBT=9,rollsCMBT=1}
+unitParams["Raid Shuttle I"] = {type="Carrier",hitCMBT=9,rollsCMBT=1}
+unitParams["Raid Shuttle II"] = {type="Carrier",hitCMBT=8,rollsCMBT=1,hitBOMB=8,rollsBOMB=1}
+unitParams["Advanced Carrier I"] = {type="Carrier",hitCMBT=9,rollsCMBT=1}
+unitParams["Advanced Carrier II"] = {type="Carrier",hitCMBT=9,rollsCMBT=1}
+unitParams["Fighter I"] = {type="Fighter",hitCMBT=9,rollsCMBT=1}
+unitParams["Fighter II"] = {type="Fighter",hitCMBT=8,rollsCMBT=1}
+unitParams["Hybrid Crystal Fighter I"] = {type="Fighter",hitCMBT=8,rollsCMBT=1}
+unitParams["Hybrid Crystal Fighter II"] = {type="Fighter",hitCMBT=7,rollsCMBT=1}
+unitParams["Heavy Bomber I"] = {type="Fighter",hitCMBT=8,rollsCMBT=1,hitBOMB=9,rollsBOMB=1}
+unitParams["Heavy Bomber II"] = {type="Fighter",hitCMBT=7,rollsCMBT=1,hitBOMB=8,rollsBOMB=1}
+unitParams["Infantry I"] = {type="Infantry",hitCMBT=8,rollsCMBT=1}
+unitParams["Infantry II"] = {type="Infantry",hitCMBT=7,rollsCMBT=1}
+unitParams["Letani Warrior I"] = {type="Infantry",hitCMBT=8,rollsCMBT=1}
+unitParams["Letani Warrior II"] = {type="Infantry",hitCMBT=7,rollsCMBT=1}
+unitParams["Spec Ops I"] = {type="Infantry",hitCMBT=7,rollsCMBT=1}
+unitParams["Spec Ops II"] = {type="Infantry",hitCMBT=6,rollsCMBT=1}
+unitParams["Ashkari I"] = {type="Infantry",hitCMBT=7,rollsCMBT=1}
+unitParams["Ashkari II"] = {type="Infantry",hitCMBT=6,rollsCMBT=1}
+unitParams["Unholy Abominations I"] = {type="Infantry",hitCMBT=5,rollsCMBT=1}
+unitParams["Unholy Abominations II"] = {type="Infantry",hitCMBT=4,rollsCMBT=1}
+unitParams["PDS I"] = {type="PDS",hitSPC=6,rollsSPC=1}
+unitParams["PDS II"] = {type="PDS",hitSPC=5,rollsSPC=1}
+unitParams["Tachyon Lance I"] = {type="PDS",hitSPC=5,rollsSPC=1}
+unitParams["Tachyon Lance II"] = {type="PDS",hitSPC=4,rollsSPC=1}
+unitParams["Perdition Array I"] = {type="PDS",hitSPC=5,rollsSPC=1}
+unitParams["Perdition Array II"] = {type="PDS",hitSPC=4,rollsSPC=1}
+unitParams["Space Dock I"] = {type="Space Dock"}
+unitParams["Space Dock II"] = {type="Space Dock"}
+unitParams["Floating Factory I"] = {type="Space Dock"}
+unitParams["Floating Factory II"] = {type="Space Dock"}
+unitParams["Planetary Fortress I"] = {type="Space Dock"}
+unitParams["Planetary Fortress II"] = {type="Space Dock"}
+unitParams["Experimental Battlestation"] = {type="Space Dock",hitSPC=5,rollsSPC=3}
+unitParams["Y'sia Y'ssrila"] = {type="Flagship",hitCMBT=5,rollsCMBT=2}
+unitParams["Son of Ragh"] = {type="Flagship",hitCMBT=5,rollsCMBT=2,hitAFB=6,rollsAFB=4}
+unitParams["J.N.S. Hylarim"] = {type="Flagship",hitCMBT=6,rollsCMBT=2,critCMBT=9}
+unitParams["Loncara Ssodu"] = {type="Flagship",hitCMBT=7,rollsCMBT=2,hitSPC=5,rollsSPC=3}
+unitParams["Duha Menaimon"] = {type="Flagship",hitCMBT=7,rollsCMBT=2}
+unitParams["The Alastor"] = {type="Flagship",hitCMBT=9,rollsCMBT=2}
+unitParams["The Inferno"] = {type="Flagship",hitCMBT=5,rollsCMBT=2}
+unitParams["Salai Sai Corian"] = {type="Flagship",hitCMBT=7,rollsCMBT=1}
+unitParams["C'morran N'orr"] = {type="Flagship",hitCMBT=6,rollsCMBT=2}
+unitParams["Hil Colish"] = {type="Flagship",hitCMBT=5,rollsCMBT=1}
+unitParams["Fourth Moon"] = {type="Flagship",hitCMBT=7,rollsCMBT=2}
+unitParams["Arc Secundus"] = {type="Flagship",hitCMBT=5,rollsCMBT=2,hitBOMB=5,rollsBOMB=3}
+unitParams["Wrath of Kenara"] = {type="Flagship",hitCMBT=7,rollsCMBT=2}
+unitParams["Van Hauge"] = {type="Flagship",hitCMBT=9,rollsCMBT=2}
+unitParams["Matriarch"] = {type="Flagship",hitCMBT=9,rollsCMBT=2}
+unitParams["0.0.1"] = {type="Flagship",hitCMBT=5,rollsCMBT=2}
+unitParams["Genesis"] = {type="Flagship",hitCMBT=5,rollsCMBT=2}
+unitParams["Nightingale II"] = {type="Flagship",hitCMBT=9,rollsCMBT=2}
+unitParams["Shai-Hulud"] = {type="Flagship",hitCMBT=9,rollsCMBT=2}
+unitParams["Khage"] = {type="Flagship",hitCMBT=5,rollsCMBT=3,hitBOMB=5,rollsBOMB=3}
+unitParams["Richtyrian"] = {type="Flagship",hitCMBT=7,rollsCMBT=2}
+unitParams["Kyr'tsad"] = {type="Flagship",hitCMBT=5,rollsCMBT=2,hitBOMB=5,rollsBOMB=2}
+unitParams["Advent Flagship"] = {type="Flagship"}
+unitParams["Vox"] = {type="Flagship",hitCMBT=7,rollsCMBT=2}
+unitParams["Chogra Tuhn"] = {type="Flagship",hitCMBT=5,rollsCMBT=2}
+unitParams["Vasari Flagship"] = {type="Flagship"}
+unitParams["TEC Flagship"] = {type="Flagship"}
+unitParams["For'xdar"] = {type="Flagship",hitCMBT=7,rollsCMBT=2}
+unitParams["Mho Rhodyn"] = {type="Flagship",hitCMBT=7,rollsCMBT=2}
+unitParams["Locus"] = {type="Flagship",hitCMBT=9,rollsCMBT=2}
+unitParams["Gheld'Atar"] = {type="Flagship",hitCMBT=7,rollsCMBT=2,hitBOMB=5,rollsBOMB=4}
+unitParams["Eru'Ishon"] = {type="Flagship",hitCMBT=7,rollsCMBT=1}
+unitParams["Regulus"] = {type="Flagship",hitCMBT=5,rollsCMBT=1}
+unitParams["Noctul H'rgan"] = {type="Flagship",hitCMBT=7,rollsCMBT=2}
+unitParams["Robotic Reprocessing Center"] = {type="Flagship",hitCMBT=7,rollsCMBT=2}
+unitParams["Coronata"] = {type="Flagship",hitCMBT=7,rollsCMBT=2}
+unitParams["Eradica"] = {type="Flagship",hitCMBT=5,rollsCMBT=2}
+unitParams["Vorastra"] = {type="Flagship",hitCMBT=7,rollsCMBT=2}
+unitParams["Kultorask"] = {type="Flagship",hitCMBT=5,rollsCMBT=2}
+unitParams["Anklyon"] = {type="Flagship",hitCMBT=7,rollsCMBT=2}
+unitParams["Ragnarov"] = {type="Flagship",hitCMBT=5,rollsCMBT=2}
+
+modValue = {}
+modValue["CMBT"] = {}
+modValue["BOMB"] = {}
+modValue["AFB"] = {}
+modValue["SPC"] = {}
+
+modValue["CMBT"]["Morale Boost"] = {}
+modValue["CMBT"]["Morale Boost"]["Flagship"] = 1
+modValue["CMBT"]["Morale Boost"]["War Sun"] = 1
+modValue["CMBT"]["Morale Boost"]["Cruiser"] = 1
+modValue["CMBT"]["Morale Boost"]["Dreadnought"] = 1
+modValue["CMBT"]["Morale Boost"]["Destroyer"] = 1
+modValue["CMBT"]["Morale Boost"]["Carrier"] = 1
+modValue["CMBT"]["Morale Boost"]["Fighter"] = 1
+modValue["CMBT"]["Morale Boost"]["Infantry"] = 1
+
+modValue["CMBT"]["Prophecy of Ixth"] = {}
+modValue["CMBT"]["Prophecy of Ixth"]["Fighter"] = 1
+
+modValue["CMBT"]["Tekklar Legion"] = {}
+modValue["CMBT"]["Tekklar Legion"]["Infantry"] = 1
+modValue["CMBT"]["Tekklar Legion"]["Fighter"] = 1
+
+modValue["CMBT"]["Tekklar Legion (Opponent)"] = {}
+modValue["CMBT"]["Tekklar Legion (Opponent)"]["Infantry"] = -1
+
+-- Include lowercase p version for now.
+modValue["CMBT"]["Fighter prototype"] = {}
+modValue["CMBT"]["Fighter prototype"]["Fighter"] = 2
+modValue["CMBT"]["Fighter Prototype"] = {}
+modValue["CMBT"]["Fighter Prototype"]["Fighter"] = 2
+
+modValue["CMBT"]["Unrelenting"] = {}
+modValue["CMBT"]["Unrelenting"]["Flagship"] = 1
+modValue["CMBT"]["Unrelenting"]["War Sun"] = 1
+modValue["CMBT"]["Unrelenting"]["Cruiser"] = 1
+modValue["CMBT"]["Unrelenting"]["Dreadnought"] = 1
+modValue["CMBT"]["Unrelenting"]["Destroyer"] = 1
+modValue["CMBT"]["Unrelenting"]["Carrier"] = 1
+modValue["CMBT"]["Unrelenting"]["Fighter"] = 1
+modValue["CMBT"]["Unrelenting"]["Infantry"] = 1
+
+modValue["CMBT"]["Fragile"] = {}
+modValue["CMBT"]["Fragile"]["Flagship"] = -1
+modValue["CMBT"]["Fragile"]["War Sun"] = -1
+modValue["CMBT"]["Fragile"]["Cruiser"] = -1
+modValue["CMBT"]["Fragile"]["Dreadnought"] = -1
+modValue["CMBT"]["Fragile"]["Destroyer"] = -1
+modValue["CMBT"]["Fragile"]["Carrier"] = -1
+modValue["CMBT"]["Fragile"]["Fighter"] = -1
+modValue["CMBT"]["Fragile"]["Infantry"] = -1
+
+modValue["CMBT"]["Nebula Defence"] = {}
+modValue["CMBT"]["Nebula Defence"]["Flagship"] = 1
+modValue["CMBT"]["Nebula Defence"]["War Sun"] = 1
+modValue["CMBT"]["Nebula Defence"]["Cruiser"] = 1
+modValue["CMBT"]["Nebula Defence"]["Dreadnought"] = 1
+modValue["CMBT"]["Nebula Defence"]["Destroyer"] = 1
+modValue["CMBT"]["Nebula Defence"]["Carrier"] = 1
+modValue["CMBT"]["Nebula Defence"]["Fighter"] = 1
+modValue["CMBT"]["Nebula Defence"]["Infantry"] = 1
+
+modValue["CMBT"]["C'morran N'orr"] = {}
+modValue["CMBT"]["C'morran N'orr"]["War Sun"] = 1
+modValue["CMBT"]["C'morran N'orr"]["Cruiser"] = 1
+modValue["CMBT"]["C'morran N'orr"]["Dreadnought"] = 1
+modValue["CMBT"]["C'morran N'orr"]["Destroyer"] = 1
+modValue["CMBT"]["C'morran N'orr"]["Carrier"] = 1
+modValue["CMBT"]["C'morran N'orr"]["Fighter"] = 1
+
+modValue["BOMB"]["Bunker"] = {}
+modValue["BOMB"]["Bunker"]["Flagship"] = -4
+modValue["BOMB"]["Bunker"]["War Sun"] = -4
+modValue["BOMB"]["Bunker"]["Dreadnought"] = -4
+
+modValue["SPC"]["Antimass Deflectors"] = {}
+modValue["SPC"]["Antimass Deflectors"]["Flagship"] = -1
+modValue["SPC"]["Antimass Deflectors"]["PDS"] = -1
+modValue["SPC"]["Antimass Deflectors"]["Space Dock"] = -1
+
+
+unitType = {}
+unitType["War Sun"] = "War Sun"
+unitType["Prototype War Sun II"] = "War Sun"
+unitType["Cruiser II"] = "Cruiser"
+unitType["Battlecruiser II"] = "Cruiser"
+unitType["Dreadnought II"] = "Dreadnought"
+unitType["Super-Dreadnought II"] = "Dreadnought"
+unitType["Exotrireme II"] = "Dreadnought"
+unitType["Lancer Dreadnought II"] = "Dreadnought"
+unitType["Destroyer II"] = "Destroyer"
+unitType["Wraith Corvette II"] = "Destroyer"
+unitType["PDS II"] = "PDS"
+unitType["Tachyon Lance II"] = "PDS"
+unitType["Perdition Array II"] = "PDS"
+unitType["Carrier II"] = "Carrier"
+unitType["Raid Shuttle II"] = "Carrier"
+unitType["Advanced Carrier II"] = "Carrier"
+unitType["Fighter II"] = "Fighter"
+unitType["Hybrid Crystal Fighter II"] = "Fighter"
+unitType["Heavy Bomber II"] = "Fighter"
+unitType["Infantry II"] = "Infantry"
+unitType["Letani Warrior II"] = "Infantry"
+unitType["Spec Ops II"] = "Infantry"
+unitType["Ashkari II"] = "Infantry"
+unitType["Unholy Abominations II"] = "Infantry"
+unitType["Space Dock II"] = "Space Dock"
+unitType["Floating Factory II"] = "Space Dock"
+unitType["Planetary Fortress II"] = "Space Dock"
+unitType["Experimental Battlestation"] = "Space Dock"
+unitType["Coronata"] = "Flagship"
+unitType["Eradica"] = "Flagship"
+unitType["Vorastra"] = "Flagship"
+unitType["Kultorask"] = "Flagship"
+unitType["Anklyon"] = "Flagship"
+unitType["Ragnarov"] = "Flagship"
+
+
+unitDie = {}
+unitDie["Dreadnought"] = "Purple"
+unitDie["Flagship"] = "Black"
+unitDie["Destroyer"] = "Red"
+unitDie["War Sun"] = "Orange"
+unitDie["Carrier"] = "Blue"
+unitDie["Fighter"] = "Teal"
+unitDie["Infantry"] = "Green"
+unitDie["Cruiser"] = "Brown"
+unitDie["PDS"] = "Orange"
+unitDie["Space Dock"] = "Yellow"
+
+diceActive = {}
+diceActiveUnit = {}
+diceActiveUnit["Dreadnought"] = {}
+diceActiveUnit["Flagship"] = {}
+diceActiveUnit["Destroyer"] = {}
+diceActiveUnit["War Sun"] = {}
+diceActiveUnit["Carrier"] = {}
+diceActiveUnit["Fighter"] = {}
+diceActiveUnit["Infantry"] = {}
+diceActiveUnit["Cruiser"] = {}
+diceActiveUnit["PDS"] = {}
+diceActiveUnit["Space Dock"] = {}
+
+unitHitOn = {}
+unitCritOn = {}
+unitRollCount = {}
+unitRollStart = {}
+
+unitName = {}
+
+rollMod = {}
+
+function resetMods()
+    rollMod["Morale Boost"] = false
+    rollMod["Prophecy of Ixth"] = false
+    rollMod["Fighter prototype"] = false
+    rollMod["Unrelenting"] = false
+    rollMod["Fragile"] = false
+    rollMod["Nebula Defence"] = false
+    rollMod["C'morran N'orr"] = false
+    rollMod["Tekklar Legion"] = false
+    rollMod["Tekklar Legion (Opponent)"] = false
+    rollMod["Bunker"] = false
+end
+
+function clickAMD()
+    if rollMod["Antimass Deflectors"] == nil then rollMod["Antimass Deflectors"] = false end
+    if rollMod["Antimass Deflectors"] == false then
+        rollMod["Antimass Deflectors"] = true
+        self.editButton({index=findButtonIndex("AMD")-1, color="Green"})
+    else
+        rollMod["Antimass Deflectors"] = false
+        self.editButton({index=findButtonIndex("AMD")-1, color={r=1, g=1, b=1}})
+    end
+end
+
+function plasmaScoring(u)
+    local buttons = self.getButtons()
+    for b, button in ipairs(buttons) do
+        if buttons[b].label == "PS" then
+            local pos = buttons[b].position
+            if pos.z - zpos[u] < 0.01 and pos.z - zpos[u] > -0.01 then
+                if plasmaActive ~= u then
+                    self.editButton({index=b-1, color="Green"})
+                    plasmaActive = u
+                else
+                    self.editButton({index=b-1, color={r=1, g=1, b=1}})
+                    plasmaActive = 0
+                end
+            else
+                self.editButton({index=b-1, color={r=1, g=1, b=1}})
+            end
+        end
+    end
+end
+
+rollModDesc = {}
+rollModDesc["Morale Boost"] = "+1 to all COMBAT rolls"
+rollModDesc["Prophecy of Ixth"] = "+1 to fighter's COMBAT rolls"
+rollModDesc["Fighter prototype"] = "+2 to fighter's COMBAT rolls"
+rollModDesc["Unrelenting"] =  "+1 to all COMBAT rolls"
+rollModDesc["Fragile"] = "-1 to all COMBAT rolls"
+rollModDesc["Nebula Defence"] = "+1 to all COMBAT rolls (defender)"
+rollModDesc["C'morran N'orr"] = "+1 to all COMBAT rolls for ships with the C'morran N'orr"
+rollModDesc["Tekklar Legion"] = "+1 to all COMBAT rolls (invasion)"
+rollModDesc["Tekklar Legion (Opponent)"] = "-1 to all COMBAT rolls (invasion)"
+rollModDesc["Bunker"] = "-4 to all BOMBARDMENT rolls"
+rollModDesc["Antimass Deflectors"] = "-1 to all SPACE CANNON rolls"
+
+
+function baseUnits(factionName)
+    unitName["War Sun"] = "None"
+    unitName["Cruiser"] = "Cruiser I"
+    unitName["Dreadnought"] = "Dreadnought I"
+    unitName["Destroyer"] = "Destroyer I"
+    unitName["PDS"] = "PDS I"
+    unitName["Carrier"] = "Carrier I"
+    unitName["Fighter"] = "Fighter I"
+    unitName["Infantry"] = "Infantry I"
+    unitName["Space Dock"] = "Space Dock I"
+
+    if factionName == "The Yssaril Tribes" then
+        unitName["Flagship"] = "Y'sia Y'ssrila"
+    elseif factionName == "The Clan Of Saar" then
+        unitName["Flagship"] = "Son of Ragh"
+        unitName["Space Dock"] = "Floating Factory I"
+    elseif factionName == "The Universities of Jol-Nar" then
+        unitName["Flagship"] = "J.N.S. Hylarim"
+        rollMod["Fragile"] = true
+    elseif factionName == "The Xxcha Kingdom" then
+        unitName["Flagship"] = "Loncara Ssodu"
+    elseif factionName == "The Arborec" then
+        unitName["Flagship"] = "Duha Menaimon"
+        unitName["Infantry"] = "Letani Warrior I"
+    elseif factionName == "The Nekro Virus" then
+        unitName["Flagship"] = "The Alastor"
+    elseif factionName == "The Embers Of Muaat" then
+        unitName["Flagship"] = "The Inferno"
+        unitName["War Sun"] = "Prototype War Sun I"
+    elseif factionName == "The Winnu" then
+        unitName["Flagship"] = "Salai Sai Corian"
+    elseif factionName == "The Sardakk N'orr" then
+        unitName["Flagship"] = "C'morran N'orr"
+        unitName["Dreadnought"] = "Exotrireme I"
+        rollMod["Unrelenting"] = true
+    elseif factionName == "The Ghosts Of Creuss" then
+        unitName["Flagship"] = "Hil Colish"
+    elseif factionName == "The Mentak Coalition" then
+        unitName["Flagship"] = "Fourth Moon"
+    elseif factionName == "The Barony Of Letnev" then
+        unitName["Flagship"] = "Arc Secundus"
+    elseif factionName == "The Emirates Of Hacan" then
+        unitName["Flagship"] = "Wrath of Kenara"
+    elseif factionName == "The Yin Brotherhood" then
+        unitName["Flagship"] = "Van Hauge"
+    elseif factionName == "The Naalu Collective" then
+        unitName["Flagship"] = "Matriarch"
+        unitName["Fighter"] = "Hybrid Crystal Fighter I"
+    elseif factionName == "The L1Z1X Mindnet" then
+        unitName["Flagship"] = "0.0.1"
+        unitName["Dreadnought"] = "Super-Dreadnought I"
+    elseif factionName == "The Federation Of Sol" then
+        unitName["Flagship"] = "Genesis"
+        unitName["Carrier"] = "Advanced Carrier I"
+        unitName["Infantry"] = "Spec Ops I"
+    elseif factionName == "The Drahn Consortium" then
+        unitName["Flagship"] = "Nightingale II"
+        unitName["Destroyer"] = "Wraith Corvette I"
+    elseif factionName == "The Fremen" then
+        unitName["Flagship"] = "Shai-Hulud"
+        unitName["Infantry"] = "Ashkari I"
+    elseif factionName == "The Khet Drakkol Union" then
+        unitName["Flagship"] = "Khage"
+    elseif factionName == "The Veldyr Sovereignty" then
+        unitName["Flagship"] = "Richtyrian"
+        unitName["Dreadnought"] = "Lancer Dreadnought I"
+        unitName["PDS"] = "Tachyon Lance I"
+    elseif factionName == "The Mandalorian Clans" then
+        unitName["Flagship"] = "Kyr'tsad"
+        unitName["Cruiser"] = "Battlecruiser I"
+        unitName["Carrier"] = "Raid Shuttle I"
+    elseif factionName == "The Advent" then
+        unitName["Flagship"] = "Advent Flagship"
+    elseif factionName == "The Free Systems Alliance" then
+        unitName["Flagship"] = "Vox"
+    elseif factionName == "The Navigators' Guild" then
+        unitName["Flagship"] = "Chogra Tuhn"
+    elseif factionName == "The Vasari Empire" then
+        unitName["Flagship"] = "Vasari Flagship"
+    elseif factionName == "The Trader Emergency Coalition" then
+        unitName["Flagship"] = "TEC Flagship"
+    elseif factionName == "The Kortali Horde" then
+        unitName["Flagship"] = "For'xdar"
+    elseif factionName == "The Rhodyn Migrant Fleet" then
+        unitName["Flagship"] = "Mho Rhodyn"
+    elseif factionName == "The HCEN Defense System" then
+        unitName["Flagship"] = "Locus"
+        unitName["PDS"] = "Perdition Array I"
+    elseif factionName == "The Gheldor Authority" then
+        unitName["Flagship"] = "Gheld'Atar"
+        unitName["Space Dock"] = "Planetary Fortress I"
+    elseif factionName == "The Zeth Contingency" then
+        unitName["Flagship"] = "Eru'Ishon"
+    elseif factionName == "The Lazax" then
+        unitName["Flagship"] = "Regulus"
+        unitName["Fighter"] = "Heavy Bomber I"
+    elseif factionName == "The Mahact Sorcerer Kings" then
+        unitName["Flagship"] = "Noctul H'rgan"
+    elseif factionName == "The Savages of Cymiae" then
+        unitName["Flagship"] = "Robotic Reprocessing Center"
+        unitName["Infantry"] = "Unholy Abominations I"
+    end
+end
+
+-- Provide a single-argument method to let outsiders click a button.
+-- (Object.call takes at most one argument, button.click_function takes three).
+-- Injected by CrLua.TTS.ClickButtonHack (yuck, not my favorite work).
+function clickButtonHack(params)
+    local function getButtonByLabel(label)
+        for _, button in ipairs(self.getButtons() or {}) do
+            if button.label == label then
+                return button
+            end
+        end
+        error('clickButtonHack: no such button label "' .. label .. '"')
+    end
+    local button = getButtonByLabel(params.buttonLabel)
+    local owner = button.function_owner or self
+    local f = button.click_function
+    if type(f) == 'string' then
+        f = owner.getVar(f)
+    end
+    if not f then
+        error('clickButtonHack: invalid click function for button label "' .. label .. '"')
+    end
+    if params.debug then
+        print('clickButtonHack: ' .. table.concat({
+            'owner="' .. owner.getName() .. '"',
+            'label="' .. params.buttonLabel .. '"',
+            'clickerColor=' .. params.clickerColor,
+            'altClick=' .. tostring(params.altClick)
+        }, ', '))
+    end
+    f(owner, params.clickerColor, params.altClick)
+end

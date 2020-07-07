@@ -381,12 +381,12 @@ function getProduceConsumeResourcesAndCost(produceConsumeItems)
         local objectEffectsOverrides = produceConsumeItems.objectEffectsOverrides[objectName]
         objectEffects = CrLua.Table.join(objectEffects or {}, objectEffectsOverrides or {})
         if objectEffects.resources then
-            result.resources = result.resources + objectEffects.resources
+            result.resources = result.resources + objectEffects.resources * count
         end
 
         local resourcesAndInfluence = getResourcesAndInfluence(objectName)
         if resourcesAndInfluence and resourcesAndInfluence.resources then
-            result.resources = result.resources + resourcesAndInfluence.resources
+            result.resources = result.resources + resourcesAndInfluence.resources * count
         end
     end
 
@@ -394,7 +394,7 @@ function getProduceConsumeResourcesAndCost(produceConsumeItems)
         local unitAttributes = CrLua.TI4.Unit.attributes(unit)
         local unitAttributesOverrides = produceConsumeItems.unitAttributesOverrides[unitName]
         unitAttributes = CrLua.Table.join(unitAttributes, unitAttributesOverrides or {})
-        result.cost = result.cost + math.ceil(unit.count * unitAttributes.cost)
+        result.cost = result.cost + math.ceil(unit.count * (unitAttributes.cost or 0))
         result.numUnits = result.numUnits + unit.count
     end
 
@@ -611,7 +611,7 @@ function announce(items, resourcesAndCost)
         local objectEffectsOverrides = items.objectEffectsOverrides[objectName]
         objectEffects = CrLua.Table.join(objectEffects or {}, objectEffectsOverrides or {})
         if objectEffects.tradegoods then
-            tradegoods = tradegoods + objectEffects.resources
+            tradegoods = tradegoods + (objectEffects.resources * count)
         else
             table.insert(consume, objectName)
         end

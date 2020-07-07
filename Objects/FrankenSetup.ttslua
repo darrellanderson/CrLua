@@ -211,6 +211,7 @@ local function replaceMultiRollers(name)
         end
     end
 
+    --[[
     local object = takeToAbove(self, name)
     coroutine.yield(0)
     local json = object.getJSON()
@@ -236,6 +237,13 @@ local function replaceMultiRollers(name)
         coroutine.yield(0)
         clone.setLock(true)
     end
+    --]]
+
+    -- MultiRoller is now Franken aware.
+    for _, object in ipairs(toReplace) do
+        object.call('setFranken')
+    end
+
 end
 
 function setupCoroutine()
@@ -257,7 +265,7 @@ function setupCoroutine()
         coroutine.yield(0)
     end
 
-    replaceMultiRollers('TI4 MultiRoller (Frankenstein)')
+    replaceMultiRollers()
     coroutine.yield(0)
 
     return 1

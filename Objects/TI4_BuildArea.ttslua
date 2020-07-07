@@ -478,7 +478,7 @@ function drawUi(items, resourcesAndCost)
 
     local r1c1 = 'Build Cost: ' .. (resourcesAndCost and resourcesAndCost.cost or '-')
     local r2c1 = 'Resources: ' .. (resourcesAndCost and (resourcesAndCost.resources .. (items.sarween and '+ST' or '')) or '-')
-    local r1c2 = '# Units: ' .. (resourcesAndCost and resourcesAndCost.unitCount or '-')
+    local r1c2 = '# Units: ' .. (resourcesAndCost and resourcesAndCost.numUnits or '-')
     local r2c2 = 'Production: R+' .. (items and items.production or '-')
 
     local w = panelWidth - 30

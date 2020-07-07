@@ -57,6 +57,17 @@ function onLoad()
     end
 end
 
+function setFranken()
+    if not isFranken() then
+        self.setName(self.getName() .. " (Franken)")
+    end
+end
+
+function isFranken()
+    local lower = string.lower(self.getName())
+    return string.find(lower, "franken")
+end
+
 function detectCards(playerColor)
     unitName = {}
     resetMods()
@@ -130,6 +141,11 @@ function checkCards(playerColor)
             if objectName == "Tekklar Legion" then
                 rollMod["Tekklar Legion (Opponent)"] = true
             end
+        end
+
+        -- Bunker can be anywhere (except in hand).
+        if object.getName() == "Bunker" and not inHandGuidSet[object.getGUID()] and not object.is_face_down then
+            rollMod["Bunker"] = true
         end
     end
 
@@ -797,31 +813,47 @@ modValue["SPC"]["Antimass Deflectors"]["Space Dock"] = -1
 
 unitType = {}
 unitType["War Sun"] = "War Sun"
+unitType["Prototype War Sun I"] = "War Sun"
 unitType["Prototype War Sun II"] = "War Sun"
 unitType["Cruiser II"] = "Cruiser"
 unitType["Battlecruiser II"] = "Cruiser"
 unitType["Dreadnought II"] = "Dreadnought"
 unitType["Super-Dreadnought II"] = "Dreadnought"
+unitType["Exotrireme I"] = "Dreadnought"
 unitType["Exotrireme II"] = "Dreadnought"
+unitType["Lancer Dreadnought I"] = "Dreadnought"
 unitType["Lancer Dreadnought II"] = "Dreadnought"
 unitType["Destroyer II"] = "Destroyer"
+unitType["Wraith Corvette I"] = "Destroyer"
 unitType["Wraith Corvette II"] = "Destroyer"
 unitType["PDS II"] = "PDS"
+unitType["Tachyon Lance I"] = "PDS"
 unitType["Tachyon Lance II"] = "PDS"
+unitType["Perdition Array I"] = "PDS"
 unitType["Perdition Array II"] = "PDS"
 unitType["Carrier II"] = "Carrier"
+unitType["Raid Shuttle I"] = "Carrier"
 unitType["Raid Shuttle II"] = "Carrier"
+unitType["Advanced Carrier I"] = "Carrier"
 unitType["Advanced Carrier II"] = "Carrier"
 unitType["Fighter II"] = "Fighter"
+unitType["Hybrid Crystal Fighter I"] = "Fighter"
 unitType["Hybrid Crystal Fighter II"] = "Fighter"
+unitType["Heavy Bomber I"] = "Fighter"
 unitType["Heavy Bomber II"] = "Fighter"
 unitType["Infantry II"] = "Infantry"
+unitType["Letani Warrior I"] = "Infantry"
 unitType["Letani Warrior II"] = "Infantry"
+unitType["Spec Ops I"] = "Infantry"
 unitType["Spec Ops II"] = "Infantry"
+unitType["Ashkari I"] = "Infantry"
 unitType["Ashkari II"] = "Infantry"
+unitType["Unholy Abominations I"] = "Infantry"
 unitType["Unholy Abominations II"] = "Infantry"
 unitType["Space Dock II"] = "Space Dock"
+unitType["Floating Factory I"] = "Space Dock"
 unitType["Floating Factory II"] = "Space Dock"
+unitType["Planetary Fortress I"] = "Space Dock"
 unitType["Planetary Fortress II"] = "Space Dock"
 unitType["Experimental Battlestation"] = "Space Dock"
 unitType["Coronata"] = "Flagship"
@@ -935,96 +967,98 @@ function baseUnits(factionName)
     unitName["Infantry"] = "Infantry I"
     unitName["Space Dock"] = "Space Dock I"
 
-    if factionName == "The Yssaril Tribes" then
-        unitName["Flagship"] = "Y'sia Y'ssrila"
-    elseif factionName == "The Clan Of Saar" then
-        unitName["Flagship"] = "Son of Ragh"
-        unitName["Space Dock"] = "Floating Factory I"
-    elseif factionName == "The Universities of Jol-Nar" then
-        unitName["Flagship"] = "J.N.S. Hylarim"
-        rollMod["Fragile"] = true
-    elseif factionName == "The Xxcha Kingdom" then
-        unitName["Flagship"] = "Loncara Ssodu"
-    elseif factionName == "The Arborec" then
-        unitName["Flagship"] = "Duha Menaimon"
-        unitName["Infantry"] = "Letani Warrior I"
-    elseif factionName == "The Nekro Virus" then
-        unitName["Flagship"] = "The Alastor"
-    elseif factionName == "The Embers Of Muaat" then
-        unitName["Flagship"] = "The Inferno"
-        unitName["War Sun"] = "Prototype War Sun I"
-    elseif factionName == "The Winnu" then
-        unitName["Flagship"] = "Salai Sai Corian"
-    elseif factionName == "The Sardakk N'orr" then
-        unitName["Flagship"] = "C'morran N'orr"
-        unitName["Dreadnought"] = "Exotrireme I"
-        rollMod["Unrelenting"] = true
-    elseif factionName == "The Ghosts Of Creuss" then
-        unitName["Flagship"] = "Hil Colish"
-    elseif factionName == "The Mentak Coalition" then
-        unitName["Flagship"] = "Fourth Moon"
-    elseif factionName == "The Barony Of Letnev" then
-        unitName["Flagship"] = "Arc Secundus"
-    elseif factionName == "The Emirates Of Hacan" then
-        unitName["Flagship"] = "Wrath of Kenara"
-    elseif factionName == "The Yin Brotherhood" then
-        unitName["Flagship"] = "Van Hauge"
-    elseif factionName == "The Naalu Collective" then
-        unitName["Flagship"] = "Matriarch"
-        unitName["Fighter"] = "Hybrid Crystal Fighter I"
-    elseif factionName == "The L1Z1X Mindnet" then
-        unitName["Flagship"] = "0.0.1"
-        unitName["Dreadnought"] = "Super-Dreadnought I"
-    elseif factionName == "The Federation Of Sol" then
-        unitName["Flagship"] = "Genesis"
-        unitName["Carrier"] = "Advanced Carrier I"
-        unitName["Infantry"] = "Spec Ops I"
-    elseif factionName == "The Drahn Consortium" then
-        unitName["Flagship"] = "Nightingale II"
-        unitName["Destroyer"] = "Wraith Corvette I"
-    elseif factionName == "The Fremen" then
-        unitName["Flagship"] = "Shai-Hulud"
-        unitName["Infantry"] = "Ashkari I"
-    elseif factionName == "The Khet Drakkol Union" then
-        unitName["Flagship"] = "Khage"
-    elseif factionName == "The Veldyr Sovereignty" then
-        unitName["Flagship"] = "Richtyrian"
-        unitName["Dreadnought"] = "Lancer Dreadnought I"
-        unitName["PDS"] = "Tachyon Lance I"
-    elseif factionName == "The Mandalorian Clans" then
-        unitName["Flagship"] = "Kyr'tsad"
-        unitName["Cruiser"] = "Battlecruiser I"
-        unitName["Carrier"] = "Raid Shuttle I"
-    elseif factionName == "The Advent" then
-        unitName["Flagship"] = "Advent Flagship"
-    elseif factionName == "The Free Systems Alliance" then
-        unitName["Flagship"] = "Vox"
-    elseif factionName == "The Navigators' Guild" then
-        unitName["Flagship"] = "Chogra Tuhn"
-    elseif factionName == "The Vasari Empire" then
-        unitName["Flagship"] = "Vasari Flagship"
-    elseif factionName == "The Trader Emergency Coalition" then
-        unitName["Flagship"] = "TEC Flagship"
-    elseif factionName == "The Kortali Horde" then
-        unitName["Flagship"] = "For'xdar"
-    elseif factionName == "The Rhodyn Migrant Fleet" then
-        unitName["Flagship"] = "Mho Rhodyn"
-    elseif factionName == "The HCEN Defense System" then
-        unitName["Flagship"] = "Locus"
-        unitName["PDS"] = "Perdition Array I"
-    elseif factionName == "The Gheldor Authority" then
-        unitName["Flagship"] = "Gheld'Atar"
-        unitName["Space Dock"] = "Planetary Fortress I"
-    elseif factionName == "The Zeth Contingency" then
-        unitName["Flagship"] = "Eru'Ishon"
-    elseif factionName == "The Lazax" then
-        unitName["Flagship"] = "Regulus"
-        unitName["Fighter"] = "Heavy Bomber I"
-    elseif factionName == "The Mahact Sorcerer Kings" then
-        unitName["Flagship"] = "Noctul H'rgan"
-    elseif factionName == "The Savages of Cymiae" then
-        unitName["Flagship"] = "Robotic Reprocessing Center"
-        unitName["Infantry"] = "Unholy Abominations I"
+    if not isFranken() then
+        if factionName == "The Yssaril Tribes" then
+            unitName["Flagship"] = "Y'sia Y'ssrila"
+        elseif factionName == "The Clan Of Saar" then
+            unitName["Flagship"] = "Son of Ragh"
+            unitName["Space Dock"] = "Floating Factory I"
+        elseif factionName == "The Universities of Jol-Nar" then
+            unitName["Flagship"] = "J.N.S. Hylarim"
+            rollMod["Fragile"] = true
+        elseif factionName == "The Xxcha Kingdom" then
+            unitName["Flagship"] = "Loncara Ssodu"
+        elseif factionName == "The Arborec" then
+            unitName["Flagship"] = "Duha Menaimon"
+            unitName["Infantry"] = "Letani Warrior I"
+        elseif factionName == "The Nekro Virus" then
+            unitName["Flagship"] = "The Alastor"
+        elseif factionName == "The Embers Of Muaat" then
+            unitName["Flagship"] = "The Inferno"
+            unitName["War Sun"] = "Prototype War Sun I"
+        elseif factionName == "The Winnu" then
+            unitName["Flagship"] = "Salai Sai Corian"
+        elseif factionName == "The Sardakk N'orr" then
+            unitName["Flagship"] = "C'morran N'orr"
+            unitName["Dreadnought"] = "Exotrireme I"
+            rollMod["Unrelenting"] = true
+        elseif factionName == "The Ghosts Of Creuss" then
+            unitName["Flagship"] = "Hil Colish"
+        elseif factionName == "The Mentak Coalition" then
+            unitName["Flagship"] = "Fourth Moon"
+        elseif factionName == "The Barony Of Letnev" then
+            unitName["Flagship"] = "Arc Secundus"
+        elseif factionName == "The Emirates Of Hacan" then
+            unitName["Flagship"] = "Wrath of Kenara"
+        elseif factionName == "The Yin Brotherhood" then
+            unitName["Flagship"] = "Van Hauge"
+        elseif factionName == "The Naalu Collective" then
+            unitName["Flagship"] = "Matriarch"
+            unitName["Fighter"] = "Hybrid Crystal Fighter I"
+        elseif factionName == "The L1Z1X Mindnet" then
+            unitName["Flagship"] = "0.0.1"
+            unitName["Dreadnought"] = "Super-Dreadnought I"
+        elseif factionName == "The Federation Of Sol" then
+            unitName["Flagship"] = "Genesis"
+            unitName["Carrier"] = "Advanced Carrier I"
+            unitName["Infantry"] = "Spec Ops I"
+        elseif factionName == "The Drahn Consortium" then
+            unitName["Flagship"] = "Nightingale II"
+            unitName["Destroyer"] = "Wraith Corvette I"
+        elseif factionName == "The Fremen" then
+            unitName["Flagship"] = "Shai-Hulud"
+            unitName["Infantry"] = "Ashkari I"
+        elseif factionName == "The Khet Drakkol Union" then
+            unitName["Flagship"] = "Khage"
+        elseif factionName == "The Veldyr Sovereignty" then
+            unitName["Flagship"] = "Richtyrian"
+            unitName["Dreadnought"] = "Lancer Dreadnought I"
+            unitName["PDS"] = "Tachyon Lance I"
+        elseif factionName == "The Mandalorian Clans" then
+            unitName["Flagship"] = "Kyr'tsad"
+            unitName["Cruiser"] = "Battlecruiser I"
+            unitName["Carrier"] = "Raid Shuttle I"
+        elseif factionName == "The Advent" then
+            unitName["Flagship"] = "Advent Flagship"
+        elseif factionName == "The Free Systems Alliance" then
+            unitName["Flagship"] = "Vox"
+        elseif factionName == "The Navigators' Guild" then
+            unitName["Flagship"] = "Chogra Tuhn"
+        elseif factionName == "The Vasari Empire" then
+            unitName["Flagship"] = "Vasari Flagship"
+        elseif factionName == "The Trader Emergency Coalition" then
+            unitName["Flagship"] = "TEC Flagship"
+        elseif factionName == "The Kortali Horde" then
+            unitName["Flagship"] = "For'xdar"
+        elseif factionName == "The Rhodyn Migrant Fleet" then
+            unitName["Flagship"] = "Mho Rhodyn"
+        elseif factionName == "The HCEN Defense System" then
+            unitName["Flagship"] = "Locus"
+            unitName["PDS"] = "Perdition Array I"
+        elseif factionName == "The Gheldor Authority" then
+            unitName["Flagship"] = "Gheld'Atar"
+            unitName["Space Dock"] = "Planetary Fortress I"
+        elseif factionName == "The Zeth Contingency" then
+            unitName["Flagship"] = "Eru'Ishon"
+        elseif factionName == "The Lazax" then
+            unitName["Flagship"] = "Regulus"
+            unitName["Fighter"] = "Heavy Bomber I"
+        elseif factionName == "The Mahact Sorcerer Kings" then
+            unitName["Flagship"] = "Noctul H'rgan"
+        elseif factionName == "The Savages of Cymiae" then
+            unitName["Flagship"] = "Robotic Reprocessing Center"
+            unitName["Infantry"] = "Unholy Abominations I"
+        end
     end
 end
 

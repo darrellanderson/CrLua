@@ -64,6 +64,13 @@ function onSave()
     return result
 end
 
+function onPlayerConnect(player_id)
+    -- For some reason the UI is not visible for late joiners.
+    -- Reset when new players join.
+    Wait.frames(_createUI, 2)
+    Wait.frames(updateUiFromConfig, 4)
+end
+
 function onPlayerTurnStart(playerColorStart, playerColorPrevious)
     if _config.updateBetweenTurns then
         _config.enabled = true
@@ -925,8 +932,9 @@ function applyPartialControlEdges(edgeSet, partialHexSet)
 
     local function zonePointIndex(zonePoints, position)
         assert(type(zonePoints) == 'table' and type(position) == 'table' and position.x)
+        local sloppyEpsilon = math.max(1, (Grid.sizeX or 0) / 6)
         for i, zonePoint in ipairs(zonePoints) do
-            if almostEqual(position, zonePoint, 1) then
+            if almostEqual(position, zonePoint, sloppyEpsilon) then
                 return i
             end
         end

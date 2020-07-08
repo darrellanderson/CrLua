@@ -73,6 +73,7 @@ STRATEGY_CARD_INITIATIVE = {
 }
 
 local _guidToParameters = {}
+local _allocatedTokenGuidToColor = {}
 
 function register(parameters)
     assert(type(parameters) == 'table')
@@ -408,9 +409,10 @@ function _allocateCommandTokens(playerColor, commandSheet, commandTokensBag, num
             _safeBroadcastToColor('You are out of Command Tokens.', playerColor, {0.8,0.2,0.2})
             break
         end
-        commandTokensBag.takeObject({
+        local token = commandTokensBag.takeObject({
             position = commandSheet.positionToWorld({ x = pos.x + (i * dx), y = pos.y + 1 + (i * 0.25), z = pos.z })
         })
+        _addUnallocatedCommandToken(token, playerColor)
     end
     _safeBroadcastToColor('Gained Command Tokens.', playerColor, {1,1,1})
 end
@@ -670,6 +672,68 @@ end
 
 -------------------------------------------------------------------------------
 
+function _addUnallocatedCommandToken(object, color)
+    local guid = object.getGUID()
+    _allocatedTokenGuidToColor[guid] = color
+    _resetUnallocatedCommandTokenSignal()
+end
+
+function _clearUnallocatedCommandToken(object)
+    local guid = object.getGUID()
+    if _allocatedTokenGuidToColor[guid] then
+        _allocatedTokenGuidToColor[guid] = nil
+        _resetUnallocatedCommandTokenSignal()
+    end
+end
+
+local _resetUnallocatedCommandTokenWaitId = false
+
+function _resetUnallocatedCommandTokenSignal()
+    local function delayed()
+        _resetUnallocatedCommandTokenWaitId = false
+
+        local colorToUnallocatedCount = {}
+        for guid, color in pairs(_allocatedTokenGuidToColor) do
+            colorToUnallocatedCount[color] = (colorToUnallocatedCount[color] or 0) + 1
+        end
+
+        for _, object in ipairs(getAllObjects()) do
+            if object.tag == 'Counter' then
+                local color = string.match(object.getName(), '(.*) Player Votes')
+                if color then
+                    if colorToUnallocatedCount[color] then
+                        object.createButton({
+                            click_function = 'doNothing',
+                            function_owner = self,
+                            label          = 'Please allocate\nCommand Tokens',
+                            position       = { x = 0, y = 0.24, z = 0.25 },
+                            rotation       = { x = 0, y = 180, z = 0 },
+                            width          = 400,
+                            height         = 50,
+                            font_size      = 40,
+                            color          = 'White',
+                            font_color     = 'Black',
+                        })
+                    else
+                        object.clearButtons()
+                    end
+                end
+            end
+        end
+    end
+
+    if _resetUnallocatedCommandTokenWaitId then
+        Wait.stop(_resetUnallocatedCommandTokenWaitId)
+        _resetUnallocatedCommandTokenWaitId = false
+    end
+    _resetUnallocatedCommandTokenWaitId = Wait.frames(delayed, 5)
+end
+
+function doNothing()
+end
+
+-------------------------------------------------------------------------------
+
 function onLoad(saveState)
     self.setColorTint({ r = 0.25, g = 0.25, b = 0.25 })
     self.setScale({ x = 2, y = 0.01, z = 2 })
@@ -684,4 +748,15 @@ function onLoad(saveState)
         end
     end
     self.setInvisibleTo(invisibleTo)
+end
+
+function onObjectPickUp(playerColor, pickedUpObject)
+    assert(type(playerColor) == 'string', type(pickedUpObject) == 'userdata')
+
+    -- Merely picking up an allocated token clears "unassigned".
+    _clearUnallocatedCommandToken(pickedUpObject)
+end
+
+function onObjectDestroy(dyingObject)
+    _clearUnallocatedCommandToken(dyingObject)
 end

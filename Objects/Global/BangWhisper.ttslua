@@ -7,12 +7,45 @@ function onChat(message, srcPlayer)
     if orginalOnChat and not orginalOnChat(message, srcPlayer) then
         return false -- originial suppressed message
     end
+
+    -- The real function throws an error on invalid input.
+    local function safeColorToHex(color)
+        local seatedColorSet = {}
+        for _, seatedColor in ipairs(getSeatedPlayers()) do
+            if color == seatedColor then
+                return Color.toHex(Color.fromString(color))
+            end
+        end
+        return 'ffffff'
+    end
+
     local srcColor = srcPlayer.color
+    local srcName = srcPlayer.steam_name
+    local srcHex = safeColorToHex(srcColor)
+    local msgHex = 'ffffff'
     local dstColor, message = string.match(message, '^!(%a+) (.+)')
+
     if dstColor then
         dstColor = dstColor:sub(1,1):upper()..dstColor:sub(2):lower()
-        local publicMessage = 'Whisper: ' .. srcColor .. ' -> ' .. dstColor
-        local privateMessage = '<' .. srcColor .. ' -> ' .. dstColor .. '>: ' .. message
+        local dstHex = safeColorToHex(dstColor)
+
+        local publicMessage = table.concat({
+            '[' .. msgHex .. ']!Whisper: ',
+            '[' .. srcHex .. ']' .. srcColor,
+            ' ',
+            '[' .. msgHex .. ']->',
+            ' ',
+            '[' .. dstHex .. ']' .. dstColor,
+        }, '')
+
+        local privateMessage = table.concat({
+            '[' .. dstHex .. ']<' .. dstColor .. '>',
+            ' ',
+            '[' .. srcHex .. ']' .. srcName .. ':',
+            ' ',
+            '[' .. msgHex .. ']' .. message
+        }, '')
+
         local found = false
         for _, color in ipairs(getSeatedPlayers()) do
             found = found or color == dstColor

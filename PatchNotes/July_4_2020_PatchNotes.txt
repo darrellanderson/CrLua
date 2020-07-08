@@ -1,7 +1,7 @@
 Franken:
 - Right click Franken bag for setup / remove zone menu items.
 - "Normal" strategy cards now support Franken (Scheming, Versatile).
-- Rename Franken multiroller and add exteral button click handler so auto-fill can use it (plasma scoring may not be set properly, unit counting should work).
+- "Normal" MultiRoller supports Franen (rename it to have "Franken" in the name)
 
 Deleted Items:
 - Ignore deleted hidden zones.
@@ -15,3 +15,14 @@ Autofill MultiRoller:
 Strategy Cards:
 - Report error instead of failing if not able to find the vote counter.
 - Only return tokens in the table area (one Blue Space faction places them on foreign faction sheets).  Also fixes potentially not reclaiming tokens on Ghosts home system depending on where it is on the table.
+- Do not return strategy cards if "Political Stability" is face up in zone.
+
+MultiRoller:
+- Fix some Blue Space flagships.
+- Use shared factions, zones.
+
+Place Trade Goods and Set Turns:
+- Bottom side has a button to end status phase for all.
+
+Globals:
+- Use shared systems, factions, zones.

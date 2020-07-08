@@ -19,7 +19,11 @@ function CrLua.TI4.Hex._layout()
     local result = CrLua.TI4.Hex._data.layout
     if not result then
         local orientation = CrLua.RedBlobHex.ORIENTATION.FLAT_TOP
-        local hexSize = CrLua.RedBlobHex.point(3.5, 3.5)
+        local size = {
+            x = (Grid.sizeX or 7) / 2.0,
+            y = (Grid.sizeY or 7) / 2.0,
+        }
+        local hexSize = CrLua.RedBlobHex.point(size.x, size.y)
         local origin = CrLua.RedBlobHex.point(0, 0)
         result = CrLua.RedBlobHex.layout(orientation, hexSize, origin)
         CrLua.TI4.Hex._data.layout = result

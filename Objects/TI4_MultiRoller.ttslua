@@ -122,9 +122,17 @@ function checkCards(playerColor)
         local zone = getZone(object)
         if zone == playerColor then
             -- Object in this player zone.
-            -- If not already a priority name, set name.
             local objectUnitType = unitType[objectName]
             local objectUnitName = objectUnitType and unitName[objectUnitType]
+
+            -- Be careful when detecting flagships, use ONLY bag or Franken token.
+            if objectUnitType == 'Flagship' then
+                if object.tag ~= 'Bag' and object.tag ~= 'Tile' then
+                    objectUnitType = false
+                end
+            end
+
+            -- If not already a priority name, set name.
             if objectUnitType and not priorityUnitNameSet[objectUnitName] then
                 unitName[objectUnitType] = objectName
             end

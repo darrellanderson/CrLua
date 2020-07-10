@@ -52,8 +52,8 @@ local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 
 function onLoad()
     createButtons()
-    for _, unitName in ipairs(unitList) do
-        unitListParams[unitName] = {}
+    for u, object in ipairs(unitList) do
+        unitListParams[unitList[u]] = {}
     end
 end
 
@@ -165,12 +165,6 @@ function updateHitValues()
             local uType = unitList[i]
             local uName = unitName[uType]
             local unit = unitName[unitList[i]]
-
-            print('xxx ' .. uType .. ' ' .. type(unitListParams[uType]))
-            print('xxx2 ' .. (uName or 'nil'))
-            for k, v in pairs(unitName) do
-                print('x ' .. k .. ' -> ' .. v)
-            end
 
             --reset crit parameter
             unitListParams[uType]["critCMBT"] = nil
@@ -862,30 +856,47 @@ unitType["Floating Factory II"] = "Space Dock"
 unitType["Planetary Fortress I"] = "Space Dock"
 unitType["Planetary Fortress II"] = "Space Dock"
 unitType["Experimental Battlestation"] = "Space Dock"
-unitType["Y'sia Y'ssrila"] = "Flagship"
-unitType["Son of Ragh"] = "Flagship"
-unitType["J.N.S. Hylarim"] = "Flagship"
-unitType["Loncara Ssodu"] = "Flagship"
-unitType["Duha Menaimon"] = "Flagship"
-unitType["The Alastor"] = "Flagship"
-unitType["The Inferno"] = "Flagship"
-unitType["Salai Sai Corian"] = "Flagship"
-unitType["C'morran N'orr"] = "Flagship"
-unitType["Hil Colish"] = "Flagship"
-unitType["Fourth Moon"] = "Flagship"
-unitType["Arc Secundus"] = "Flagship"
-unitType["Wrath of Kenara"] = "Flagship"
-unitType["Van Hauge"] = "Flagship"
-unitType["Matriarch"] = "Flagship"
-unitType["[0.0.1]"] = "Flagship"
-unitType["Genesis"] = "Flagship"
 unitType["Coronata"] = "Flagship"
 unitType["Eradica"] = "Flagship"
 unitType["Vorastra"] = "Flagship"
 unitType["Kultorask"] = "Flagship"
 unitType["Anklyon"] = "Flagship"
 unitType["Ragnarov"] = "Flagship"
-
+--
+unitType["Y'sia Y'ssrila"] = "Flagship" -- Franken
+unitType["Son of Ragh"] = "Flagship" -- Franken
+unitType["J.N.S. Hylarim"] = "Flagship" -- Franken
+unitType["Loncara Ssodu"] = "Flagship" -- Franken
+unitType["Duha Menaimon"] = "Flagship" -- Franken
+unitType["The Alastor"] = "Flagship" -- Franken
+unitType["The Inferno"] = "Flagship" -- Franken
+unitType["Salai Sai Corian"] = "Flagship" -- Franken
+unitType["C'morran N'orr"] = "Flagship" -- Franken
+unitType["Hil Colish"] = "Flagship" -- Franken
+unitType["Fourth Moon"] = "Flagship" -- Franken
+unitType["Arc Secundus"] = "Flagship" -- Franken
+unitType["Wrath of Kenara"] = "Flagship" -- Franken
+unitType["Van Hauge"] = "Flagship" -- Franken
+unitType["Matriarch"] = "Flagship" -- Franken
+unitType["[0.0.1]"] = "Flagship" -- Franken
+unitType["Genesis"] = "Flagship" -- Franken
+unitType["Nightingale II"] = "Flagship" -- Franken
+unitType["Shai-Hulud"] = "Flagship" -- Franken
+unitType["Khage"] = "Flagship" -- Franken
+unitType["Richtyrian"] = "Flagship" -- Franken
+unitType["Kyr'tsad"] = "Flagship" -- Franken
+unitType["Advent Flagship"] = "Flagship" -- Franken
+unitType["Vox"] = "Flagship" -- Franken
+unitType["Chogra Tuhn"] = "Flagship" -- Franken
+unitType["Vasari Flagship"] = "Flagship" -- Franken
+unitType["TEC Flagship"] = "Flagship" -- Franken
+unitType["For'xdar"] = "Flagship" -- Franken
+unitType["Mho Rhodyn"] = "Flagship" -- Franken
+unitType["Locus"] = "Flagship" -- Franken
+unitType["Gheld'Atar"] = "Flagship" -- Franken
+unitType["Eru'Ishon"] = "Flagship" -- Franken
+unitType["Regulus"] = "Flagship" -- Franken
+unitType["Noctul H'rgan"] = "Flagship" -- Franken
 
 unitDie = {}
 unitDie["Dreadnought"] = "Purple"

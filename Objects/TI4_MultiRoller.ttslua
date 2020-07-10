@@ -52,8 +52,8 @@ local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 
 function onLoad()
     createButtons()
-    for u, object in ipairs(unitList) do
-        unitListParams[unitList[u]] = {}
+    for _, unitName in ipairs(unitList) do
+        unitListParams[unitName] = {}
     end
 end
 
@@ -165,6 +165,12 @@ function updateHitValues()
             local uType = unitList[i]
             local uName = unitName[uType]
             local unit = unitName[unitList[i]]
+
+            print('xxx ' .. uType .. ' ' .. type(unitListParams[uType]))
+            print('xxx2 ' .. (uName or 'nil'))
+            for k, v in pairs(unitName) do
+                print('x ' .. k .. ' -> ' .. v)
+            end
 
             --reset crit parameter
             unitListParams[uType]["critCMBT"] = nil
@@ -703,7 +709,7 @@ unitParams["Arc Secundus"] = {type="Flagship",hitCMBT=5,rollsCMBT=2,hitBOMB=5,ro
 unitParams["Wrath of Kenara"] = {type="Flagship",hitCMBT=7,rollsCMBT=2}
 unitParams["Van Hauge"] = {type="Flagship",hitCMBT=9,rollsCMBT=2}
 unitParams["Matriarch"] = {type="Flagship",hitCMBT=9,rollsCMBT=2}
-unitParams["0.0.1"] = {type="Flagship",hitCMBT=5,rollsCMBT=2}
+unitParams["[0.0.1]"] = {type="Flagship",hitCMBT=5,rollsCMBT=2}
 unitParams["Genesis"] = {type="Flagship",hitCMBT=5,rollsCMBT=2}
 unitParams["Nightingale II"] = {type="Flagship",hitCMBT=9,rollsCMBT=2}
 unitParams["Shai-Hulud"] = {type="Flagship",hitCMBT=9,rollsCMBT=2}
@@ -856,6 +862,23 @@ unitType["Floating Factory II"] = "Space Dock"
 unitType["Planetary Fortress I"] = "Space Dock"
 unitType["Planetary Fortress II"] = "Space Dock"
 unitType["Experimental Battlestation"] = "Space Dock"
+unitType["Y'sia Y'ssrila"] = "Flagship"
+unitType["Son of Ragh"] = "Flagship"
+unitType["J.N.S. Hylarim"] = "Flagship"
+unitType["Loncara Ssodu"] = "Flagship"
+unitType["Duha Menaimon"] = "Flagship"
+unitType["The Alastor"] = "Flagship"
+unitType["The Inferno"] = "Flagship"
+unitType["Salai Sai Corian"] = "Flagship"
+unitType["C'morran N'orr"] = "Flagship"
+unitType["Hil Colish"] = "Flagship"
+unitType["Fourth Moon"] = "Flagship"
+unitType["Arc Secundus"] = "Flagship"
+unitType["Wrath of Kenara"] = "Flagship"
+unitType["Van Hauge"] = "Flagship"
+unitType["Matriarch"] = "Flagship"
+unitType["[0.0.1]"] = "Flagship"
+unitType["Genesis"] = "Flagship"
 unitType["Coronata"] = "Flagship"
 unitType["Eradica"] = "Flagship"
 unitType["Vorastra"] = "Flagship"
@@ -1006,7 +1029,7 @@ function baseUnits(factionName)
             unitName["Flagship"] = "Matriarch"
             unitName["Fighter"] = "Hybrid Crystal Fighter I"
         elseif factionName == "The L1Z1X Mindnet" then
-            unitName["Flagship"] = "0.0.1"
+            unitName["Flagship"] = "[0.0.1]"
             unitName["Dreadnought"] = "Super-Dreadnought I"
         elseif factionName == "The Federation Of Sol" then
             unitName["Flagship"] = "Genesis"

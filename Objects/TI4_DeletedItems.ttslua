@@ -24,6 +24,13 @@ local lastErrorTimestamp = false
 
 local enableDebugMessages = false
 
+local ignoreGuidSet = {}
+
+-- Add a way for external objects to tell us to ignore a deletion.
+function ignoreGuid(guid)
+    ignoreGuidSet[guid] = true
+end
+
 function onLoad()
     debugMessage('DEBUG MESSAGES ARE ENABLED')
     createButton()
@@ -58,6 +65,11 @@ function onObjectDestroy(dyingObject)
     -- No regrets.
     if dyingObject == self or string.find(dyingObject.getName(), 'TI4 Deleted Items') then
         objectEnteredContainerSet[dyingObject] = nil
+        return
+    end
+
+    if ignoreGuidSet[dyingObject.getGUID()] then
+        ignoreGuidSet[dyingObject.getGUID()] = nil
         return
     end
 

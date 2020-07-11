@@ -1,0 +1,240 @@
+local TAG = 'AutoFillMultiRollerArena'
+
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
+        return function(parameters) return helperObject.call(functionName, parameters) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
+
+_activatedSystemGuid = false
+
+function onLoad(saveState)
+    CrLua.Log.d(TAG, 'onLoad ' .. tostring(_activatedSystemGuid))
+    Wait.frames(applyUi, 2)
+end
+
+function onPlayerConnect(player_id)
+    Wait.frames(applyUi, 2)
+end
+
+function onObjectDrop(playerColor, droppedObject)
+    CrLua.Log.d(TAG, 'onObjectDrop ' ..droppedObject.getName())
+    local isPlayerCurrentTurn = playerColor == Turns.turn_color
+    if not isPlayerCurrentTurn then
+        return
+    end
+    local isCommandToken = string.find(droppedObject.getName(), ' Command Token')
+    if not isCommandToken then
+        return
+    end
+    local system = _systemHelper.systemFromPosition(droppedObject.getPosition())
+    if not system then
+        return  -- ignore tokens not dropped on a system
+    end
+
+    CrLua.Log.d(TAG, 'onObjectDrop: activated by ' .. playerColor)
+    _activatedSystemGuid = system.guid
+
+    -- Replace our diffuse image with the one from the activated tile.
+    local systemObject = getObjectFromGUID(system.guid)
+    local systemCustom = systemObject.getCustomObject()
+    local custom = self.getCustomObject()
+    custom.diffuse = systemCustom.diffuse
+
+    -- Resetting custom object triggers delete.  Tell Deleted Items it is ok.
+    ignoreDeletedItem(self.getGUID())
+    self.setCustomObject(custom)
+    local newSelf = self.reload()
+
+    local function injectActivatedSystemGuid()
+        CrLua.Log.d(TAG, 'applying activated system guid')
+        newSelf.setVar('_activatedSystemGuid', _activatedSystemGuid)
+    end
+    Wait.frames(injectActivatedSystemGuid, 1)
+    Wait.frames(injectActivatedSystemGuid, 3)  -- again just a little later
+end
+
+local _deletedItemsGuid = false
+function ignoreDeletedItem(guid)
+    CrLua.Log.d(TAG, 'ignoreDeletedItem ' .. guid)
+
+    local deletedItems = _deletedItemsGuid and getObjectFromGUID(_deletedItemsGuid)
+    if not deletedItems then
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == 'TI4 Deleted Items' then
+                _deletedItemsGuid = object.getGUID()
+                deletedItems = object
+                break
+            end
+        end
+    end
+    if deletedItems then
+        CrLua.Log.d(TAG, 'ignoreDeletedItem found ' .. deletedItems.getName())
+        deletedItems.call('ignoreGuid', guid)
+    end
+end
+
+-------------------------------------------------------------------------------
+
+function getBoundingBox(object)
+    local bounds = object.getBounds()
+    return {
+        min = {
+            x = bounds.center.x - bounds.size.x,
+            z = bounds.center.z - bounds.size.z,
+        },
+        max = {
+            x = bounds.center.x + bounds.size.x,
+            z = bounds.center.z + bounds.size.z,
+        },
+    }
+end
+
+function isInsideBoundingBox(p, bb)
+    return p.x >= bb.min.x and p.x <= bb.max.x and p.z >= bb.min.z and p.z <= bb.max.z
+end
+
+local SMOOTH_POSITION_FAST = false
+
+function warpIn()
+    CrLua.Log.d(TAG, 'warpIn')
+
+    local systemObject = _activatedSystemGuid and getObjectFromGUID(_activatedSystemGuid)
+    if not systemObject then
+        error(TAG .. ': no activated system')
+    end
+
+    local hex = CrLua.TI4.Hex.fromPosition(systemObject.getPosition())
+    local bb = getBoundingBox(systemObject)
+    local function checkUnit(unit)
+        local p = unit.object.getPosition()
+        if isInsideBoundingBox(p, bb) and hex == CrLua.TI4.Hex.fromPosition(p) then
+            p = self.positionToWorld(systemObject.positionToLocal(p))
+            p.y = p.y + 2
+            local collide = false
+            unit.object.setPositionSmooth(p, collide, SMOOTH_POSITION_FAST)
+        end
+    end
+    CrLua.TI4.Unit.getAllUnits(checkUnit)
+end
+
+function warpOut()
+    CrLua.Log.d(TAG, 'warpOut')
+
+    local systemObject = _activatedSystemGuid and getObjectFromGUID(_activatedSystemGuid)
+    if not systemObject then
+        error(TAG .. ': no activated system')
+    end
+
+    local extraY = 0
+
+    local hex = CrLua.TI4.Hex.fromPosition(systemObject.getPosition())
+    local bb = getBoundingBox(self)
+    local function checkUnit(unit)
+        local p = unit.object.getPosition()
+        if isInsideBoundingBox(p, bb) then
+            p = systemObject.positionToWorld(self.positionToLocal(p))
+            if hex == CrLua.TI4.Hex.fromPosition(p) then
+                p.y = p.y + 2 + extraY
+                extraY = extraY + 0.5
+                local collide = false
+                unit.object.setPositionSmooth(p, collide, SMOOTH_POSITION_FAST)
+            end
+        end
+    end
+    CrLua.TI4.Unit.getAllUnits(checkUnit)
+end
+
+-------------------------------------------------------------------------------
+
+function onButtonClick(player, option, id)
+    CrLua.Log.d(TAG, 'onButtonClick: id=' .. id)
+    if id == 'warpIn' then
+        warpIn()
+    elseif id == 'warpOut' then
+        warpOut()
+    end
+end
+
+function applyUi()
+    local function getWarpButton(position, rotation, id, value)
+        return {
+            tag = 'Button',
+            attributes = {
+                position = position,
+                rotation = rotation,
+                id = id,
+            },
+            value = value,
+        }
+    end
+    local buttons = {
+        getWarpButton('-60 247 0', '0 0 0', 'warpIn', 'WARP IN'),
+        getWarpButton('60 247 0', '0 0 0', 'warpOut', 'WARP OUT')
+    }
+    self.UI.setXmlTable({
+        {
+            tag = 'Defaults',
+            children = {
+                {
+                    tag = 'Button',
+                    attributes = {
+                        onClick = 'onButtonClick',
+                        fontSize = 12,
+                        fontStyle = 'Bold',
+                        width = 100,
+                        height = 25,
+                    }
+                },
+            }
+        },
+        {
+            tag = 'Panel',
+            attributes = {
+                position = '0 0 -32',  -- 0.05
+                rotation = '0 0 180',
+                width = 100,
+                height = 100,
+            },
+            children = buttons
+        }
+    })
+end
+
+-------------------------------------------------------------------------------
+
+#include <~/CrLua/CrLua>
+#include <~/CrLua/LockGlobals>
+
+#include <~/CrLua/List>
+#include <~/CrLua/LockTable>
+#include <~/CrLua/Log>
+#include <~/CrLua/Polygon>
+#include <~/CrLua/RedBlobHex>
+#include <~/CrLua/Table>
+#include <~/CrLua/Util>
+
+#include <~/CrLua/TI4/Faction>
+#include <~/CrLua/TI4/Hex>
+#include <~/CrLua/TI4/Unit>
+
+--CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
+
+CrLua.assertRequired({
+    'TI4.Hex',
+    'TI4.Unit',
+    'List',
+    'Log'
+})
+CrLua.lock()

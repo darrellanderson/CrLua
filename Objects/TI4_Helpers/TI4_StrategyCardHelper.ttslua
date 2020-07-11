@@ -380,7 +380,7 @@ function _returnCommandTokens(playerColor, commandTokens, commandTokensBag)
     _safeBroadcastToColor('Returned Command Tokens.', playerColor, {1,1,1})
 end
 
-function _getAllocateCommandTokensCount(playerColor, faction, lowerNameToInZoneCards, versatile)
+function _getAllocateCommandTokensCount(playerColor, faction, lowerNameToInZoneCards)
     assert(type(playerColor) == 'string' and type(lowerNameToInZoneCards) == 'table')
     local result = 2
     if faction and faction.extraCommandTokens then
@@ -391,7 +391,7 @@ function _getAllocateCommandTokensCount(playerColor, faction, lowerNameToInZoneC
         _safeBroadcastToColor('Hyper Metabolism active.', playerColor, {0.1,0.5,0.1})
         result = result + 1
     end
-    if versatile then
+    if lowerNameToInZoneCards['versatile'] then
         _safeBroadcastToColor('Versatile active.', playerColor, {0.1,0.5,0.1})
         result = result + 1
     end
@@ -417,7 +417,7 @@ function _allocateCommandTokens(playerColor, commandSheet, commandTokensBag, num
     _safeBroadcastToColor('Gained Command Tokens.', playerColor, {1,1,1})
 end
 
-function _getDealActionCardsCount(playerColor, faction, lowerNameToInZoneCards, scheming)
+function _getDealActionCardsCount(playerColor, faction, lowerNameToInZoneCards)
     assert(type(playerColor) == 'string' and type(lowerNameToInZoneCards) == 'table')
     local result = 1
     if faction and faction.extraActionCards then
@@ -428,7 +428,7 @@ function _getDealActionCardsCount(playerColor, faction, lowerNameToInZoneCards, 
         _safeBroadcastToColor('Neural Motivator active.', playerColor, {0.1,0.5,0.1})
         result = result + 1
     end
-    if scheming then
+    if lowerNameToInZoneCards['scheming'] then
         _safeBroadcastToColor('Scheming active.', playerColor, {0.1,0.5,0.1})
         result = result + 1
     end
@@ -469,8 +469,7 @@ local function _doEndOfStatusPhaseCoroutineBody(playerColor)
     local units = {}
     local lowerNameToCards = {}
 
-    local scheming = false  -- Franken
-    local versatile = false  -- Franken
+    local isFranken = false
 
     -- Gather other relevant objects in a single pass.
     local inHandGuidSet = _zoneHelper.inHand()
@@ -485,13 +484,9 @@ local function _doEndOfStatusPhaseCoroutineBody(playerColor)
                 commandSheet = object
             elseif name == voteCounterName then
                 voteCounter = object
-            elseif name == 'Scheming' then
-                scheming = true
-            elseif name == 'Versatile' then
-                versatile = true
             elseif string.match(name, unitNamePattern) or name == flagshipName then
                 table.insert(units, object)
-            elseif object.tag == 'Card' then
+            elseif object.tag == 'Card' or name == 'Scheming' or name == 'Versatile' then
                 local lowerName = string.lower(name)
                 local cards = lowerNameToCards[lowerName]
                 if not cards then
@@ -500,6 +495,8 @@ local function _doEndOfStatusPhaseCoroutineBody(playerColor)
                 end
                 table.insert(cards, object)
             end
+
+            isFranken = isFranken or string.match(name, '^TI4 MultiRoller') and string.find(string.lower(name), 'franken')
         end
     end
     coroutine.yield(0)
@@ -527,6 +524,11 @@ local function _doEndOfStatusPhaseCoroutineBody(playerColor)
     end
     coroutine.yield(0)
 
+    -- Franken do not benefit from faction attributes and may have different flagships.
+    if isFranken then
+        faction = false
+    end
+
     _readyCards(playerColor, lowerNameToInZoneCards)
     _repairUnits(playerColor, units)
 
@@ -540,7 +542,7 @@ local function _doEndOfStatusPhaseCoroutineBody(playerColor)
         _safeBroadcastToColor('No faction sheet detected.', playerColor, {0.8,0.2,0.2})
     end
 
-    local numCommandTokens = _getAllocateCommandTokensCount(playerColor, faction, lowerNameToInZoneCards, versatile)
+    local numCommandTokens = _getAllocateCommandTokensCount(playerColor, faction, lowerNameToInZoneCards)
     if commandTokensBag then
         _returnCommandTokens(playerColor, commandTokens, commandTokensBag)
         coroutine.yield(0)
@@ -557,7 +559,7 @@ local function _doEndOfStatusPhaseCoroutineBody(playerColor)
         end
     end
 
-    local numActionCards = _getDealActionCardsCount(playerColor, faction, lowerNameToInZoneCards, scheming)
+    local numActionCards = _getDealActionCardsCount(playerColor, faction, lowerNameToInZoneCards)
     while numActionCards > 0 do
         local actionDeck = _getActionDeck()
         if not actionDeck then

@@ -353,6 +353,7 @@ function getUnits(hex, adjacentHexes)
     local adjacentHexesSet = CrLua.List.toSet(adjacentHexes or {})
     local function isInSelfOrAdjacentHex(unit)
         local position = unit.object.getPosition()
+        unit.position = position
         unit.hex = CrLua.TI4.Hex.fromPosition(position)
         return unit.hex == hex or adjacentHexesSet[unit.hex]
     end
@@ -399,6 +400,58 @@ end
 
 -------------------------------------------------------------------------------
 
+function getArenaUnits(activatedSystemGuid)
+    local arenaName = 'TI4 Auto-fill MultiRoller Arena'
+
+    -- Allow multiple arena objects to coexist.
+    local bbToArenaObject = false
+    for _, object in ipairs(getAllObjects()) do
+        if object.getName() == arenaName then
+            local bounds = object.getBounds()
+            local bb = {
+                min = {
+                    x = bounds.center.x - bounds.size.x,
+                    z = bounds.center.z - bounds.size.z,
+                },
+                max = {
+                    x = bounds.center.x + bounds.size.x,
+                    z = bounds.center.z + bounds.size.z,
+                },
+            }
+            bbToArenaObject = bbToArenaObject or {}
+            bbToArenaObject[bb] = object
+        end
+    end
+    if not bbToArenaObject then
+        CrLua.Log.d(TAG, 'getArenaUnits: no arenas')
+        return false
+    end
+
+    local activatedSystemObject = getObjectFromGUID(activatedSystemGuid)
+    local hex = CrLua.TI4.Hex.fromPosition(activatedSystemObject.getPosition())
+
+    local function checkUnit(unit)
+        local p = unit.object.getPosition()
+        for bb, arenaObject in pairs(bbToArenaObject) do
+            if p.x >= bb.min.x and p.x <= bb.max.x and p.z >= bb.min.z and p.z <= bb.max.z then
+                -- unit is in arena bounding box.  Get in-system position to
+                -- make sure it is actually in the hex.
+                p = activatedSystemObject.positionToWorld(arenaObject.positionToLocal(p))
+                if hex == CrLua.TI4.Hex.fromPosition(p) then
+                    unit.hex = hex
+                    unit.position = p  -- world position inside activated system
+                    return true
+                end
+            end
+        end
+    end
+    local result = CrLua.TI4.Unit.getAllUnits(checkUnit)
+    CrLua.Log.d(TAG, 'getArenaUnits: #units=' .. (result and #result or 0))
+    return result
+end
+
+-------------------------------------------------------------------------------
+
 function autoFill(params)
     assert(type(params.clickerColor) == 'string', 'clickerColor')
     assert(type(params.altClick) == 'boolean', 'altClick')
@@ -431,17 +484,23 @@ function autoFill(params)
     local hex, adjacent = getHexes(data.lastActivatedPosition)
     local unitsInHex, unitsInAdjacent = getUnits(hex, adjacent)
 
+    -- Inject units on supplemental tile, using a fake object for position.
+    local system = _systemHelper.systemFromPosition(data.lastActivatedPosition)
+    local arenaUnits = getArenaUnits(system.guid)
+    if arenaUnits then
+        unitsInHex = CrLua.List.join(unitsInHex, arenaUnits)
+    end
+
     -- If per-planet, restrict to units in hex to those on the given planet.
     local planet = false
     if params.planetIndex then
-        local system = _systemHelper.systemFromPosition(data.lastActivatedPosition)
         if system and system.planets and #system.planets >= params.planetIndex then
             planet = system.planets[params.planetIndex].name
             local onPlanet = {}
             for _, unit in ipairs(unitsInHex) do
                 local p = _systemHelper.planetFromPosition({
                     systemGuid = system.guid,
-                    position = unit.object.getPosition(),
+                    position = unit.position,
                     exact = false
                 })
                 if p and p.name == planet then

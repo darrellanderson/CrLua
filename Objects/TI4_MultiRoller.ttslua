@@ -127,7 +127,7 @@ function checkCards(playerColor)
 
             -- Be careful when detecting flagships, use ONLY bag or Franken token.
             if objectUnitType == 'Flagship' then
-                if object.tag ~= 'Bag' and object.tag ~= 'Tile' then
+                if object.tag ~= 'Bag' and object.tag ~= 'Tile' and object.tag ~= 'Card' then
                     objectUnitType = false
                 end
             end

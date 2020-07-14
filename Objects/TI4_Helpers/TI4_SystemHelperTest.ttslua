@@ -16,6 +16,12 @@ end
 
 local systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 
+local function systemFromTileNumber(tile)
+    for _, system in ipairs(systemHelper.systems()) do
+        if system.tile == tile then return system end
+    end
+end
+
 function onLoad(save_state)
     print(self.getName() .. '.onLoad')
 

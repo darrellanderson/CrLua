@@ -242,13 +242,16 @@ local _systems = {
         { name = "Hope's End", resources = 3, influence = 0, trait = 'hazardous' }
     }},
     ['8b4ba2'] = { tile = 1014, planets = {
-        { name = 'Cormund', resources = 2, influence = 0, trait = 'cultural' }
+        { name = 'Cormund', resources = 2, influence = 0, trait = 'cultural' },
+        anomalies = { 'nebula'}
     }},
     ['a682b7'] = { tile = 1015, planets = {
         { name = 'Malice', resources = 0, influence = 2, trait = 'cultural', position = { x = -0.9, z = -0.4 } }
     }},
     ['35baa0'] = { tile = 1016, planets = {
-        { name = 'Everra', resources = 3, influence = 1, trait = 'cultural', position = { x = 0.7, z = -1.2 } }
+        { name = 'Everra', resources = 3, influence = 1, trait = 'cultural', position = { x = 0.7, z = -1.2 },
+        anomalies = { 'gravity rift'}
+    }
     }},
     ['ff5d4a'] = { tile = 1017, planets = {
         { name = 'Vega Major', resources = 2, influence = 1, trait = 'industrial' },

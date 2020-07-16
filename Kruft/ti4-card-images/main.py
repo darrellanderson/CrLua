@@ -275,7 +275,7 @@ def agendaCard(title, type, body):
     color = (0, 0, 0, 255)
     text = body
     y = 220
-    maxWidth = 480
+    maxWidth = 400
     if 'Elect ' in text:
         for line in text.split('\n'):
             x = 250

@@ -1,0 +1,120 @@
+--- Push data to a Google sheet
+-- @author Darrell
+--
+-- Google Sheets provides an API to edit/update sheets, however it requires
+-- authentication even if the sheet is public.  Rather than going through the
+-- authentication process, instead talk to a proxy Google Apps Script which
+-- interacts with sheets.
+--
+-- Here are some links I found useful while researching this:
+-- @see https://developers.google.com/sheets/api/guides/concepts
+-- @see https://developers.google.com/sheets/api/guides/values
+-- @see http://embedded-lab.com/blog/post-data-google-sheets-using-esp8266/
+--
+-- HOW TO USE:
+--
+-- Copy the base spreadsheet, the File -> Share -> Get Link.  Make sure the
+-- link sharing settings are "Anyone with the link" and "Editor" so this script
+-- can update the sheet.  CAREFUL, keep this link private to prevent hooligans
+-- from updating your sheet.
+
+local _sheetShareLink = 'https://docs.google.com/spreadsheets/d/1ehY7DKXigzavvlqkNKyjsHTYclnjJOE2Tbf2tOzHzPA/edit?usp=sharing'
+local _webScript = 'https://script.google.com/macros/s/AKfycbyoA0RDjoyekumzpE8l_HCEx8KTwPmjZqDLbrVTg1mVQ0mDKOWp/exec'
+
+function sheetLinkToSheetId(url)
+    local id = string.match(url, 'http[s]://docs.google.com/spreadsheets/.*/(.*)/edit')
+    if not id then
+        error('unable to extract id from sheet url')
+    end
+    return id
+end
+
+function webRequestToTable(webRequest)
+    assert(type(webRequest) == 'userdata')
+    return {
+        download_progress = webRequest.download_progress,
+        error = webRequest.error,
+        is_error = webRequest.is_error,
+        is_done = webRequest.is_done,
+        text = webRequest.text,
+        upload_progress = webRequest.upload_progress,
+        url = webRequest.url
+    }
+end
+
+function putCallback(webRequest)
+    print('putCallback: error = "' .. (webRequest.error or 'nil') .. '"')
+    for k, v in pairs(webRequestToTable(webRequest)) do
+        print(k .. ' -> ' .. tostring(v or 'nil'))
+    end
+end
+
+function onLoad(save_state)
+    print('onLoad ' .. self.getName() .. ' ' .. Time.time)
+
+    self.createInput({
+        input_function = "doNothing",
+      function_owner = self,
+      position  = {x=0, y=0.2, z=0},
+      width    = 1000,
+      height    = 180,
+      font_size  = 50,
+      alignment  = 2,
+      value    = "",
+      label     = "Enter the Google Sheet EDITOR ENABLED shared link."
+    })
+    self.createButton({
+      click_function  = "report",
+      function_owner  = self,
+      label      = "Report",
+      position    = {x=0, y=0.5, z=0.4},
+      width      = 500,
+      height      = 200,
+      font_size    = 100,
+    })
+end
+
+function doNothing()
+end
+
+function getReportData(id)
+    local result = {
+        id = id
+    }
+
+    result.players = {}
+    for _, player in ipairs(Player.getPlayers()) do
+        table.insert(result.players, {
+            color = player.color,
+            hexColor = Color.toHex(Color.fromString(player.color)),
+            name = player.steam_name
+        })
+    end
+
+
+    return result
+end
+
+function report()
+    local function getLink()
+        for _, input in ipairs(self.getInputs()) do
+            if string.match(input.label, '^Enter the Google Sheet') then
+                return input.value
+            end
+        end
+        error('missing input')
+    end
+    local link = getLink()
+
+    local id = sheetLinkToSheetId(link)
+    local postData = getReportData(id)
+
+    --local url = string.gsub(_apiUrl, '$SHEET_ID', _sheetId)
+    --url = url .. '?' .. 'key=' .. _apiKey
+
+    local url = _webScript
+    WebRequest.post(url, JSON.encode(postData), putCallback)
+end
+
+#include <~/CrLua/CrLua>
+#include <~/CrLua/LockGlobals>

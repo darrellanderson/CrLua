@@ -80,6 +80,7 @@ function register(parameters)
     assert(type(parameters.guid) == 'string')
     assert(type(parameters.position) == 'table' and type(parameters.position.x) == 'number')
     assert(type(parameters.rotation) == 'table' and type(parameters.rotation.x) == 'number')
+    assert(type(parameters.ui) == 'string')
     assert(type(parameters.onPlayCallback) == 'string')
 
     _guidToParameters[parameters.guid] = parameters
@@ -178,7 +179,23 @@ end
 function _onClickPlay(strategyCard, parameters, playerColor)
     assert(type(strategyCard) == 'userdata' and type(parameters) == 'table' and type('playerColor') == 'string')
     _hideConfirmButtom(strategyCard)
-    strategyCard.call(parameters.onPlayCallback, playerColor)
+
+    -- Toggle visibility
+    local seated = {}
+    for _, color in pairs(getSeatedPlayers()) do
+        table.insert(seated, color)
+    end
+    local active = UI.getAttribute(parameters.ui, 'active')
+    active = string.lower(active) == 'true' and true or false
+    if active or #seated == 0 then
+        UI.setAttribute(parameters.ui, 'active', false)
+    else
+        UI.setAttribute(parameters.ui, "visibility", table.concat(seated, "|"))
+        UI.setAttribute(parameters.ui, "active", true)
+        -- Tell the card in case there is any custom handling there.
+        broadcastToAll('Activating ' .. strategyCard.getName(), playerColor)
+        strategyCard.call(parameters.onPlayCallback, playerColor)
+    end
 end
 
 function _onClickReturn(strategyCard, parameters, playerColor)

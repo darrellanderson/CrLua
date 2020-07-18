@@ -1,0 +1,71 @@
+--- Shared deck locations, etc.
+-- @author Darrell
+
+-- Find decks based on placemats, that way can move mats and it just works.
+local PLACEMAT_GUID = {
+    SCORE = '',
+    DECKS = '',
+}
+
+local DECK = {
+    ['Objectives1'] = {
+        parentGuid = PLACEMAT_GUID.SCORE,
+        deckTransform = {
+            position = {},
+            rotation = {},
+        },
+        discardTransform = false,
+        cardNames = {},
+    },
+    ['Objectives2'] = {
+        parentGuid = PLACEMAT_GUID.SCORE,
+        deckTransform = {
+            position = {},
+            rotation = {},
+        },
+        discardTransform = false,
+        cardNames = {},
+    },
+    ['Secrets'] = {
+        parentGuid = PLACEMAT_GUID.DECKS,
+        deckTransform = {
+            position = {},
+            rotation = {},
+        },
+        discardTransform = false,
+        shuffleOnDiscard = true,
+        cardNames = {},
+    },
+    ['Agendas'] = {
+        parentGuid = PLACEMAT_GUID.DECKS,
+        deckTransform = {
+            position = {},
+            rotation = {},
+        },
+        discardTransform = {
+            position = {},
+            rotation = {},
+        },
+        cardNames = {},
+    },
+    ['Actions'] = {
+        parentGuid = PLACEMAT_GUID.DECKS,
+        deckTransform = {
+            position = {},
+            rotation = {},
+        },
+        discardTransform = {
+            position = {},
+            rotation = {},
+        },
+        cardNames = {},
+    },
+}
+
+local _cardNameToDeck = {}
+
+function discard(cardGuid)
+end
+
+function draw(parameters)
+end

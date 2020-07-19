@@ -44,7 +44,7 @@ function unburn(object)
     _burningObjectGuidSet[object.getGUID()] = nil
 
     local attachments = object.removeAttachments()
-    for _, attachment in ipairs(attachments) do
+    for _, attachment in ipairs(attachments or {}) do
         if _deletedItems then
             _deletedItems.call('ignoreGuid', attachment.getGUID())
         end
@@ -54,6 +54,15 @@ end
 
 function onLoad(saveState)
     _lastCheck = math.floor(Time.time)
+end
+
+function onDestroy()
+    for guid, _ in pairs(_burningObjectGuidSet) do
+        local object = getObjectFromGUID(guid)
+        if object then
+            unburn(object)
+        end
+    end
 end
 
 function onUpdate()

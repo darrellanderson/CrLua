@@ -344,7 +344,7 @@ function _maybeUpdateZones()
 
         local colorToCommandSheet = {}
         local numCommandSheets = 0
-        local factionNameToFactionSheet = {}
+        local guidToFactionSheet = {}
         for _, object in ipairs(getAllObjects()) do
             local name = object.getName()
             local color = string.match(name, '^Command Sheet %((%a+)%)$')
@@ -354,13 +354,14 @@ function _maybeUpdateZones()
             end
             local factionName = string.match(name, '^(.+) Sheet$')
             if factionName then
-                factionNameToFactionSheet[factionName] = object
+                local guid = object.getGUID()
+                guidToFactionSheet[guid] = object
             end
         end
 
         local function hasFactionSheet(polygon)
             assert(type(polygon) == 'table')
-            for _, factionSheet in pairs(factionNameToFactionSheet) do
+            for _, factionSheet in pairs(guidToFactionSheet) do
                 if _polygonContains(polygon, factionSheet.getPosition()) then
                     return true
                 end

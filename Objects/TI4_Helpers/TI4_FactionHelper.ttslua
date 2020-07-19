@@ -174,10 +174,13 @@ function _maybeUpdate()
         -- faction name), and command token bags (indexed by "token faction" name,
         -- which may differ slightly from the faction sheet faction name).
         local colorToCommandSheet = {}
-        local factionNameToFactionSheet = {}
-        local tokenFactionNameToBag = {}
+        local factionSheetGuidToFactionSheet = {}
+        local factionSheetGuidToFactionName = {}
+        local tokenBagGuidToBag = {}
+        local tokenBagGuidToTokenFactionName = {}
         for _, object in ipairs(getAllObjects()) do
             local name = object.getName()
+            local guid = object.getGUID()
 
             -- "Command Sheet (COLOR)"
             local color = string.match(name, '^Command Sheet %((%a+)%)$')
@@ -190,13 +193,15 @@ function _maybeUpdate()
             local factionName = string.match(name, '^(.+) Sheet$')
             factionName = factionName and factionLowerToFactionName[string.lower(factionName)]
             if factionName then
-                factionNameToFactionSheet[factionName] = object
+                factionSheetGuidToFactionSheet[guid] = object
+                factionSheetGuidToFactionName[guid] = factionName
             end
 
             -- "TOKEN_FACTION Command Tokens Bag"
             local tokenFactionName, tokenType = string.match(name, '^(.*) (%u%a+) Tokens Bag$')
             if tokenType == 'Command' then
-                tokenFactionNameToBag[tokenFactionName] = object
+                tokenBagGuidToBag[guid] = object
+                tokenBagGuidToTokenFactionName[guid] = tokenFactionName
             end
         end
 
@@ -257,11 +262,21 @@ function _maybeUpdate()
         end
 
         -- Map command sheet color to nearest faction, tokenFaction, and seated player.
-        local colorToFactionName = colorToClosestKey(factionNameToFactionSheet)
-        local colorToTokenFactionName = colorToClosestKey(tokenFactionNameToBag)
+        local colorToFactionSheetGuid = colorToClosestKey(factionSheetGuidToFactionSheet)
+        local colorToTokenBagGuid = colorToClosestKey(tokenBagGuidToBag)
+
+        local colorToFactionName = {}
+        for color, guid in pairs(colorToFactionSheetGuid) do
+            colorToFactionName[color] = factionSheetGuidToFactionName[guid]
+        end
+        local colorToTokenFactionName = {}
+        for color, guid in pairs(colorToTokenBagGuid) do
+            colorToTokenFactionName[color] = tokenBagGuidToTokenFactionName[guid]
+        end
 
         _colorToFaction = {}
-        for color, factionName in pairs(colorToFactionName) do
+        for color, _ in pairs(colorToFactionSheetGuid) do
+            local factionName = colorToFactionName[color]
             local attributes = {
                 name = factionName,
                 tokenName = colorToTokenFactionName[color],

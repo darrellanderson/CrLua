@@ -584,6 +584,7 @@ function processReadyCoroutine()
         elseif object.tag == 'Deck' then
             putCardsFromDeck(object, objectData.state, true)
         else
+            object.setRotation(objectData.state.getRotation()) -- rotate to match bag
             objectData.state.putObject(object)
         end
     end

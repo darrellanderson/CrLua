@@ -13,13 +13,29 @@
 --
 -- HOW TO USE:
 --
--- Copy the base spreadsheet, the File -> Share -> Get Link.  Make sure the
--- link sharing settings are "Anyone with the link" and "Editor" so this script
--- can update the sheet.  CAREFUL, keep this link private to prevent hooligans
--- from updating your sheet.
+-- Open the Google Sheet you want this script to update.  Click "File", "Share",
+-- and set Get Link to "Editor" (anyone on the internet with this link can edit).
+-- Yes, that's scary.  Be careful not to expose the URL!
+--
+-- (Editor permission is necesary as proxy edits as a generic Google user, not you).
+--
+-- When calling the proxy the post body should be a JSON-encoded table with:
+-- {
+--   id = string sheet id.
+--   sheet = optional string sheet name, defaults to "Sheet1".
+--   cells = table from cell to new value.
+-- }
+--
+-- Example:
+-- local body = JSON.encode({
+--     id = '<google sheet id>',
+--     cells = {
+--         a1 = 'hello',
+--         a2 = 'world'
+--     }
+-- })
 
-local _sheetShareLink = 'https://docs.google.com/spreadsheets/d/1ehY7DKXigzavvlqkNKyjsHTYclnjJOE2Tbf2tOzHzPA/edit?usp=sharing'
-local _webScript = 'https://script.google.com/macros/s/AKfycbyoA0RDjoyekumzpE8l_HCEx8KTwPmjZqDLbrVTg1mVQ0mDKOWp/exec'
+local GAS_PROXY = 'https://script.google.com/macros/s/AKfycbzx5wxUv3BG6EiYfIv0mC9YNnEJKMkSNh0uYSOMJlGOjCJ8Ak2s/exec'
 
 function sheetLinkToSheetId(url)
     local id = string.match(url, 'http[s]://docs.google.com/spreadsheets/.*/(.*)/edit')
@@ -29,23 +45,15 @@ function sheetLinkToSheetId(url)
     return id
 end
 
-function webRequestToTable(webRequest)
-    assert(type(webRequest) == 'userdata')
-    return {
-        download_progress = webRequest.download_progress,
-        error = webRequest.error,
-        is_error = webRequest.is_error,
-        is_done = webRequest.is_done,
-        text = webRequest.text,
-        upload_progress = webRequest.upload_progress,
-        url = webRequest.url
-    }
+function getCallback(webRequest)
+    print('getCallback: ' .. webRequest.text)
 end
 
 function putCallback(webRequest)
-    print('putCallback: error = "' .. (webRequest.error or 'nil') .. '"')
-    for k, v in pairs(webRequestToTable(webRequest)) do
-        print(k .. ' -> ' .. tostring(v or 'nil'))
+    if webRequest.text == 'ok' then
+        print('putCallback: success!')
+    else
+        print('putCallback: error = "' .. (webRequest.error or 'nil') .. '"')
     end
 end
 
@@ -54,67 +62,67 @@ function onLoad(save_state)
 
     self.createInput({
         input_function = "doNothing",
-      function_owner = self,
-      position  = {x=0, y=0.2, z=0},
-      width    = 1000,
-      height    = 180,
-      font_size  = 50,
-      alignment  = 2,
-      value    = "",
-      label     = "Enter the Google Sheet EDITOR ENABLED shared link."
+        function_owner = self,
+        position  = {x=0, y=0.25, z=-0.5},
+        width = 1000,
+        height = 180,
+        font_size = 50,
+        alignment = 2,
+        value = "",
+        label = "Enter the Google Sheet EDITOR ENABLED shared link."
+    })
+    self.createInput({
+        input_function = "doNothing",
+        function_owner = self,
+        position = {x=0, y=0.25, z=0},
+        width = 1000,
+        height = 180,
+        font_size = 50,
+        alignment = 2,
+        value = "",
+        label = "Update A1 with this value."
     })
     self.createButton({
-      click_function  = "report",
-      function_owner  = self,
-      label      = "Report",
-      position    = {x=0, y=0.5, z=0.4},
-      width      = 500,
-      height      = 200,
-      font_size    = 100,
+        click_function = "updateGoogleSheet",
+        function_owner = self,
+        label = "Update Sheet",
+        position = {x=0, y=0.5, z=0.5},
+        width = 500,
+        height = 200,
+        font_size = 70,
     })
 end
 
 function doNothing()
 end
 
-function getReportData(id)
-    local result = {
-        id = id
-    }
-
-    result.players = {}
-    for _, player in ipairs(Player.getPlayers()) do
-        table.insert(result.players, {
-            color = player.color,
-            hexColor = Color.toHex(Color.fromString(player.color)),
-            name = player.steam_name
-        })
-    end
-
-
-    return result
-end
-
-function report()
-    local function getLink()
+function updateGoogleSheet()
+    local function getInputValue(labelPrefix)
         for _, input in ipairs(self.getInputs()) do
-            if string.match(input.label, '^Enter the Google Sheet') then
+            if string.match(input.label, labelPrefix) then
                 return input.value
             end
         end
         error('missing input')
     end
-    local link = getLink()
+    local sheetUrl = getInputValue('^Enter the Google Sheet')
+    local value = getInputValue('^Update A1')
 
-    local id = sheetLinkToSheetId(link)
-    local postData = getReportData(id)
+    local id = sheetLinkToSheetId(sheetUrl)
+    local postData = {
+        id = id,
+        cells = {
+            a1 = value,
+            a2 = 'also setting a2 to show multiple sets in one call'
+        }
+    }
 
-    --local url = string.gsub(_apiUrl, '$SHEET_ID', _sheetId)
-    --url = url .. '?' .. 'key=' .. _apiKey
+    WebRequest.post(GAS_PROXY, JSON.encode(postData), putCallback)
 
-    local url = _webScript
-    WebRequest.post(url, JSON.encode(postData), putCallback)
+    -- Also go a GET to read the content of a single cell (useful to verify
+    -- correct sheet).
+    local url = GAS_PROXY
+    url = url .. '?id=' .. id
+    url = url .. '&cell=' .. 'a3'
+    WebRequest.get(url, getCallback)
 end
-
-#include <~/CrLua/CrLua>
-#include <~/CrLua/LockGlobals>

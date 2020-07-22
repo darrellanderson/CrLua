@@ -1,0 +1,157 @@
+--- Separate faction box cards into tech, promissory, and planets.
+-- @author Darrell
+
+function updateBoxToSeparateTechPromissoryPlanetCardsBags(box)
+    assert(box.tag == 'Bag')
+    print('Updating "' .. box.getName() .. '"')
+
+    -- All bags have a faction name prefix.  Easier to put back in correct box.
+    local factionName = assert(string.match(box.getName(), '^(.*) Box$'))
+    local cardsBagName = factionName .. ' Cards Bag'
+    local techBagName = factionName .. ' Tech Bag'
+    local promissoryBagName = factionName .. ' Promissory Bag'
+    local planetsBagName = factionName .. ' Planets Bag'
+
+    local entryNameToGuid = {}
+    for _, entry in ipairs(box.getObjects()) do
+        entryNameToGuid[entry.name] = entry.guid
+    end
+
+    if not entryNameToGuid[cardsBagName] then
+        -- No cards bag, already updated?
+        assert(entryNameToGuid[techBagName], 'missing "Tech Bag"')
+        assert(entryNameToGuid[promissoryBagName], 'missing "Promissory Bag"')
+        assert(entryNameToGuid[planetsBagName], 'missing "Planets Bag"')
+        -- Everything looks good.  Abort!!
+        print('"' .. box.getName() .. '" already using new bags, aborting')
+        return
+    end
+
+    -- Have a cards bag.  Make sure replacement bags do not exist yet.
+    assert(not entryNameToGuid[techBagName], 'have "Tech Bag"')
+    assert(not entryNameToGuid[promissoryBagName], 'have "Promissory Bag"')
+    assert(not entryNameToGuid[planetsBagName], 'have "Planets Bag"')
+
+    -- Get cards bag.
+    local pos = box.getPosition()
+    local cardsBag = box.takeObject({
+        guid = assert(entryNameToGuid[cardsBagName]),
+        position = { x = pos.x, y = pos.y + 5, z = pos.z },
+    })
+    assert(cardsBag.tag == 'Bag')
+
+    -- Create replament bags.
+    local function spawnBag(name, xOffset)
+        local bag = spawnObject({
+            type = 'Bag',
+            position = { x = pos.x + xOffset, y = pos.y + 5, z = pos.z },
+            sound = false,
+            snap_to_grid = false,
+        })
+        bag.setName(name)
+        bag.use_grid = false
+        bag.use_snap_points = false
+        return bag
+    end
+    local techBag = spawnBag(techBagName, 5)
+    local promissoryBag = spawnBag(promissoryBagName, 10)
+    local planetsBag = spawnBag(planetsBagName, 15)
+
+    -- This function looks at the backing image for the deck, assuming
+    -- card type based on deck image layout.  Clever, but fragile and
+    -- makes fixing cards, homebrew, and expansions difficult.
+    local function cardOrDeckToBag(cardOrDeck)
+        assert(cardOrDeck.tag == 'Card' or cardOrDeck.tag == 'Deck')
+
+        -- HACK: Xxcha promissory card is not typical.
+        if cardOrDeck.getName() == 'Political Favor' then
+            return promissoryBag
+        end
+
+        details = cardOrDeck.getJSON()
+        NHstart = string.find(details,"NumHeight") + 12
+        NHend = string.find(details,",",NHstart) - 1
+        numHeight = string.sub(details,NHstart,NHend)
+        if numHeight == "6" then
+            return techBag
+        elseif numHeight == "7" then
+            return promissoryBag
+        else
+            return planetsBag
+        end
+    end
+
+    -- Move cards bag contents to new bags.
+    for i, entry in ipairs(cardsBag.getObjects()) do
+        local pos = cardsBag.getPosition()
+        local object = cardsBag.takeObject({
+            guid = entry.guid,
+            position = { x = pos.x, y = pos.y + 5 + i, z = pos.z },
+        })
+        local bag = assert(cardOrDeckToBag(object))
+        if object.tag == 'Deck' then
+            local pos = object.getPosition()
+            -- Rather than put a deck in a bag, store individual cards.
+            -- Easier to search card bags without needing to pull decks out.
+            for i = object.getQuantity(), 1, -1 do
+                local card = false
+                if i > 1 then
+                    card = object.takeObject({
+                        position = { x = pos.x, y = pos.y, z = pos.z + 5 + i }
+                    })
+                else
+                    card = object.remainder
+                end
+                bag.putObject(card)
+            end
+        elseif object.tag == 'Card' then
+            bag.putObject(object)
+        else
+            error('not a deck of card "' .. object.getName() .. '"')
+        end
+    end
+
+    -- Because planets are the dumping grounds for "other" cards, print
+    -- planet names for sanity checking.
+    local function contents(bag)
+        local names = {}
+        for _, entry in ipairs(bag.getObjects()) do
+            table.insert(names, entry.name)
+        end
+        return table.concat(names, ', ')
+    end
+    print('planets: ' .. contents(planetsBag))
+
+    -- Put things back.  (MOST have 2 tech, blue space can have 4 with flagships).
+    assert(techBag.getQuantity() >= 2, 'tech: ' .. contents(techBag))
+    box.putObject(techBag)
+
+    assert(promissoryBag.getQuantity() == 1, 'promissory: ' .. contents(techBag))
+    box.putObject(promissoryBag)
+
+    assert(planetsBag.getQuantity() > 0, 'no planets')
+    box.putObject(planetsBag)
+
+    assert(cardsBag.getQuantity() == 0, 'leftover cards')
+    destroyObject(cardsBag)
+end
+
+function updateAllBoxesToSeparateTechPromissoryPlanetCardsBags()
+    local boxes = {}
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Bag' and string.match(object.getName(), ' Box$') then
+            table.insert(boxes, object)
+        end
+    end
+
+    for i, box in ipairs(boxes) do
+        local function delayedUpdate()
+            updateBoxToSeparateTechPromissoryPlanetCardsBags(box)
+        end
+        Wait.frames(delayedUpdate, i * 2)
+    end
+end
+
+function onLoad(save_state)
+    self.addContextMenuItem('Update Boxes', updateAllBoxesToSeparateTechPromissoryPlanetCardsBags, false)
+end

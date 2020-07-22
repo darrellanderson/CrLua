@@ -1,0 +1,683 @@
+-- NOTE: NEKRO UNPACK BUG NEEDS TO GET FACTION TECHS AS STARTING TECHS
+
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
+        return function(parameters) return helperObject.call(functionName, parameters) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+
+local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
+local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
+
+function onLoad()
+    createButtons()
+end
+
+function createButtons()
+    self.createButton({
+        click_function = "clickTokens",
+        function_owner = self,
+        label          = "Get Tokens",
+        position       = {x=0, y=0.2, z=0.6},
+        width          = 1000,
+        height         = 400,
+        font_size      = 200,
+        tooltip = 'Return All Command Tokens'
+    })
+    self.createButton({
+        click_function = "clickSetup",
+        function_owner = self,
+        label          = "Unpack",
+        position       = {x=0, y=0.2, z=-0.6},
+        width          = 1000,
+        height         = 400,
+        font_size      = 200,
+        tooltip = 'Unpack Faction Box'
+    })
+end
+
+function _safeBroadcastToColor(message, playerColor, messageColor)
+    for _, player in ipairs(Player.getPlayers()) do
+        if player.color == playerColor then
+            broadcastToColor(message, playerColor, messageColor)
+            return
+        end
+    end
+    broadcastToAll(message, messageColor)
+end
+
+function clickTokens(_, playerColor)
+    local faction = _factionHelper.fromColor(playerColor)
+    if not faction then
+        _safeBroadcastToColor("No faction detected.", playerColor, {0.8,0.2,0.2})
+		return
+    end
+    if not faction.tokenName then
+        _safeBroadcastToColor("No command token bag detected.", playerColor, {0.8,0.2,0.2})
+		return
+    end
+
+    local bagName = faction.tokenName .. " Command Tokens Bag"
+    local tokenName = faction.tokenName .. " Command Token"
+
+    local tokenBag = false
+    local tokens = {}
+
+    for _, object in ipairs(allObjects) do
+        local name = object.getName()
+        if object.tag == 'Bag' and name == bagName then
+            tokenBag = object
+        elseif name == tokenName and _zoneHelper.inTableZone(object.getPosition()) then
+            table.insert(tokens, object)
+        end
+    end
+    if not tokenBag then
+        _safeBroadcastToColor("No command token bag detected.", playerColor, {0.8,0.2,0.2})
+        return
+    end
+    for _, token in ipairs(tokens) do
+        tokenBag.putObject(token)
+    end
+end
+
+local LOCAL_OFFSET_XZ = {
+    sheet = { 6, -0.2 },
+    commandTokensBag = { 0, 0 },
+    ownerTokensBag = { 0.9, -3.3 },
+    other = { 7, -3.3 },
+    tech = { 10.2, -3.3 },
+    commandTokens = {
+        { 0.4, -2.1 },
+        { -0.7, -2.1 },
+        { -0.2, -1.2 },
+        { -1, -0.7 },
+        { -2.1, -0.7 },
+        { -1.6, -1.7 },
+        { -1, 0.3 },
+        { -2.1, 0.3 }
+    }
+}
+
+function clickSetup(_, playerColor)
+    -- Choose a player color to unpack.  Could using the clicking player color
+    -- (function argument), or in this case unpack the closest command sheet.
+    local commandSheet, color = getClosestCommandSheetAndColor(self.getPosition())
+    unpack(color)
+end
+
+-- Cannot pass arguments to coroutine.  Push to this list, pop when starting.
+-- (Use push/pop in case starting multiple unpacks same frame).
+local _unpackColor = {}
+
+function unpack(playerColor)
+    table.insert(_unpackColor, playerColor)
+    startLuaCoroutine(self, 'unpackCoroutine')
+end
+
+function unpackCoroutine(playerColor)
+    local playerColor = table.remove(_unpackColor)
+
+    local function reportInfo(message)
+        _safeBroadcastToColor(message, playerColor, playerColor)
+    end
+    local function reportError(message)
+        _safeBroadcastToColor(message, playerColor, {0.8, 0.2, 0.2})
+    end
+
+    if not playerColor then
+        reportError('No player color, aborting.')
+        return 1
+    end
+    reportInfo('Unpacking for ' .. playerColor)
+
+    -- Get command sheet.
+    local commandSheet = getCommandSheet(playerColor)
+    if not commandSheet then
+        reportError('Missing command sheet for ' .. playerColor)
+        return 1
+    end
+    coroutine.yield(0)
+
+    -- Get faction.
+    local factionName, ownerToken = getFactionFromNearbyOwnerToken(commandSheet)
+    if not factionName then
+        reportError('No faction token detected.')
+        return 1
+    end
+    coroutine.yield(0)
+
+    -- Get faction box, and locations for in-player-area items.
+    local boxName = string.upper(factionName .. ' Box')
+    boxName = string.gsub(boxName, '-', '%%-')  -- escape hyphens for find
+    local techDeckName = 'Technology Cards'
+    local noteDeckName = 'Notes (' .. playerColor .. ')'
+    local flagshipName = playerColor .. ' Flagship'
+    local scoreboardName = 'Scoreboard'
+
+    local box = false
+    local techDeck = false
+    local noteDeck = false
+    local flagship = false
+    local scoreboard = false
+
+    for _, object in ipairs(getAllObjects()) do
+        local tag = object.tag
+        local name = object.getName()
+        local pos = object.getPosition()
+        if tag == 'Bag' and string.find(string.upper(name), boxName) then
+            box = object
+        elseif tag == 'Deck' and name == techDeckName and isInCommandSheetZone(commandSheet, pos) then
+            techDeck = object
+        elseif tag == 'Deck' and name == noteDeckName then
+            noteDeck = object
+        elseif name == flagshipName then
+            flagship = object
+        elseif name == scoreboardName then
+            scoreboard = object
+        end
+    end
+    coroutine.yield(0)
+
+    if not box then
+        reportError('Missing ' .. boxName)
+        return 1
+    elseif box.getQuantity() < 5 then
+        reportError('Box missing components for ' .. faction)
+        return 1
+    end
+    if not techDeck then
+        reportError('Missing ' .. techDeckName)
+        return 1
+    end
+    if not noteDeck then
+        reportError('Missing ' .. noteDeckName)
+        return 1
+    end
+    if not flagship then
+        reportError('Missing ' .. flagshipName)
+        return 1
+    end
+    if not scoreboard then
+        reportError('Missing ' .. scoreboard)
+        return 1
+    end
+
+    -- Start unpacking!
+    local numLoose = 0
+
+    local techBagName = string.upper(factionName .. ' Tech Bag')
+    local promissoryBagName = string.upper(factionName .. ' Promissory Bag')
+    local planetsBagName = string.upper(factionName .. ' Planets Bag')
+    local ownerTokensBagName = string.upper(factionName .. ' Owner Tokens Bag')
+    local commandTokensBagName = string.upper(factionName .. ' Command Tokens Bag')
+    local homeSystemTileName = string.upper(factionName .. ' Tile')
+
+    local foundTech = false
+    local foundPromissory = false
+    local foundPlanets = false
+    local commandTokensBag = false
+    local ownerTokensBag = false
+    local factionSheet = false
+    local homeSystemTile = false
+
+    local takePosition = {}
+    takePosition[homeSystemTileName] = getHomePosition(commandSheet)
+
+    if factionName == 'GHOSTS OF CREUSS' then
+        takePosition[string.upper('Creuss Gate Tile')] = takePosition[homeSystemTileName]
+        takePosition[homeSystemTileName] = getGhostsHomePosition(commandSheet)
+    end
+
+    local numLoose = 0
+    for _, entry in ipairs(box.getObjects()) do
+        local upperName = string.upper(entry.name)
+        if upperName == techBagName then
+            unpackCards(box, entry.guid, techDeck)
+            foundTech = true
+        elseif upperName == promissoryBagName then
+            unpackCards(box, entry.guid, noteDeck)
+            foundPromissory = true
+        elseif upperName == planetsBagName then
+            numLoose = unpackCardsLoose(box, entry.guid, commandSheet, numLoose)
+            foundPlanets = true
+        elseif upperName == ownerTokensBagName then
+            ownerTokensBag = unpackOffset(box, entry.guid, commandSheet, LOCAL_OFFSET_XZ.ownerTokensBag)
+        elseif upperName == commandTokensBagName then
+            commandTokensBag = unpackOffset(box, entry.guid, commandSheet, LOCAL_OFFSET_XZ.commandTokensBag)
+        elseif string.match(entry.name, ' Sheet$') then
+            factionSheet = unpackOffset(box, entry.guid, commandSheet, LOCAL_OFFSET_XZ.sheet)
+        elseif takePosition[upperName] then
+            homeSystemTile = box.takeObject({
+                guid = entry.guid,
+                position = takePosition[upperName]
+            })
+        else
+            unpackOffset(box, entry.guid, commandSheet, LOCAL_OFFSET_XZ.other, { -numLoose, 0 })
+            numLoose = numLoose + 1
+        end
+        coroutine.yield(0)
+    end
+    coroutine.yield(0)
+
+    if not foundTech then
+        reportError('Missing tech bag')
+        return 1
+    end
+    if not foundPromissory then
+        reportError('Missing promissory bag')
+        return 1
+    end
+    if not foundPlanets then
+        reportError('Missing planets bag')
+        return 1
+    end
+    if not commandTokensBag then
+        reportError('Missing command tokens bag')
+        return 1
+    end
+    if not ownerTokensBag then
+        reportError('Missing owner tokens bag')
+        return 1
+    end
+    if not factionSheet then
+        reportError('Missing faction sheet')
+        return 1
+    end
+    if not homeSystemTile then
+        reportError('Missing home system tile')
+        return 1
+    end
+
+    -- Wait for things to stop moving, the move the owner token up in case
+    -- it got stuck beneath the faction sheet or other object.
+    -- Watch out for the owner token being underneath the faction sheet / other.
+    local function busy()
+        local objects = {
+            factionSheet,
+            commandTokensBag,
+            ownerTokensBag,
+            homeSystemTile,
+        }
+        for _, object in ipairs(objects) do
+            if not object.resting then
+                return true
+            end
+        end
+    end
+    while busy() do
+        coroutine.yield(0)
+    end
+
+    ownerToken.translate({ x = 0, y = 5, z = 0 })
+    coroutine.yield(0)
+    coroutine.yield(0)
+
+    -- Wait once more, make sure faction sheet is flat before locking.
+    while busy() do
+        coroutine.yield(0)
+    end
+    coroutine.yield(0)
+
+    -- Lock!
+    factionSheet.setLock(true)
+    homeSystemTile.setLock(true)
+    commandTokensBag.setLock(true)
+    ownerTokensBag.setLock(true)
+
+    -- Unpack command tokens.
+    for _, xz in ipairs(LOCAL_OFFSET_XZ.commandTokens) do
+        unpackOffset(commandTokensBag, nil, commandSheet, xz)
+    end
+    coroutine.yield(0)
+
+    -- Unpack starting tech.
+    unpackStartingTech(techDeck, setupParams[factionName].tech, commandSheet)
+    coroutine.yield(0)
+
+    -- Unpack starting units.
+    local unitBags = getUnitBags(playerColor)
+    unpackStartingUnits(unitBags, setupParams[factionName], homeSystemTile)
+    coroutine.yield(0)
+
+    -- Rename flagship.
+    renameFlagship(unitBags['Flagship'], setupParams[factionName])
+    coroutine.yield(0)
+
+    return 1
+end
+
+function getClosestCommandSheetAndColor(position)
+    assert(type(position) == 'table')
+    local colorToCommandSheet = {}
+    for _, object in ipairs(getAllObjects()) do
+        local color = string.match(object.getName(), '^Command Sheet %((%a+)%)$')
+        if color then
+            colorToCommandSheet[color] = object
+        end
+    end
+
+    local best = false
+    local bestDistanceSq = false
+    local p1 = position
+    for color, commandSheet in pairs(colorToCommandSheet) do
+        local p2 = commandSheet.getPosition()
+        local distanceSq = (p1.x - p2.x)^2 + (p1.z - p2.z)^2
+        if not best or distanceSq < bestDistanceSq then
+            best = color
+            bestDistanceSq = distanceSq
+        end
+    end
+
+    return colorToCommandSheet[best], best
+end
+
+function getCommandSheet(playerColor)
+    assert(type(playerColor) == 'string')
+    local commandSheetName = 'Command Sheet (' .. playerColor .. ')'
+    local commandSheet = false
+    for _, object in ipairs(getAllObjects()) do
+        if object.getName() == commandSheetName then
+            return object
+        end
+    end
+end
+
+function isInCommandSheetZone(commandSheet, position)
+    assert(type(commandSheet) == 'userdata' and type(position) == 'table')
+    local bb = {
+        min = {
+            x = -3,
+            z = -6,
+        },
+        max = {
+            x = 12,
+            z = 3,
+        }
+    }
+    local p = commandSheet.positionToLocal(position)
+    return bb.min.x <= p.x and p.x <= bb.max.x and bb.min.z <= p.z and p.z <= bb.max.z
+end
+
+function getFactionFromNearbyOwnerToken(commandSheet)
+    assert(type(commandSheet) == 'userdata')
+    local inHandGuidSet = _zoneHelper.inHand()
+    local function getFactionNameIfInZone(ownerToken)
+        -- Filter to only not-in-hand, yes-in-zone.
+        if inHandGuidSet[ownerToken.getGUID()] then
+            return false
+        end
+        if not isInCommandSheetZone(commandSheet, ownerToken.getPosition()) then
+            return false
+        end
+
+        -- If this object exactly matches a faction name use it.
+        local name = ownerToken.getName()
+        if setupParams[string.upper(name)] then
+            return name
+        end
+
+        -- Otherwise look for an owner token.
+        local factionName = string.match(name, '^(.+) Owner Token$')
+        if not factionName then
+            return false
+        end
+        if setupParams[string.upper(factionName)] then
+            return factionName
+        end
+    end
+
+    for _, object in ipairs(getAllObjects()) do
+        local factionName = getFactionNameIfInZone(object)
+        if factionName then
+            return string.upper(factionName), object
+        end
+    end
+end
+
+function unpackOffset(container, entryGuid, commandSheet, offsetXZ, extraXZ)
+    assert((container.tag == 'Bag' or container.tag == 'Deck') and (entryGuid == nil or type(entryGuid) == 'string') and type(commandSheet) == 'userdata' and type(offsetXZ) == 'table')
+    local pos = { x = offsetXZ[1], y = 1, z = offsetXZ[2] }
+    if extraXZ then
+        pos.x = pos.x + (extraXZ[1] or 0)
+        pos.z = pos.z + (extraXZ[2] or 0)
+    end
+    pos = commandSheet.positionToWorld(pos)
+    return container.takeObject({
+        guid = entryGuid,
+        position = pos,
+        rotation = { x = 0, y = commandSheet.getRotation().y, z = 0 },
+    })
+end
+
+function unpackCards(container, cardsBagGuid, deck)
+    assert(container.tag == 'Bag' and type(cardsBagGuid) == 'string' and deck.tag == 'Deck')
+    local pos = container.getPosition()
+    local cardsBag = container.takeObject({
+        guid = cardsBagGuid,
+        position = { x = pos.x, y = pos.y + 5, z = pos.z }
+    })
+    local pos = cardsBag.getPosition()
+    for i, entry in ipairs(cardsBag.getObjects()) do
+        local card = cardsBag.takeObject({
+            position = { x = pos.x, y = pos.y + 5 + i, z = pos.z }
+        })
+        deck.putObject(card)
+    end
+    container.putObject(cardsBag)
+end
+
+function unpackCardsLoose(container, cardsBagGuid, commandSheet, numLoose)
+    assert(container.tag == 'Bag' and type(cardsBagGuid) == 'string' and type(commandSheet) == 'userdata' and type(numLoose) == 'number')
+    local pos = container.getPosition()
+    local cardsBag = container.takeObject({
+        guid = cardsBagGuid,
+        position = { x = pos.x, y = pos.y + 5, z = pos.z }
+    })
+    for i, entry in ipairs(cardsBag.getObjects()) do
+        unpackOffset(cardsBag, entry.guid, commandSheet, LOCAL_OFFSET_XZ.other, { -numLoose, 0 })
+        numLoose = numLoose + 1
+    end
+    container.putObject(cardsBag)
+    return numLoose
+end
+
+function unpackStartingTech(techDeck, techs, commandSheet)
+    assert(techDeck.tag == 'Deck' and type(techs) == 'table' and type(commandSheet) == 'userdata')
+
+    local techToGuid = {}
+    for _, tech in ipairs(techs) do
+        techToGuid[tech] = false
+    end
+
+    for _, entry in ipairs(techDeck.getObjects()) do
+        if techToGuid[entry.name] == false then
+            techToGuid[entry.name] = entry.guid
+        end
+    end
+
+    for i, tech in ipairs(techs) do
+        local guid = assert(techToGuid[tech])
+        unpackOffset(techDeck, guid, commandSheet, LOCAL_OFFSET_XZ.tech, { 0, i })
+    end
+end
+
+function getUnitBags(playerColor)
+    assert(type(playerColor) == 'string')
+    local colorUnitNameSet = {}
+    for _, unitName in ipairs(unitList) do
+        colorUnitNameSet[playerColor .. ' ' .. unitName] = true
+    end
+    local unitBags = {}
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        if object.tag == 'Bag' and colorUnitNameSet[object.getName()] then
+            local unitName = string.match(name, '^' .. playerColor .. ' (.*)$')
+            unitBags[unitName] = object
+        end
+    end
+    return unitBags
+end
+
+function unpackStartingUnits(unitBags, params, homeSystemTile)
+    assert(type(unitBags) == 'table' and type(params) == 'table' and type(homeSystemTile) == 'userdata')
+    local startingUnits = {}
+    for k, v in pairs(params) do
+        local bag = unitBags[k]
+        if bag then
+            for _ = 1, v do
+                table.insert(startingUnits, bag)
+            end
+        end
+    end
+    if #startingUnits > 0 then
+        local dPhi = math.pi * 2.0 / #startingUnits
+        local r = 1.5
+        for i, bag in ipairs(startingUnits) do
+            local phi = dPhi * i
+            local pos = {
+                x = math.cos(phi) * r,
+                y = 1,
+                z = math.sin(phi) * r
+            }
+            pos = homeSystemTile.positionToWorld(pos)
+            bag.takeObject({
+                position = pos,
+            })
+        end
+    end
+end
+
+function renameFlagship(flagshipBag, params)
+    assert(flagshipBag.tag == 'Bag' and type(params) == 'table')
+    local name = params.fsName
+    local desc = params.fsDescr
+
+    flagshipBag.setName(name)
+    flagshipBag.setDescription(desc)
+    local pos = flagshipBag.getPosition()
+    for _, entry in ipairs(flagshipBag.getObjects()) do
+        local flagship = flagshipBag.takeObject({
+            guid = entry.guid,
+            position = { x = pos.x, y = pos.y + 5, z = pos.z }
+        })
+        flagship.setName(name)
+        flagship.setDescription(desc)
+        flagshipBag.putObject(flagship)
+    end
+end
+
+function getHomePosition(commandSheet)
+    assert(type(commandSheet) == 'userdata')
+    -- Find the hex closest to the command sheet, skipping 3
+    local p1 = commandSheet.getPosition()
+    local best = false
+    local bestDistanceSq = false
+    for i = 1, #tilePositions, 3 do
+        local p2 = tilePositions[i]
+        local distanceSq = (p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2
+        if not best or distanceSq < bestDistanceSq then
+            best = p2
+            bestDistanceSq = distanceSq
+        end
+    end
+    -- Return a copy in case caller mutates it!
+    return { x = best.x, y = best.y, z = best.z }
+end
+
+function getGhostsHomePosition(commandSheet)
+    assert(type(commandSheet) == 'userdata')
+    local pos = getHomePosition(commandSheet)
+    if pos.x < -1 then
+        pos.x = pos.x - 12
+    elseif pos.x > 1 then
+        pos.x = pos.x + 12
+    elseif pos.z > 1 then
+        pos.x = pos.x + 12
+        pos.z = pos.z + 1
+    else
+        pos.x = pos.x - 12
+        pos.z = pos.z - 1
+    end
+    return pos
+end
+
+unitList = {
+    "Infantry",
+    "Fighter",
+    "Destroyer",
+    "Cruiser",
+    "Carrier",
+    "Dreadnought",
+    "War_Sun",
+    "Space_Dock",
+    "PDS",
+    "Flagship"
+}
+
+setupParams = {}
+setupParams["CLAN OF SAAR"] = {Infantry=4,Fighter=2,Cruiser=1,Carrier=2,Space_Dock=1,tech={"Antimass Deflectors"},fsName="Son of Ragh",fsDescr="ANTI-FIGHTER BARRAGE 6 (X4)"}
+setupParams["UNIVERSITIES OF JOL-NAR"] = {Infantry=2,Fighter=1,Carrier=2,Dreadnought=1,Space_Dock=1,PDS=2,tech={"Antimass Deflectors","Neural Motivator","Sarween Tools","Plasma Scoring"},fsName="J.N.S. Hylarim",fsDescr="When making a combat roll for this ship, each result of 9 or 10, before applying modifiers, produces 2 extra hits."}
+setupParams["SARDAKK N'ORR"] = {Infantry=5,Cruiser=1,Carrier=2,Space_Dock=1,PDS=1,tech={},fsName="C'morran N'orr",fsDescr="Apply +1 to the result of each of your other ship's combat rolls in this system."}
+setupParams["EMIRATES OF HACAN"] = {Infantry=4,Fighter=2,Cruiser=1,Carrier=2,Space_Dock=1,tech={"Antimass Deflectors","Sarween Tools"},fsName="Wrath of Kenara",fsDescr="After you roll a die during a space combat in this system, you may spend 1 trade good to apply +1 to the result."}
+setupParams["EMBERS OF MUAAT"] = {Infantry=4,Fighter=2,War_Sun=1,Space_Dock=1,tech={"Plasma Scoring"},fsName="The Inferno",fsDescr="ACTION: Spend 1 token from your strategy pool to place 1 cruiser in this unit's system."}
+setupParams["ARBOREC"] = {Infantry=4,Fighter=2,Cruiser=1,Carrier=1,Space_Dock=1,PDS=1,tech={"Magen Defense Grid"},fsName="Duha Menaimon",fsDescr="After you activate this system, you may produce up to 5 units in this system."}
+setupParams["GHOSTS OF CREUSS"] = {Infantry=4,Fighter=2,Destroyer=2,Carrier=1,Space_Dock=1,tech={"Gravity Drive"},fsName="Hil Colish",fsDescr="This ship's system contains a delta wormhole.  During movement, this ship may move before or after your other ships."}
+setupParams["NEKRO VIRUS"] = {Infantry=2,Fighter=2,Cruiser=1,Carrier=1,Dreadnought=1,Space_Dock=1,tech={"Dacxive Animators","Valefar Assimilator X","Valefar Assimilator Y"},fsName="The Alastor",fsDescr="At the start of space combat, choose any number of your ground forces in this system to participate in that combat as is they were ships.  These ground forces do not count against fleet supply."}
+setupParams["BARONY OF LETNEV"] = {Infantry=3,Fighter=1,Destroyer=1,Carrier=1,Dreadnought=1,Space_Dock=1,tech={"Antimass Deflectors","Plasma Scoring"},fsName="Arc Secundus",fsDescr="Other players' units in this system lose PLANETARY SHIELD.  At the start of each space combat round, repair this ship.  BOMBARDMENT 5 (X3)"}
+setupParams["FEDERATION OF SOL"] = {Infantry=5,Fighter=3,Destroyer=1,Carrier=2,Space_Dock=1,tech={"Antimass Deflectors","Neural Motivator"},fsName="Genesis",fsDescr="At the end of the status phase, place 1 infantry from your reinforcements in this system's space area."}
+setupParams["NAALU COLLECTIVE"] = {Infantry=4,Fighter=3,Destroyer=1,Cruiser=1,Carrier=1,Space_Dock=1,PDS=1,tech={"Neural Motivator","Sarween Tools"},fsName="Matriarch",fsDescr="During an invasion in this system, you may commit fighters to planets as if they were ground forces.  When combat ends, return those units to the space area."}
+setupParams["MENTAK COALITION"] = {Infantry=4,Fighter=3,Cruiser=2,Carrier=1,Space_Dock=1,PDS=1,tech={"Sarween Tools","Plasma Scoring"},fsName="Fourth Moon",fsDescr="Other players' ships in this system cannot use SUSTAIN DAMAGE."}
+setupParams["YIN BROTHERHOOD"] = {Infantry=4,Fighter=4,Destroyer=1,Carrier=2,Space_Dock=1,tech={"Sarween Tools"},fsName="Van Hauge",fsDescr="When this ship is destroyed, destroy all ships in this system."}
+setupParams["XXCHA KINGDOM"] = {Infantry=4,Fighter=3,Cruiser=2,Carrier=1,Space_Dock=1,PDS=1,tech={"Graviton Laser System"},fsName="Loncara Ssodu",fsDescr="You may use this units SPACE CANNON against ships that are in adjacent systems.  SPACE CANNON 5 (X3)"}
+setupParams["L1Z1X MINDNET"] = {Infantry=5,Fighter=3,Carrier=1,Dreadnought=1,Space_Dock=1,PDS=1,tech={"Neural Motivator","Plasma Scoring"},fsName="[0.0.1]",fsDescr="During a space combat, hits produced by this ship and by your dreadnoughts in this system must be assigned to non-fighter ships if able."}
+setupParams["YSSARIL TRIBES"] = {Infantry=5,Fighter=2,Cruiser=1,Carrier=2,Space_Dock=1,PDS=1,tech={"Neural Motivator"},fsName="Y'sia Y'ssrila",fsDescr="This ship can move through systems that contain another players' ships."}
+setupParams["WINNU"] = {Infantry=2,Fighter=2,Cruiser=1,Carrier=1,Space_Dock=1,PDS=1,tech={"Antimass Deflectors","Neural Motivator","Sarween Tools","Plasma Scoring"},fsName="Salai Sai Corian",fsDescr="When this unit makes a combat roll, it rolls a number of dice equal to the number of your opponent's non-fighter ships in this system."}
+setupParams["DRAHN CONSORTIUM"] = {Infantry=4,Fighter=3,Destroyer=1,Carrier=2,Space_Dock=1,tech={"Neural Motivator","Plasma Scoring"},fsName="Nightingale II",fsDescr="Other players cannot play action cards during a space combat in this system."}
+setupParams["FREMEN"] = {Infantry=7,Fighter=2,Cruiser=2,Carrier=1,Space_Dock=1,tech={"Antimass Deflectors"},fsName="Shai-Hulud",fsDescr="You may use your GUERILLA WARRIORS faction ability in this system as if it were your home system."}
+setupParams["KHET DRAKKOL UNION"] = {Infantry=4,Fighter=3,Destroyer=1,Dreadnought=2,Space_Dock=1,PDS=1,tech={"Sarween Tools"},fsName="Khage",fsDescr=" "}
+setupParams["VELDYR SOVEREIGNTY"] = {Infantry=3,Fighter=2,Destroyer=1,Dreadnought=1,Carrier=1,Space_Dock=1,PDS=1,tech={"Plasma Scoring"},fsName="Richtyrian",fsDescr="When this ship makes a combat roll, it rolls 1 additional die for each round of space combat that has been resolved this combat."}
+setupParams["MANDALORIAN CLANS"] = {Infantry=5,Fighter=2,Cruiser=2,Carrier=1,Space_Dock=1,tech={"Neural Motivator","Antimass Deflectors"},fsName="Kyr'tsad",fsDescr="This ship cannot be destroyed by Direct Hit action cards."}
+setupParams["ADVENT"] = {Infantry=2,Fighter=6,Destroyer=1,Carrier=2,Space_Dock=1,tech={"Neural Motivator","Sarween Tools"},fsName="Advent Flagship",fsDescr=" "}
+setupParams["FREE SYSTEMS ALLIANCE"] = {Infantry=4,Fighter=2,Cruiser=2,Carrier=1,Space_Dock=1,PDS=1,tech={"Neural Motivator"},fsName="Vox",fsDescr="After this ship rolls a combat die, you may spend any amount of influence to apply +1 to that die's result for each influence spent."}
+setupParams["NAVIGATORS' GUILD"] = {Infantry=4,Fighter=1,Cruiser=1,Carrier=2,Space_Dock=1,tech={"Antimass Deflectors","Sarween Tools"},fsName="Chogra Tuhn",fsDescr="Other players' ships cannot move through this unit's system."}
+setupParams["VASARI EMPIRE"] = {Infantry=3,Fighter=2,Destroyer=1,Carrier=1,Dreadnought=1,Space_Dock=1,PDS=1,tech={"Antimass Deflectors","Plasma Scoring"},fsName="Vasari Flagship",fsDescr=" "}
+setupParams["TRADER EMERGENCY COALITION"] = {Infantry=2,Fighter=2,Cruiser=1,Destroyer=1,Carrier=1,Space_Dock=2,tech={"Sarween Tools","Plasma Scoring"},fsName="TEC Flagship",fsDescr=" "}
+setupParams["KORTALI HORDE"] = {Infantry=5,Fighter=3,Cruiser=1,Carrier=2,Space_Dock=1,fsName="For'xdar",tech={"Dacxive Animators"},fsDescr="Planets controlled by other players in this system cannot be readied."}
+setupParams["RHODYN MIGRANT FLEET"] = {Infantry=4,Fighter=2,Destroyer=1,Space_Dock=1,fsName="Mho Rhodyn",tech={"Gravity Drive"},fsDescr="At the end of the status phase, place 1 fighter from your reinforcements into this system’s space area."}
+setupParams["HCEN DEFENSE SYSTEM"] = {Infantry=3,Cruiser=1,Carrier=1,PDS=2,Space_Dock=1,fsName="Locus",tech={"Graviton Laser System"},fsDescr="At the start of your turn, you may move 1 of your PDS to a planet you control in this system."}
+setupParams["GHELDOR AUTHORITY"] = {Infantry=4,Fighter=2,Destroyer=1,Carrier=2,Space_Dock=1,fsName="Gheld'Atar",tech={"Magen Defense Grid"},fsDescr="Units you control that are on planets adjacent to this system cannot lose PLANETARY SHIELD."}
+setupParams["ZETH CONTINGENCY"] = {Infantry=3,Fighter=2,Destroyer=2,Carrier=1,Space_Dock=1,PDS=1,fsName="Eru'Ishon",tech={"Antimass Deflectors","Neural Motivator","Sarween Tools","Plasma Scoring"},fsDescr="When this unit makes a combat roll, it rolls a number of dice equal to the greatest number of technologies you control in any color."}
+setupParams["LAZAX"] = {Infantry=3,Fighter=2,Cruiser=1,Carrier=1,Dreadnought=1,Space_Dock=1,PDS=1,tech={"Antimass Deflectors","Neural Motivator","Sarween Tools","Plasma Scoring"},fsName="Regulus",fsDescr="When this unit makes a combat roll, it rolls 1 additional die for each victory point you have."}
+setupParams["MAHACT SORCERER KINGS"] = {Infantry=4,Fighter=2,Cruiser=1,Carrier=2,Space_Dock=1,PDS=2,fsName="Noctul H'rgan",tech={},fsDescr="Other units you control in this system may instead have the abilities and attributes of another player's units of the same type in this system."}
+setupParams["SAVAGES OF CYMIAE"] = {Infantry=2,Fighter=2,Cruiser=1,Carrier=1,Space_Dock=1,PDS=1,tech={"Plasma Scoring","Magen Defense Grid"},fsName="Robotic Reprocessing Center",fsDescr="Your infantry in this system gain SUSTAIN DAMAGE during ground combat."}
+
+tilePositions = {
+    {x=15.75,y=2,z=-9.093},
+    {x=10.5,y=2,z=-12.124},
+    {x=5.25,y=2,z=-15.155},
+    {x=0,y=2,z=-18.187},
+    {x=-5.25,y=2,z=-15.155},
+    {x=-10.5,y=2,z=-12.124},
+    {x=-15.75,y=2,z=-9.093},
+    {x=-15.75,y=2,z=-3.031},
+    {x=-15.75,y=2,z=3.031},
+    {x=-15.75,y=2,z=9.093},
+    {x=-10.5,y=2,z=12.124},
+    {x=-5.25,y=2,z=15.155},
+    {x=0,y=2,z=18.187},
+    {x=5.25,y=2,z=15.155},
+    {x=10.5,y=2,z=12.124},
+    {x=15.75,y=2,z=9.093},
+    {x=15.75,y=2,z=3.031},
+    {x=15.75,y=2,z=-3.031}
+}

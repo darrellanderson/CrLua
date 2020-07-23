@@ -353,6 +353,8 @@ function unpackCoroutine(playerColor)
     renameFlagship(unitBags['Flagship'], setupParams[factionName])
     coroutine.yield(0)
 
+    unpackScoreboardOwnerTokens(ownerTokensBag, scoreboard, playerColor)
+
     return 1
 end
 
@@ -609,6 +611,36 @@ function getGhostsHomePosition(commandSheet)
         pos.z = pos.z - 1
     end
     return pos
+end
+
+function unpackScoreboardOwnerTokens(ownerTokensBag, scoreboard, playerColor)
+    local function getPlayerIndex()
+        for i, color in ipairs(Player.getColors()) do
+            if color == playerColor then
+                return i
+            end
+        end
+        error('illegal color "' .. playerColor .. '"')
+    end
+    local idx = getPlayerIndex()
+
+    local OWNER_TOKEN_COUNT = 15
+    local SPACING_X = 0.6
+    local SPACING_Z = 0.5
+
+    local dx = ((idx - 1) % 2) * SPACING_X
+    local dz = math.floor((idx - 1) / 2) * SPACING_Z
+    local p = scoreboard.positionToWorld({
+        x = 4 + dx,
+        y = 0,
+        z = -1.5 + dz
+    })
+    for i = 1, OWNER_TOKEN_COUNT do
+        ownerTokensBag.takeObject({
+            position = p
+        })
+        p.y = p.y + 0.1
+    end
 end
 
 unitList = {

@@ -27,7 +27,7 @@ function CrLua.TTS.Overlap.overlap(srcs, dsts)
         return true
     end
 
-    local result = {}
+    local dstToSrcs = {}
     for _, dst in ipairs(dsts) do
         -- Compute a bounding box to fast-fail things outside it.
         local bounds = dst.getBounds()
@@ -45,17 +45,17 @@ function CrLua.TTS.Overlap.overlap(srcs, dsts)
             local p = src.getPosition()
             if src ~= dst and maybeInside(bb, src.getPosition()) then
                 if definitelyInside(src, dst) then
-                    local entry = result[src]
-                    if not entry then
-                        entry = {}
-                        result[src] = entry
+                    local srcs = dstToSrcs[dst]
+                    if not srcs then
+                        srcs = {}
+                        dstToSrcs[dst] = srcs
                     end
-                    table.insert(entry, dst)
+                    table.insert(srcs, src)
                 end
             end
         end
     end
-    return result
+    return dstToSrcs
 end
 
 function CrLua.TTS.Overlap._testOverlap()
@@ -69,12 +69,12 @@ function CrLua.TTS.Overlap._testOverlap()
             table.insert(dsts, object)
         end
     end
-    local overlap = CrLua.TTS.Overlap.overlap(srcs, dsts)
-    for k, v in pairs(overlap) do
-        local dsts = {}
-        for _, dst in ipairs(v) do
-            table.insert(dsts, dst.getName())
+    local dstToSrcs = CrLua.TTS.Overlap.overlap(srcs, dsts)
+    for dst, srcs in pairs(dstToSrcs) do
+        local names = {}
+        for _, src in ipairs(srcs) do
+            table.insert(names, dst.getName())
         end
-        print(k.getName() .. ': ' .. table.concat(dsts, ', '))
+        print(dst.getName() .. ': ' .. table.concat(names, ', '))
     end
 end

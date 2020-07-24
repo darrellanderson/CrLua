@@ -1,6 +1,37 @@
 --- Separate faction box cards into tech, promissory, and planets.
 -- @author Darrell
 
+function updateBoxHomeSystemTile(box)
+    print('Updating "' .. box.getName() .. '"')
+    local factionName = assert(string.match(box.getName(), '^(.*) Box$'))
+
+    local tileName = factionName .. ' Tile'
+    local otherTileEntry = false
+
+    for _, entry in ipairs(box.getObjects()) do
+        if entry.name == tileName then
+            return  -- expected tile
+        end
+        if string.match(entry.name, ' Tile$') then
+            assert(not otherTileEntry)
+            otherTileEntry = entry
+        end
+    end
+    assert(otherTileEntry)
+    print(factionName .. ' -> ' .. otherTileEntry.name)
+
+    local pos = box.getPosition()
+    local tile = box.takeObject({
+        guid = otherTileEntry.guid,
+        position = { x = pos.x, y = pos.y + 5, z = pos.z },
+    })
+    local function delayedPut()
+        tile.setName(tileName)
+        box.putObject(tile)
+    end
+    Wait.frames(delayedPut, 1)
+end
+
 function updateBoxToSeparateTechPromissoryPlanetCardsBags(box)
     assert(box.tag == 'Bag')
     print('Updating "' .. box.getName() .. '"')
@@ -146,7 +177,8 @@ function updateAllBoxesToSeparateTechPromissoryPlanetCardsBags()
 
     for i, box in ipairs(boxes) do
         local function delayedUpdate()
-            updateBoxToSeparateTechPromissoryPlanetCardsBags(box)
+            updateBoxHomeSystemTile(box)
+            --updateBoxToSeparateTechPromissoryPlanetCardsBags(box)
         end
         Wait.frames(delayedUpdate, i * 2)
     end

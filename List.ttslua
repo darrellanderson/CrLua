@@ -192,3 +192,50 @@ function CrLua.List._testUnique()
     local unique = CrLua.List.unique(list)
     assert(#unique == 3 and unique[1] == 'a' and unique[2] == 'b' and unique[3] == 'c')
 end
+
+-------------------------------------------------------------------------------
+--- Given an updated list, append any new items not in the old list but
+-- otherwise preserve old list order.  Also remove any items in the old
+-- list that are not in the new list.
+-- @param oldList : use this item order.
+-- @param newList : append any new items not in old, remove any old items not in new.
+-- @return list : table with the add/prune modifications.
+-------------------------------------------------------------------------------
+function CrLua.List.pruneAndAppendMissing(oldList, newList)
+    assert(type(oldList) == 'table' and type(newList) == 'table')
+
+    local oldSet = {}
+    for _, oldItem in ipairs(oldList) do
+        oldSet[oldItem] = true
+    end
+    local newSet = {}
+    for _, newItem in ipairs(newList) do
+        newSet[newItem] = true
+    end
+
+    -- Start by copying over old items in order, prune any missing from new.
+    local result = {}
+    for _, item in ipairs(oldList) do
+        if newSet[item] then
+            table.insert(result, item)
+        end
+    end
+
+    -- Then add any new entries.
+    for _, item in ipairs(newList) do
+        if not oldSet[item] then
+            table.insert(result, item)
+        end
+    end
+
+    return result
+end
+
+function CrLua.List._testPruneAndAppendMissing()
+    local a = { 1, 2, 3, 4, 5 }
+    local b = { 3, 5, 1, 7, 9 }
+    local c = CrLua.List.pruneAndAppendMissing(a, b)
+    for i, v in ipairs({ 1, 3, 5, 7, 9 }) do
+        assert(c[i] == v)
+    end
+end

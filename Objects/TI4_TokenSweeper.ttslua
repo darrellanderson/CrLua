@@ -525,6 +525,7 @@ function getUnitBags(playerColor)
     assert(type(playerColor) == 'string')
     local colorUnitNameSet = {}
     for _, unitName in ipairs(unitList) do
+        unitName = string.gsub(unitName, '_', ' ')
         colorUnitNameSet[playerColor .. ' ' .. unitName] = true
     end
     local unitBags = {}
@@ -540,8 +541,10 @@ end
 
 function unpackStartingUnits(unitBags, params, homeSystemTile)
     assert(type(unitBags) == 'table' and type(params) == 'table' and type(homeSystemTile) == 'userdata')
+
     local startingUnits = {}
     for k, v in pairs(params) do
+        k = string.gsub(k, '_', ' ')
         local bag = unitBags[k]
         if bag then
             for _ = 1, v do
@@ -683,14 +686,14 @@ setupParams["L1Z1X MINDNET"] = {Infantry=5,Fighter=3,Carrier=1,Dreadnought=1,Spa
 setupParams["YSSARIL TRIBES"] = {Infantry=5,Fighter=2,Cruiser=1,Carrier=2,Space_Dock=1,PDS=1,tech={"Neural Motivator"},fsName="Y'sia Y'ssrila",fsDescr="This ship can move through systems that contain another players' ships."}
 setupParams["WINNU"] = {Infantry=2,Fighter=2,Cruiser=1,Carrier=1,Space_Dock=1,PDS=1,tech={"Antimass Deflectors","Neural Motivator","Sarween Tools","Plasma Scoring"},fsName="Salai Sai Corian",fsDescr="When this unit makes a combat roll, it rolls a number of dice equal to the number of your opponent's non-fighter ships in this system."}
 setupParams["DRAHN CONSORTIUM"] = {Infantry=4,Fighter=3,Destroyer=1,Carrier=2,Space_Dock=1,tech={"Neural Motivator","Plasma Scoring"},fsName="Nightingale II",fsDescr="Other players cannot play action cards during a space combat in this system."}
-setupParams["FREMEN"] = {Infantry=7,Fighter=2,Cruiser=2,Carrier=1,Space_Dock=1,tech={"Antimass Deflectors"},fsName="Shai-Hulud",fsDescr="You may use your GUERILLA WARRIORS faction ability in this system as if it were your home system."}
+setupParams["FREMEN"] = {Infantry=7,Fighter=2,Cruiser=2,Carrier=1,Space_Dock=1,tech={"Antimass Deflectors"},fsName="Shai-Hulud",fsDescr="During a round of combat in the system, 1 unit you control may roll 1 additional combat die."}
 setupParams["KHET DRAKKOL UNION"] = {Infantry=4,Fighter=3,Destroyer=1,Dreadnought=2,Space_Dock=1,PDS=1,tech={"Sarween Tools"},fsName="Khage",fsDescr=" "}
 setupParams["VELDYR SOVEREIGNTY"] = {Infantry=3,Fighter=2,Destroyer=1,Dreadnought=1,Carrier=1,Space_Dock=1,PDS=1,tech={"Plasma Scoring"},fsName="Richtyrian",fsDescr="When this ship makes a combat roll, it rolls 1 additional die for each round of space combat that has been resolved this combat."}
 setupParams["MANDALORIAN CLANS"] = {Infantry=5,Fighter=2,Cruiser=2,Carrier=1,Space_Dock=1,tech={"Neural Motivator","Antimass Deflectors"},fsName="Kyr'tsad",fsDescr="This ship cannot be destroyed by Direct Hit action cards."}
 setupParams["ADVENT"] = {Infantry=2,Fighter=6,Destroyer=1,Carrier=2,Space_Dock=1,tech={"Neural Motivator","Sarween Tools"},fsName="Advent Flagship",fsDescr=" "}
-setupParams["FREE SYSTEMS ALLIANCE"] = {Infantry=4,Fighter=2,Cruiser=2,Carrier=1,Space_Dock=1,PDS=1,tech={"Neural Motivator"},fsName="Vox",fsDescr="After this ship rolls a combat die, you may spend any amount of influence to apply +1 to that die's result for each influence spent."}
+setupParams["FREE SYSTEMS ALLIANCE"] = {Infantry=4,Fighter=2,Cruiser=2,Carrier=1,Space_Dock=1,PDS=1,tech={"Neural Motivator"},fsName="Vox",fsDescr="FSA is When this unit makes a combat roll, it rolls 1 additional die for each planet in this system of any single trait."}
 setupParams["NAVIGATORS' GUILD"] = {Infantry=4,Fighter=1,Cruiser=1,Carrier=2,Space_Dock=1,tech={"Antimass Deflectors","Sarween Tools"},fsName="Chogra Tuhn",fsDescr="Other players' ships cannot move through this unit's system."}
-setupParams["VASARI EMPIRE"] = {Infantry=3,Fighter=2,Destroyer=1,Carrier=1,Dreadnought=1,Space_Dock=1,PDS=1,tech={"Antimass Deflectors","Plasma Scoring"},fsName="Vasari Flagship",fsDescr=" "}
+setupParams["VASARI EMPIRE"] = {Infantry=3,Fighter=2,Destroyer=1,Carrier=1,Dreadnought=1,Space_Dock=1,tech={"Antimass Deflectors","Plasma Scoring"},fsName="Vasari Flagship",fsDescr=" "}
 setupParams["TRADER EMERGENCY COALITION"] = {Infantry=2,Fighter=2,Cruiser=1,Destroyer=1,Carrier=1,Space_Dock=2,tech={"Sarween Tools","Plasma Scoring"},fsName="TEC Flagship",fsDescr=" "}
 setupParams["KORTALI HORDE"] = {Infantry=5,Fighter=3,Cruiser=1,Carrier=2,Space_Dock=1,fsName="For'xdar",tech={"Dacxive Animators"},fsDescr="Planets controlled by other players in this system cannot be readied."}
 setupParams["RHODYN MIGRANT FLEET"] = {Infantry=4,Fighter=2,Destroyer=1,Space_Dock=1,Flagship=1,fsName="Mho Rhodyn",tech={"Gravity Drive"},fsDescr="At the end of the status phase, place 1 fighter from your reinforcements into this system’s space area."}

@@ -8,13 +8,15 @@ function onChat(message, srcPlayer)
         return false -- originial suppressed message
     end
 
+    local colorSet = {}
+    for _, color in ipairs(getSeatedPlayers()) do
+        colorSet[color] = true
+    end
+
     -- The real function throws an error on invalid input.
     local function safeColorToHex(color)
-        local seatedColorSet = {}
-        for _, seatedColor in ipairs(getSeatedPlayers()) do
-            if color == seatedColor then
-                return Color.toHex(Color.fromString(color))
-            end
+        if colorSet[color] then
+            return Color.toHex(Color.fromString(color))
         end
         return 'ffffff'
     end
@@ -46,17 +48,12 @@ function onChat(message, srcPlayer)
             '[' .. msgHex .. ']' .. message
         }, '')
 
-        local found = false
-        for _, color in ipairs(getSeatedPlayers()) do
-            found = found or color == dstColor
-            if color == srcColor or color == dstColor then
-                printToColor(privateMessage, color, srcColor)
-            else
-                printToColor(publicMessage, color, srcColor)
-            end
-        end
-        if not found then
+        if not colorSet[dstColor] then
             printToColor('No one is playing as ' .. dstColor, srcColor, srcColor)
+        else
+            printToAll(publicMessage)
+            printToColor(privateMessage, srcColor, srcColor)
+            printToColor(privateMessage, dstColor, srcColor)
         end
         return false
     end

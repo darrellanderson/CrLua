@@ -1,0 +1,289 @@
+--- Keep track of each players' tech, and acquisition order.
+-- @author Darrell
+--
+-- Assumes Nekro makes a copy of assimilated technology cards.
+-------------------------------------------------------------------------------
+
+local TAG = 'CrLua.TI4.PlayerTech'
+
+CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
+CrLua.TI4 = CrLua.TI4 or {}
+CrLua.TI4.PlayerTech = assert(not CrLua.TI4.PlayerTech) and {
+    _require = { 'TTS.HelperClient' },
+    _allowMissingKeys = { 'TECHNOLOGIES' }
+}
+
+CrLua.TI4.PlayerTech.TECHNOLOGIES = {
+    ['Advanced Carrier II'] = 'Adv Carrier II',
+    ['Antimass Deflectors'] = 'Antimass',
+    ['Assault Cannon'] = 'Assault Cannon',
+    ['Bioplasmosis'] = 'Bioplas',
+    ['Carrier II'] = 'Carrier II',
+    ['Chaos Mapping'] = 'Chaos Map',
+    ['Cruiser II'] = 'Cruiser II',
+    ['Dacxive Animators'] = 'Dacxive',
+    ['Destroyer II'] = 'Destroyer II',
+    ['Dimensional Splicer'] = 'D. Splicer',
+    ['Dreadnought II'] = 'Dread II',
+    ['Duranium Armor'] = 'Duranium',
+    ['E-res Siphons'] = 'E-Res',
+    ['Exotrireme II'] = 'Exotrireme II',
+    ['Fighter II'] = 'Fighter II',
+    ['Fleet Logistics'] = 'Fleet Logistics',
+    ['Floating Factory II'] = 'FF II',
+    ['Graviton Laser System'] = 'Graviton',
+    ['Gravity Drive'] = 'Grav Drive',
+    ['Hegemonic Trade Policy'] = 'Hegemonic',
+    ['Hybrid Crystal Fighter II'] = 'HCF II',
+    ['Hyper Metabolism'] = 'Hyper',
+    ['Impulse Core'] = 'Impulse',
+    ['Infantry II'] = 'Infantry II',
+    ['Inheritance Systems'] = 'Inherit. Systems',
+    ['Instinct Training'] = 'Instinct Train',
+    ['Integrated Economy'] = 'Integrated Eco.',
+    ['L4 Disruptors'] = 'L4 Disrupt',
+    ['Lazax Gate Folding'] = 'Lazax Gate',
+    ['Letani Warrior II'] = 'Letani II',
+    ['Light-Wave Deflector'] = 'Light/Wave',
+    ['Magen Defense Grid'] = 'Magen',
+    ['Mageon Implants'] = 'Mageon',
+    ['Magmus Reactor'] = 'Magmus',
+    ['Mirror Computing'] = 'Mirror Comp',
+    ['Neural Motivator'] = 'Neural',
+    ['Neuroglaive'] = 'Neuroglaive',
+    ['Non-Euclidean Shielding'] = 'N.E.S.',
+    ['Nullification Field'] = 'Null. Field',
+    ['PDS II'] = 'PDS II',
+    ['Plasma Scoring'] = 'Plasma',
+    ['Production Biomes'] = 'Prod. Biomes',
+    ['Prototype War Sun II'] = 'PWS II',
+    ['Quantum Datahub Node'] = 'QDHN',
+    ['Salvage Operations'] = 'Salvage Ops.',
+    ['Sarween Tools'] = 'Sarween',
+    ['Space Dock II'] = 'Space Dock II',
+    ['Spacial Conduit Cylinder'] = 'Spacial Conduit',
+    ['Spec Ops II'] = 'Spec Ops II',
+    ['Super-Dreadnought II'] = 'SuperDread II',
+    ['Transit Diodes'] = 'Transit',
+    ['Transparasteel Plating'] = 'Transparasteel',
+    ['Valefar Assimilator X'] = nil,
+    ['Valefar Assimilator Y'] = nil,
+    ['Valkyrie Particle Weave'] = 'Valkyrie PW',
+    ['War Sun'] = 'War Sun',
+    ['Wormhole Generator'] = 'Wormhole Gen',
+    ['X-89 Bacterial Weapon Ω'] = 'X-89 B.W.',
+    ['X-89 Bacterial Weapon'] = 'X-89 B.W.',
+    ['Yin Spinner'] = 'Yin Spin',
+}
+
+local _factionHelper = CrLua.TTS.HelperClient.get('TI4_FACTION_HELPER')
+local _zoneHelper = CrLua.TTS.HelperClient.get('TI4_ZONE_HELPER')
+
+local _data = {
+    -- Player color to technologies, in add order.
+    playerToTechs = {}
+}
+
+function CrLua.TI4.PlayerTech.load(data)
+    _data = data or _data
+end
+
+function CrLua.TI4.PlayerTech.save()
+    return _data
+end
+
+-------------------------------------------------------------------------------
+
+--- Find technology cards in the game and sanity check the technologies keys.
+-- This is for validating spellings, not normal use.
+function CrLua.TI4.PlayerTech._verifyCardNames()
+    local boxes = {}  -- Box -> xxx Cards Bag -> Index 2
+    local techDeck = false
+
+    for _, object in ipairs(getAllObjects()) do
+        local tag = object.tag
+        local name = object.getName()
+        if tag == 'Deck' and string.match(name, 'Technology Cards$') then
+            techDeck = techDeck or object
+        end
+        if tag == 'Bag' and string.match(name, ' Box$') then
+            table.insert(boxes, object)
+        end
+    end
+
+    -- This is how unpack does it, very fragile if decks get redone!
+    local function isTechCards(object)
+        local details = object.getJSON()
+        local NHstart = string.find(details,"NumHeight") + 12
+        local NHend = string.find(details,",",NHstart) - 1
+        local numHeight = string.sub(details,NHstart,NHend)
+        return numHeight == "6"
+    end
+
+    local function getCardsFromCardsBag(cardsBag)
+        local result = {}
+        local pos = cardsBag.getPosition()
+        for i, entry in ipairs(cardsBag.getObjects()) do
+            local object = cardsBag.takeObject({
+                guid = entry.guid,
+                position = { x = pos.x, y = pos.y + 5 + i, z = pos.z }
+            })
+            if isTechCards(object) then
+                for _, entry in ipairs(object.getObjects()) do
+                    table.insert(result, entry.name)
+                end
+            end
+            cardsBag.putObject(object)
+        end
+        if #result == 0 then
+            error('missing cards from "' .. cardsBag.getName() .. '"')
+        end
+        return result
+    end
+    local function getCardsFromFactionBox(box)
+        local pos = box.getPosition()
+        for _, entry in ipairs(box.getObjects()) do
+            if string.match(entry.name, ' Cards Bag$') then
+                local cardsBag = box.takeObject({
+                    guid = entry.guid,
+                    position = { x = pos.x, y = pos.y + 5, z = pos.z }
+                })
+                local result = getCardsFromCardsBag(cardsBag)
+                box.putObject(cardsBag)
+                return result
+            end
+        end
+        error('missing cards bag from "' .. box.getName() .. '"')
+    end
+
+    local cardNameSet = {}
+    for _, entry in ipairs(techDeck.getObjects()) do
+        cardNameSet[entry.name] = true
+    end
+    for _, box in ipairs(boxes) do
+        for _, name in ipairs(getCardsFromFactionBox(box)) do
+            cardNameSet[name] = true
+        end
+    end
+
+    for name, _ in pairs(cardNameSet) do
+        if not CrLua.TI4.PlayerTech.TECHNOLOGIES[name] then
+            print('card "' .. name .. '" not in technologies table')
+        end
+    end
+
+    for name, _ in pairs(CrLua.TI4.PlayerTech.TECHNOLOGIES) do
+        if not cardNameSet[name] then
+            print('technoligies key "' .. name .. '" not in cards')
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
+
+--- Maintain per-player technologies, preserving add order.
+function CrLua.TI4.PlayerTech.updatePlayerToTech(playerColor, newTechs)
+    assert(type(playerColor) == 'string' and type(newTechs) == 'table')
+
+    local techs = _data.playerToTechs[playerColor] or {}
+    local techSet = {}
+    for _, tech in ipairs(techs) do
+        techSet[tech] = true
+    end
+    local newTechSet = {}
+    for _, tech in ipairs(newTechs) do
+        newTechSet[tech] = true
+    end
+
+    -- Remove missing.
+    for i = #techs, 1, -1 do
+        local tech = techs[i]
+        if not newTechSet[tech] then
+            CrLua.Log.d(TAG, 'updatePlayerToTech: removing "' .. tech .. '" for ' .. playerColor)
+            table.remove(techs, i)
+        end
+    end
+
+    -- Add new.
+    for _, tech in ipairs(newTechs) do
+        if not techSet[tech] then
+            CrLua.Log.d(TAG, 'updatePlayerToTech: adding "' .. tech .. '" for ' .. playerColor)
+            table.insert(techs, tech)
+            techSet[tech] = true
+        end
+    end
+
+    _data.playerToTechs[playerColor] = techs
+end
+
+--- Scan the table for technologies, update each player.
+function CrLua.TI4.PlayerTech.updateAllPlayersToTech()
+    CrLua.Log.d(TAG, 'updateAllPlayersToTech')
+
+    local guidToName = {}
+    local guidToPosition = {}
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        if CrLua.TI4.PlayerTech.TECHNOLOGIES[name] then
+            local guid = object.getGUID()
+            guidToName[guid] = name
+            guidToPosition[guid] = object.getPosition()
+        end
+    end
+
+    local guidToZone = _zoneHelper.zonesFromPositions(guidToPosition)
+    local colorToTechs = {}
+
+    for guid, color in pairs(guidToZone) do
+        local entry = colorToTechs[color]
+        if not entry then
+            entry = {}
+            colorToTechs[color] = entry
+        end
+        local tech = assert(guidToName[guid])
+        table.insert(entry, tech)
+    end
+
+    for color, _ in pairs(_factionHelper.allFactions()) do
+        local techs = colorToTechs[color] or {}
+        CrLua.TI4.PlayerTech.updatePlayerToTech(color, techs)
+    end
+end
+
+-------------------------------------------------------------------------------
+
+function CrLua.TI4.PlayerTech.getTechnologyCards(playerColor)
+    return _data.playerToTechs[playerColor]
+end
+
+--- Generate the entire spreadsheet contents.
+function CrLua.TI4.PlayerTech.getCells()
+    local cells = {}
+    local colorToColumn = {
+        Blue = 'B',
+        Purple = 'C',
+        Yellow = 'D',
+        Red = 'E',
+        Green = 'F',
+        White = 'G',
+        --Orange = 'H',
+        --Pink = 'I',
+    }
+    for color, col in pairs(colorToColumn) do
+        cells[col .. 3] = 'N/A'
+        cells[col .. 4] = ''
+    end
+    for _, player in ipairs(Player.getPlayers()) do
+        local col = colorToColumn[player.color]
+        cells[col .. 3] = player.steam_name
+    end
+    for color, techs in pairs(_data.playerToTechs) do
+        local col = colorToColumn[color]
+        for i, tech in ipairs(techs) do
+            cells[col .. (i + 3)] = CrLua.TI4.PlayerTech.TECHNOLOGIES[tech]
+        end
+    end
+    return cells
+end
+
+-------------------------------------------------------------------------------

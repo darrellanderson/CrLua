@@ -9,10 +9,11 @@ local TAG = 'CrLua.TI4.PlayerTech'
 CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
 CrLua.TI4 = CrLua.TI4 or {}
 CrLua.TI4.PlayerTech = assert(not CrLua.TI4.PlayerTech) and {
-    _require = { 'TTS.HelperClient' },
+    _require = { 'List', 'TTS.HelperClient' },
     _allowMissingKeys = { 'TECHNOLOGIES' }
 }
 
+-- Map from card name to streamer tech sheet text.
 CrLua.TI4.PlayerTech.TECHNOLOGIES = {
     ['Advanced Carrier II'] = 'Adv Carrier II',
     ['Antimass Deflectors'] = 'Antimass',
@@ -79,146 +80,13 @@ CrLua.TI4.PlayerTech.TECHNOLOGIES = {
 local _factionHelper = CrLua.TTS.HelperClient.get('TI4_FACTION_HELPER')
 local _zoneHelper = CrLua.TTS.HelperClient.get('TI4_ZONE_HELPER')
 
-local _data = {
-    -- Player color to technologies, in add order.
-    playerToTechs = {}
-}
-
-function CrLua.TI4.PlayerTech.load(data)
-    _data = data or _data
-end
-
-function CrLua.TI4.PlayerTech.save()
-    return _data
-end
-
--------------------------------------------------------------------------------
-
---- Find technology cards in the game and sanity check the technologies keys.
--- This is for validating spellings, not normal use.
-function CrLua.TI4.PlayerTech._verifyCardNames()
-    local boxes = {}  -- Box -> xxx Cards Bag -> Index 2
-    local techDeck = false
-
-    for _, object in ipairs(getAllObjects()) do
-        local tag = object.tag
-        local name = object.getName()
-        if tag == 'Deck' and string.match(name, 'Technology Cards$') then
-            techDeck = techDeck or object
-        end
-        if tag == 'Bag' and string.match(name, ' Box$') then
-            table.insert(boxes, object)
-        end
-    end
-
-    -- This is how unpack does it, very fragile if decks get redone!
-    local function isTechCards(object)
-        local details = object.getJSON()
-        local NHstart = string.find(details,"NumHeight") + 12
-        local NHend = string.find(details,",",NHstart) - 1
-        local numHeight = string.sub(details,NHstart,NHend)
-        return numHeight == "6"
-    end
-
-    local function getCardsFromCardsBag(cardsBag)
-        local result = {}
-        local pos = cardsBag.getPosition()
-        for i, entry in ipairs(cardsBag.getObjects()) do
-            local object = cardsBag.takeObject({
-                guid = entry.guid,
-                position = { x = pos.x, y = pos.y + 5 + i, z = pos.z }
-            })
-            if isTechCards(object) then
-                for _, entry in ipairs(object.getObjects()) do
-                    table.insert(result, entry.name)
-                end
-            end
-            cardsBag.putObject(object)
-        end
-        if #result == 0 then
-            error('missing cards from "' .. cardsBag.getName() .. '"')
-        end
-        return result
-    end
-    local function getCardsFromFactionBox(box)
-        local pos = box.getPosition()
-        for _, entry in ipairs(box.getObjects()) do
-            if string.match(entry.name, ' Cards Bag$') then
-                local cardsBag = box.takeObject({
-                    guid = entry.guid,
-                    position = { x = pos.x, y = pos.y + 5, z = pos.z }
-                })
-                local result = getCardsFromCardsBag(cardsBag)
-                box.putObject(cardsBag)
-                return result
-            end
-        end
-        error('missing cards bag from "' .. box.getName() .. '"')
-    end
-
-    local cardNameSet = {}
-    for _, entry in ipairs(techDeck.getObjects()) do
-        cardNameSet[entry.name] = true
-    end
-    for _, box in ipairs(boxes) do
-        for _, name in ipairs(getCardsFromFactionBox(box)) do
-            cardNameSet[name] = true
-        end
-    end
-
-    for name, _ in pairs(cardNameSet) do
-        if not CrLua.TI4.PlayerTech.TECHNOLOGIES[name] then
-            print('card "' .. name .. '" not in technologies table')
-        end
-    end
-
-    for name, _ in pairs(CrLua.TI4.PlayerTech.TECHNOLOGIES) do
-        if not cardNameSet[name] then
-            print('technoligies key "' .. name .. '" not in cards')
-        end
-    end
-end
-
 -------------------------------------------------------------------------------
 
 --- Maintain per-player technologies, preserving add order.
-function CrLua.TI4.PlayerTech.updatePlayerToTech(playerColor, newTechs)
-    assert(type(playerColor) == 'string' and type(newTechs) == 'table')
-
-    local techs = _data.playerToTechs[playerColor] or {}
-    local techSet = {}
-    for _, tech in ipairs(techs) do
-        techSet[tech] = true
-    end
-    local newTechSet = {}
-    for _, tech in ipairs(newTechs) do
-        newTechSet[tech] = true
-    end
-
-    -- Remove missing.
-    for i = #techs, 1, -1 do
-        local tech = techs[i]
-        if not newTechSet[tech] then
-            CrLua.Log.d(TAG, 'updatePlayerToTech: removing "' .. tech .. '" for ' .. playerColor)
-            table.remove(techs, i)
-        end
-    end
-
-    -- Add new.
-    for _, tech in ipairs(newTechs) do
-        if not techSet[tech] then
-            CrLua.Log.d(TAG, 'updatePlayerToTech: adding "' .. tech .. '" for ' .. playerColor)
-            table.insert(techs, tech)
-            techSet[tech] = true
-        end
-    end
-
-    _data.playerToTechs[playerColor] = techs
-end
-
---- Scan the table for technologies, update each player.
-function CrLua.TI4.PlayerTech.updateAllPlayersToTech()
-    CrLua.Log.d(TAG, 'updateAllPlayersToTech')
+-- @param playerColorToTechs table : map from player color to in-order tech list.
+-- @return table : updated map from player color to in-order tech list.
+function CrLua.TI4.PlayerTech.updateAllPlayersToTech(playerColorToTechs)
+    assert(type(playerColorToTechs) == 'table')
 
     local guidToName = {}
     local guidToPosition = {}
@@ -244,20 +112,20 @@ function CrLua.TI4.PlayerTech.updateAllPlayersToTech()
         table.insert(entry, tech)
     end
 
+    local updated = {}
     for color, _ in pairs(_factionHelper.allFactions()) do
-        local techs = colorToTechs[color] or {}
-        CrLua.TI4.PlayerTech.updatePlayerToTech(color, techs)
+        local oldTechs = playerColorToTechs[color] or {}
+        local newTechs = colorToTechs[color] or {}
+        local updatedTechs = CrLua.List.pruneAndAppendMissing(oldTechs, newTechs)
+        updated[color] = updatedTechs
     end
+    return updated
 end
 
 -------------------------------------------------------------------------------
 
-function CrLua.TI4.PlayerTech.getTechnologyCards(playerColor)
-    return _data.playerToTechs[playerColor]
-end
-
 --- Generate the entire spreadsheet contents.
-function CrLua.TI4.PlayerTech.getCells()
+function CrLua.TI4.PlayerTech.getCells(playerColorToTechs)
     local cells = {}
     local colorToColumn = {
         Blue = 'B',
@@ -277,7 +145,7 @@ function CrLua.TI4.PlayerTech.getCells()
         local col = colorToColumn[player.color]
         cells[col .. 3] = player.steam_name
     end
-    for color, techs in pairs(_data.playerToTechs) do
+    for color, techs in pairs(playerColorToTechs) do
         local col = colorToColumn[color]
         for i, tech in ipairs(techs) do
             cells[col .. (i + 3)] = CrLua.TI4.PlayerTech.TECHNOLOGIES[tech]

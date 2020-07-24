@@ -162,6 +162,24 @@ function shouldZombie(object)
             end
         end
     end
+
+    -- If a card is being deleted after being added to a deck that is
+    -- normally caught by the enter-container event.  However, when (g)rouping
+    -- multiple cards to make a deck it is not.  To detect those (rare?)
+    -- legal deletions scan decks for the card.
+    if object.tag == 'Card' then
+        local guid = object.getGUID()
+        for _, otherObject in ipairs(getAllObjects()) do
+            if otherObject.tag == 'Deck' then
+                for _, entry in ipairs(otherObject.getObjects()) do
+                    if entry.guid == guid then
+                        return false
+                    end
+                end
+            end
+        end
+    end
+
     return true
 end
 

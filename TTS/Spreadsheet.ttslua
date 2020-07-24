@@ -16,6 +16,10 @@ CrLua.TTS.Spreadsheet.GAS_PROXY = 'https://script.google.com/macros/s/AKfycbzx5w
 
 local _idToCells = {}
 
+function CrLua.TTS.Spreadsheet.idFromUrl(url)
+    return string.match(url, '^http[s]://docs.google.com/spreadsheets/.*/(.*)/edit')
+end
+
 --- Push only changed cells to the sheet.
 function CrLua.TTS.Spreadsheet.update(id, sheet, cells)
     assert(type(id) == 'string' and type(cells) == 'table')

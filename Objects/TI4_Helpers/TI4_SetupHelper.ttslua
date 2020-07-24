@@ -1,0 +1,600 @@
+--- Table setup.
+-- @author the_mantis (original TI4 tokensweeper unpack)
+-- @author Milty (per-color unpack, player-count zones)
+-- @author Darrell (gathered code into this shared helper)
+
+-- Users should copy this getHelperClient function, and use via:
+--
+-- local setupHelper = getHelperClient('TI4_SETUP_HELPER')
+--
+-- Where one can call any main function in this file via the helper.
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
+        return function(parameters) return helperObject.call(functionName, parameters) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+
+local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
+
+-------------------------------------------------------------------------------
+
+DEFAULT_COLOR_LIST = {"White","Blue","Purple","Yellow","Red","Green",'Orange','Pink'}
+
+_agendaCenter = false
+_playerList = false
+_mapColorToPlayer = false
+_agendaSpot = false
+
+local function debugLog(message)
+    print(message)
+end
+
+function setZoneList(playerCount)
+    debugLog('setZoneList')
+    assert(type(playerCount) == 'number')
+    assert(_agendaCenter, '_agendaCenter not set')
+
+    -- assigns half the players rounded up to the 'north' side of the table
+    local zoneCenters = _zoneHelper.getPlayerCountZoneCenters(playerCount)
+
+    -- empties the table of zone coordinates
+    _agendaSpot = {}
+    -- generates zone corners for each player, starting from 'northwest' at 1 clockwise
+    for i, zoneCenter in ipairs(zoneCenters) do
+        local zFlip = zoneCenter.z < 0 and 1 or -1
+        table.insert(_agendaSpot, {
+            x = zoneCenter.x / 10 + _agendaCenter.x,
+            y = zoneCenter.y + _agendaCenter.y,
+            z = -3.75 * zFlip + _agendaCenter.z,
+        })
+    end
+end
+
+function setPlayerColors(playerCount)
+    debugLog('setPlayerColors')
+    assert(type(playerCount) == 'number')
+
+    _playerList = {}
+    _mapColorToPlayer = {}
+
+    for x = 1, playerCount do
+        local defaultColor = DEFAULT_COLOR_LIST[x]
+        _playerList[x] = defaultColor
+        _mapColorToPlayer[defaultColor] = x
+    end
+end
+
+function transformHands(playerCount)
+    debugLog('transformHands')
+    assert(type(playerCount) == 'number')
+    assert(_mapColorToPlayer, '_mapColorToPlayer not set')
+
+    local allPlayers = Player.getAvailableColors()
+    local zoneCenters = _zoneHelper.getPlayerCountZoneCenters(playerCount)
+    local x = 0
+    for i, color in pairs(allPlayers) do
+        local playerIndex = _mapColorToPlayer[color]
+        if playerIndex then
+            local zoneCenter = zoneCenters[playerIndex]
+            local handpos = false
+            local handrot = false
+            if zoneCenter.z < 0 then
+                handpos = {zoneCenter.x, 5, -61.5}
+                handrot = {0, 0, 0}
+            else
+                handpos = {zoneCenter.x, 5, 61.5}
+                handrot = {0, 180, 0}
+            end
+            Player[color].setHandTransform({
+                position = handpos,
+                rotation = handrot,
+                scale    = {12.00, 10.00, 5.00}
+            })
+        else
+            local x = x + 1
+            local handpos = {148 - 3 * x, 0, 80}
+            Player[color].setHandTransform({
+                position = handpos,
+                rotation = {0, 0, 0},
+                scale = {1, 5, 1}
+            })
+        end
+    end
+end
+
+function getAgendaSpot(playerColor)
+    return _agendaSpot[_mapColorToPlayer[playerColor]]
+end
+
+function moveUnpackersandMultirollers(playerCount)
+    debugLog('moveUnpackersandMultirollers')
+    local setupBag = getObjectFromGUID('ef04ca')
+    local zoneCenters = _zoneHelper.getPlayerCountZoneCenters(playerCount)
+    for i, item in ipairs(getAllObjects()) do
+        if item.getName() == "TI4 Unpacker" or string.match(item.getName(), '^TI4 MultiRoller ') then
+            setupBag.putObject(item)
+        end
+    end
+    local unpackers = {}
+    local rollers = {}
+    for i, item in ipairs(setupBag.getObjects()) do
+        local name = item.name
+        if name == "TI4 Unpacker" then
+            table.insert(unpackers, item.guid)
+        elseif string.match(name, '^TI4 MultiRoller ') then
+            table.insert(rollers, item.guid)
+        end
+    end
+    for x = 1, playerCount do
+        local playerColor = _playerList[x]
+        local playerIndex = _mapColorToPlayer[playerColor]
+        local zoneCenter = zoneCenters[playerIndex]
+        local yRotation = zoneCenter.z < 0 and 180 or 0
+        local zUnpacker = false
+        local zRoller = false
+        if yRotation == 180 then
+            zUnpacker = zoneCenter.z - 1.5
+            zRoller = zoneCenter.z - 54
+        else
+            zUnpacker = zoneCenter.z + 1.5
+            zRoller = zoneCenter.z + 54
+        end
+        local takeParamsUnpackers = {
+            position = { x = zoneCenter.x, y = -1.6, z = zUnpacker },
+            rotation = { 0, yRotation, 0 },
+            guid = table.remove(unpackers),
+            callback_function = function(obj) take_callbackLock(obj) end,
+        }
+        local takeParamsRoller = {
+            position = { x = zoneCenter.x, y = -1.6, z = zRoller },
+            rotation = { 0, yRotation, 0 },
+            guid = table.remove(rollers),
+            callback_function = function(obj) take_callbackLock(obj) end,
+        }
+        setupBag.takeObject(takeParamsUnpackers)
+        setupBag.takeObject(takeParamsRoller)
+    end
+end
+
+function moveCommandSheets(playerCount)
+    debugLog('moveCommandSheets')
+    local setupBag = getObjectFromGUID('ef04ca')
+    local zoneCenters = _zoneHelper.getPlayerCountZoneCenters(playerCount)
+    for i,item in ipairs(getAllObjects()) do
+        local name = item.getName()
+        local color = string.match(name, '^Command Sheet %((%a+)%)$')
+        if color then
+            setupBag.putObject(item)
+        end
+    end
+    local commandSheetGUIDs = {}
+    for i, item in ipairs(setupBag.getObjects()) do
+        local name = item.name
+        local color = string.match(name, '^Command Sheet %((%a+)%)$')
+        if color then
+            commandSheetGUIDs[color] = item.guid
+        end
+    end
+    for x = 1, playerCount do
+        local playerColor = _playerList[x]
+        local playerIndex = _mapColorToPlayer[playerColor]
+        local zoneCenter = zoneCenters[playerIndex]
+        local yRotation = zoneCenter.z < 0 and 180 or 0
+        local xpoint = false
+        local zpoint = false
+        if yRotation == 180 then
+            xpoint = zoneCenter.x + 9
+            zpoint = zoneCenter.z - 16
+        else
+            xpoint = zoneCenter.x - 9
+            zpoint = zoneCenter.z + 16
+        end
+        local takeParams = {
+            position = { x = xpoint, y = -1.6, z = zpoint },
+            rotation = { 0, yRotation, 0 },
+            guid = commandSheetGUIDs[playerColor],
+            callback_function = function(obj) take_callbackLock(obj) end,
+        }
+        setupBag.takeObject(takeParams)
+    end
+end
+
+function take_callbackLock(object_spawned)
+    object_spawned.setLock(true)
+end
+
+function setupAgendaZone(playerCount)
+    debugLog('setupAgendaZone')
+    if playerCount <= 6 then
+        _agendaCenter = { x = -42.75, y = -1.6, z = 0 }
+    else
+        _agendaCenter = { x = -44.75, y = -1.6, z = 0 }
+    end
+    local agendaZoneOffsets = {
+        ["Against:"] = { x = 4.25 },
+        ["Speaker Token"] = { x = 0 },
+        ["For:"] = { x = -4.25 },
+        ["Votes"] = { x = -9.25 }
+    }
+    local setupBag = getObjectFromGUID('ef04ca')
+    for i, item in ipairs(getAllObjects()) do
+        local itemName = item.getName()
+        local itemGUID = item.getGUID()
+        if itemName == "Against:" or itemName == "Votes" or itemName == "For:" or itemName == "Speaker Token - Agenda" then
+            setupBag.putObject(item)
+        end
+    end
+    local setupBagContents = setupBag.getObjects()
+    for j, item in pairs(setupBagContents) do
+        local compType = false
+        local takeParamsAgenda = false
+        local itemName = item.name
+        local itemGUID = item.guid
+        for key, thing in pairs(agendaZoneOffsets) do
+            local start, finish = string.find(itemName, key)
+            if start then
+                compType = string.sub(itemName, start, finish)
+                takeParamsAgenda = {
+                    guid = itemGUID,
+                    position = {
+                        x = _agendaCenter.x + agendaZoneOffsets[compType].x,
+                        y = _agendaCenter.y,
+                        z = _agendaCenter.z
+                    },
+                    rotation = {0, 270, 0},
+                }
+            end
+        end
+        if compType then
+            setupBag.takeObject(takeParamsAgenda)
+            compType = nil
+        end
+    end
+end
+
+function setupGame(playerColor, playerCount)
+    debugLog('setupGame')
+    assert(type(playerColor) == 'string' and type(playerCount) == 'number')
+
+    local LineDrawFunctions = {
+        [3] = function() draw3Pcircle() end,
+        [4] = function() draw4Pcircle() end,
+        [5] = function() draw5Pcircle() end,
+        [6] = function() draw6Pcircle() end,
+        [7] = function() draw7Pcircle() end,
+        [8] = function() draw8Pcircle() end
+    }
+    setupAgendaZone(playerCount)
+    setZoneList(playerCount)
+    setPlayerColors(playerCount)
+    moveUnpackersandMultirollers(playerCount)
+    moveCommandSheets(playerCount)
+    transformHands(playerCount)
+    local lineDraw = LineDrawFunctions[playerCount]
+    --lineDraw()
+    UI.setAttribute("startup", "active", false)
+end
+
+--- This is the primary entry point for using the helper object.
+function setup(params)
+    assert(type(params) == 'table')
+    assert(type(params.playerColor) == 'string')
+    assert(type(params.playerCount) == 'number')
+    setupGame(params.playerColor, params.playerCount)
+end
+
+function draw3Pcircle()
+    Global.setVectorLines({
+        -- player1 spot
+        {points = getCircleVectorPoints({15.75, -2, -9.09},1.75, 32, 1),color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=true,square=false,}, -- purple circle
+        {points={{0.2,-1.0,-12.1},{0.2,-1.0,-71.6},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,}, -- purple horizontal
+        {points={{18.4,-1.0,-12.1},{64,-1.0,-12.1},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,}, -- purple vertical
+        -- player2 spot
+        {points = getCircleVectorPoints({-15.75, -2, -9.09},1.75, 32, 1),color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=true,square=false,}, -- white circle
+        {points={{-0.2,-1.0,-12.1},{-0.2,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,}, -- white vertical
+        {points={{-18.4,-1.0,-12.1},{-64,-1.0,-12.1},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,}, -- white horizontal
+        -- player3 spot
+        {points = getCircleVectorPoints({0, -2, 18.2},1.75, 32, 1),color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=true,square=false,}, -- red circle
+        {points={{18.4,-1.0,12.1},{64.0,-1.0,12.1},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,}, -- red horizontal
+        {points={{-18.4,-1.0,12.1},{-64,-1.0,12.1},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,}, -- red horizontal
+        {points = getHexagonVectorPoints({0,-2,0},6,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false}, -- grey ring hexagons
+        {points = getHexagonVectorPoints({0,-2,0},18,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points = getHexagonVectorPoints({0,-2,0},12,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points={{-40,-1.0,-1.6},{-45.5,-1.0,-1.6},{-45.5,-1.0,1.6},{-40,-1.0,1.6},},color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false,}, -- grey agenda box
+    })
+    return true
+end
+
+function draw4Pcircle()
+    Global.setVectorLines({
+        -- player1 spot
+        {points = getCircleVectorPoints({5.25,-2,-15.15},1.75,32,1),color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{18.4,-1.0,-12.1},{64.0,-1.0,-12.1},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{0.2,-1.0,-12.1},{0.2,-1.0,-71.6},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+
+        -- player2 spot
+        {points=getCircleVectorPoints({-15.75,-2,-3.03}, 1.75, 32, 1),color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{-18.4,-1.0,-12.1},{-64,-1.0,-12.1},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{-0.2,-1.0,-12.1},{-0.2,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+
+        -- player3 spot
+        {points = getCircleVectorPoints({-5.25,-2,15.15},1.75,32,1),color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{-0.2,-1.0,12.1},{-0.2,-1.0,71.6},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{-18.4,-1.0,12.1},{-64,-1.0,12.1},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+
+        -- player4 spot
+        {points= getCircleVectorPoints({15.75,-2,3.03},1.75,32,1),color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{0.2,-1.0,12.1},{0.2,-1.0,71.6},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{18.4,-1.0,12.1},{64,-1.0,12.1},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+
+        --grey ring hexagons and agenda box
+        {points = getHexagonVectorPoints({0,-2,0},6,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points = getHexagonVectorPoints({0,-2,0},18,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points = getHexagonVectorPoints({0,-2,0},12,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points={{-40,-1.0,-1.6},{-45.5,-1.0,-1.6},{-45.5,-1.0,1.6},{-40,-1.0,1.6},},color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+    })
+    return true
+end
+
+function draw5Pcircle()
+    Global.setVectorLines({
+        -- player1 spot
+        {points = getCircleVectorPoints({15.75, -2, -9.09},1.75, 32, 1),color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{22.2,-1.0,-12.1},{22.2,-1.0,-71.6},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{18.4,-1.0,-12.1},{64,-1.0,-12.1},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+
+        -- player2 spot
+        {points = getCircleVectorPoints({0,-2,-18.25},1.75,32,1),color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{21.8,-1.0,-12.1},{21.8,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{-21.8,-1.0,-12.1},{-21.8,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+
+        -- player3 spot
+        {points=getCircleVectorPoints({-15.75,-2,-9.09}, 1.75, 32, 1),color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{-18.4,-1.0,-12.1},{-64,-1.0,-12.1},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{-22.2,-1.0,-12.1},{-22.2,-1.0,-71.6},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+
+        -- player4 spot
+        {points = getCircleVectorPoints({-15.75, -2, 9.09},1.75, 32, 1),color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{-0.2,-1.0,12.1},{-0.2,-1.0,71.6},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{-18.4,-1.0,12.1},{-64,-1.0,12.1},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+
+        -- player5spot
+        {points = getCircleVectorPoints({15.75, -2, 9.09},1.75, 32, 1),color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{0.2,-1.0,12.1},{0.2,-1.0,71.6},},color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{18.4,-1.0,12.1},{64,-1.0,12.1},},color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+
+        --grey ring hexagons and agenda box
+        {points = getHexagonVectorPoints({0,-2,0},6,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points = getHexagonVectorPoints({0,-2,0},18,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points = getHexagonVectorPoints({0,-2,0},12,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points={{-40,-1.0,-1.6},{-45.5,-1.0,-1.6},{-45.5,-1.0,1.6},{-40,-1.0,1.6},},color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        -- grey warp zone template
+        {points = getCircleVectorPoints({0, -2, 12},1.25, 32, 1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points = getHexagonVectorPoints({0,-2,6},3,0,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points = getHexagonVectorPoints({5.25,-2,9},3,0,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points = getHexagonVectorPoints({-5.25,-2,9},3,0,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points = getHexagonVectorPoints({5.25,-2,15},3,0,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points = getHexagonVectorPoints({-5.25,-2,15},3,0,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points = getHexagonVectorPoints({0,-2,18},3,0,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+    })
+    return true
+end
+
+function draw6Pcircle()
+    Global.setVectorLines({
+        -- player1 spot
+        {points = getCircleVectorPoints({15.75, -2, -9.09},1.75, 32, 1),color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{22.2,-1.0,-12.1},{22.2,-1.0,-71.6},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{18.4,-1.0,-12.1},{64,-1.0,-12.1},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        -- player2 spot
+        {points = getCircleVectorPoints({0,-2,-18.25},1.75,32,1),color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{21.8,-1.0,-12.1},{21.8,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{-21.8,-1.0,-12.1},{-21.8,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        -- player3 spot
+        {points=getCircleVectorPoints({-15.75,-2,-9.09}, 1.75, 32, 1),color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{-18.4,-1.0,-12.1},{-64,-1.0,-12.1},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{-22.2,-1.0,-12.1},{-22.2,-1.0,-71.6},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        -- player4 spot
+        {points = getCircleVectorPoints({-15.75, -2, 9.09},1.75, 32, 1),color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{-18.4,-1.0,12.1},{-64,-1.0,12.1},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{-22.2,-1.0,12.1},{-22.2,-1.0,71.6},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        -- player5 spot
+        {points = getCircleVectorPoints({0,-2,18.25},1.75,32,1),color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{21.8,-1.0,12.1},{21.8,-1.0,71.6},},color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{-21.8,-1.0,12.1},{-21.8,-1.0,71.6},},color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        -- player6 spot
+        {points = getCircleVectorPoints({15.75, -2, 9.09},1.75, 32, 1),color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{18.4,-1.0,12.1},{64,-1.0,12.1},},color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{22.2,-1.0,12.1},{22.2,-1.0,71.6},},color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+
+        --grey ring hexagons and agenda box
+        {points = getHexagonVectorPoints({0,-2,0},6,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points = getHexagonVectorPoints({0,-2,0},18,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points = getHexagonVectorPoints({0,-2,0},12,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points={{-40,-1.0,-1.6},{-45.5,-1.0,-1.6},{-45.5,-1.0,1.6},{-40,-1.0,1.6},},color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+    })
+    return true
+end
+
+function draw7Pcircle()
+    Global.setVectorLines({
+        -- player1 spot
+        {points = getCircleVectorPoints({15.75, -2, -15},1.75, 32, 1),color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{18.4,-1.0,-12.1},{64,-1.0,-12.1},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{32.2,-1.0,-12.1},{32.2,-1.0,-71.6},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        -- player2 spot
+        {points = getCircleVectorPoints({0,-2,-24.25},1.75,32,1),color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{31.8,-1.0,-12.1},{31.8,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{0.2,-1.0,-12.1},{0.2,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        -- player3 spot
+        {points = getCircleVectorPoints({-15.75, -2, -15},1.75, 32, 1),color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{-0.2,-1.0,-12.1},{-0.2,-1.0,-71.6},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{-31.8,-1.0,-12.1},{-31.8,-1.0,-71.6},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        -- player4 spot
+        {points=getCircleVectorPoints({-21,-2,0}, 1.75, 32, 1),color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{-18.4,-1.0,-12.1},{-64,-1.0,-12.1},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{-32.2,-1.0,-12.1},{-32.2,-1.0,-71.6},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        -- player5 spot
+        {points = getCircleVectorPoints({-15.75, -2, 15},1.75, 32, 1),color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{-18.4,-1.0,12.1},{-64,-1.0,12.1},},color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{-22.2,-1.0,12.1},{-22.2,-1.0,71.6},},color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        -- player6 spot
+        {points = getCircleVectorPoints({15.75, -2, 15},1.75, 32, 1),color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{21.8,-1.0,12.1},{21.8,-1.0,71.6},},color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{-21.8,-1.0,12.1},{-21.8,-1.0,71.6},},color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        --purple circle, vertical, horizontals
+        {points = getCircleVectorPoints({21, -2, 0},1.75, 32, 1),color=_playerList[7],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{18.4,-1.0,12.1},{64,-1.0,12.1},},color=_playerList[7],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{22.2,-1.0,12.1},{22.2,-1.0,71.6},},color=_playerList[7],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+
+        --grey ring hexagons and agenda box
+        {points = getHexagonVectorPoints({0,-2,0},6,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points = getHexagonVectorPoints({0,-2,0},18,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points = getHexagonVectorPoints({0,-2,0},12,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points = getHexagonVectorPoints({0,-2,0},24,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points={{-42,-1.0,-1.6},{-47.5,-1.0,-1.6},{-47.5,-1.0,1.6},{-42,-1.0,1.6},},color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        -- grey warp zone template
+        {points = getCircleVectorPoints({0,-2,18.25},1.25,32,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points = getHexagonVectorPoints({0,-2,12},3,0,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points = getHexagonVectorPoints({5.25,-2,15},3,0,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points = getHexagonVectorPoints({-5.25,-2,15},3,0,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points = getHexagonVectorPoints({5.25,-2,21},3,0,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points = getHexagonVectorPoints({-5.25,-2,21},3,0,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points = getHexagonVectorPoints({0,-2,24},3,0,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+    })
+    return true
+end
+
+function draw8Pcircle()
+    Global.setVectorLines({
+        -- player1 spot
+        {points = getCircleVectorPoints({15.75, -2, -15},1.75, 32, 1),color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{18.4,-1.0,-12.1},{64,-1.0,-12.1},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{32.2,-1.0,-12.1},{32.2,-1.0,-71.6},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        -- player2 spot
+        {points = getCircleVectorPoints({0,-2,-24.25},1.75,32,1),color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{31.8,-1.0,-12.1},{31.8,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{0.2,-1.0,-12.1},{0.2,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        -- player3 spot
+        {points = getCircleVectorPoints({-15.75, -2, -15},1.75, 32, 1),color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{-0.2,-1.0,-12.1},{-0.2,-1.0,-71.6},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{-31.8,-1.0,-12.1},{-31.8,-1.0,-71.6},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        -- player4 spot
+        {points=getCircleVectorPoints({-21,-2,0}, 1.75, 32, 1),color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{-18.4,-1.0,-12.1},{-64,-1.0,-12.1},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{-32.2,-1.0,-12.1},{-32.2,-1.0,-71.6},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        -- player5 spot
+        {points = getCircleVectorPoints({-15.75, -2, 15},1.75, 32, 1),color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{-18.4,-1.0,12.1},{-64,-1.0,12.1},},color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{-32.2,-1.0,12.1},{-32.2,-1.0,71.6},},color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        -- player6 spot
+        {points = getCircleVectorPoints({0,-2,24.25},1.75,32,1),color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{-0.2,-1.0,12.1},{-0.2,-1.0,71.6},},color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{-31.8,-1.0,12.1},{-31.8,-1.0,71.6},},color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        -- player7 spot
+        {points = getCircleVectorPoints({15.75, -2, 15},1.75, 32, 1),color=_playerList[7],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{31.8,-1.0,12.1},{31.8,-1.0,71.6},},color=_playerList[7],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{0.2,-1.0,12.1},{0.2,-1.0,71.6},},color=_playerList[7],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        -- player8 spot
+        {points = getCircleVectorPoints({21, -2, 0},1.75, 32, 1),color=_playerList[8],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+        {points={{18.4,-1.0,12.1},{64,-1.0,12.1},},color=_playerList[8],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        {points={{32.3,-1.0,12.1},{32.2,-1.0,71.6},},color=_playerList[8],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
+        --grey ring hexagons and agenda box
+        {points = getHexagonVectorPoints({0,-2,0},6,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points = getHexagonVectorPoints({0,-2,0},18,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points = getHexagonVectorPoints({0,-2,0},12,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points = getHexagonVectorPoints({0,-2,0},24,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
+        {points={{-42,-1.0,-1.6},{-47.5,-1.0,-1.6},{-47.5,-1.0,1.6},{-42,-1.0,1.6},},color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false,},
+    })
+    return true
+end
+
+function getCircleVectorPoints(origin, radius, steps, y)
+    local t = {}
+    local d,s,c,r = 360/steps, math.sin, math.cos, math.rad
+    for i = 0,steps do
+        table.insert(t, {
+            origin[1] + c(r(d*i))*radius,
+            origin[2] + y,
+            origin[3] + s(r(d*i))*radius
+        })
+    end
+    return t
+end
+
+function getHexagonVectorPoints(origin, radius, rot, y)
+    local t = {}
+    local d,s,c,r = 60, math.sin, math.cos, math.rad
+    for i = 0,6 do
+        table.insert(t, {
+            origin[1] + c(r(d*i+rot))*radius,
+            origin[2] + y,
+            origin[3] + s(r(d*i+rot))*radius
+        })
+    end
+    return t
+end
+
+-------------------------------------------------------------------------------
+
+function unpackColorBox(playerColor)
+    -- TODO XXX
+end
+
+-------------------------------------------------------------------------------
+
+function unpackFactionBox(playerColor)
+    -- TODO XXX
+end
+
+-------------------------------------------------------------------------------
+
+function onLoad(saveState)
+    self.setColorTint({ r = 0.25, g = 0.25, b = 0.25 })
+    self.setScale({ x = 2, y = 0.01, z = 2 })
+    self.setName('TI4_SETUP_HELPER')
+    self.setDescription('Shared helper functions used by other objects, PLEASE LEAVE ON TABLE! This object is only visible to the black (GM) player.')
+
+    -- Only the GM/black player can see this object.  Others can still interact!
+    local invisibleTo = {}
+    for _, color in ipairs(Player.getColors()) do
+        if color ~= 'Black' then
+            table.insert(invisibleTo, color)
+        end
+    end
+    self.setInvisibleTo(invisibleTo)
+end
+
+-------------------------------------------------------------------------------
+--- Partially lock the _G global variable table.
+-- Include this AFTER creating any necessary globals to prevent new ones.
+--
+-- - Existing globals can still be read AND WRITTEN.
+-- - Cannot read non-existent globals.
+-- - Cannot write new globals.
+--
+-- This helps catch typos where what was meant to access a local instead
+-- references a (hopefully non-existent) global, as well as forgetting to use
+-- "local" when creating objects.
+--
+-- @author Darrell
+-------------------------------------------------------------------------------
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

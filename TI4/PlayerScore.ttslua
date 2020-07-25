@@ -1,0 +1,184 @@
+--- Compute player scores.
+-- @author Darrell
+
+local TAG = 'CrLua.TI4.PlayerScore'
+
+CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
+CrLua.TI4 = CrLua.TI4 or {}
+CrLua.TI4.PlayerScore = assert(not CrLua.TI4.PlayerScore) and {
+    _require = { 'List', 'TTS.HelperClient', 'TTS.Overlap' },
+    _allowMissingKeys = {}
+}
+
+CrLua.TI4.PlayerScore.PHASE1 = {
+    ['Diversify Research'] = '2 TECH 2 COLORS',
+    ['Develop Weaponry'] = '2 UNIT UPGRADES',
+    ['Sway the Council'] = '8 INFLUENCE',
+    ['Erect a Monument'] = '8 RESOURCES',
+    ['Negotiate Trade Routes'] = '5 TRADE GOODS',
+    ['Lead From The Front'] = '3 COMMAND TOKENS',
+    ['Intimidate Council'] = '2 SYS ADJ TO MR',
+    ['Corner the Market'] = '4 PLANET SAME TRAIT',
+    ['Found Research Outposts'] = '3 TECH SPECIALTY',
+    ['Expand Borders'] = '6 NON-HOME PLANET',
+}
+
+CrLua.TI4.PlayerScore.PHASE2 = {
+    ['Master the Sciences'] = '2 TECH 4 COLORS',
+    ['Revolutionize Warfare'] = '3 UNIT UPGRADES',
+    ['Manipulate Galactic Law'] = '16 INFLUENCE',
+    ['Found a Golden Age'] = '16 RESOURCES',
+    ['Centralize Galatic Trade'] = '10 TRADE GOODS',
+    ['Galvanize the People'] = '6 COMMAND TOKENS',
+    ['Conquer the Weak'] = '1 OPPONENT HOME',
+    ['Unify the Colonies'] = '6 PLANET SAME TRAIT',
+    ['Form Galactic Brain Trust'] = '5 TECH SPECIALTY',
+    ['Subdue the Galaxy'] = '11 NON-HOME PLANET',
+}
+
+CrLua.TI4.PlayerScore.SECRET = {
+    ['Become the Gatekeeper'] = 'ALPHA AND BETA',
+    ['Mine Rare Metals'] = '4 HAZARDOUS',
+    ['Forge An Alliance'] = '4 CULTURAL',
+    ['Monopolize Production'] = '4 INDUSTRIAL',
+    ['Cut Supply Lines'] = 'BLOCKADE SD',
+    ['Occupy the Seat of the Empire'] = 'MR W/ 3 SHIPS',
+    ['Learn Secrets of the Cosmos'] = '3 ADJ TO ANOMALY',
+    ['Control the Region'] = '6 SYSTEMS',
+    ['Threaten Enemies'] = 'SYS ADJ TO HOME',
+    ['Adapt New Strategies'] = '2 FACTION TECH',
+    ['Master the Laws of Physics'] = '4 TECH 1 COLOR',
+    ['Gather A Mighty Fleet'] = '5 DREADNOUGHTS',
+    ['Form a Spy Network'] = '5 ACTION CARDS',
+    ['Fuel the War Machine'] = '3 SPACE DOCKS',
+    ['Establish A Perimeter'] = '4 PDS',
+    ['Make an Example of Their World'] = 'BOMBARD LAST GF',
+    ['Turn Their Fleets to Dust'] = 'SPC LAST SHIP',
+    ['Destroy Their Greatest Ship'] = 'DESTORY WS/FLAG',
+    ['Unveil Flagship'] = 'WIN W/ FLAGSHIP',
+    ['Spark a Rebellion'] = 'WIN VS LEADER',
+}
+
+CrLua.TI4.PlayerScore.AGENDA = {
+    ['Shard of the Throne'] = 'SHARD of the THRONE',
+    ['The Crown of Emphidia'] = 'CROWN of EMPHIDIA',
+    ['Holy Planet of Ixth'] = 'HOLY PLANET of IXTH',
+    ['Seed of an Empire'] = 'SEED of an EMPIRE',
+    ['Mutiny'] = 'MUTINY +1/-1',
+}
+
+CrLua.TI4.PlayerScore.STRATEGY = {
+    ['Leadership'] = 'Leadership',
+    ['Diplomacy'] = 'Diplomacy',
+    ['Diplomacy (Revised)'] = 'Diplomacy',
+    ['Politics'] = 'Politics',
+    ['Construction'] = 'Construction',
+    ['Trade'] = 'Trade',
+    ['Warfare'] = 'Warfare',
+    ['Technology'] = 'Technology',
+    ['Imperial'] = 'Imperial',
+}
+
+CrLua.TI4.PlayerScore.MECATOL = 'Custodians'
+CrLua.TI4.PlayerScore.SCOREBOARD = 'Scoreboard'
+
+local _factionHelper = CrLua.TTS.HelperClient.get('TI4_FACTION_HELPER')
+
+--- Get map from scoring relevant object name to lists of objects with name.
+function CrLua.TI4.PlayerScore.getNameToScoreObjects()
+    local keysAreObjectNames = {
+        CrLua.TI4.PlayerScore.PHASE1,
+        CrLua.TI4.PlayerScore.PHASE2,
+        CrLua.TI4.PlayerScore.SECRET,
+        CrLua.TI4.PlayerScore.AGENDA,
+        CrLua.TI4.PlayerScore.STRATEGY,
+        { [CrLua.TI4.PlayerScore.MECATOL] = true },
+        { [CrLua.TI4.PlayerScore.SCOREBOARD] = true },
+    }
+
+    local nameToScoreObjects = {}
+    for _, useKeys in ipairs(keysAreObjectNames) do
+        for k, _ in pairs(useKeys) do
+            nameToScoreObjects[k] = {}
+        end
+    end
+
+    for color, faction in pairs(_factionHelper.allFactions()) do
+        local name = faction.tokenName .. ' Owner Token'
+        nameToScoreObjects[name] = {}
+    end
+
+    for _, object in ipairs(getAllObjects()) do
+        local objects = nameToScoreObjects[object.getName()]
+        if objects then
+            table.insert(objects, object)
+        end
+    end
+
+    local nonEmpty = {}
+    for k, v in pairs(nameToScoreObjects) do
+        if #v > 0 then
+            nonEmpty[k] = v
+        end
+    end
+    return nonEmpty
+end
+
+--- Get map from scoring relevant object name to list of owner tokens on it.
+function CrLua.TI4.PlayerScore.nameToOwnerTokens(nameToScoreObjects)
+    assert(type(nameToScoreObjects) == 'table')
+
+    local srcs = {}
+    local dsts = {}
+    for name, objects in pairs(nameToScoreObjects) do
+        if string.find(name, ' Owner Token$') then
+            srcs = CrLua.List.join(srcs, objects)
+        else
+            dsts = CrLua.List.join(dsts, objects)
+        end
+    end
+    local dstToSrcs = CrLua.TTS.Overlap.overlap(srcs, dsts)
+
+    local nameToOwnerTokens = {}
+    for dst, srcs in pairs(dstToSrcs) do
+        local name = dst.getName()
+        nameToOwnerTokens[name] = CrLua.List.join(nameToOwnerTokens[name] or {}, srcs)
+    end
+    return nameToOwnerTokens
+end
+
+function CrLua.TI4.PlayerScore.score(scoreboard, ownerToken)
+    assert(type(scoreboard) == 'userdata' and type(ownerToken) == 'userdata')
+
+    -- Owner tokens are not centered at their position!  Use the bounds center.
+    local center = ownerToken.getBounds().center
+
+    -- Scoreboard local space x.
+    local p = scoreboard.positionToLocal(center)
+    print ('xxx ' .. ownerToken.getName() .. ' x=' .. p.x .. ' z=' .. p.z)
+    local u = -(p.x - 3.25) / 6.5
+    return u * (scoreboard.is_face_down and 15 or 11)
+end
+
+function CrLua.TI4.PlayerScore.colorToScore(nameToScoreObjects, nameToOwnerTokens)
+    assert(#nameToScoreObjects[CrLua.TI4.PlayerScore.SCOREBOARD] == 1)
+    local scoreboard = nameToScoreObjects[CrLua.TI4.PlayerScore.SCOREBOARD][1]
+    assert(scoreboard)
+    local ownerTokens = nameToOwnerTokens[CrLua.TI4.PlayerScore.SCOREBOARD] or {}
+
+    local ownerTokenNameToColor = {}
+    for color, faction in pairs(_factionHelper.allFactions()) do
+        local name = faction.tokenName .. ' Owner Token'
+        ownerTokenNameToColor[name] = color
+    end
+
+    local colorToScore = {}
+    for _, ownerToken in ipairs(ownerTokens) do
+        local color = ownerTokenNameToColor[ownerToken.getName()]
+        assert(color)
+        local score = CrLua.TI4.PlayerScore.score(scoreboard, ownerToken)
+        colorToScore[color] = math.max(colorToScore[color] or 0, score)
+    end
+
+    return colorToScore
+end

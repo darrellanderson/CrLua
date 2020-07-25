@@ -1,0 +1,347 @@
+--- Keep track of each players' tech, and acquisition order.
+-- @author Darrell
+--
+-- Assumes Nekro makes a copy of assimilated technology cards.
+-------------------------------------------------------------------------------
+
+local TAG = 'SpreadsheetUpdate'
+
+-------------------------------------------------------------------------------
+
+local _data = {
+    sheetIdTech = false,
+    sheetNameTech = 'Sheet1',
+
+    sheetIdScore = false,
+    sheetNameScore = 'Sheet1',
+
+    updateBetweenTurns = false,
+    saveIds = false,
+
+    playerColorToTechs = false,
+}
+
+function onLoad(saveState)
+    CrLua.Log.d(TAG, 'onLoad')
+    local success, value = pcall(function() return JSON.decode(saveState) end)
+    if success and value and type(value) == 'table' then
+        for k, v in pairs(value) do
+            _data[k] = v
+        end
+    end
+
+    -- Make it an error to access/write a missing key.
+    _data = CrLua.LockTable.readWriteRequireKey('_data', _data)
+
+    Wait.frames(createUI, 3)
+    Wait.frames(updateUI, 5)  -- wait for UI to exist before updating
+end
+
+function onSave()
+    assert(_data, 'data')
+
+    -- Optionally remove the sheet ids from save, may not want them in file.
+    local save = {}
+    for k, v in pairs(_data) do
+        save[k] = v
+    end
+    if not _data.saveIds then
+        save.sheetIdTech = false
+        save.sheetIdScore = false
+    end
+
+    return JSON.encode(save)
+end
+
+function onPlayerTurnStart(playerColorStart, playerColorPrevious)
+    -- Always update state to preserve order.
+    updateTechState()
+    updateScoreState()
+
+    -- Optionally also push to sheet.
+    if _data.updateBetweenTurns() then
+        updateSpreadsheetTech()
+        updateSpreadsheetScore()
+    end
+end
+
+function onDrop(player_color)
+
+    local nameToObjects = CrLua.TI4.PlayerScore._getNameToObjects()
+    for k, v in pairs(nameToObjects) do
+        print('xxx1 ' .. k)
+    end
+    local targetToOwnerTokens = CrLua.TI4.PlayerScore.targetToOwnerTokens(nameToObjects)
+    for k, v in pairs(targetToOwnerTokens) do
+        print('xxx2 ' .. k.getName() .. ' -> ' .. (#v))
+    end
+    local colorToScore = CrLua.TI4.PlayerScore.colorToScore(targetToOwnerTokens)
+    for k, v in pairs(colorToScore) do
+        print('xxx3 ' .. k .. ' -> ' .. v)
+    end
+
+end
+
+-------------------------------------------------------------------------------
+
+function updateTechState()
+    -- Update the local table to preserve order.  Does not push to sheet.
+    _data.playerColorToTechs = CrLua.TI4.PlayerTech.updateAllPlayersToTech(_data.playerColorToTechs)
+end
+
+function updateScoreState()
+    local nameToScoreObjects = CrLua.TI4.PlayerScore.getNameToScoreObjects()
+    local nameToOwnerTokens = CrLua.TI4.PlayerScore.nameToOwnerTokens(nameToScoreObjects)
+    local colorToScore = CrLua.TI4.PlayerScore.colorToScore(nameToScoreObjects, nameToOwnerTokens)
+
+    for k, v in pairs(nameToScoreObjects) do
+        print('nameToScoreObjects #' .. k .. ' ' .. #v)
+    end
+    for k, v in pairs(nameToOwnerTokens) do
+        print('nameToOwnerTokens #' .. k .. ' ' .. #v)
+    end
+    for k, v in pairs(colorToScore) do
+        print('colorToScore ' .. k .. ' ' .. v)
+    end
+end
+
+-------------------------------------------------------------------------------
+
+function _sheetId(idOrUrl)
+    local id = idOrUrl
+    if string.match(id, '^http') then
+        id = CrLua.TTS.Spreadsheet.idFromUrl(id)
+    end
+    return id
+end
+
+function validateSpreadsheetTech()
+    local function callback(value)
+        if value ~= 'Sarween' then
+            error('either cannot access sheet or sheet is not the tech sheet (j5 not "Sarween")')
+        end
+    end
+    CrLua.TTS.Spreadsheet.get(_sheetIdTech, _sheetNameTech, 'j5', callback)
+end
+
+function updateSpreadsheetTech()
+    local sheetId = _sheetId(_data.sheetIdTech)
+    local sheetName = _data.sheetNameTech
+
+    local cells = CrLua.TI4.PlayerTech.getCells(_data.playerColorToTechs)
+    if sheetId then
+        CrLua.Log.i(TAG, 'updating tech spreadsheet')
+        CrLua.TTS.Spreadsheet.update(sheetId, sheetName, cells)
+    else
+        CrLua.Log.i(TAG, 'no tech spreadsheet, not updating tech')
+    end
+end
+
+function updateSpreadsheetScore()
+    local sheetId = _sheetId(_data.sheetIdScore)
+    local sheetName = _data.sheetNameScore
+end
+-------------------------------------------------------------------------------
+
+function createUI()
+    local defaults = {
+        tag = 'Defaults',
+        children = {
+            {
+                tag = 'Toggle',
+                attributes = {
+                    fontSize = 12,
+                    onValueChanged = 'onToggleValueChanged',
+                }
+            },
+            {
+                tag = 'Button',
+                attributes = {
+                    onClick = 'onButtonClick',
+                    fontSize = 18,
+                }
+            },
+            {
+                tag = 'Text',
+                attributes = {
+                    class = 'label',
+                    fontSize = 14,
+                    alignment = 'MiddleLeft'
+                }
+            },
+            {
+                tag = 'Text',
+                attributes = {
+                    class = 'title',
+                    fontSize = 24,
+                    fontStyle = 'Bold',
+                    alignment = 'MiddleCenter'
+                }
+            },
+            {
+                tag = 'InputField',
+                attributes = {
+                    fontSize = 14,
+                    onValueChanged = 'onInputValueChanged',
+                    lineType = 'MultiLineSubmit',
+                }
+            },
+        }
+    }
+    local top = {
+        tag = 'VerticalLayout',
+        attributes = {
+            position = '0 0 2',  -- 0.05
+            rotation = '0 180 90',
+            width = 200,
+            height = 280,
+            padding = '10 10 10 10',
+            spacing = 10,
+        },
+        children = {
+            {
+                tag = 'Text',
+                attributes = {
+                    class = 'title'
+                },
+                value = 'TI4 Spreadsheet Update'
+            },
+            {
+                tag = 'Button',
+                attributes = {
+                    id = 'updateTech',
+                },
+                value = 'Update Tech'
+            },
+            {
+                tag = 'Button',
+                attributes = {
+                    id = 'updateScore',
+                },
+                value = 'Update Score'
+            },
+            {
+                tag = 'Toggle',
+                attributes = {
+                    id = 'updateBetweenTurns',
+                    fontSize = 14,
+                },
+                value = 'Update between turns'
+            },
+            {
+                tag = 'Text',
+                attributes = {
+                    fontSize = 12
+                },
+                value = '(Flip for settings)'
+            }
+        }
+    }
+
+    local bottom = {
+        tag = 'VerticalLayout',
+        attributes = {
+            position = '0 0 -22',  -- -20.05
+            rotation = '0 0 90',
+            width = 200,
+            height = 280,
+            padding = '10 10 10 10',
+            spacing = 10,
+        },
+        children = {
+            {
+                tag = 'InputField',
+                attributes = {
+                    id = 'sheetIdTech',
+                    placeHolder = 'Tech sheet id or URL',
+                },
+            },
+            {
+                tag = 'InputField',
+                attributes = {
+                    id = 'sheetIdScore',
+                    placeHolder = 'Score sheet id or URL',
+                },
+            },
+            {
+                tag = 'Toggle',
+                attributes = {
+                    id = 'saveIds',
+                    fontSize = 14,
+                },
+                value = 'Save ids?'
+            },
+
+        }
+    }
+
+    self.UI.setXmlTable({ defaults, top, bottom })
+end
+
+function updateUI()
+    self.UI.setAttribute('updateBetweenTurns', 'isOn', _data.updateBetweenTurns)
+    self.UI.setAttribute('saveIds', 'isOn', _data.saveIds)
+    if _data.sheetIdTech then
+        self.UI.setAttribute('sheetIdTech', 'text', _data.sheetIdTech)
+    end
+    if _data.sheetIdScore then
+        self.UI.setAttribute('sheetIdScore', 'text', _data.sheetIdScore)
+    end
+end
+
+function onButtonClick(player, value, id)
+    if id == 'updateTech' then
+        updateTechState()
+        updateSpreadsheetTech()
+    elseif id == 'updateScore' then
+        updateScoreState()
+        updateSpreadsheetScore()
+    else
+        error('unknown button id "' .. id .. '"')
+    end
+end
+
+function onToggleValueChanged(player, value, id)
+    local valueAsBool = string.lower(value) == 'true' and true or false
+    if id == 'updateBetweenTurns' then
+        _data.updateBetweenTurns = valueAsBool
+    elseif id == 'saveIds' then
+        _data.saveIds = valueAsBool
+    else
+        error('unknown toggle id "' .. id .. '"')
+    end
+end
+
+function onInputValueChanged(player, value, id)
+    if id == 'sheetIdTech' then
+        _data.sheetIdTech = value
+    elseif id == 'sheetIdScore' then
+        _data.sheetIdScore = value
+    else
+        error('unknown input id "' .. id .. '"')
+    end
+end
+
+-------------------------------------------------------------------------------
+
+#include <~/CrLua/CrLua>
+#include <~/CrLua/LockGlobals>
+
+#include <~/CrLua/List>
+#include <~/CrLua/LockTable>
+#include <~/CrLua/Log>
+
+#include <~/CrLua/TTS/HelperClient>
+#include <~/CrLua/TTS/Overlap>
+#include <~/CrLua/TTS/Spreadsheet>
+
+#include <~/CrLua/TI4/PlayerScore>
+#include <~/CrLua/TI4/PlayerTech>
+
+--#include <~/CrLua/UnitTest>
+--CrLua.UnitTest.runTests('CrLua', CrLua, true)
+
+CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
+
+CrLua.assertRequired({ 'TI4.PlayerScore', 'TI4.PlayerTech', 'TTS.Spreadsheet' })
+CrLua.lock()

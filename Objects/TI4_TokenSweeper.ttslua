@@ -243,7 +243,7 @@ function unpackCoroutine(playerColor)
     local takePosition = {}
     takePosition[homeSystemTileName] = getHomePosition(commandSheet)
 
-    if factionName == 'GHOSTS OF CREUSS' then
+    if faction.tokenName == 'Ghosts of Creuss' then
         takePosition['Creuss Gate Tile'] = takePosition[homeSystemTileName]
         takePosition[homeSystemTileName] = getGhostsHomePosition(commandSheet)
     end
@@ -308,22 +308,39 @@ function unpackCoroutine(playerColor)
     end
 
     -- Wait for things to stop moving.
-    local function busy()
-        local objects = {
-            factionSheet,
-            commandTokensBag,
-            ownerTokensBag,
-            homeSystemTile,
-            ownerToken,
-        }
+    local items = {}
+    local function addObjects(objects)
         for _, object in ipairs(objects) do
-            if not object.resting then
+            table.insert(items, {
+                object = object,
+                name = object.getName(),
+                guid = object.getGUID()
+            })
+        end
+    end
+    addObjects({ factionSheet, commandTokensBag, ownerTokensBag, homeSystemTile, ownerToken })
+    local function anyMissing(doReport)
+        for _, item in ipairs(items) do
+            if not getObjectFromGUID(item.guid) then
+                if doReport then
+                    reportError('Missing ' .. item.name)
+                end
                 return true
             end
         end
     end
-    while busy() do
+    local function busy()
+        for _, item in ipairs(items) do
+            if not item.object.resting then
+                return true
+            end
+        end
+    end
+    while not anyMissing(false) and busy() do
         coroutine.yield(0)
+    end
+    if anyMissing(true) then
+        return 1
     end
 
     -- Move the owner token "up" in case it is beneath anything.
@@ -360,13 +377,13 @@ function unpackCoroutine(playerColor)
     coroutine.yield(0)
 
     -- Remind players of further setup.
-    if factionName == "WINNU" then
+    if faction.tokenName == "Winnu" then
         reportInfo("Pick 1 technology and return the other 3 to your deck.")
     end
-    if factionName == "LAZAX" then
+    if faction.tokenName == "Lazax" then
         reportInfo("Pick 1 technology and return the other 3 to your deck.")
     end
-    if factionName == "ZETH CONTINGENCY" then
+    if faction.tokenName == "Zeth Contingency" then
         reportInfo("Pick 2 technologies and return the other 2 to your deck.")
     end
 
@@ -536,7 +553,7 @@ end
 
 function getUnitBags(playerColor)
     assert(type(playerColor) == 'string')
-    unitList = {
+    local unitList = {
         "Infantry",
         "Fighter",
         "Destroyer",
@@ -667,16 +684,16 @@ function unpackScoreboardOwnerTokens(ownerTokensBag, scoreboard, playerColor)
     local dx = ((idx - 1) % 2) * SPACING_X
     local dz = math.floor((idx - 1) / 2) * SPACING_Z
     local p = scoreboard.positionToWorld({
-        x = 4.2 + dx,
+        x = (4.2 + dx) * (scoreboard.is_face_down and -1 or 1),
         y = 0,
         z = -1.5 + dz
     })
     for i = 1, OWNER_TOKEN_COUNT do
+        p.y = p.y + 0.11
         ownerTokensBag.takeObject({
             position = p,
             rotation = { x = 0, y = scoreboard.getRotation().y + 90, z = 0 }
         })
-        p.y = p.y + 0.1
     end
 
     -- Place token on score zero.
@@ -685,8 +702,8 @@ function unpackScoreboardOwnerTokens(ownerTokensBag, scoreboard, playerColor)
     local dx = ((idx - 1) % 2) * SPACING_X
     local dz = math.floor((idx - 1) / 2) * SPACING_Z
     local p = scoreboard.positionToWorld({
-        x = 2.75 + dx,
-        y = 0.5 + (idx * 0.2),
+        x = (2.75 + dx) * (scoreboard.is_face_down and -1 or 1),
+        y = (0.5 + (idx * 0.2)) * (scoreboard.is_face_down and -1 or 1),
         z = -0.4 + dz
     })
 
@@ -716,3 +733,13 @@ tilePositions = {
     {x=15.75,y=2,z=3.031},
     {x=15.75,y=2,z=-3.031}
 }
+
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

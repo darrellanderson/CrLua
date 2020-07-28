@@ -436,7 +436,8 @@ function _maybeUpdate()
         local colorToFactionSheetGuid = colorToClosestKey(factionSheetGuidToFactionSheet)
 
         _colorToFaction = {}
-        for color, _ in pairs(colorToFactionSheetGuid) do
+        for color, factionSheetGuid in pairs(colorToFactionSheetGuid) do
+            local factionName = factionSheetGuidToFactionName[factionSheetGuid]
             local attributes = {
                 color = color,
                 commandSheetGuid = colorToCommandSheet[color].getGUID(),

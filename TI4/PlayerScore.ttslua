@@ -79,6 +79,15 @@ CrLua.TI4.PlayerScore.STRATEGY = {
     ['Imperial'] = 'Imperial',
 }
 
+CrLua.TI4.PlayerScore.ACTION = {
+    ['Imperial Rider'] = '?'
+}
+
+CrLua.TI4.PlayerScore.PROMISSORY = {
+    ['COLOR Support for the Throne'] = '?'
+}
+
+
 CrLua.TI4.PlayerScore.MECATOL = 'Custodians'
 CrLua.TI4.PlayerScore.SCOREBOARD = 'Scoreboard'
 
@@ -92,6 +101,8 @@ function CrLua.TI4.PlayerScore.getNameToScoreObjects()
         CrLua.TI4.PlayerScore.SECRET,
         CrLua.TI4.PlayerScore.AGENDA,
         CrLua.TI4.PlayerScore.STRATEGY,
+        CrLua.TI4.PlayerScore.ACTION,
+        CrLua.TI4.PlayerScore.PROMISSORY,
         { [CrLua.TI4.PlayerScore.MECATOL] = true },
         { [CrLua.TI4.PlayerScore.SCOREBOARD] = true },
     }

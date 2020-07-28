@@ -359,9 +359,10 @@ function _getOrCreateControlledViewObject()
     -- Use a second object with restricted visibility to affect who can see the lines.
     -- Do not restrict visibility on self, control panel is visible to all.
 
+    local cvoName = self.getName() .. ' controlled view object'
+
     -- If not known, see if there is one already out there.
     if not _controlledViewObject then
-        local cvoName = self.getName() .. ' controlled view object'
         for _, object in ipairs(getAllObjects()) do
             if object.getName() == cvoName then
                 _controlledViewObject = object

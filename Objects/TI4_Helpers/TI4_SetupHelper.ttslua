@@ -28,239 +28,380 @@ local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 -------------------------------------------------------------------------------
 
-DEFAULT_COLOR_LIST = {"White","Blue","Purple","Yellow","Red","Green",'Orange','Pink'}
-
-_agendaCenter = false
-_playerList = false
-_mapColorToPlayer = false
-_agendaSpot = false
-
+local _debug = true
 local function debugLog(message)
-    print(message)
+    if _debug then
+        print(message)
+    end
 end
 
-function setZoneList(playerCount)
-    debugLog('setZoneList')
+local function getEntryGuid(container, namePattern)
+    for _, entry in ipairs(container.getObjects()) do
+        if string.match(entry.name, namePattern) then
+            return entry.guid
+        end
+    end
+end
+
+local function offsetPosition(position, offset)
+    return {
+        x = position.x + (offset.x or 0),
+        y = position.y + (offset.y or 0),
+        z = position.z + (offset.z or 0) * (position.z > 0 and 1 or -1)
+    }
+end
+
+local function offsetRotation(position, offset)
+    local result = { x = 0, y = 0, z = 0 }
+
+    local z = offsetPosition(position, offset).z
+    if z == 0 then
+        result.y = 270
+    else
+        result.y = z > 0 and 0 or 180
+    end
+    result.y = result.y + (offset.yRot or 0)
+    return result
+end
+
+local function agendaCenter(playerCount)
     assert(type(playerCount) == 'number')
-    assert(_agendaCenter, '_agendaCenter not set')
+    return {
+        x = playerCount <= 6 and -42.75 or -44.75,
+        y = 0,
+        z = 0
+    }
+end
 
-    -- assigns half the players rounded up to the 'north' side of the table
+local function agendaCenterPlayer(playerCount, playerZoneCenter)
+    assert(type(playerCount) == 'number' and type(playerZoneCenter) == 'table')
+    local center = agendaCenter(playerCount)
+    return {
+        x = center.x + playerZoneCenter.x / 10,
+        y = center.y,
+        z = center.z + 3.75 * (playerZoneCenter.z > 0 and 1 or -1)
+    }
+end
+
+--- Setup tables have "NAME_TO_" sub-tables from name pattern to attributes.
+-- This function gathers the combined list of all name patterns.
+local function allNamePatterns(t)
+    local result = {}
+    for k, v in pairs(t) do
+        if type(k) == 'string' and type(v) == 'table' and string.match(k, '^NAME_TO_') then
+            for namePattern, _ in pairs(v) do
+                table.insert(result, namePattern)
+            end
+        end
+    end
+    return result
+end
+
+-------------------------------------------------------------------------------
+
+local SetupGeneric = {
+    NAME_TO_PLAYER_ZONE_OFFSET = {
+        ['^TI4 Unpacker$'] = { x = 0, z = 1.5 },
+        ['^TI4 MultiRoller'] = { x = 0, z = 54, lock = true },
+        ['^Technology Cards$'] = { x = -10, z = 1.5 },
+    },
+    NAME_TO_PLAYER_AGENDA_ZONE_OFFSET = {
+        ['^Any Whens%?$'] = { x = -0.6, z = 3 },
+        ['^Any Afters%?$'] = { x = 0.6, z = 3 },
+    },
+    NAME_TO_AGENDA_ZONE_OFFSET = {
+        ['^For:$'] = { x = -4.25, lock = true },
+        ['^Against:$'] = { x = 4.25, lock = true },
+        ['^Votes$'] = { x = -9.25 },
+        ['^Speaker Token %- Agenda$'] = { x = 0 },
+    }
+}
+
+function SetupGeneric.getSetupBag()
+    for _, object in ipairs(getAllObjects()) do
+        if object.getName() == 'Setup Bag' then
+            return object
+        end
+    end
+end
+
+function SetupGeneric.pack(setupBag)
+    debugLog('SetupGeneric.pack')
+    assert(setupBag.tag == 'Bag')
+
+    local nameToObjects = {}
+    for _, namePattern in ipairs(allNamePatterns(SetupGeneric)) do
+        nameToObjects[namePattern] = {}
+    end
+
+    local deletedItems = false
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        if name == 'TI4 Deleted Items' then
+            deletedItems = object
+        end
+        for namePattern, objects in pairs(nameToObjects) do
+            if string.match(name, namePattern) then
+                table.insert(objects, object)
+            end
+        end
+    end
+
+    -- Pack only one copy of each object.
+    for namePattern, objects in pairs(nameToObjects) do
+        for i, object in ipairs(objects) do
+            if i == 1 and not getEntryGuid(setupBag, namePattern) then
+                setupBag.putObject(object)
+            else
+                if deletedItems then
+                    deletedItems.call('ignoreGuid', object.getGUID())
+                end
+                destroyObject(object)
+            end
+        end
+    end
+end
+
+function SetupGeneric.unpack(setupBag, playerCount)
+    debugLog('SetupGeneric.unpack')
+    assert(setupBag.tag == 'Bag' and type(playerCount) == 'number' and playerCount > 0)
+
+    -- Get per-object json.  Leave the "master" copies of the objects in the
+    -- setup bag, spawn new copies from the json.
+    local pos = setupBag.getPosition()
+    local nameToJson = {}
+    for i, namePattern in ipairs(allNamePatterns(SetupGeneric)) do
+        local guid = assert(getEntryGuid(setupBag, namePattern), 'setup bag missing ' .. namePattern)
+        local object = setupBag.takeObject({
+            guid = guid,
+            position = { x = pos.x, y = pos.y + (5 * i), z = pos.z }
+        })
+        nameToJson[namePattern] = object.getJSON()
+        setupBag.putObject(object)
+    end
+
     local zoneCenters = _zoneHelper.getPlayerCountZoneCenters(playerCount)
+    local agendaPos = agendaCenter(playerCount)
 
-    -- empties the table of zone coordinates
-    _agendaSpot = {}
-    -- generates zone corners for each player, starting from 'northwest' at 1 clockwise
-    for i, zoneCenter in ipairs(zoneCenters) do
-        local zFlip = zoneCenter.z < 0 and 1 or -1
-        table.insert(_agendaSpot, {
-            x = zoneCenter.x / 10 + _agendaCenter.x,
-            y = zoneCenter.y + _agendaCenter.y,
-            z = -3.75 * zFlip + _agendaCenter.z,
+    -- Per player objects.
+    for _, zoneCenter in ipairs(zoneCenters) do
+        for namePattern, offset in pairs(SetupGeneric.NAME_TO_PLAYER_ZONE_OFFSET) do
+            local json = assert(nameToJson[namePattern], 'no json for ' .. namePattern)
+            spawnObjectJSON({
+                json              = json,
+                position          = offsetPosition(zoneCenter, offset),
+                rotation          = offsetRotation(zoneCenter, offset),
+                callback_function = function(object) object.setLock(offset.lock or false) end,
+                sound             = false,
+            })
+        end
+        local agendaPosPlayer = agendaCenterPlayer(playerCount, zoneCenter)
+        for namePattern, offset in pairs(SetupGeneric.NAME_TO_PLAYER_AGENDA_ZONE_OFFSET) do
+            local json = assert(nameToJson[namePattern], 'no json for ' .. namePattern)
+            spawnObjectJSON({
+                json              = json,
+                position          = offsetPosition(agendaPosPlayer, offset),
+                rotation          = offsetRotation(agendaPosPlayer, offset),
+                callback_function = function(object) object.setLock(offset.lock or false) end,
+                sound             = false,
+            })
+        end
+    end
+
+    -- Singleton agenda zone objects.
+    for namePattern, offset in pairs(SetupGeneric.NAME_TO_AGENDA_ZONE_OFFSET) do
+        local json = assert(nameToJson[namePattern], 'no json for ' .. namePattern)
+        spawnObjectJSON({
+            json              = json,
+            position          = offsetPosition(agendaPos, offset),
+            rotation          = offsetRotation(agendaPos, offset),
+            callback_function = function(object) object.setLock(offset.lock or false) end,
+            sound             = false,
         })
     end
 end
 
-function setPlayerColors(playerCount)
-    debugLog('setPlayerColors')
+-------------------------------------------------------------------------------
+
+local SetupColor = {
+    DEFAULT_COLOR_LIST = { 'White', 'Blue', 'Purple', 'Yellow', 'Red', 'Green', 'Orange', 'Pink', 'Brown' },
+    NAME_TO_PLAYER_ZONE_OFFSET = {
+        ['Command Sheet %($COLOR%)'] = { x = -9, z = 16, lock = true },
+        ['Notes %($COLOR%)'] = { x = -5, z = 1.5 },
+        ['Directionaliser %($COLOR%)'] = { x = 0, y = 0.46, z = -5, yRot = 270, lock = true },
+        ['Active/Passed %($COLOR%)'] = { x = 5, y = 1, z = 1.5 }
+    },
+    NAME_TO_PLAYER_AGENDA_ZONE_OFFSET = {
+        ['$COLOR Player Votes'] = { x = 0, y = 1, z = 1, yRot = 180 },
+    },
+    NAME_TO_DIRECTIONALISER_OFFSET = {
+        -- These are in Directionaliser local coordinate space.
+        ['$COLOR Infantry'] = { x = 0, y = 1, z = -12.2 },
+        ['$COLOR Fighter'] = { x = 0, y = 1, z = -10.6 },
+        ['$COLOR Space Dock'] = { x = 0, y = 1, z = -8.4 },
+        ['$COLOR PDS'] = { x = 0, y = 1, z = -6.1 },
+        ['$COLOR Carrier'] = { x = 0, y = 1, z = -2.6 },
+        ['$COLOR Destroyer'] = { x = 0, y = 1, z = -0.1 },
+        ['$COLOR Cruiser'] = { x = 0, y = 1, z = 3.0 },
+        ['$COLOR Dreadnought'] = { x = 0, y = 1, z = 6.2 },
+        ['$COLOR Flagship'] = { x = 0, y = 1, z = 9.6 },
+        ['$COLOR War Sun'] = { x = 0, y = 1, z = 12.1 },
+    }
+}
+
+--- Get the player (default) colors list, and a reverse map from color to player index.
+function SetupColor.defaultPlayerColors(playerCount)
+    debugLog('SetupColor.defaultPlayerColors')
     assert(type(playerCount) == 'number')
 
-    _playerList = {}
-    _mapColorToPlayer = {}
-
-    for x = 1, playerCount do
-        local defaultColor = DEFAULT_COLOR_LIST[x]
-        _playerList[x] = defaultColor
-        _mapColorToPlayer[defaultColor] = x
+    local playerColors = {}
+    local colorToPlayerIndex = {}
+    for i = 1, playerCount do
+        local color = SetupColor.DEFAULT_COLOR_LIST[i]
+        playerColors[i] = color
+        colorToPlayerIndex[color] = i
     end
+    return playerColors, colorToPlayerIndex
 end
 
-function transformHands(playerCount)
-    debugLog('transformHands')
+function SetupColor.transformHands(playerCount)
+    debugLog('SetupColor.transformHands')
     assert(type(playerCount) == 'number')
-    assert(_mapColorToPlayer, '_mapColorToPlayer not set')
 
-    local allPlayers = Player.getAvailableColors()
+    local playerColors, colorToPlayerIndex = SetupColor.defaultPlayerColors(playerCount)
     local zoneCenters = _zoneHelper.getPlayerCountZoneCenters(playerCount)
-    local x = 0
-    for i, color in pairs(allPlayers) do
-        local playerIndex = _mapColorToPlayer[color]
+
+    local allPlayerColors = Player.getAvailableColors()
+    local nonPlayerIndex = 0
+    for i, color in pairs(allPlayerColors) do
+        local playerIndex = colorToPlayerIndex[color]
         if playerIndex then
             local zoneCenter = zoneCenters[playerIndex]
-            local handpos = false
-            local handrot = false
-            if zoneCenter.z < 0 then
-                handpos = {zoneCenter.x, 5, -61.5}
-                handrot = {0, 0, 0}
-            else
-                handpos = {zoneCenter.x, 5, 61.5}
-                handrot = {0, 180, 0}
-            end
             Player[color].setHandTransform({
-                position = handpos,
-                rotation = handrot,
-                scale    = {12.00, 10.00, 5.00}
+                position = {
+                    x = zoneCenter.x,
+                    y = 4,
+                    z = 61.5 * (zoneCenter.z > 0 and 1 or -1)
+                },
+                rotation = {
+                    x = 0,
+                    y = zoneCenter.z > 0 and 180 or 0,
+                    z = 0
+                },
+                scale = { 12, 8, 5 }
             })
         else
-            local x = x + 1
-            local handpos = {148 - 3 * x, 0, 80}
             Player[color].setHandTransform({
-                position = handpos,
-                rotation = {0, 0, 0},
-                scale = {1, 5, 1}
+                position = {
+                    x = 148 - 3 * nonPlayerIndex,
+                    y = 5,
+                    z = 80
+                },
+                rotation = { 0, 0, 0 },
+                scale = { 1, 4, 1 }
             })
+            nonPlayerIndex = nonPlayerIndex + 1
         end
     end
 end
 
-function getAgendaSpot(playerColor)
-    return _agendaSpot[_mapColorToPlayer[playerColor]]
+function SetupColor.getColorToBox()
+    debugLog('SetupColor.getColorToColorBox')
+    local colorSet = {}
+    for _, color in ipairs(SetupColor.DEFAULT_COLOR_LIST) do
+        colorSet[color] = true
+    end
+    local result = {}
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        local color = string.match(name, '^(.*) Box')
+        if object.tag == 'Bag' and colorSet[color] then
+            result[color] = object
+        end
+    end
+    return result
 end
 
-function moveUnpackersandMultirollers(playerCount)
-    debugLog('moveUnpackersandMultirollers')
-    local setupBag = getObjectFromGUID('ef04ca')
-    local zoneCenters = _zoneHelper.getPlayerCountZoneCenters(playerCount)
-    for i, item in ipairs(getAllObjects()) do
-        if item.getName() == "TI4 Unpacker" or string.match(item.getName(), '^TI4 MultiRoller ') then
-            setupBag.putObject(item)
-        end
-    end
-    local unpackers = {}
-    local rollers = {}
-    for i, item in ipairs(setupBag.getObjects()) do
-        local name = item.name
-        if name == "TI4 Unpacker" then
-            table.insert(unpackers, item.guid)
-        elseif string.match(name, '^TI4 MultiRoller ') then
-            table.insert(rollers, item.guid)
-        end
-    end
-    for x = 1, playerCount do
-        local playerColor = _playerList[x]
-        local playerIndex = _mapColorToPlayer[playerColor]
-        local zoneCenter = zoneCenters[playerIndex]
-        local yRotation = zoneCenter.z < 0 and 180 or 0
-        local zUnpacker = false
-        local zRoller = false
-        if yRotation == 180 then
-            zUnpacker = zoneCenter.z - 1.5
-            zRoller = zoneCenter.z - 54
-        else
-            zUnpacker = zoneCenter.z + 1.5
-            zRoller = zoneCenter.z + 54
-        end
-        local takeParamsUnpackers = {
-            position = { x = zoneCenter.x, y = -1.6, z = zUnpacker },
-            rotation = { 0, yRotation, 0 },
-            guid = table.remove(unpackers),
-            callback_function = function(obj) take_callbackLock(obj) end,
-        }
-        local takeParamsRoller = {
-            position = { x = zoneCenter.x, y = -1.6, z = zRoller },
-            rotation = { 0, yRotation, 0 },
-            guid = table.remove(rollers),
-            callback_function = function(obj) take_callbackLock(obj) end,
-        }
-        setupBag.takeObject(takeParamsUnpackers)
-        setupBag.takeObject(takeParamsRoller)
-    end
-end
+function SetupColor.pack(colorToColorBox)
+    debugLog('SetupColor.pack')
+    assert(type(colorToColorBox) == 'table')
 
-function moveCommandSheets(playerCount)
-    debugLog('moveCommandSheets')
-    local setupBag = getObjectFromGUID('ef04ca')
-    local zoneCenters = _zoneHelper.getPlayerCountZoneCenters(playerCount)
-    for i,item in ipairs(getAllObjects()) do
-        local name = item.getName()
-        local color = string.match(name, '^Command Sheet %((%a+)%)$')
-        if color then
-            setupBag.putObject(item)
-        end
+    local namePatterns = {}
+    for _, namePattern in ipairs(allNamePatterns(SetupColor)) do
+        namePattern = string.gsub(namePattern, '$COLOR', '(.*)')
+        table.insert(namePatterns, namePattern)
     end
-    local commandSheetGUIDs = {}
-    for i, item in ipairs(setupBag.getObjects()) do
-        local name = item.name
-        local color = string.match(name, '^Command Sheet %((%a+)%)$')
-        if color then
-            commandSheetGUIDs[color] = item.guid
-        end
-    end
-    for x = 1, playerCount do
-        local playerColor = _playerList[x]
-        local playerIndex = _mapColorToPlayer[playerColor]
-        local zoneCenter = zoneCenters[playerIndex]
-        local yRotation = zoneCenter.z < 0 and 180 or 0
-        local xpoint = false
-        local zpoint = false
-        if yRotation == 180 then
-            xpoint = zoneCenter.x + 9
-            zpoint = zoneCenter.z - 16
-        else
-            xpoint = zoneCenter.x - 9
-            zpoint = zoneCenter.z + 16
-        end
-        local takeParams = {
-            position = { x = xpoint, y = -1.6, z = zpoint },
-            rotation = { 0, yRotation, 0 },
-            guid = commandSheetGUIDs[playerColor],
-            callback_function = function(obj) take_callbackLock(obj) end,
-        }
-        setupBag.takeObject(takeParams)
-    end
-end
 
-function take_callbackLock(object_spawned)
-    object_spawned.setLock(true)
-end
-
-function setupAgendaZone(playerCount)
-    debugLog('setupAgendaZone')
-    if playerCount <= 6 then
-        _agendaCenter = { x = -42.75, y = -1.6, z = 0 }
-    else
-        _agendaCenter = { x = -44.75, y = -1.6, z = 0 }
-    end
-    local agendaZoneOffsets = {
-        ["Against:"] = { x = 4.25 },
-        ["Speaker Token"] = { x = 0 },
-        ["For:"] = { x = -4.25 },
-        ["Votes"] = { x = -9.25 }
-    }
-    local setupBag = getObjectFromGUID('ef04ca')
-    for i, item in ipairs(getAllObjects()) do
-        local itemName = item.getName()
-        local itemGUID = item.getGUID()
-        if itemName == "Against:" or itemName == "Votes" or itemName == "For:" or itemName == "Speaker Token - Agenda" then
-            setupBag.putObject(item)
-        end
-    end
-    local setupBagContents = setupBag.getObjects()
-    for j, item in pairs(setupBagContents) do
-        local compType = false
-        local takeParamsAgenda = false
-        local itemName = item.name
-        local itemGUID = item.guid
-        for key, thing in pairs(agendaZoneOffsets) do
-            local start, finish = string.find(itemName, key)
-            if start then
-                compType = string.sub(itemName, start, finish)
-                takeParamsAgenda = {
-                    guid = itemGUID,
-                    position = {
-                        x = _agendaCenter.x + agendaZoneOffsets[compType].x,
-                        y = _agendaCenter.y,
-                        z = _agendaCenter.z
-                    },
-                    rotation = {0, 270, 0},
-                }
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        for _, namePattern in ipairs(namePatterns) do
+            local color = string.match(name, namePattern)
+            if color and colorToColorBox[color] then
+                colorToColorBox[color].putObject(object)
             end
         end
-        if compType then
-            setupBag.takeObject(takeParamsAgenda)
-            compType = nil
-        end
     end
 end
+
+function SetupColor.unpack(colorToColorBox, playerCount)
+    debugLog('SetupColor.unpack')
+    assert(type(colorToColorBox) == 'table' and type(playerCount) == 'number')
+
+    local playerColors, colorToPlayerIndex = SetupColor.defaultPlayerColors(playerCount)
+    local zoneCenters = _zoneHelper.getPlayerCountZoneCenters(playerCount)
+    local agendaPos = agendaCenter(playerCount)
+
+    local nameToObject = {}
+
+    -- Per player objects.
+    for i, color in ipairs(playerColors) do
+        local colorBox = assert(colorToColorBox[color], 'missing box for ' .. color)
+        local zoneCenter = zoneCenters[i]
+
+        for namePattern, offset in pairs(SetupColor.NAME_TO_PLAYER_ZONE_OFFSET) do
+            namePattern = string.gsub(namePattern, '$COLOR', color)
+            local guid = assert(getEntryGuid(colorBox, namePattern), 'missing ' .. namePattern)
+            local object = colorBox.takeObject({
+                guid              = guid,
+                position          = offsetPosition(zoneCenter, offset),
+                rotation          = offsetRotation(zoneCenter, offset),
+                callback_function = function(object) object.setLock(offset.lock or false) end,
+            })
+            nameToObject[object.getName()] = object
+        end
+        local agendaPosPlayer = agendaCenterPlayer(playerCount, zoneCenter)
+        for namePattern, offset in pairs(SetupColor.NAME_TO_PLAYER_AGENDA_ZONE_OFFSET) do
+            namePattern = string.gsub(namePattern, '$COLOR', color)
+            local guid = assert(getEntryGuid(colorBox, namePattern), 'missing ' .. namePattern)
+            local object = colorBox.takeObject({
+                guid              = guid,
+                position          = offsetPosition(agendaPosPlayer, offset),
+                rotation          = offsetRotation(agendaPosPlayer, offset),
+                callback_function = function(object) object.setLock(offset.lock or false) end,
+            })
+            nameToObject[object.getName()] = object
+        end
+    end
+    return nameToObject
+end
+
+function SetupColor.unpackUnits(color, colorBox, directionaliser)
+    debugLog('SetupColor.unpackUnits')
+    assert(type(color) == 'string' and colorBox.tag == 'Bag' and type(directionaliser) == 'userdata')
+
+    for namePattern, offset in pairs(SetupColor.NAME_TO_DIRECTIONALISER_OFFSET) do
+        namePattern = string.gsub(namePattern, '$COLOR', color)
+        local guid = assert(getEntryGuid(colorBox, namePattern), 'missing ' .. namePattern)
+        colorBox.takeObject({
+            guid              = guid,
+            position          = directionaliser.positionToWorld(offset),
+            rotation          = directionaliser.getRotation(),
+            callback_function = function(object) object.setLock(offset.lock or false) end,
+        })
+    end
+end
+
+-------------------------------------------------------------------------------
 
 function setupGame(playerColor, playerCount)
     debugLog('setupGame')
@@ -282,7 +423,7 @@ function setupGame(playerColor, playerCount)
     transformHands(playerCount)
     local lineDraw = LineDrawFunctions[playerCount]
     --lineDraw()
-    UI.setAttribute("startup", "active", false)
+    UI.setAttribute('startup', 'active', false)
 end
 
 --- This is the primary entry point for using the helper object.
@@ -547,18 +688,6 @@ end
 
 -------------------------------------------------------------------------------
 
-function unpackColorBox(playerColor)
-    -- TODO XXX
-end
-
--------------------------------------------------------------------------------
-
-function unpackFactionBox(playerColor)
-    -- TODO XXX
-end
-
--------------------------------------------------------------------------------
-
 function onLoad(saveState)
     self.setColorTint({ r = 0.25, g = 0.25, b = 0.25 })
     self.setScale({ x = 2, y = 0.01, z = 2 })
@@ -573,6 +702,48 @@ function onLoad(saveState)
         end
     end
     self.setInvisibleTo(invisibleTo)
+
+    self.addContextMenuItem('pack', contextMenuPack, true)
+    self.addContextMenuItem('unpack', contextMenuUnpack, true)
+    self.addContextMenuItem('hands', contextMenuHands, true)
+    self.addContextMenuItem('packColors', contextMenuPackColors, true)
+    self.addContextMenuItem('unpackColors', contextMenuUnpackColors, true)
+end
+
+function contextMenuPack()
+    local setupBag = assert(SetupGeneric.getSetupBag())
+    SetupGeneric.pack(setupBag)
+end
+function contextMenuUnpack()
+    local setupBag = assert(SetupGeneric.getSetupBag())
+    SetupGeneric.unpack(setupBag, 4)
+end
+function contextMenuHands()
+    SetupColor.transformHands(4)
+end
+function contextMenuPackColors()
+    local colorToBox = assert(SetupColor.getColorToBox())
+    SetupColor.pack(colorToBox)
+end
+function contextMenuUnpackColors()
+    local colorToBox = assert(SetupColor.getColorToBox())
+    local nameToObject = SetupColor.unpack(colorToBox, 4)
+
+    local d = nameToObject['Directionaliser (White)']
+    if d then
+        for _, p in ipairs(d.getSnapPoints()) do
+            local t = { p.position.x, p.position.y, p.position.z }
+            for i, v in ipairs(t) do
+                t[i] = math.floor(v * 1000) / 1000
+            end
+            print('xxx pos ' .. table.concat(t, ', '))
+        end
+
+        local function delayedUnpack()
+            SetupColor.unpackUnits('White', colorToBox['White'], d)
+        end
+        Wait.time(delayedUnpack, 4)
+    end
 end
 
 -------------------------------------------------------------------------------

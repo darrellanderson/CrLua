@@ -45,7 +45,7 @@ end
 
 local function offsetPosition(position, offset)
     return {
-        x = position.x + (offset.x or 0),
+        x = position.x + (offset.x or 0) * (position.z > 0 and 1 or -1),
         y = position.y + (offset.y or 0),
         z = position.z + (offset.z or 0) * (position.z > 0 and 1 or -1)
     }
@@ -151,6 +151,7 @@ function SetupGeneric.pack(setupBag)
     for namePattern, objects in pairs(nameToObjects) do
         for i, object in ipairs(objects) do
             if i == 1 and not getEntryGuid(setupBag, namePattern) then
+                object.setLock(false)
                 setupBag.putObject(object)
             else
                 if deletedItems then
@@ -337,6 +338,7 @@ function SetupColor.pack(colorToColorBox)
         for _, namePattern in ipairs(namePatterns) do
             local color = string.match(name, namePattern)
             if color and colorToColorBox[color] then
+                object.setLock(false)
                 colorToColorBox[color].putObject(object)
             end
         end
@@ -385,53 +387,119 @@ function SetupColor.unpack(colorToColorBox, playerCount)
     return nameToObject
 end
 
+function SetupColor.packUnits(color, colorBox)
+    assert(type(color) == 'string' and colorBox.tag == 'Bag')
+
+    local unitBagSet = {}
+    for namePattern, offset in pairs(SetupColor.NAME_TO_DIRECTIONALISER_OFFSET) do
+        namePattern = string.gsub(namePattern, '$COLOR', color)
+        unitBagSet[namePattern] = true
+    end
+
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Bag' and unitBagSet[object.getName()] then
+            object.setLock(false)
+            colorBox.putObject(object)
+        end
+    end
+end
+
 function SetupColor.unpackUnits(color, colorBox, directionaliser)
     debugLog('SetupColor.unpackUnits')
     assert(type(color) == 'string' and colorBox.tag == 'Bag' and type(directionaliser) == 'userdata')
 
+    local nameToObject = {}
     for namePattern, offset in pairs(SetupColor.NAME_TO_DIRECTIONALISER_OFFSET) do
         namePattern = string.gsub(namePattern, '$COLOR', color)
         local guid = assert(getEntryGuid(colorBox, namePattern), 'missing ' .. namePattern)
-        colorBox.takeObject({
+        local object = colorBox.takeObject({
             guid              = guid,
             position          = directionaliser.positionToWorld(offset),
             rotation          = directionaliser.getRotation(),
             callback_function = function(object) object.setLock(offset.lock or false) end,
         })
+        nameToObject[object.getName()] = object
     end
+    return nameToObject
 end
 
 -------------------------------------------------------------------------------
 
-function setupGame(playerColor, playerCount)
-    debugLog('setupGame')
-    assert(type(playerColor) == 'string' and type(playerCount) == 'number')
+local _setupQueue = {}
 
-    local LineDrawFunctions = {
-        [3] = function() draw3Pcircle() end,
-        [4] = function() draw4Pcircle() end,
-        [5] = function() draw5Pcircle() end,
-        [6] = function() draw6Pcircle() end,
-        [7] = function() draw7Pcircle() end,
-        [8] = function() draw8Pcircle() end
-    }
-    setupAgendaZone(playerCount)
-    setZoneList(playerCount)
-    setPlayerColors(playerCount)
-    moveUnpackersandMultirollers(playerCount)
-    moveCommandSheets(playerCount)
-    transformHands(playerCount)
-    local lineDraw = LineDrawFunctions[playerCount]
-    --lineDraw()
-    UI.setAttribute('startup', 'active', false)
+function setupCoroutine()
+    debugLog('setupCoroutine')
+
+    local params = assert(table.remove(_setupQueue))
+    local playerCount = assert(params.playerCount)
+    local colors = SetupColor.defaultPlayerColors(playerCount)
+
+    local setupBag = assert(SetupGeneric.getSetupBag())
+    local colorToBox = assert(SetupColor.getColorToBox())
+    coroutine.yield(0)
+
+    for color, box in pairs(colorToBox) do
+        SetupColor.packUnits(color, box)
+        coroutine.yield(0)
+    end
+
+    SetupColor.pack(colorToBox)
+    coroutine.yield(0)
+
+    SetupGeneric.pack(setupBag)
+    coroutine.yield(0)
+
+    SetupColor.transformHands(playerCount)
+    coroutine.yield(0)
+
+    SetupGeneric.unpack(setupBag, playerCount)
+    coroutine.yield(0)
+
+    local nameToObject = SetupColor.unpack(colorToBox, playerCount)
+    for _ = 1, 10 do
+        coroutine.yield(0)
+    end
+
+    local colorToDirectionaliser = {}
+    for _, color in ipairs(colors) do
+        local box = assert(colorToBox[color], 'missing box for ' .. color)
+        local name = 'Directionaliser (' .. color .. ')'
+        local directionaliser = assert(nameToObject[name], 'missing ' .. name)
+        while not directionaliser.resting do
+            coroutine.yield(0)
+        end
+        colorToDirectionaliser[color] = directionaliser
+    end
+    coroutine.yield(0)
+
+    local unitBags = {}
+    for color, directionaliser in pairs(colorToDirectionaliser) do
+        local box = assert(colorToBox[color], 'missing box for ' .. color)
+        local nameToUnitBag = SetupColor.unpackUnits(color, box, directionaliser)
+        for _, unitBag in pairs(nameToUnitBag) do
+            while not unitBag.resting do
+                coroutine.yield(0)
+            end
+            unitBag.setLock(true)
+        end
+        coroutine.yield(0)
+    end
+
+    return 1 -- REQUIRED!  MUST RETURN 1 TO STOP COROUTINE!
 end
+
+-------------------------------------------------------------------------------
 
 --- This is the primary entry point for using the helper object.
 function setup(params)
     assert(type(params) == 'table')
     assert(type(params.playerColor) == 'string')
     assert(type(params.playerCount) == 'number')
-    setupGame(params.playerColor, params.playerCount)
+
+    table.insert(_setupQueue, params)
+    startLuaCoroutine(self, 'setupCoroutine')
+
+    UI.setAttribute('startup', 'active', false)
 end
 
 function draw3Pcircle()
@@ -736,7 +804,6 @@ function contextMenuUnpackColors()
             for i, v in ipairs(t) do
                 t[i] = math.floor(v * 1000) / 1000
             end
-            print('xxx pos ' .. table.concat(t, ', '))
         end
 
         local function delayedUnpack()

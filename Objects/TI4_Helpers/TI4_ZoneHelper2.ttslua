@@ -24,104 +24,222 @@ function getHelperClient(helperObjectName)
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
 
+-- Map from player count to zone attributes.
 local DEFAULT_ZONES = {
-  [2] = {
-      zones = {
-          [1] = {{-64, -50}, {-64, -12.1}, {64, -12.1}, {64, -50}},
-          [2] = {{-64, 50}, {-64, 12.1}, {64, 12.1}, {64, 50}},
-        }},
-  [3] = {
-      zones = {
-          [1] = {{-64, -50}, {-64, -12.1}, {64, -12.1}, {64, -50}},
-          [2] = {{-64, 50}, {-64, 12.1}, {0, 12.1}, {0, 50}},
-          [3] = {{0, 50}, {0, 12.1}, {64, 12.1}, {64, 50}},
-        }},
-  [4] = {
-      zones = {
-          [1] = {{0, -50}, {0, -12.1}, {64, -12.1}, {64, -50}},
-          [2] = {{-64, -50}, {-64, -12.1}, {0, -12.1}, {0, -50}},
-          [3] = {{-64, 50}, {-64, 12.1}, {0, 12.1}, {0, 50}},
-          [4] = {{0, 50}, {0, 12.1}, {64, 12.1}, {64, 50}},
-        }},
-  [5] = {
-      zones = {
-          [1] = {{0, -50}, {0, -12.1}, {64, -12.1}, {64, -50}},
-          [2] = {{-64, -50}, {-64, -12.1}, {0, -12.1}, {0, -50}},
-          [3] = {{-64, 50}, {-64, 12.1}, {-21.33, 12.1}, {-21.33, 50}},
-          [4] = {{-21.33, 50}, {-21.33, 12.1}, {21.33, 12.1}, {21.33, 50}},
-          [5] = {{21.33, 50}, {21.33, 12.1}, {64, 12.1}, {64, 50}},
-        }},
-  [6] = {
-      zones = {
-          [1] = {{21.33, -50}, {21.33, -12.1}, {64, -12.1}, {64, -50}},
-          [2] = {{-21.33, -50}, {-21.33, -12.1}, {21.33, -12.1}, {21.33, -50}},
-          [3] = {{-64, -50}, {-64, -12.1}, {-21.33, -12.1}, {-21.33, -50}},
-          [4] = {{-64, 50}, {-64, 12.1}, {-21.33, 12.1}, {-21.33, 50}},
-          [5] = {{-21.33, 50}, {-21.33, 12.1}, {21.33, 12.1}, {21.33, 50}},
-          [6] = {{21.33, 50}, {21.33, 12.1}, {64, 12.1}, {64, 50}},
-        }},
-  [7] = {
-      zones = {
-          [1] = {{21.33, -50}, {21.33, -12.1}, {64, -12.1}, {64, -50}},
-          [2] = {{-21.33, -50}, {-21.33, -12.1}, {21.33, -12.1}, {21.33, -50}},
-          [3] = {{-64, -50}, {-64, -12.1}, {-21.33, -12.1}, {-21.33, -50}},
-          [4] = {{-64, 50}, {-64, 12.1}, {-32, 12.1}, {-32, 50}},
-          [5] = {{-32, 50}, {-32, 12.1}, {0, 12.1}, {0, 50}},
-          [6] = {{0, 50}, {0, 12.1}, {32, 12.1}, {32, 50}},
-          [7] = {{32, 50}, {32, 12.1}, {64, 12.1}, {64, 50}},
-        }},
-  [8] = {
-      zones = {
-          [1] = {{32, -50}, {32, -12.1}, {64, -12.1}, {64, -50}},
-          [2] = {{0, -50}, {0, -12.1}, {32, -12.1}, {32, -50}},
-          [3] = {{-32, -50}, {-32, -12.1}, {0, -12.1}, {0, -50}},
-          [4] = {{-64, -50}, {-64, -12.1}, {-32, -12.1}, {-32, -50}},
-          [5] = {{-64, 50}, {-64, 12.1}, {-32, 12.1}, {-32, 50}},
-          [6] = {{-32, 50}, {-32, 12.1}, {0, 12.1}, {0, 50}},
-          [7] = {{0, 50}, {0, 12.1}, {32, 12.1}, {32, 50}},
-          [8] = {{32, 50}, {32, 12.1}, {64, 12.1}, {64, 50}},
-        }},
-
-    tableXZ = {{-128, -128}, {-128, 128}, {128, 128}, {128, -128}},
-    y = 0
+    [2] = {
+        zones = {
+            [1] = {{-64, -50}, {-64, -12.1}, {64, -12.1}, {64, -50}},
+            [2] = {{64, 50}, {64, 12.1}, {-64, 12.1}, {-64, 50}},
+        },
+        homeSystemPositions = {
+            [1] = {0.00, -18.19},
+            [2] = {0.00, 18.19},
+        }
+    },
+    [3] = {
+        zones = {
+            [1] = {{-64, -50}, {-64, -12.1}, {64, -12.1}, {64, -50}},
+            [2] = {{0, 50}, {0, 12.1}, {-64, 12.1}, {-64, 50}},
+            [3] = {{64, 50}, {64, 12.1}, {0, 12.1}, {0, 50}},
+        },
+        homeSystemPositions = {
+            [1] = {0.00, -18.19},
+            [2] = {-15.75, 9.09},
+            [3] = {15.75, 9.09},
+        }
+    },
+    [4] = {
+        zones = {
+            [1] = {{0, -50}, {0, -12.1}, {64, -12.1}, {64, -50}},
+            [2] = {{-64, -50}, {-64, -12.1}, {0, -12.1}, {0, -50}},
+            [3] = {{0, 50}, {0, 12.1}, {-64, 12.1}, {-64, 50}},
+            [4] = {{64, 50}, {64, 12.1}, {0, 12.1}, {0, 50}},
+        },
+        homeSystemPositions = {
+            [1] = {15.75, -9.09},
+            [2] = {-15.75, -9.09},
+            [3] = {-15.75, 9.09},
+            [4] = {15.75, 9.09},
+        }
+    },
+    [5] = {
+        zones = {
+            [1] = {{0, -50}, {0, -12.1}, {64, -12.1}, {64, -50}},
+            [2] = {{-64, -50}, {-64, -12.1}, {0, -12.1}, {0, -50}},
+            [3] = {{-21.33, 50}, {-21.33, 12.1}, {-64, 12.1}, {-64, 50}},
+            [4] = {{21.33, 50}, {21.33, 12.1}, {-21.33, 12.1}, {-21.33, 50}},
+            [5] = {{64, 50}, {64, 12.1}, {21.33, 12.1}, {21.33, 50}},
+        },
+        homeSystemPositions = {
+            [1] = {15.75, -9.09},
+            [2] = {-15.75, -9.09},
+            [3] = {-15.75, 9.09},
+            [4] = {0.00, 18.19},
+            [5] = {15.75, 9.09},
+        }
+    },
+    [6] = {
+        zones = {
+            [1] = {{21.33, -50}, {21.33, -12.1}, {64, -12.1}, {64, -50}},
+            [2] = {{-21.33, -50}, {-21.33, -12.1}, {21.33, -12.1}, {21.33, -50}},
+            [3] = {{-64, -50}, {-64, -12.1}, {-21.33, -12.1}, {-21.33, -50}},
+            [4] = {{-21.33, 50}, {-21.33, 12.1}, {-64, 12.1}, {-64, 50}},
+            [5] = {{21.33, 50}, {21.33, 12.1}, {-21.33, 12.1}, {-21.33, 50}},
+            [6] = {{64, 50}, {64, 12.1}, {21.33, 12.1}, {21.33, 50}},
+        },
+        homeSystemPositions = {
+            [1] = {15.75, -9.09},
+            [2] = {0.00, -18.19},
+            [3] = {-15.75, -9.09},
+            [4] = {-15.75, 9.09},
+            [5] = {0.00, 18.19},
+            [6] = {15.75, 9.09},
+        }
+    },
+    [7] = {
+        zones = {
+            [1] = {{21.33, -50}, {21.33, -12.1}, {64, -12.1}, {64, -50}},
+            [2] = {{-21.33, -50}, {-21.33, -12.1}, {21.33, -12.1}, {21.33, -50}},
+            [3] = {{-64, -50}, {-64, -12.1}, {-21.33, -12.1}, {-21.33, -50}},
+            [4] = {{-32, 50}, {-32, 12.1}, {-64, 12.1}, {-64, 50}},
+            [5] = {{0, 50}, {0, 12.1}, {-32, 12.1}, {-32, 50}},
+            [6] = {{32, 50}, {32, 12.1}, {0, 12.1}, {0, 50}},
+            [7] = {{64, 50}, {64, 12.1}, {32, 12.1}, {32, 50}},
+        },
+        homeSystemPositions = {
+            [1] = {15.75, -9.09},
+            [2] = {0.00, -18.19},
+            [3] = {-15.75, -9.09},
+            [4] = {-15.75, 9.09},
+            [5] = {0.00, 18.19},
+            [6] = {15.75, 9.09},
+            [7] = {-5.25, 21.22}, -- wrong, placeholder outside outer ring
+        }
+    },
+    [8] = {
+        zones = {
+            [1] = {{32, -50}, {32, -12.1}, {64, -12.1}, {64, -50}},
+            [2] = {{0, -50}, {0, -12.1}, {32, -12.1}, {32, -50}},
+            [3] = {{-32, -50}, {-32, -12.1}, {0, -12.1}, {0, -50}},
+            [4] = {{-64, -50}, {-64, -12.1}, {-32, -12.1}, {-32, -50}},
+            [5] = {{-32, 50}, {-32, 12.1}, {-64, 12.1}, {-64, 50}},
+            [6] = {{0, 50}, {0, 12.1}, {-32, 12.1}, {-32, 50}},
+            [7] = {{32, 50}, {32, 12.1}, {0, 12.1}, {0, 50}},
+            [8] = {{64, 50}, {64, 12.1}, {32, 12.1}, {32, 50}},
+        },
+        homeSystemPositions = {
+            [1] = {15.75, -9.09},
+            [2] = {0.00, -18.19},
+            [3] = {-15.75, -9.09},
+            [4] = {-15.75, 9.09},
+            [5] = {0.00, 18.19},
+            [6] = {15.75, 9.09},
+            [7] = {-5.25, 21.22}, -- wrong, placeholder outside outer ring
+            [8] = {-10.50, 18.19}, -- wrong, placeholder outside outer ring
+        }
+    },
 }
+
+local DEFAULT_TABLE_XZ = {{-128, -128}, {-128, 128}, {128, 128}, {128, -128}}
+local DEFAULT_TABLE_Y = 0
 
 -- Current zones.
-local _zones = {
-    y = false,
-    colorToZone = {},
-    tableXZ = {},
-}
+local _zones = {}
+local _table = {}
+local _lastUpdateZoneColorTime = false
 
-local _update = {
-    time = false,
-    periodicUpdateSeconds = 10,
-}
+-------------------------------------------------------------------------------
 
-function getPlayerCountZones(numPlayers)
-    return DEFAULT_ZONES[numPlayers].zones
-end
+--- Reset the number of zones.
+-- @param playerCount number : player count.
+function setPlayerCount(playerCount)
+    _table = {
+        polygon = DEFAULT_TABLE_XZ,
+        boundingBox = _boundingBox(DEFAULT_TABLE_XZ),
+        y = DEFAULT_TABLE_Y,
+    }
 
-function getPlayerCountZoneCenters(numPlayers)
-    local result = {}
-    for i, border in ipairs(DEFAULT_ZONES[numPlayers].zones) do
-        local bb = _boundingBox(border)
-        result[i] = {
-            x = (bb.min.x + bb.max.x) / 2,
-            y = DEFAULT_ZONES.y,
-            z = (bb.min.z + bb.max.z) / 2
-        }
+    if playerCount ~= #_zones then
+        local zoneAttributes = assert(DEFAULT_ZONES[playerCount], 'invalid player count')
+        _zones = {}
+        for i = 1, playerCount do
+            local polygon = assert(zoneAttributes.zones[i])
+            local bb = _boundingBox(polygon)
+            table.insert(_zones, {
+                color = false,
+                polygon = polygon,
+                boundingBox = bb,
+                center = {
+                    x = (bb.min.x + bb.max.x) / 2,
+                    y = _table.y,
+                    z = (bb.min.z + bb.max.z) / 2
+                },
+                homeSystemPosition = assert(zoneAttributes.homeSystemPositions[i]),
+            })
+        end
+        updateZoneColors()
     end
-    return result
 end
 
---- Get all zones.
--- @return table : list of color strings.
+--- Update zone colors by scanning for command sheets.
+function updateZoneColors()
+    _lastUpdateZoneColorTime = Time.time
+    for _, zone in ipairs(_zones) do
+        zone.color = false
+    end
+    for _, object in ipairs(getAllObjects()) do
+        local color = string.match(object.getName(), '^Command Sheet %((%a+)%)$')
+        if color then
+            local p = object.getPosition()
+            for _, zone in ipairs(_zones) do
+                if _boundingBoxContains(zone.boundingBox, p) and _polygonContains(zone.polygon, p) then
+                    if zone.color then
+                        broadcastToAll('Warning: more than one command sheet in zone ("' .. object.getName() .. '")')
+                    end
+                    zone.color = color
+                end
+            end
+        end
+    end
+end
+
+function _maybeUpdateZoneColors()
+    if not _lastUpdateZoneColorTime or (Time.time - _lastUpdateZoneColorTime > 10) then
+        updateZoneColors()
+    end
+end
+
+-------------------------------------------------------------------------------
+
+--- Get all zones' attributes.
+-- @return table : list of zone attribute tables in zone index order.
+function zonesAttributes()
+    _maybeUpdateZoneColors()
+    return _zones
+end
+
+--- Get a single zone's attributes.
+-- @param color string : command sheet color.
+-- @return table : zone attributes.
+function zoneAttributes(color)
+    assert(type(color) == 'string')
+    _maybeUpdateZoneColors()
+    for _, zone in ipairs(_zones) do
+        if zone.color == color then
+            return zone
+        end
+    end
+end
+
+--- Get all zone colors.
+-- @return table : list of color strings in zone index order.
 function zones()
-    _maybeUpdateZones()
+    _maybeUpdateZoneColors()
     local result = {}
-    for color, zone in pairs(_zones.colorToZone) do
-        table.insert(result, color)
+    for _, zone in ipairs(_zones) do
+        if zone.color then
+            table.insert(result, zone.color)
+        end
     end
     return result
 end
@@ -131,10 +249,10 @@ end
 -- @return string : zone color, or nil if not in zone.
 function zoneFromPosition(position)
     assert(type(position) == 'table' and type(position.x) == 'number')
-    _maybeUpdateZones()
-    for color, zone in pairs(_zones.colorToZone) do
+    _maybeUpdateZoneColors()
+    for _, zone in ipairs(_zones) do
         if _boundingBoxContains(zone.boundingBox, position) and _polygonContains(zone.polygon, position) then
-            return color
+            return zone.color
         end
     end
 end
@@ -145,7 +263,7 @@ end
 -- @return table : map from guid to zone color string.
 function zonesFromPositions(guidToPosition)
     assert(type(guidToPosition) == 'table')
-    _maybeUpdateZones()
+    _maybeUpdateZoneColors()
     local result = {}
     for guid, position in pairs(guidToPosition) do
         result[guid] = zoneFromPosition(position)
@@ -173,25 +291,47 @@ end
 -- @return boolean : true if on main table.
 function inTableZone(position)
     assert(type(position) == 'table' and type(position.x) == 'number')
-    _maybeUpdateZones()
-    return _boundingBoxContains(_zones.table.boundingBox, position) and _polygonContains(_zones.table.polygon, position)
+    return _boundingBoxContains(_table.boundingBox, position) and _polygonContains(_table.polygon, position)
 end
 
---- Get XYZ border about a zone (suitable for vector lines).
--- @param parameters table: {color:string, inset:number, clipToTable:boolean}
--- @return table : list of {xyz} points.
-function zoneBorder(parameters)
-    assert(type(parameters.color) == 'string')
-    _maybeUpdateZones()
-    local result = {}
-    local zone = _zones.colorToZone[parameters.color]
-    local polygon = zone and zone.polygon
-    if polygon then
-        if parameters.inset then
-            polygon = _inset(polygon, parameters.inset)
+--- Get setVectorLines compatible lines from zone borders.
+-- @param parameters table : { inset, clipToTable, thickness }
+function getBordersVectorLines(parameters)
+    assert(type(parameters) == 'table')
+
+    local thickness = parameters.thickness or 0.1
+    local inset = parameters.inset or (thickness / 2)
+    local dy = 0.01
+
+    local function polygonToPointsXYZ(polygon)
+        local pointsXYZ = {}
+        for _, xz in ipairs(polygon) do
+            table.insert(pointsXYZ, {
+                x = xz[1], y = _table.y + dy, z = xz[2]
+            })
         end
+        return pointsXYZ
+    end
+    local function homeSystemXYZ(centerXZ)
+        local pointsXYZ = {}
+        for i = 1, 16 do
+            local phi = i / 16 * math.pi * 2
+            local r = 2
+            table.insert(pointsXYZ, {
+                x = centerXZ[1] + math.sin(phi) * r,
+                y = _table.y + dy,
+                z = centerXZ[2] + math.cos(phi) * r
+            })
+        end
+        return pointsXYZ
+    end
+
+    local lines = {}
+    for _, zone in ipairs(_zones) do
+        local polygon = assert(zone.polygon)
+        polygon = _inset(polygon, inset)
         if parameters.clipToTable then
-            local bb = _zones.table.boundingBox
+            local bb = _table.boundingBox
             for i, xz in ipairs(polygon) do
                 xz[1] = math.max(xz[1], bb.min.x)
                 xz[1] = math.min(xz[1], bb.max.x)
@@ -199,11 +339,22 @@ function zoneBorder(parameters)
                 xz[2] = math.min(xz[2], bb.max.z)
             end
         end
-        for _, xz in ipairs(polygon) do
-            table.insert(result, { x = xz[1], y = _zones.y, z = xz[2] })
-        end
+        table.insert(lines, {
+            points = polygonToPointsXYZ(polygon),
+            thickness = thickness,
+            color = zone.color or 'Grey',
+            loop = true,
+            square = true,
+        })
+        table.insert(lines, {
+            points = homeSystemXYZ(zone.homeSystemPosition),
+            thickness = thickness,
+            color = zone.color or 'Grey',
+            loop = true,
+            square = true,
+        })
     end
-    return result
+    return lines
 end
 
 function _boundingBox(polygonXZ)
@@ -382,70 +533,6 @@ function _testInset()
     assert(almost(inset[3], 1.76, 0.1), '3: ' .. inset[3][1] .. ', ' .. inset[3][2])
 end
 
-function _maybeUpdateZones()
-    if not _update.time or (Time.time - _update.time) > _update.periodicUpdateSeconds then
-        _update.time = Time.time
-
-        local colorToCommandSheet = {}
-        local numCommandSheets = 0
-        local guidToFactionSheet = {}
-        for _, object in ipairs(getAllObjects()) do
-            local name = object.getName()
-            local color = string.match(name, '^Command Sheet %((%a+)%)$')
-            if color then
-                colorToCommandSheet[color] = object
-                numCommandSheets = numCommandSheets + 1
-            end
-            local factionName = string.match(name, '^(.+) Sheet$')
-            if factionName then
-                local guid = object.getGUID()
-                guidToFactionSheet[guid] = object
-            end
-        end
-
-        local function hasFactionSheet(polygon)
-            assert(type(polygon) == 'table')
-            for _, factionSheet in pairs(guidToFactionSheet) do
-                if _polygonContains(polygon, factionSheet.getPosition()) then
-                    return true
-                end
-            end
-        end
-        local function getSeatColor(polygon)
-            assert(type(polygon) == 'table')
-            for color, commandSheet in pairs(colorToCommandSheet) do
-                if _polygonContains(polygon, commandSheet.getPosition()) then
-                    return color
-                end
-            end
-            error('no seat color')
-        end
-
-        _zones.colorToZone = {}
-        local function addZone(color, polygon)
-            assert(type(color) == 'string' and type(polygon) == 'table')
-            _zones.colorToZone[color] = {
-                polygon = polygon,
-                boundingBox = _boundingBox(polygon)
-            }
-        end
-
-        local polygons = false
-        _zones.y = DEFAULT_ZONES.y
-        _zones.table = {
-            polygon = DEFAULT_ZONES.tableXZ,
-            boundingBox = _boundingBox(DEFAULT_ZONES.tableXZ)
-        }
-        for i = 1, numCommandSheets do
-            local polygon = DEFAULT_ZONES[numCommandSheets].zones[i]
-            if hasFactionSheet(polygon) then
-                addZone(getSeatColor(polygon), polygon)
-            end
-        end
-        polygons = DEFAULT_ZONES[numCommandSheets].zones
-    end
-end
-
 function onLoad(saveState)
     self.setColorTint({ r = 0.25, g = 0.25, b = 0.25 })
     self.setScale({ x = 2, y = 0.01, z = 2 })
@@ -460,4 +547,13 @@ function onLoad(saveState)
         end
     end
     self.setInvisibleTo(invisibleTo)
+
+    -- Set initial player count based on command sheets.
+    local numCommandSheets = 0
+    for _, object in ipairs(getAllObjects()) do
+        if string.match(object.getName(), '^Command Sheet %((%a+)%)$') then
+            numCommandSheets = numCommandSheets + 1
+        end
+    end
+    setPlayerCount(numCommandSheets)
 end

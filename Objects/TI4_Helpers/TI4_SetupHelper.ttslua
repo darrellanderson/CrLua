@@ -35,6 +35,7 @@ local function debugLog(message)
     end
 end
 
+--- Find the guid of an object inside a container from a matching name pattern.
 local function getEntryGuid(container, namePattern)
     for _, entry in ipairs(container.getObjects()) do
         if string.match(entry.name, namePattern) then
@@ -43,6 +44,7 @@ local function getEntryGuid(container, namePattern)
     end
 end
 
+--- Compute position from a zone center and offset.
 local function offsetPosition(position, offset)
     return {
         x = position.x + (offset.x or 0) * (position.z > 0 and 1 or -1),
@@ -51,6 +53,7 @@ local function offsetPosition(position, offset)
     }
 end
 
+--- Compute a rotation from zone center and offset.
 local function offsetRotation(position, offset)
     local result = { x = 0, y = 0, z = 0 }
 
@@ -64,6 +67,7 @@ local function offsetRotation(position, offset)
     return result
 end
 
+--- Get the agenda zone for the given player count.
 local function agendaCenter(playerCount)
     assert(type(playerCount) == 'number')
     return {
@@ -73,18 +77,18 @@ local function agendaCenter(playerCount)
     }
 end
 
-local function agendaCenterPlayer(playerCount, playerZoneCenter)
-    assert(type(playerCount) == 'number' and type(playerZoneCenter) == 'table')
-    local center = agendaCenter(playerCount)
+--- Get the per-player player agenda zone for the player/player count.
+local function agendaCenterPlayer(agendaZoneCenter, playerZoneCenter)
+    assert(type(agendaZoneCenter) == 'table' and type(playerZoneCenter) == 'table')
     return {
-        x = center.x + playerZoneCenter.x / 10,
-        y = center.y,
-        z = center.z + 3.75 * (playerZoneCenter.z > 0 and 1 or -1)
+        x = agendaZoneCenter.x + playerZoneCenter.x / 10,
+        y = agendaZoneCenter.y,
+        z = agendaZoneCenter.z + 3.75 * (playerZoneCenter.z > 0 and 1 or -1)
     }
 end
 
---- Setup tables have "NAME_TO_" sub-tables from name pattern to attributes.
--- This function gathers the combined list of all name patterns.
+--- Get all "NAME_TO_" sub-table keys.
+-- Setup tables have "NAME_TO_" sub-tables from name pattern to attributes.
 local function allNamePatterns(t)
     local result = {}
     for k, v in pairs(t) do
@@ -147,7 +151,7 @@ function SetupGeneric.pack(setupBag)
         end
     end
 
-    -- Pack only one copy of each object.
+    -- Pack only one copy of each object, delete the rest.
     for namePattern, objects in pairs(nameToObjects) do
         for i, object in ipairs(objects) do
             if i == 1 and not getEntryGuid(setupBag, namePattern) then
@@ -163,9 +167,9 @@ function SetupGeneric.pack(setupBag)
     end
 end
 
-function SetupGeneric.unpack(setupBag, playerCount)
+function SetupGeneric.unpack(setupBag)
     debugLog('SetupGeneric.unpack')
-    assert(setupBag.tag == 'Bag' and type(playerCount) == 'number' and playerCount > 0)
+    assert(setupBag.tag == 'Bag')
 
     -- Get per-object json.  Leave the "master" copies of the objects in the
     -- setup bag, spawn new copies from the json.
@@ -175,28 +179,28 @@ function SetupGeneric.unpack(setupBag, playerCount)
         local guid = assert(getEntryGuid(setupBag, namePattern), 'setup bag missing ' .. namePattern)
         local object = setupBag.takeObject({
             guid = guid,
-            position = { x = pos.x, y = pos.y + (5 * i), z = pos.z }
+            position = { x = pos.x, y = pos.y - (5 * i), z = pos.z }
         })
         nameToJson[namePattern] = object.getJSON()
         setupBag.putObject(object)
     end
 
-    local zoneCenters = _zoneHelper.getPlayerCountZoneCenters(playerCount)
-    local agendaPos = agendaCenter(playerCount)
+    local zonesAttributes = _zoneHelper.zonesAttributes()
+    local agendaZoneCenter = agendaCenter(#zonesAttributes)
 
     -- Per player objects.
-    for _, zoneCenter in ipairs(zoneCenters) do
+    for _, zone in ipairs(zonesAttributes) do
         for namePattern, offset in pairs(SetupGeneric.NAME_TO_PLAYER_ZONE_OFFSET) do
             local json = assert(nameToJson[namePattern], 'no json for ' .. namePattern)
             spawnObjectJSON({
                 json              = json,
-                position          = offsetPosition(zoneCenter, offset),
-                rotation          = offsetRotation(zoneCenter, offset),
+                position          = offsetPosition(zone.center, offset),
+                rotation          = offsetRotation(zone.center, offset),
                 callback_function = function(object) object.setLock(offset.lock or false) end,
                 sound             = false,
             })
         end
-        local agendaPosPlayer = agendaCenterPlayer(playerCount, zoneCenter)
+        local agendaPosPlayer = agendaCenterPlayer(agendaZoneCenter, zone.center)
         for namePattern, offset in pairs(SetupGeneric.NAME_TO_PLAYER_AGENDA_ZONE_OFFSET) do
             local json = assert(nameToJson[namePattern], 'no json for ' .. namePattern)
             spawnObjectJSON({
@@ -214,8 +218,8 @@ function SetupGeneric.unpack(setupBag, playerCount)
         local json = assert(nameToJson[namePattern], 'no json for ' .. namePattern)
         spawnObjectJSON({
             json              = json,
-            position          = offsetPosition(agendaPos, offset),
-            rotation          = offsetRotation(agendaPos, offset),
+            position          = offsetPosition(agendaZoneCenter, offset),
+            rotation          = offsetRotation(agendaZoneCenter, offset),
             callback_function = function(object) object.setLock(offset.lock or false) end,
             sound             = false,
         })
@@ -226,6 +230,20 @@ end
 
 local SetupColor = {
     DEFAULT_COLOR_LIST = { 'White', 'Blue', 'Purple', 'Yellow', 'Red', 'Green', 'Orange', 'Pink', 'Brown' },
+
+    HAND = {
+        ACTIVE = {
+            OFFSET = { x = 0, y = 4, z = 61.5 },
+            SCALE = { x = 12, y = 8, z = 5 }
+        },
+        INACTIVE = {
+            POSITION = { x = 148, y = 4, z = 80, dx = 3 },
+            SCALE = { x = 1, y = 2, z = 1 }
+        }
+    },
+
+    COLOR_BOX_OFFSET = { x = 0, y = 5, z = 0, lock = true },
+
     NAME_TO_PLAYER_ZONE_OFFSET = {
         ['Command Sheet %($COLOR%)'] = { x = -9, z = 16, lock = true },
         ['Notes %($COLOR%)'] = { x = -5, z = 1.5 },
@@ -250,82 +268,64 @@ local SetupColor = {
     }
 }
 
---- Get the player (default) colors list, and a reverse map from color to player index.
-function SetupColor.defaultPlayerColors(playerCount)
-    debugLog('SetupColor.defaultPlayerColors')
-    assert(type(playerCount) == 'number')
-
-    local playerColors = {}
-    local colorToPlayerIndex = {}
-    for i = 1, playerCount do
-        local color = SetupColor.DEFAULT_COLOR_LIST[i]
-        playerColors[i] = color
-        colorToPlayerIndex[color] = i
-    end
-    return playerColors, colorToPlayerIndex
-end
-
-function SetupColor.transformHands(playerCount)
+--- Move hands to zone
+function SetupColor.transformHands()
     debugLog('SetupColor.transformHands')
-    assert(type(playerCount) == 'number')
 
-    local playerColors, colorToPlayerIndex = SetupColor.defaultPlayerColors(playerCount)
-    local zoneCenters = _zoneHelper.getPlayerCountZoneCenters(playerCount)
+    local zonesAttributes = _zoneHelper.zonesAttributes()
+    local playerCount = #zonesAttributes
 
-    local allPlayerColors = Player.getAvailableColors()
-    local nonPlayerIndex = 0
-    for i, color in pairs(allPlayerColors) do
-        local playerIndex = colorToPlayerIndex[color]
-        if playerIndex then
-            local zoneCenter = zoneCenters[playerIndex]
+    for i, color in ipairs(SetupColor.DEFAULT_COLOR_LIST) do
+        if i <= playerCount then
+            local zoneCenter = zonesAttributes[i].center
             Player[color].setHandTransform({
-                position = {
-                    x = zoneCenter.x,
-                    y = 4,
-                    z = 61.5 * (zoneCenter.z > 0 and 1 or -1)
-                },
-                rotation = {
-                    x = 0,
-                    y = zoneCenter.z > 0 and 180 or 0,
-                    z = 0
-                },
-                scale = { 12, 8, 5 }
+                position = offsetPosition(zoneCenter, SetupColor.HAND.ACTIVE.OFFSET),
+                rotation = offsetRotation(zoneCenter, SetupColor.HAND.ACTIVE.OFFSET),
+                scale    = SetupColor.HAND.ACTIVE.SCALE
             })
         else
+            local nonPlayerIndex = (i - playerCount) - 1
             Player[color].setHandTransform({
                 position = {
-                    x = 148 - 3 * nonPlayerIndex,
-                    y = 5,
-                    z = 80
+                    x = SetupColor.HAND.INACTIVE.POSITION.x + SetupColor.HAND.INACTIVE.POSITION.dx,
+                    y = SetupColor.HAND.INACTIVE.POSITION.y,
+                    z = SetupColor.HAND.INACTIVE.POSITION.z
                 },
                 rotation = { 0, 0, 0 },
-                scale = { 1, 4, 1 }
+                scale = SetupColor.HAND.INACTIVE.SCALE
             })
-            nonPlayerIndex = nonPlayerIndex + 1
         end
     end
 end
 
-function SetupColor.getColorToBox()
-    debugLog('SetupColor.getColorToColorBox')
-    local colorSet = {}
-    for _, color in ipairs(SetupColor.DEFAULT_COLOR_LIST) do
-        colorSet[color] = true
-    end
-    local result = {}
-    for _, object in ipairs(getAllObjects()) do
-        local name = object.getName()
-        local color = string.match(name, '^(.*) Box')
-        if object.tag == 'Bag' and colorSet[color] then
-            result[color] = object
-        end
-    end
-    return result
+--- Keep per-player pack/unpack independent so color change can use it too!
+
+function SetupColor.packColorBoxIntoSetupBag(setupBag, box)
+    debugLog('SetupColor.packColorBox ' .. box.getName())
+    assert(setupBag.tag == 'Bag' and box.tag == 'Bag')
+
+    setupBag.putObject(box)
 end
 
-function SetupColor.pack(colorToColorBox)
-    debugLog('SetupColor.pack')
-    assert(type(colorToColorBox) == 'table')
+function SetupColor.unpackColorBoxFromSetupBag(setupBag, color, zoneCenter)
+    debugLog('SetupColor.unpackColorBoxFromSetupBag ' .. color)
+    assert(setupBag.tag == 'Bag' and type(color) == 'string' and type(zoneCenter) == 'table')
+
+    local offset = SetupColor.COLOR_BOX_OFFSET
+    local guid = assert(getEntryGuid(setupBag, '^' .. color .. ' Box$'), ' missing box for ' .. color)
+    local box = setupBag.takeObject({
+        guid              = guid,
+        position          = offsetPosition(zoneCenter, offset),
+        rotation          = offsetRotation(zoneCenter, offset),
+        callback_function = function(object) object.setLock(offset.lock or false) end,
+        smooth            = false,
+    })
+    return box
+end
+
+function SetupColor.pack(color, colorBox)
+    debugLog('SetupColor.pack ' .. color)
+    assert(type(color) == 'string' and colorBox.tag == 'Bag')
 
     local namePatterns = {}
     for _, namePattern in ipairs(allNamePatterns(SetupColor)) do
@@ -336,53 +336,43 @@ function SetupColor.pack(colorToColorBox)
     for _, object in ipairs(getAllObjects()) do
         local name = object.getName()
         for _, namePattern in ipairs(namePatterns) do
-            local color = string.match(name, namePattern)
-            if color and colorToColorBox[color] then
+            if string.match(name, namePattern) == color then
                 object.setLock(false)
-                colorToColorBox[color].putObject(object)
+                colorBox.putObject(object)
             end
         end
     end
 end
 
-function SetupColor.unpack(colorToColorBox, playerCount)
-    debugLog('SetupColor.unpack')
-    assert(type(colorToColorBox) == 'table' and type(playerCount) == 'number')
-
-    local playerColors, colorToPlayerIndex = SetupColor.defaultPlayerColors(playerCount)
-    local zoneCenters = _zoneHelper.getPlayerCountZoneCenters(playerCount)
-    local agendaPos = agendaCenter(playerCount)
+function SetupColor.unpack(color, colorBox, zoneCenter, agendaZoneCenter)
+    debugLog('SetupColor.unpack ' .. color)
+    assert(type(color) == 'string' and colorBox.tag == 'Bag' and type(zoneCenter) == 'table' and type(agendaZoneCenter) == 'table')
 
     local nameToObject = {}
-
-    -- Per player objects.
-    for i, color in ipairs(playerColors) do
-        local colorBox = assert(colorToColorBox[color], 'missing box for ' .. color)
-        local zoneCenter = zoneCenters[i]
-
-        for namePattern, offset in pairs(SetupColor.NAME_TO_PLAYER_ZONE_OFFSET) do
-            namePattern = string.gsub(namePattern, '$COLOR', color)
-            local guid = assert(getEntryGuid(colorBox, namePattern), 'missing ' .. namePattern)
-            local object = colorBox.takeObject({
-                guid              = guid,
-                position          = offsetPosition(zoneCenter, offset),
-                rotation          = offsetRotation(zoneCenter, offset),
-                callback_function = function(object) object.setLock(offset.lock or false) end,
-            })
-            nameToObject[object.getName()] = object
-        end
-        local agendaPosPlayer = agendaCenterPlayer(playerCount, zoneCenter)
-        for namePattern, offset in pairs(SetupColor.NAME_TO_PLAYER_AGENDA_ZONE_OFFSET) do
-            namePattern = string.gsub(namePattern, '$COLOR', color)
-            local guid = assert(getEntryGuid(colorBox, namePattern), 'missing ' .. namePattern)
-            local object = colorBox.takeObject({
-                guid              = guid,
-                position          = offsetPosition(agendaPosPlayer, offset),
-                rotation          = offsetRotation(agendaPosPlayer, offset),
-                callback_function = function(object) object.setLock(offset.lock or false) end,
-            })
-            nameToObject[object.getName()] = object
-        end
+    for namePattern, offset in pairs(SetupColor.NAME_TO_PLAYER_ZONE_OFFSET) do
+        namePattern = string.gsub(namePattern, '$COLOR', color)
+        local guid = assert(getEntryGuid(colorBox, namePattern), 'missing ' .. namePattern)
+        local object = colorBox.takeObject({
+            guid              = guid,
+            position          = offsetPosition(zoneCenter, offset),
+            rotation          = offsetRotation(zoneCenter, offset),
+            callback_function = function(object) object.setLock(offset.lock or false) end,
+            smooth            = false,
+        })
+        nameToObject[object.getName()] = object
+    end
+    local agendaPosPlayer = agendaCenterPlayer(agendaZoneCenter, zoneCenter)
+    for namePattern, offset in pairs(SetupColor.NAME_TO_PLAYER_AGENDA_ZONE_OFFSET) do
+        namePattern = string.gsub(namePattern, '$COLOR', color)
+        local guid = assert(getEntryGuid(colorBox, namePattern), 'missing ' .. namePattern)
+        local object = colorBox.takeObject({
+            guid              = guid,
+            position          = offsetPosition(agendaPosPlayer, offset),
+            rotation          = offsetRotation(agendaPosPlayer, offset),
+            callback_function = function(object) object.setLock(offset.lock or false) end,
+            smooth            = false,
+        })
+        nameToObject[object.getName()] = object
     end
     return nameToObject
 end
@@ -399,13 +389,14 @@ function SetupColor.packUnits(color, colorBox)
     for _, object in ipairs(getAllObjects()) do
         if object.tag == 'Bag' and unitBagSet[object.getName()] then
             object.setLock(false)
+            object.jointTo() -- break joints
             colorBox.putObject(object)
         end
     end
 end
 
 function SetupColor.unpackUnits(color, colorBox, directionaliser)
-    debugLog('SetupColor.unpackUnits')
+    debugLog('SetupColor.unpackUnits ' .. color)
     assert(type(color) == 'string' and colorBox.tag == 'Bag' and type(directionaliser) == 'userdata')
 
     local nameToObject = {}
@@ -417,7 +408,9 @@ function SetupColor.unpackUnits(color, colorBox, directionaliser)
             position          = directionaliser.positionToWorld(offset),
             rotation          = directionaliser.getRotation(),
             callback_function = function(object) object.setLock(offset.lock or false) end,
+            smooth            = false,
         })
+        object.use_grid = false
         nameToObject[object.getName()] = object
     end
     return nameToObject
@@ -425,70 +418,88 @@ end
 
 -------------------------------------------------------------------------------
 
-local _setupQueue = {}
+function SetupColor.packOld(setupBag)
+    debugLog('packOld')
+    assert(setupBag.tag == 'Bag')
 
-function setupCoroutine()
-    debugLog('setupCoroutine')
-
-    local params = assert(table.remove(_setupQueue))
-    local playerCount = assert(params.playerCount)
-    local colors = SetupColor.defaultPlayerColors(playerCount)
-
-    local setupBag = assert(SetupGeneric.getSetupBag())
-    local colorToBox = assert(SetupColor.getColorToBox())
+    -- Zone helper gets current zones / colors.
+    _zoneHelper.updateZoneColors()
     coroutine.yield(0)
 
-    for color, box in pairs(colorToBox) do
-        SetupColor.packUnits(color, box)
-        coroutine.yield(0)
+    for _, zone in ipairs(_zoneHelper.zonesAttributes()) do
+        if zone.color then
+            local colorBox = SetupColor.unpackColorBoxFromSetupBag(setupBag, zone.color, zone.center)
+            assert(colorBox, 'missing box for ' .. zone.color)
+            coroutine.yield(0)
+
+            SetupColor.packUnits(zone.color, colorBox)
+            coroutine.yield(0)
+
+            SetupColor.pack(zone.color, colorBox)
+            coroutine.yield(0)
+
+            SetupColor.packColorBoxIntoSetupBag(setupBag, colorBox)
+            coroutine.yield(0)
+        end
     end
-
-    SetupColor.pack(colorToBox)
-    coroutine.yield(0)
 
     SetupGeneric.pack(setupBag)
     coroutine.yield(0)
+end
 
-    SetupColor.transformHands(playerCount)
-    coroutine.yield(0)
+function SetupColor.unpackNew(setupBag)
+    debugLog('unpackNew')
+    assert(setupBag.tag == 'Bag')
 
-    SetupGeneric.unpack(setupBag, playerCount)
-    coroutine.yield(0)
-
-    local nameToObject = SetupColor.unpack(colorToBox, playerCount)
-    for _ = 1, 10 do
+    -- Zone helper gets current zones but they do not have colors yet.
+    local zonesAttributes = _zoneHelper.zonesAttributes()
+    local agendaZoneCenter = agendaCenter(#zonesAttributes)
+    for i, zone in ipairs(zonesAttributes) do
+        local color = assert(SetupColor.DEFAULT_COLOR_LIST[i])
+        local colorBox = SetupColor.unpackColorBoxFromSetupBag(setupBag, color, zone.center)
+        assert(colorBox, 'missing box for ' .. color)
         coroutine.yield(0)
-    end
 
-    local colorToDirectionaliser = {}
-    for _, color in ipairs(colors) do
-        local box = assert(colorToBox[color], 'missing box for ' .. color)
+        local nameToObject = SetupColor.unpack(color, colorBox, zone.center, agendaZoneCenter)
+        coroutine.yield(0)
+
         local name = 'Directionaliser (' .. color .. ')'
         local directionaliser = assert(nameToObject[name], 'missing ' .. name)
-        while not directionaliser.resting do
-            coroutine.yield(0)
-        end
-        colorToDirectionaliser[color] = directionaliser
-    end
-    coroutine.yield(0)
+        local unitBags = SetupColor.unpackUnits(color, colorBox, directionaliser)
+        coroutine.yield(0)
 
-    local unitBags = {}
-    for color, directionaliser in pairs(colorToDirectionaliser) do
-        local box = assert(colorToBox[color], 'missing box for ' .. color)
-        local nameToUnitBag = SetupColor.unpackUnits(color, box, directionaliser)
-        for _, unitBag in pairs(nameToUnitBag) do
+        SetupColor.packColorBoxIntoSetupBag(setupBag, colorBox)
+        coroutine.yield(0)
+
+        -- About to wait for resting, give a little extra time for gravity.
+        coroutine.yield(0)
+        coroutine.yield(0)
+
+        -- Units were unpacked ABOVE directionaliser.  Wait for them to fall.
+        for _, unitBag in ipairs(unitBags) do
             while not unitBag.resting do
                 coroutine.yield(0)
             end
-            unitBag.setLock(true)
+            -- Instead of `unitBag.setLock(true)`, create a joint.  Can now
+            -- pick up and move directionaliser by dragging a unit bag on it.
+            -- Caution: rotating the directionalizer will break the joints!
+            unitBag.jointTo(directionaliser, {
+                type = 'Fixed',
+                collision = false,
+                break_force = 10000,
+                break_torque = 10000
+            })
         end
-        coroutine.yield(0)
     end
+    coroutine.yield(0)
 
-    return 1 -- REQUIRED!  MUST RETURN 1 TO STOP COROUTINE!
+    SetupGeneric.unpack(setupBag)
+
 end
 
 -------------------------------------------------------------------------------
+
+local _setupQueue = {}
 
 --- This is the primary entry point for using the helper object.
 function setup(params)
@@ -501,6 +512,38 @@ function setup(params)
 
     UI.setAttribute('startup', 'active', false)
 end
+
+function setupCoroutine()
+    debugLog('setupCoroutine')
+
+    local params = assert(table.remove(_setupQueue))
+    local playerCount = assert(params.playerCount)
+
+    local setupBag = assert(SetupGeneric.getSetupBag())
+    coroutine.yield(0)
+
+    SetupColor.packOld(setupBag)
+    coroutine.yield(0)
+
+    _zoneHelper.setPlayerCount(playerCount)
+
+    SetupColor.transformHands()
+    coroutine.yield(0)
+
+    SetupColor.unpackNew(setupBag)
+    coroutine.yield(0)
+
+    _zoneHelper.updateZoneColors()
+    coroutine.yield(0)
+
+    Global.setVectorLines(_zoneHelper.getBordersVectorLines({
+        thickness = 0.5,
+    }))
+
+    return 1 -- REQUIRED!  MUST RETURN 1 TO STOP COROUTINE!
+end
+
+-------------------------------------------------------------------------------
 
 function draw3Pcircle()
     Global.setVectorLines({
@@ -770,47 +813,6 @@ function onLoad(saveState)
         end
     end
     self.setInvisibleTo(invisibleTo)
-
-    self.addContextMenuItem('pack', contextMenuPack, true)
-    self.addContextMenuItem('unpack', contextMenuUnpack, true)
-    self.addContextMenuItem('hands', contextMenuHands, true)
-    self.addContextMenuItem('packColors', contextMenuPackColors, true)
-    self.addContextMenuItem('unpackColors', contextMenuUnpackColors, true)
-end
-
-function contextMenuPack()
-    local setupBag = assert(SetupGeneric.getSetupBag())
-    SetupGeneric.pack(setupBag)
-end
-function contextMenuUnpack()
-    local setupBag = assert(SetupGeneric.getSetupBag())
-    SetupGeneric.unpack(setupBag, 4)
-end
-function contextMenuHands()
-    SetupColor.transformHands(4)
-end
-function contextMenuPackColors()
-    local colorToBox = assert(SetupColor.getColorToBox())
-    SetupColor.pack(colorToBox)
-end
-function contextMenuUnpackColors()
-    local colorToBox = assert(SetupColor.getColorToBox())
-    local nameToObject = SetupColor.unpack(colorToBox, 4)
-
-    local d = nameToObject['Directionaliser (White)']
-    if d then
-        for _, p in ipairs(d.getSnapPoints()) do
-            local t = { p.position.x, p.position.y, p.position.z }
-            for i, v in ipairs(t) do
-                t[i] = math.floor(v * 1000) / 1000
-            end
-        end
-
-        local function delayedUnpack()
-            SetupColor.unpackUnits('White', colorToBox['White'], d)
-        end
-        Wait.time(delayedUnpack, 4)
-    end
 end
 
 -------------------------------------------------------------------------------

@@ -161,6 +161,18 @@ function fromColor(color)
     return _colorToFaction[color]
 end
 
+--- Get faction from token name (strips off any "owner token" or "command token" suffix, if present)
+function fromTokenName(tokenName)
+    assert(type(tokenName) == 'string')
+    tokenName = string.match(tokenName, '^(.*) .* Token$') or tokenName
+    _maybeUpdate()
+    for color, faction in pairs(_colorToFaction) do
+        if faction.tokenName == tokenName then
+            return faction
+        end
+    end
+end
+
 function _maybeUpdate()
     if not _update.time or (Time.time - _update.time) > _update.periodicUpdateSeconds then
         _update.time = Time.time

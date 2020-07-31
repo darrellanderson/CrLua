@@ -536,11 +536,15 @@ function setupCoroutine()
     _zoneHelper.updateZoneColors()
     coroutine.yield(0)
 
+    updateVectorLines()
+
+    return 1 -- REQUIRED!  MUST RETURN 1 TO STOP COROUTINE!
+end
+
+function updateVectorLines()
     Global.setVectorLines(_zoneHelper.getBordersVectorLines({
         thickness = 0.5,
     }))
-
-    return 1 -- REQUIRED!  MUST RETURN 1 TO STOP COROUTINE!
 end
 
 -------------------------------------------------------------------------------
@@ -813,6 +817,8 @@ function onLoad(saveState)
         end
     end
     self.setInvisibleTo(invisibleTo)
+
+    updateVectorLines()
 end
 
 -------------------------------------------------------------------------------

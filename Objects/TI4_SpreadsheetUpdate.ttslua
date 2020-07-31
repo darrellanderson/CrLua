@@ -18,7 +18,17 @@ local _data = {
     updateBetweenTurns = false,
     saveIds = false,
 
-    playerColorToTechs = false,
+    playerColorToTechs = {},
+    playerColorToStrategy = {},
+    playerScores = {},
+    stageOneObjectives = {},
+    StageOneMap = {},
+    stageTwoObjectives = {},
+    StageTwoMap = {},
+    playerSecrets = {},
+    supportMap = {},
+    MecatolPoints = {},
+    otherPoints = {}
 }
 
 function onLoad(saveState)
@@ -59,7 +69,7 @@ function onPlayerTurnStart(playerColorStart, playerColorPrevious)
     updateScoreState()
 
     -- Optionally also push to sheet.
-    if _data.updateBetweenTurns() then
+    if _data.updateBetweenTurns then
         updateSpreadsheetTech()
         updateSpreadsheetScore()
     end
@@ -67,7 +77,7 @@ end
 
 function onDrop(player_color)
 
-    local nameToObjects = CrLua.TI4.PlayerScore._getNameToObjects()
+    --[[local nameToObjects = CrLua.TI4.PlayerScore._getNameToObjects()
     for k, v in pairs(nameToObjects) do
         print('xxx1 ' .. k)
     end
@@ -78,7 +88,7 @@ function onDrop(player_color)
     local colorToScore = CrLua.TI4.PlayerScore.colorToScore(targetToOwnerTokens)
     for k, v in pairs(colorToScore) do
         print('xxx3 ' .. k .. ' -> ' .. v)
-    end
+    end]]--
 
 end
 
@@ -87,22 +97,35 @@ end
 function updateTechState()
     -- Update the local table to preserve order.  Does not push to sheet.
     _data.playerColorToTechs = CrLua.TI4.PlayerTech.updateAllPlayersToTech(_data.playerColorToTechs)
+
 end
 
 function updateScoreState()
     local nameToScoreObjects = CrLua.TI4.PlayerScore.getNameToScoreObjects()
     local nameToOwnerTokens = CrLua.TI4.PlayerScore.nameToOwnerTokens(nameToScoreObjects)
-    local colorToScore = CrLua.TI4.PlayerScore.colorToScore(nameToScoreObjects, nameToOwnerTokens)
+    _data.playerScores = CrLua.TI4.PlayerScore.colorToScore(nameToScoreObjects, nameToOwnerTokens)
+    _data.stageOneObjectives = CrLua.TI4.PlayerScore.updatePublicOneObjectives(_data.stageOneObjectives, nameToScoreObjects)
+    _data.StageOneMap = CrLua.TI4.PlayerScore.mapStageOne(nameToOwnerTokens)
+    _data.stageTwoObjectives = CrLua.TI4.PlayerScore.updatePublicTwoObjectives(_data.stageTwoObjectives, nameToScoreObjects)
+    _data.StageTwoMap = CrLua.TI4.PlayerScore.mapStageTwo(nameToOwnerTokens)
+    _data.playerSecrets = CrLua.TI4.PlayerScore.updateSecrets(_data.playerSecrets, nameToOwnerTokens)
+    _data.playerColorToStrategy = CrLua.TI4.PlayerScore.updateStrategy()
+    _data.supportMap = CrLua.TI4.PlayerScore.mapSupports(nameToOwnerTokens)
+    _data.MecatolPoints = CrLua.TI4.PlayerScore.getMecatolPoints(_data.MecatolPoints, nameToOwnerTokens)
+    _data.otherPoints = CrLua.TI4.PlayerScore.mapOtherPoints(_data.otherPoints, nameToOwnerTokens)
 
-    for k, v in pairs(nameToScoreObjects) do
+    --[[for k, v in pairs(nameToScoreObjects) do
         print('nameToScoreObjects #' .. k .. ' ' .. #v)
     end
     for k, v in pairs(nameToOwnerTokens) do
         print('nameToOwnerTokens #' .. k .. ' ' .. #v)
-    end
-    for k, v in pairs(colorToScore) do
-        print('colorToScore ' .. k .. ' ' .. v)
-    end
+        for i, j in ipairs(v) do
+          print(v[i].getName())
+        end
+    end]]--
+    -- for k, v in pairs(colorToScore) do
+    --    print('colorToScore ' .. k .. ' ' .. v)
+    --end
 end
 
 -------------------------------------------------------------------------------
@@ -140,6 +163,14 @@ end
 function updateSpreadsheetScore()
     local sheetId = _sheetId(_data.sheetIdScore)
     local sheetName = _data.sheetNameScore
+    local cells = CrLua.TI4.PlayerScore.getCells(_data.stageOneObjectives, _data.stageTwoObjectives, _data.playerScores, _data.playerSecrets, _data.playerColorToStrategy, _data.StageOneMap, _data.StageTwoMap, _data.supportMap, _data.MecatolPoints, _data.otherPoints)
+
+    if sheetId then
+        CrLua.Log.i(TAG, 'updating score spreadsheet')
+        CrLua.TTS.Spreadsheet.update(sheetId, sheetName, cells)
+    else
+        CrLua.Log.i(TAG, 'no score spreadsheet, not updating score')
+    end
 end
 -------------------------------------------------------------------------------
 

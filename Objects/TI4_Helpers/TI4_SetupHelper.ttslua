@@ -83,7 +83,7 @@ local function agendaCenterPlayer(agendaZoneCenter, playerZoneCenter)
     return {
         x = agendaZoneCenter.x + playerZoneCenter.x / 10,
         y = agendaZoneCenter.y,
-        z = agendaZoneCenter.z + 3.75 * (playerZoneCenter.z > 0 and 1 or -1)
+        z = agendaZoneCenter.z + 4 * (playerZoneCenter.z > 0 and 1 or -1)
     }
 end
 
@@ -105,9 +105,9 @@ end
 
 local SetupGeneric = {
     NAME_TO_PLAYER_ZONE_OFFSET = {
-        ['^TI4 Unpacker$'] = { x = 0, z = 1.5 },
-        ['^TI4 MultiRoller'] = { x = 0, z = 54, lock = true },
-        ['^Technology Cards$'] = { x = -10, z = 1.5 },
+        ['^Technology Cards$'] = { x = 10, z = 2 },
+        ['^TI4 Unpacker$'] = { x = -10, z = 2 },
+        ['^TI4 MultiRoller'] = { x = 0, z = 40, lock = true },
     },
     NAME_TO_PLAYER_AGENDA_ZONE_OFFSET = {
         ['^Any Whens%?$'] = { x = -0.6, z = 3 },
@@ -233,22 +233,22 @@ local SetupColor = {
 
     HAND = {
         ACTIVE = {
-            OFFSET = { x = 0, y = 4, z = 61.5 },
-            SCALE = { x = 12, y = 8, z = 5 }
+            OFFSET = { x = 0, y = 4, z = 22.5 },
+            SCALE = { x = 20, y = 8, z = 5 }
         },
         INACTIVE = {
             POSITION = { x = 148, y = 4, z = 80, dx = 3 },
-            SCALE = { x = 1, y = 2, z = 1 }
+            SCALE = { x = 1, y = 4, z = 1 }
         }
     },
 
     COLOR_BOX_OFFSET = { x = 0, y = 5, z = 0, lock = true },
 
     NAME_TO_PLAYER_ZONE_OFFSET = {
-        ['Command Sheet %($COLOR%)'] = { x = -9, z = 16, lock = true },
-        ['Notes %($COLOR%)'] = { x = -5, z = 1.5 },
-        ['Directionaliser %($COLOR%)'] = { x = 0, y = 0.46, z = -5, yRot = 270, lock = true },
-        ['Active/Passed %($COLOR%)'] = { x = 5, y = 1, z = 1.5 }
+        ['Notes %($COLOR%)'] = { x = 7, z = 2 },
+        ['Active/Passed %($COLOR%)'] = { x = 4, y = 1, z = 2 },
+        ['Command Sheet %($COLOR%)'] = { x = -8, z = 11, lock = true },
+        ['Directionaliser %($COLOR%)'] = { x = 0, y = 0.46, z = -2, yRot = 270, lock = true },
     },
     NAME_TO_PLAYER_AGENDA_ZONE_OFFSET = {
         ['$COLOR Player Votes'] = { x = 0, y = 1, z = 1, yRot = 180 },
@@ -399,7 +399,7 @@ function SetupColor.unpackUnits(color, colorBox, directionaliser)
     debugLog('SetupColor.unpackUnits ' .. color)
     assert(type(color) == 'string' and colorBox.tag == 'Bag' and type(directionaliser) == 'userdata')
 
-    local nameToObject = {}
+    local unitBags = {}
     for namePattern, offset in pairs(SetupColor.NAME_TO_DIRECTIONALISER_OFFSET) do
         namePattern = string.gsub(namePattern, '$COLOR', color)
         local guid = assert(getEntryGuid(colorBox, namePattern), 'missing ' .. namePattern)
@@ -411,9 +411,9 @@ function SetupColor.unpackUnits(color, colorBox, directionaliser)
             smooth            = false,
         })
         object.use_grid = false
-        nameToObject[object.getName()] = object
+        table.insert(unitBags, object)
     end
-    return nameToObject
+    return unitBags
 end
 
 -------------------------------------------------------------------------------
@@ -426,21 +426,27 @@ function SetupColor.packOld(setupBag)
     _zoneHelper.updateZoneColors()
     coroutine.yield(0)
 
+    local colorToBox = {}
     for _, zone in ipairs(_zoneHelper.zonesAttributes()) do
         if zone.color then
-            local colorBox = SetupColor.unpackColorBoxFromSetupBag(setupBag, zone.color, zone.center)
-            assert(colorBox, 'missing box for ' .. zone.color)
-            coroutine.yield(0)
-
-            SetupColor.packUnits(zone.color, colorBox)
-            coroutine.yield(0)
-
-            SetupColor.pack(zone.color, colorBox)
-            coroutine.yield(0)
-
-            SetupColor.packColorBoxIntoSetupBag(setupBag, colorBox)
-            coroutine.yield(0)
+            colorToBox[zone.color] = SetupColor.unpackColorBoxFromSetupBag(setupBag, zone.color, zone.center)
+            assert(colorToBox[zone.color], 'missing box for ' .. zone.color)
         end
+    end
+    coroutine.yield(0)
+
+    for color, box in pairs(colorToBox) do
+        SetupColor.packUnits(color, box)
+    end
+    coroutine.yield(0)
+
+    for color, box in pairs(colorToBox) do
+        SetupColor.pack(color, box)
+    end
+    coroutine.yield(0)
+
+    for color, box in pairs(colorToBox) do
+        SetupColor.packColorBoxIntoSetupBag(setupBag, box)
     end
 
     SetupGeneric.pack(setupBag)
@@ -451,39 +457,60 @@ function SetupColor.unpackNew(setupBag)
     debugLog('unpackNew')
     assert(setupBag.tag == 'Bag')
 
+    SetupGeneric.unpack(setupBag)
+    coroutine.yield(0)
+
     -- Zone helper gets current zones but they do not have colors yet.
     local zonesAttributes = _zoneHelper.zonesAttributes()
     local agendaZoneCenter = agendaCenter(#zonesAttributes)
+    local colorToState = {}
+
     for i, zone in ipairs(zonesAttributes) do
         local color = assert(SetupColor.DEFAULT_COLOR_LIST[i])
-        local colorBox = SetupColor.unpackColorBoxFromSetupBag(setupBag, color, zone.center)
-        assert(colorBox, 'missing box for ' .. color)
-        coroutine.yield(0)
+        colorToState[color] = {
+            box = SetupColor.unpackColorBoxFromSetupBag(setupBag, color, zone.center),
+            zoneCenter = zone.center,
+            directionaliser = false,
+            unitBags = false
+        }
+        assert(colorToState[color].box, 'missing box for ' .. color)
+    end
+    coroutine.yield(0)
 
-        local nameToObject = SetupColor.unpack(color, colorBox, zone.center, agendaZoneCenter)
-        coroutine.yield(0)
-
+    for color, state in pairs(colorToState) do
+        local nameToObject = SetupColor.unpack(color, state.box, state.zoneCenter, agendaZoneCenter)
         local name = 'Directionaliser (' .. color .. ')'
-        local directionaliser = assert(nameToObject[name], 'missing ' .. name)
-        local unitBags = SetupColor.unpackUnits(color, colorBox, directionaliser)
-        coroutine.yield(0)
+        state.directionaliser = nameToObject[name]
+        assert(state.directionaliser, 'missing ' .. name)
+    end
+    coroutine.yield(0)
 
-        SetupColor.packColorBoxIntoSetupBag(setupBag, colorBox)
-        coroutine.yield(0)
+    for color, state in pairs(colorToState) do
+        state.unitBags = SetupColor.unpackUnits(color, state.box, state.directionaliser)
+        assert(state.unitBags, 'missing unit bags')
+        assert(#state.unitBags > 0, 'empty unit bags')
+    end
+    coroutine.yield(0)
 
-        -- About to wait for resting, give a little extra time for gravity.
-        coroutine.yield(0)
-        coroutine.yield(0)
+    for color, state in pairs(colorToState) do
+        SetupColor.packColorBoxIntoSetupBag(setupBag, state.box)
+    end
+    coroutine.yield(0)
 
+    -- About to wait for resting, give a little extra time for gravity.
+    coroutine.yield(0)
+    coroutine.yield(0)
+
+    for color, state in pairs(colorToState) do
         -- Units were unpacked ABOVE directionaliser.  Wait for them to fall.
-        for _, unitBag in ipairs(unitBags) do
+        for _, unitBag in ipairs(state.unitBags) do
             while not unitBag.resting do
                 coroutine.yield(0)
             end
             -- Instead of `unitBag.setLock(true)`, create a joint.  Can now
             -- pick up and move directionaliser by dragging a unit bag on it.
             -- Caution: rotating the directionalizer will break the joints!
-            unitBag.jointTo(directionaliser, {
+            unitBag.jointTo(state.directionaliser, {
                 type = 'Fixed',
                 collision = false,
                 break_force = 10000,
@@ -491,10 +518,6 @@ function SetupColor.unpackNew(setupBag)
             })
         end
     end
-    coroutine.yield(0)
-
-    SetupGeneric.unpack(setupBag)
-
 end
 
 -------------------------------------------------------------------------------
@@ -515,6 +538,8 @@ end
 
 function setupCoroutine()
     debugLog('setupCoroutine')
+
+    Global.setVectorLines({})
 
     local params = assert(table.remove(_setupQueue))
     local playerCount = assert(params.playerCount)

@@ -386,10 +386,19 @@ function place_tile(tileinfo, location, rotation)
 end
 
 function place_tile_from_bag(bag, guid, location, rotation)
+    local function delayedLock(object)
+        Wait.time(function() object.setLock(do_lock) end, 1)
+    end
+
     if bag ~= nil and bag.getObjects ~= nil then
         for i, g in ipairs(bag.getObjects()) do
             if g.guid == guid then
-                bag.takeObject({guid = guid, position = location, rotation = rotation, callback_function = function(tile) tile.setLock(do_lock) end})
+                bag.takeObject({
+                    guid = guid,
+                    position = location,
+                    rotation = rotation,
+                    callback_function = do_lock and delayedLock
+                })
                 return true
             end
         end
@@ -535,7 +544,11 @@ function place_card(name, location, rotation, broadcast_not_found)
                             deck_last_cards[deck_contents[1].nickname] = {}
                         end
                     end
-                    obj.takeObject({guid = g.guid, position = location, rotation = rotation})
+                    obj.takeObject({
+                        guid = g.guid,
+                        position = location,
+                        rotation = rotation
+                    })
                     return true
                 end
             end

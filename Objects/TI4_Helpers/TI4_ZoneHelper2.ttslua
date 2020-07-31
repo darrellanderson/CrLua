@@ -250,7 +250,8 @@ local _lastUpdateZoneColorTime = false
 
 --- Reset the number of zones.
 -- @param playerCount number : player count.
-function setPlayerCount(playerCount)
+-- @param setPlayerCount boolean : helper cannot call directly, use setPlayerCountWithExtraRing
+function setPlayerCount(playerCount, extraRing)
     _table = {
         polygon = DEFAULT_TABLE_XZ,
         boundingBox = _boundingBox(DEFAULT_TABLE_XZ),
@@ -262,6 +263,16 @@ function setPlayerCount(playerCount)
         _zones = {}
         for i = 1, playerCount do
             local polygon = assert(zoneAttributes.zones[i])
+            if extraRing then
+                local mutated = {}
+                for _, xz in ipairs(polygon) do
+                    table.insert(mutated, {
+                        xz[1],
+                        xz[2] + 7 * (xz[2] > 0 and 1 or -1)
+                    })
+                end
+                polygon = mutated
+            end
             local bb = _boundingBox(polygon)
             table.insert(_zones, {
                 color = false,
@@ -277,6 +288,10 @@ function setPlayerCount(playerCount)
         end
         updateZoneColors()
     end
+end
+
+function setPlayerCountWithExtraRing(playerCount)
+    setPlayerCount(playerCount, true)
 end
 
 --- Update zone colors by scanning for command sheets.

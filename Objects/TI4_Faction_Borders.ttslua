@@ -16,12 +16,12 @@ local DEFAULT_CONFIG = {
     },
     thickness = {
         planet = 0.1,
-        ground = 0.25,
-        space = 0.1
+        ground = 0.15,
+        space = 0.075
     },
     padding = {
         planet = 0,
-        ground = 0,
+        ground = 0.1,
         space = 0.4
     },
     updateBetweenTurns = false,
@@ -35,6 +35,28 @@ local _clickPlayerColor = false
 local _warnedSystems = {}
 
 local _debugVisualize = false
+
+local _lastUpdateBetweenTurnsTime = false
+
+-------------------------------------------------------------------------------
+
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
+        return function(parameters) return helperObject.call(functionName, parameters) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+
+local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 
 -------------------------------------------------------------------------------
 
@@ -73,9 +95,12 @@ end
 
 function onPlayerTurnStart(playerColorStart, playerColorPrevious)
     if _config.updateBetweenTurns then
-        _config.enabled = true
-        updateCache()
-        drawPolygons()
+        if (not _lastUpdateBetweenTurnsTime) or (Time.time - _lastUpdateBetweenTurnsTime > 1) then
+            _lastUpdateBetweenTurnsTime = Time.time
+            _config.enabled = true
+            updateCache()
+            drawPolygons()
+        end
     end
 end
 
@@ -506,7 +531,7 @@ function warnSystem(system, message)
     local messageParts = {
         self.getName() .. ': ',
         message,
-        ' (' .. CrLua.TI4.System.toString(system) .. ')'
+        ' (' .. system.string .. ')'
     }
     message = table.concat(messageParts, '')
     printToAll(message, _clickPlayerColor and _clickPlayerColor or nil)
@@ -518,6 +543,36 @@ end
 
 -------------------------------------------------------------------------------
 
+function planetBorderXZ(system, planetName)
+    assert(type(system) == 'table' and system.tile and type(planetName) == 'string')
+
+    local function planetByName()
+        for _, planet in ipairs(system.planets or {}) do
+            if planet.name == planetName then
+                return planet
+            end
+        end
+        error('missing planet "' .. planetName .. '" from system "' .. system.string .. '"')
+    end
+
+    local object = getObjectFromGUID(system.guid)
+
+    local planet = planetByName()
+    local p = planet.position
+    local r = planet.radius
+
+    local points = {}
+    for i = 1, 16 do
+        local phi = i / 16 * math.pi * 2
+        table.insert(points, object.positionToWorld({
+            x = p.x + math.cos(phi) * r,
+            y = system.y,
+            z = p.z + math.sin(phi) * r,
+        }))
+    end
+    return CrLua.Polygon.fromXYZ(points)
+end
+
 function updateCache()
     -- Keep the non-inset polygons to be able to rapidly adjust thickness.
     _cache = {
@@ -526,7 +581,7 @@ function updateCache()
             ground = false,
             space = false,
         },
-        y = false,
+        y = (_cache and _cache.y) or false,
     }
 
     local colors = {}
@@ -543,8 +598,7 @@ function updateCache()
     _cache.originalPolygons.planets = {}
     for hex, owners in pairs(hexToOwners) do
         for planetName, color in pairs(owners.planetName) do
-            local line = CrLua.TI4.System.planetVectorLine(owners.system, planetName, {thickness = 0})
-            local polygon = CrLua.Polygon.fromXYZ(line.points)
+            local polygon = planetBorderXZ(owners.system, planetName)
             table.insert(polygon, polygon[1])  -- loop
             table.insert(_cache.originalPolygons.planets, {
                 color = assert(color),
@@ -577,12 +631,14 @@ function updateCache()
         end
     end
 
-    -- Get a world Y value from CrLua.TI4.System.
-    local y = CrLua.TI4.System.LOCAL_Y
-    local system = CrLua.TI4.System.fromPosition({ x = 0, y = 0, z = 0 })
-    assert(system and system.object)
-    local position = system.object.positionToWorld({ x = 0, y = y, z = 0 })
-    _cache.y = position.y
+    -- Get a world Y value from system.
+    if not _cache.y then
+        local system = assert(_systemHelper.systemFromPosition({ x = 0, y = 0, z = 0 }), 'missing system 0,0,0')
+        assert(system.y, 'missing system.y')
+        local object = assert(getObjectFromGUID(system.guid), 'missing object 0,0,0')
+        local position = object.positionToWorld({ x = 0, y = system.y, z = 0 })
+        _cache.y = position.y + 0.05
+    end
 end
 
 function removePolygons()
@@ -690,12 +746,15 @@ end
 function getAllUnitsAndOwnerTokens()
     -- Map from hex to system.
     local hexToSystem = {}
-    for _, system in ipairs(CrLua.TI4.System.getAllSystems()) do
-        local hex = CrLua.TI4.Hex.fromPosition(system.object.getPosition())
-        if hexToSystem[hex] then
-            warnSystem(system, 'Multiple system tiles in same hex?')
-        else
-            hexToSystem[hex] = system
+    for guid, system in pairs(_systemHelper.systems()) do
+        local systemObject = getObjectFromGUID(guid)
+        if systemObject then
+            local hex = CrLua.TI4.Hex.fromPosition(systemObject.getPosition())
+            if hexToSystem[hex] then
+                warnSystem(system, 'Multiple system tiles in same hex?')
+            else
+                hexToSystem[hex] = system
+            end
         end
     end
 
@@ -719,7 +778,14 @@ function getAllUnitsAndOwnerTokens()
                         thing.ground = true
                     end
                 end
-                thing.planetName = (thing.ownerToken or thing.ground) and CrLua.TI4.System.planetFromPosition(thing.system, position, true)
+                if thing.ownerToken or thing.ground then
+                    local planet = _systemHelper.planetFromPosition({
+                        systemGuid = thing.system.guid,
+                        position = position,
+                        exact = true
+                    })
+                    thing.planetName = planet and planet.name
+                end
 
                 -- Owner tokens on planets count for ground control.
                 -- Include owner tokens in space ONLY IF NO PLANETS IN SYSTEM!
@@ -941,11 +1007,21 @@ function applyPartialControlEdges(edgeSet, partialHexSet)
         end
     end
 
+    local function getZonePoints(system)
+        assert(type(system) == 'table' and system.tile)
+        local systemObject = getObjectFromGUID(system.guid)
+        local result = {}
+        for _, p in ipairs(system.zoneEdgePositions) do
+            table.insert(result, systemObject.positionToWorld(p))
+        end
+        return result
+    end
+
     -- Add zone interior bondaries to partial lines.  Unlike edges, this do not
     -- require clockwise polygon winding (that will happen naturally via extended).
     for partialHex, partial in pairs(partialHexSet) do
         local system = assert(partial.system)
-        local zonePoints = CrLua.TI4.System.zoneEdgePositions(system)
+        local zonePoints = getZonePoints(system)
         local neighbors = CrLua.TI4.Hex.neighbors(partialHex)
 
         if #system.planets == 2 and #zonePoints == 2 then
@@ -964,10 +1040,7 @@ function applyPartialControlEdges(edgeSet, partialHexSet)
                 end
             end
             if not found then
-                Global.setVectorLines({
-                    CrLua.TI4.System.vectorLine(system, { color = 'Red' })
-                })
-                error(TAG .. ': 2-zone system but no divider?')
+                error(TAG .. ': 2-zone system but no divider? ("' .. system.string .. '")')
             end
 
         elseif #system.planets == 3 and #zonePoints == 3 then
@@ -998,16 +1071,26 @@ function applyPartialControlEdges(edgeSet, partialHexSet)
         end
     end
 
+    local function getPlanetPosition(system, planetName)
+        assert(type(system) == 'table' and system.tile and type(planetName) == 'string')
+        for _, planet in ipairs(system.planets or {}) do
+            if planet.name == planetName then
+                local systemObject = getObjectFromGUID(system.guid)
+                return systemObject.positionToWorld(planet.position)
+            end
+        end
+    end
+
     -- Add full edges for partial zones in proper winding order.
     -- Do this BEFORE breaking edges in half in case need to break these!
     for partialHex, partial in pairs(partialHexSet) do
         local system = assert(partial.system)
-        local zonePoints = CrLua.TI4.System.zoneEdgePositions(system)
+        local zonePoints = getZonePoints(system)
         local neighbors = CrLua.TI4.Hex.neighbors(partialHex)
 
         if #system.planets == 2 and #zonePoints == 2 then
             assert(#partial.planetNames == 1)
-            local planetPosition = CrLua.TI4.System.planetToPosition(system, partial.planetNames[1])
+            local planetPosition = getPlanetPosition(system, partial.planetNames[1])
 
             -- Create or destroy any full edges.
             for i, neighbor in ipairs(neighbors) do
@@ -1043,7 +1126,7 @@ function applyPartialControlEdges(edgeSet, partialHexSet)
                 local a1, aMidpoint, a2 = commonEdgeWithMid(partialHex, neighbor)
 
                 local function planetDistance(planet)
-                    local position = CrLua.TI4.System.planetToPosition(system, planet.name)
+                    local position = getPlanetPosition(system, planet.name)
                     return CrLua.Util.distanceSq(position, aMidpoint)
                 end
                 local _, closestPlanet = CrLua.Util.min(system.planets, planetDistance)
@@ -1068,12 +1151,12 @@ function applyPartialControlEdges(edgeSet, partialHexSet)
     -- Add/break edges for parital zone half-edges.
     for partialHex, partial in pairs(partialHexSet) do
         local system = assert(partial.system)
-        local zonePoints = CrLua.TI4.System.zoneEdgePositions(system)
+        local zonePoints = getZonePoints(system)
         local neighbors = CrLua.TI4.Hex.neighbors(partialHex)
 
         if #system.planets == 2 and #zonePoints == 2 then
             assert(#partial.planetNames == 1)
-            local planetPosition = CrLua.TI4.System.planetToPosition(system, partial.planetNames[1])
+            local planetPosition = getPlanetPosition(system, partial.planetNames[1])
 
             -- Connect from midpoint to approriate corner based on which side
             -- of the partial zone is owned, and to we own the adjacent system.
@@ -1204,13 +1287,32 @@ function getControlPolygon(hexSet, edgeSet, partialEdgeSet)
             end
         end
 
+        local function positionToBearing(dir)
+            assert(type(dir) == 'table' and dir.x)
+
+            -- Compute bearing in radians.
+            local bearing = math.atan2(dir.z, -dir.x) + (math.pi / 2)
+
+            -- Convert to degrees between 0 and 360.
+            bearing = (bearing * 180 / math.pi) % 360
+            if bearing < 0 then
+                bearing = bearing + 360
+            end
+            if bearing == 360 then
+                bearing = 0  -- hmm, apparently this can happen.  floating point precision?
+            end
+
+            assert(0 <= bearing and bearing < 360, 'bearing='..bearing)
+            return bearing
+        end
+
         -- If there is more than one partial edge sharing this point, choose
         -- the one with the smallest clockwise winding to get pretty insets.
         local function bearingDelta(candidate)
             local dirPrev = { x = candidate.prev[1] - candidate.cur[1], z = candidate.prev[2] - candidate.cur[2] }
             local dirNext = { x = candidate.next[1] - candidate.cur[1], z = candidate.next[2] - candidate.cur[2] }
-            local bearingPrev = CrLua.TI4.System._positionToBearing(false, dirPrev)
-            local bearingNext = CrLua.TI4.System._positionToBearing(false, dirNext)
+            local bearingPrev = positionToBearing(dirPrev)
+            local bearingNext = positionToBearing(dirNext)
             local d = bearingNext - bearingPrev
             if d < 0 then
                 d = d + 360
@@ -1295,12 +1397,10 @@ end
 -------------------------------------------------------------------------------
 
 #include <~/CrLua/CrLua>
-#include <~/CrLua/TI4/Homebrew>
 #include <~/CrLua/LockGlobals>
 
 #include <~/CrLua/TI4/Faction>
 #include <~/CrLua/TI4/Hex>
-#include <~/CrLua/TI4/System>
 #include <~/CrLua/TI4/Unit>
 
 #include <~/CrLua/List>
@@ -1315,5 +1415,5 @@ end
 --#include <~/CrLua/UnitTest>
 --CrLua.UnitTest.runTests(TAG, CrLua, true)
 
-CrLua.assertRequired({ 'TI4.Hex', 'TI4.System', 'TI4.Unit', 'List', 'Log', 'Table' })
+CrLua.assertRequired({ 'TI4.Hex', 'TI4.Unit', 'List', 'Log', 'Table' })
 CrLua.lock()

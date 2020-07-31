@@ -26,6 +26,65 @@ end
 
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
+local SetupGeneric = {
+    NAME_TO_PLAYER_ZONE_OFFSET = {
+        ['^Technology Cards$'] = { x = 10, z = 2 },
+        ['^TI4 Unpacker$'] = { x = -10, z = 2 },
+        ['^TI4 MultiRoller'] = { x = 0, z = 42, lock = true },
+    },
+    NAME_TO_PLAYER_AGENDA_ZONE_OFFSET = {
+        ['^Any Whens%?$'] = { x = -0.6, z = 3 },
+        ['^Any Afters%?$'] = { x = 0.6, z = 3 },
+    },
+    NAME_TO_AGENDA_ZONE_OFFSET = {
+        ['^For:$'] = { x = -4.25, lock = true },
+        ['^Against:$'] = { x = 4.25, lock = true },
+        ['^Votes$'] = { x = -9.25 },
+        ['^Speaker Token %- Agenda$'] = { x = 0 },
+    }
+}
+
+local SetupColor = {
+    DEFAULT_COLOR_LIST = { 'White', 'Blue', 'Purple', 'Yellow', 'Red', 'Green', 'Orange', 'Pink', 'Brown' },
+
+    HAND = {
+        ACTIVE = {
+            OFFSET = { x = 0, y = 4, z = 21, dzMiddle = 5, yRot = 180 },
+            SCALE = { x = 20, y = 8, z = 4 }
+        },
+        INACTIVE = {
+            POSITION = { x = 148, y = 4, z = 80, dx = 3 },
+            SCALE = { x = 1, y = 4, z = 1 }
+        }
+    },
+
+    -- The box with per-color items, hover above the player area.
+    COLOR_BOX_OFFSET = { x = 0, y = 5, z = 0, lock = true },
+
+    NAME_TO_PLAYER_ZONE_OFFSET = {
+        ['Notes %($COLOR%)'] = { x = 7, z = 2 },
+        ['Active/Passed %($COLOR%)'] = { x = 4, y = 1, z = 2 },
+        ['Command Sheet %($COLOR%)'] = { x = -8, z = 11, lock = true },
+        ['Directionaliser %($COLOR%)'] = { x = 0, y = 0.46, z = -2, yRot = 270, lock = true },
+    },
+    NAME_TO_PLAYER_AGENDA_ZONE_OFFSET = {
+        ['$COLOR Player Votes'] = { x = 0, y = 1, z = 1, yRot = 180 },
+    },
+    NAME_TO_DIRECTIONALISER_OFFSET = {
+        -- These are in Directionaliser local coordinate space.
+        ['$COLOR Infantry'] = { x = 0, y = 1, z = -12.2 },
+        ['$COLOR Fighter'] = { x = 0, y = 1, z = -10.6 },
+        ['$COLOR Space Dock'] = { x = 0, y = 1, z = -8.4 },
+        ['$COLOR PDS'] = { x = 0, y = 1, z = -6.1 },
+        ['$COLOR Carrier'] = { x = 0, y = 1, z = -2.6 },
+        ['$COLOR Destroyer'] = { x = 0, y = 1, z = -0.1 },
+        ['$COLOR Cruiser'] = { x = 0, y = 1, z = 3.0 },
+        ['$COLOR Dreadnought'] = { x = 0, y = 1, z = 6.2 },
+        ['$COLOR Flagship'] = { x = 0, y = 1, z = 9.6 },
+        ['$COLOR War Sun'] = { x = 0, y = 1, z = 12.1 },
+    }
+}
+
 -------------------------------------------------------------------------------
 
 local _debug = true
@@ -102,24 +161,6 @@ local function allNamePatterns(t)
 end
 
 -------------------------------------------------------------------------------
-
-local SetupGeneric = {
-    NAME_TO_PLAYER_ZONE_OFFSET = {
-        ['^Technology Cards$'] = { x = 10, z = 2 },
-        ['^TI4 Unpacker$'] = { x = -10, z = 2 },
-        ['^TI4 MultiRoller'] = { x = 0, z = 40, lock = true },
-    },
-    NAME_TO_PLAYER_AGENDA_ZONE_OFFSET = {
-        ['^Any Whens%?$'] = { x = -0.6, z = 3 },
-        ['^Any Afters%?$'] = { x = 0.6, z = 3 },
-    },
-    NAME_TO_AGENDA_ZONE_OFFSET = {
-        ['^For:$'] = { x = -4.25, lock = true },
-        ['^Against:$'] = { x = 4.25, lock = true },
-        ['^Votes$'] = { x = -9.25 },
-        ['^Speaker Token %- Agenda$'] = { x = 0 },
-    }
-}
 
 function SetupGeneric.getSetupBag()
     for _, object in ipairs(getAllObjects()) do
@@ -228,46 +269,6 @@ end
 
 -------------------------------------------------------------------------------
 
-local SetupColor = {
-    DEFAULT_COLOR_LIST = { 'White', 'Blue', 'Purple', 'Yellow', 'Red', 'Green', 'Orange', 'Pink', 'Brown' },
-
-    HAND = {
-        ACTIVE = {
-            OFFSET = { x = 0, y = 4, z = 22.5 },
-            SCALE = { x = 20, y = 8, z = 5 }
-        },
-        INACTIVE = {
-            POSITION = { x = 148, y = 4, z = 80, dx = 3 },
-            SCALE = { x = 1, y = 4, z = 1 }
-        }
-    },
-
-    COLOR_BOX_OFFSET = { x = 0, y = 5, z = 0, lock = true },
-
-    NAME_TO_PLAYER_ZONE_OFFSET = {
-        ['Notes %($COLOR%)'] = { x = 7, z = 2 },
-        ['Active/Passed %($COLOR%)'] = { x = 4, y = 1, z = 2 },
-        ['Command Sheet %($COLOR%)'] = { x = -8, z = 11, lock = true },
-        ['Directionaliser %($COLOR%)'] = { x = 0, y = 0.46, z = -2, yRot = 270, lock = true },
-    },
-    NAME_TO_PLAYER_AGENDA_ZONE_OFFSET = {
-        ['$COLOR Player Votes'] = { x = 0, y = 1, z = 1, yRot = 180 },
-    },
-    NAME_TO_DIRECTIONALISER_OFFSET = {
-        -- These are in Directionaliser local coordinate space.
-        ['$COLOR Infantry'] = { x = 0, y = 1, z = -12.2 },
-        ['$COLOR Fighter'] = { x = 0, y = 1, z = -10.6 },
-        ['$COLOR Space Dock'] = { x = 0, y = 1, z = -8.4 },
-        ['$COLOR PDS'] = { x = 0, y = 1, z = -6.1 },
-        ['$COLOR Carrier'] = { x = 0, y = 1, z = -2.6 },
-        ['$COLOR Destroyer'] = { x = 0, y = 1, z = -0.1 },
-        ['$COLOR Cruiser'] = { x = 0, y = 1, z = 3.0 },
-        ['$COLOR Dreadnought'] = { x = 0, y = 1, z = 6.2 },
-        ['$COLOR Flagship'] = { x = 0, y = 1, z = 9.6 },
-        ['$COLOR War Sun'] = { x = 0, y = 1, z = 12.1 },
-    }
-}
-
 --- Move hands to zone
 function SetupColor.transformHands()
     debugLog('SetupColor.transformHands')
@@ -278,8 +279,24 @@ function SetupColor.transformHands()
     for i, color in ipairs(SetupColor.DEFAULT_COLOR_LIST) do
         if i <= playerCount then
             local zoneCenter = zonesAttributes[i].center
+            local position = offsetPosition(zoneCenter, SetupColor.HAND.ACTIVE.OFFSET)
+
+            -- If this zone is between two like-center-z zones, move hand to
+            -- avoid cards flying between left/right neighbors from hitting
+            -- this hand.  NOTE: this fails if there are 5 players on a side!
+            -- Give a little wiggle room in case zones are built programatically
+            -- and could have floating point error differences for "same".
+            local thisZ = zoneCenter.z
+            local prevZ = zonesAttributes[i - 1] and zonesAttributes[i - 1].center.z or math.huge
+            local nextZ = zonesAttributes[i + 1] and zonesAttributes[i + 1].center.z or math.huge
+            local epsilon = 0.1
+            if math.abs(thisZ - prevZ) < epsilon and math.abs(thisZ - nextZ) < epsilon then
+                local dz = SetupColor.HAND.ACTIVE.OFFSET.dzMiddle
+                position.z = position.z + dz * (position.z > 0 and 1 or -1)
+            end
+
             Player[color].setHandTransform({
-                position = offsetPosition(zoneCenter, SetupColor.HAND.ACTIVE.OFFSET),
+                position = position,
                 rotation = offsetRotation(zoneCenter, SetupColor.HAND.ACTIVE.OFFSET),
                 scale    = SetupColor.HAND.ACTIVE.SCALE
             })
@@ -561,15 +578,9 @@ function setupCoroutine()
     _zoneHelper.updateZoneColors()
     coroutine.yield(0)
 
-    updateVectorLines()
+    Global.setVectorLines(_zoneHelper.getBordersVectorLines({}))
 
     return 1 -- REQUIRED!  MUST RETURN 1 TO STOP COROUTINE!
-end
-
-function updateVectorLines()
-    Global.setVectorLines(_zoneHelper.getBordersVectorLines({
-        thickness = 0.5,
-    }))
 end
 
 -------------------------------------------------------------------------------
@@ -842,8 +853,6 @@ function onLoad(saveState)
         end
     end
     self.setInvisibleTo(invisibleTo)
-
-    updateVectorLines()
 end
 
 -------------------------------------------------------------------------------

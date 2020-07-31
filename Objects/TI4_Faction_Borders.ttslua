@@ -57,6 +57,7 @@ function getHelperClient(helperObjectName)
 end
 
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
+local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 
 -------------------------------------------------------------------------------
 
@@ -537,7 +538,8 @@ function warnSystem(system, message)
     printToAll(message, _clickPlayerColor and _clickPlayerColor or nil)
 
     if _clickPlayerColor then
-        Player[_clickPlayerColor].pingTable(system.object.getPosition())
+        local systemObject = getObjectFromGUID(system.guid)
+        Player[_clickPlayerColor].pingTable(systemObject.getPosition())
     end
 end
 
@@ -720,8 +722,7 @@ end
 function getOwnerTokens()
     -- Map from token faction to color.
     local tokenFactionColor = {}
-    local factions = CrLua.TI4.Faction.all()
-    for _, faction in ipairs(factions) do
+    for _, faction in pairs(_factionHelper.allFactions()) do
         if faction.tokenName and faction.color then
             tokenFactionColor[faction.tokenName] = faction.color
         end
@@ -1064,7 +1065,8 @@ function applyPartialControlEdges(edgeSet, partialHexSet)
                 local planetCurrent = system.planets[i].name
                 local planetPrev = system.planets[i == 1 and 3 or i - 1].name
                 if ownedPlanetNameSet[planetCurrent] ~= ownedPlanetNameSet[planetPrev] then
-                    partialEdgeSet[partialHex .. i] = { zoneCorners[i], system.object.getPosition() }
+                    local systemObject = getObjectFromGUID(system.guid)
+                    partialEdgeSet[partialHex .. i] = { zoneCorners[i], systemObject.getPosition() }
                 end
             end
 

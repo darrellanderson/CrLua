@@ -24,6 +24,8 @@ function getHelperClient(helperObjectName)
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
 
+local DEFAULT_VECTOR_LINE_THICKNESS = 0.15
+
 -- Map from player count to zone attributes.
 local DEFAULT_ZONES = {
     [2] = {
@@ -407,20 +409,23 @@ function inTableZone(position)
     return _boundingBoxContains(_table.boundingBox, position) and _polygonContains(_table.polygon, position)
 end
 
+-------------------------------------------------------------------------------
+
 --- Get setVectorLines compatible lines from zone borders.
 -- @param parameters table : { inset, clipToTable, thickness }
 function getBordersVectorLines(parameters)
     assert(type(parameters) == 'table')
 
-    local thickness = parameters.thickness or 0.1
+    local thickness = parameters.thickness or DEFAULT_VECTOR_LINE_THICKNESS
+    local homeSystemThickness = parameters.homeSystemThickness or thickness
     local inset = parameters.inset or (thickness / 2)
-    local dy = 0.01
+    local elevateY = 0.01
 
     local function polygonToPointsXYZ(polygon)
         local pointsXYZ = {}
         for _, xz in ipairs(polygon) do
             table.insert(pointsXYZ, {
-                x = xz[1], y = _table.y + dy, z = xz[2]
+                x = xz[1], y = _table.y + elevateY, z = xz[2]
             })
         end
         return pointsXYZ
@@ -432,7 +437,7 @@ function getBordersVectorLines(parameters)
             local r = 2
             table.insert(pointsXYZ, {
                 x = centerXZ[1] + math.sin(phi) * r,
-                y = _table.y + dy,
+                y = _table.y + elevateY,
                 z = centerXZ[2] + math.cos(phi) * r
             })
         end
@@ -461,7 +466,7 @@ function getBordersVectorLines(parameters)
         })
         table.insert(lines, {
             points = homeSystemXYZ(zone.homeSystemPosition),
-            thickness = thickness,
+            thickness = homeSystemThickness,
             color = zone.color or 'Grey',
             loop = true,
             square = true,
@@ -469,6 +474,8 @@ function getBordersVectorLines(parameters)
     end
     return lines
 end
+
+-------------------------------------------------------------------------------
 
 function _boundingBox(polygonXZ)
     assert(type(polygonXZ) == 'table')

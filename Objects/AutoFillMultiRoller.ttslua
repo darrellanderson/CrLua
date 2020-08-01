@@ -58,6 +58,7 @@ local CARDS = {
     ['Antimass Deflectors'] = { owner = 'them' },
     ['Plasma Scoring'] = { owner = 'us' },
     ['Experimental Battlestation'] = { owner = 'us' },
+    ['Blitz'] = { owner = 'us' },
     ['Perdition Array II'] = { owner = 'us' },  -- Blue Space HCEN
     ['Tachyon Lance II'] = { owner = 'us' },  -- Blue Space Veldyr
 }
@@ -579,7 +580,11 @@ function autoFill(params)
     elseif autofillTypeAttributes == AUTOFILL_TYPE.SPACE_COMBAT then
         fillUnits = CrLua.TI4.Unit.filterToShips(selfUnitsInHex)
     elseif autofillTypeAttributes == AUTOFILL_TYPE.BOMBARDMENT then
-        fillUnits, psUnit = CrLua.TI4.Unit.filterToBombardment(selfUnitsInHex)
+        if cardSet['Blitz'] then
+            fillUnits, psUnit = CrLua.TI4.Unit.filterToNonFighterShips(selfUnitsInHex)
+        else
+            fillUnits, psUnit = CrLua.TI4.Unit.filterToBombardment(selfUnitsInHex)
+        end
         if planetaryShield then
             fillUnits = {}
         end

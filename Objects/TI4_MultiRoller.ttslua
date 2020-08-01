@@ -26,7 +26,7 @@ unitListParams = {}
 listAFB = {1,5}
 listCMBT = {1,2,3,4,5,6,7,8}
 listSPC = {1,4,9,10}
-listBOMB = {1,2,4,7}
+listBOMB = {1,2,3,4,5,6,7}
 listPS = {1,2,4,7,9,10}
 plasmaActive = 0
 
@@ -57,15 +57,34 @@ function onLoad()
     end
 end
 
+local CHANGE_BUTTON_COLOR_FOR_FRANKEN = true
+
+function makeFrankenButtons()
+    if CHANGE_BUTTON_COLOR_FOR_FRANKEN then
+        local tint = { r = 107/255, g = 142/255, b = 35/255 }
+        for i, button in ipairs(self.getButtons()) do
+            self.editButton({
+                index = i - 1,
+                color = tint
+            })
+        end
+    end
+end
+
 function setFranken()
     if not isFranken() then
         self.setName(self.getName() .. " (Franken)")
+        makeFrankenButtons()
     end
 end
 
 function isFranken()
     local lower = string.lower(self.getName())
-    return string.find(lower, "franken")
+    local result = string.find(lower, "franken")
+    if result then
+        makeFrankenButtons()
+    end
+    return result
 end
 
 function detectCards(playerColor)
@@ -144,6 +163,7 @@ function checkCards(playerColor)
             if not ignoreRollModNameSet[objectName] and rollMod[objectName] ~= nil then
                 rollMod[objectName] = true
             end
+
         elseif zone then
             -- Object in different player zone.
             if objectName == "Tekklar Legion" then
@@ -214,6 +234,10 @@ function updateHitValues()
                 unitListParams[uType]["hitBOMB"] = unitParams[uName].hitBOMB
                 unitListParams[uType]["rollsBOMB"] = unitParams[uName].rollsBOMB
                 unitString = unitParams[uName].hitBOMB .. "x" .. unitParams[uName].rollsBOMB
+            elseif rollMod["Blitz"] and (uType == "Carrier" or uType == "Cruiser" or uType == "Destroyer" or uType == "Flagship") then
+                unitListParams[uType]["hitBOMB"] = 6
+                unitListParams[uType]["rollsBOMB"] = 1
+                unitString = "6x1"
             else
                 unitListParams[uType]["hitBOMB"] = 0
                 unitListParams[uType]["rollsBOMB"] = 0
@@ -814,6 +838,8 @@ modValue["BOMB"]["Bunker"]["Flagship"] = -4
 modValue["BOMB"]["Bunker"]["War Sun"] = -4
 modValue["BOMB"]["Bunker"]["Dreadnought"] = -4
 
+modValue["BOMB"]["Blitz"] = {}  -- cannot do the usual table, affects multiple units
+
 modValue["SPC"]["Antimass Deflectors"] = {}
 modValue["SPC"]["Antimass Deflectors"]["Flagship"] = -1
 modValue["SPC"]["Antimass Deflectors"]["PDS"] = -1
@@ -954,6 +980,7 @@ function resetMods()
     rollMod["Tekklar Legion"] = false
     rollMod["Tekklar Legion (Opponent)"] = false
     rollMod["Bunker"] = false
+    rollMod["Blitz"] = false
 end
 
 function clickAMD()
@@ -998,6 +1025,7 @@ rollModDesc["C'morran N'orr"] = "+1 to all COMBAT rolls for ships with the C'mor
 rollModDesc["Tekklar Legion"] = "+1 to all COMBAT rolls (invasion)"
 rollModDesc["Tekklar Legion (Opponent)"] = "-1 to all COMBAT rolls (invasion)"
 rollModDesc["Bunker"] = "-4 to all BOMBARDMENT rolls"
+rollModDesc["Blitz"] = "BOMBARDMENT 6 to non-fighter, non-bomdbardment ships"
 rollModDesc["Antimass Deflectors"] = "-1 to all SPACE CANNON rolls"
 
 

@@ -350,15 +350,22 @@ function parse_string(input)
 end
 
 function place_tiles(buildlist)
+    local origin = {
+        position = { x = 0, y = 1, z = 0 },
+        rotation = { x = 0, y = 0, z = 0 }
+    }
+
     local mecatol = getObjectFromGUID(mecatol_guid)
-    if mecatol == nil then
-        broadcastToAll("Unable to find Mecatol Rex, ensure that it has not been deleted and that it is at the center of the table.")
-        return
+    if mecatol then
+        origin.position = mecatol.getPosition()
+        origin.rotation = mecatol.getRotation()
+    else
+        broadcastToAll("Unable to find Mecatol Rex, generating map at the center of the table.")
     end
 
-    local hex_itr = spiral_hex_iterator(mecatol.getPosition(), mecatol.getRotation())
+    local hex_itr = spiral_hex_iterator(origin.position, origin.rotation)
     for i, info in ipairs(buildlist) do
-        place_tile(info, hex_itr(), mecatol.getRotation())
+        place_tile(info, hex_itr(), origin.rotation)
     end
 end
 

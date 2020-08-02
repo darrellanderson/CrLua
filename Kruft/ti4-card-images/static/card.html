@@ -13,6 +13,7 @@
                     <label>Card type</label>
                     <select name="card" id="card" class="field-select" onchange="onSelectChanged();">
                     <option value="action">Action</option>
+                    <option value="action_codex">Action (Codex)</option>
                     <option value="secret">Secret Objective</option>
                     <option value="stage1">Stage 1 Public Objective</option>
                     <option value="stage2">Stage 2 Public Objective</option>
@@ -113,7 +114,7 @@
             document.getElementById("nobilityFooterBlock").style.display = 'none';
             document.getElementById("nobilityPointsBlock").style.display = 'none';
 
-            if (card == 'action') {
+            if (card == 'action' || card == 'action_codex') {
                 document.getElementById("actionFlavorBlock").style.display = 'block';
             }
             if (card == 'secret') {

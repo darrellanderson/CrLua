@@ -166,13 +166,66 @@ ACTION_FLAVOR_DY = 14
 ACTION_FLAVOR_TEXT_SIZE = 27
 ACTION_FLAVOR_TEXT_H = 31
 
+SECRET_TITLE_L = 250
+SECRET_TITLE_R = 100
+SECRET_TITLE_Y1 = 35
+SECRET_TITLE_Y2 = 15
+SECRET_TITLE_TEXT_SIZE = 44
+SECRET_TITLE_TEXT_H = 44
+
+SECRET_TYPE_L = 250
+SECRET_TYPE_R = 100
+SECRET_TYPE_Y = 128
+SECRET_TYPE_TEXT_SIZE = 31
+SECRET_TYPE_TEXT_H = 31
+
+SECRET_BODY_L = 250
+SECRET_BODY_R = 95
+SECRET_BODY_Y = 395
+SECRET_BODY_TEXT_SIZE = 38
+SECRET_BODY_TEXT_H = 47
+
+PUBLIC_TITLE_L = 250
+PUBLIC_TITLE_R = 100
+PUBLIC_TITLE_Y1 = 35
+PUBLIC_TITLE_Y2 = 15
+PUBLIC_TITLE_TEXT_SIZE = 44
+PUBLIC_TITLE_TEXT_H = 44
+
+PUBLIC_BODY_L = 250
+PUBLIC_BODY_R = 50
+PUBLIC_BODY_Y = 395
+PUBLIC_BODY_TEXT_SIZE = 39
+PUBLIC_BODY_TEXT_H = 48
+
+AGENDA_TITLE_L = 250
+AGENDA_TITLE_R = 100
+AGENDA_TITLE_Y1 = 55
+AGENDA_TITLE_Y2 = 35
+AGENDA_TITLE_TEXT_SIZE = 44
+AGENDA_TITLE_TEXT_H = 44
+
+AGENDA_TYPE_L = 250
+AGENDA_TYPE_R = 100
+AGENDA_TYPE_Y = 165
+AGENDA_TYPE_TEXT_SIZE = 31
+AGENDA_TYPE_TEXT_H = 31
+
+AGENDA_BODY_ELECT_L = 250
+AGENDA_BODY_ELECT_R = 90
+AGENDA_BODY_FORAGAINST_L = 60
+AGENDA_BODY_FORAGAINST_R = 75
+AGENDA_BODY_Y = 225
+AGENDA_BODY_TEXT_SIZE = 28
+AGENDA_BODY_TEXT_H = 35
+
 # REPLACE THESE WITH PER CARD CONSTANTS
 TITLE_SIZE = 44
 TITLE_LINEH = 44
 TYPE_SIZE = 32
 TYPE_LINEH = 32
-BODY_SM_SIZE = 32
-BODY_SM_LINEH = 38
+BODY_SM_SIZE = 31
+BODY_SM_LINEH = 37
 BODY_LG_SIZE = 40
 BODY_LG_LINEH = 47
 
@@ -228,14 +281,14 @@ def secretObjectiveCard(title, type, body):
     img = getImage('SecretObjective.jpg')
     draw = ImageDraw.Draw(img)
 
-    font = getFont('HandelGothicDBold.otf', TITLE_SIZE)
+    font = getFont('HandelGothicDBold.otf', SECRET_TITLE_TEXT_SIZE)
     color = (254, 196, 173, 255)
     text = title
-    x = 250
-    y1 = 35
-    y2 = 15
-    maxX = 400
-    lineH = TITLE_LINEH
+    x = SECRET_TITLE_L
+    y1 = SECRET_TITLE_Y1
+    y2 = SECRET_TITLE_Y2
+    maxX = CARD_W - SECRET_TITLE_R
+    lineH = SECRET_TITLE_TEXT_H
     y = nudgeY(font, text, maxX, y1, y2)
     wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
 
@@ -246,21 +299,21 @@ def secretObjectiveCard(title, type, body):
     color = (12, 12, 14, 255)
     draw.rectangle([(x, y), (x+w, y+h)], color)
 
-    font = getFont('HandelGothicDBold.otf', TYPE_SIZE)
+    font = getFont('HandelGothicDBold.otf', SECRET_TYPE_TEXT_SIZE)
     color = (255, 255, 255, 255) if type.lower() == 'status phase' else (255, 0, 0, 255)
     text = type
-    x = 250
-    y = 127
-    maxX = 400
-    lineH = 26
+    x = SECRET_TYPE_L
+    y = SECRET_TYPE_Y
+    maxX = CARD_W - SECRET_TYPE_R
+    lineH = SECRET_TYPE_TEXT_H
     wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
 
-    font = getFont('MyriadProSemibold.otf', BODY_LG_SIZE)
+    font = getFont('MyriadProSemibold.otf', SECRET_BODY_TEXT_SIZE)
     color = (255, 255, 255, 255)
     text = body
-    x = 250
-    y = 395
-    maxX = 450
+    x = SECRET_BODY_L
+    y = SECRET_BODY_Y
+    maxX = CARD_W - SECRET_BODY_R
     lineH = BODY_LG_LINEH
     y = wrapTextCenterHV(draw, font, text, x, y, maxX, color, lineH)
 
@@ -271,24 +324,24 @@ def publicObjectiveCard(level, title, body):
     img = getImage(imageName)
     draw = ImageDraw.Draw(img)
 
-    font = getFont('HandelGothicDBold.otf', TITLE_SIZE)
+    font = getFont('HandelGothicDBold.otf', PUBLIC_TITLE_TEXT_SIZE)
     color = (249, 249, 169, 255) if level == 1 else (173, 239, 254, 255)
     text = title
-    x = 250
-    y1 = 35
-    y2 = 15
-    maxX = 400
-    lineH = TITLE_LINEH
+    x = PUBLIC_TITLE_L
+    y1 = PUBLIC_TITLE_Y1
+    y2 = PUBLIC_TITLE_Y2
+    maxX = CARD_W - PUBLIC_TITLE_R
+    lineH = PUBLIC_TITLE_TEXT_H
     y = nudgeY(font, text, maxX, y1, y2)
     wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
 
-    font = getFont('MyriadProSemibold.otf', BODY_LG_SIZE)
+    font = getFont('MyriadProSemibold.otf', PUBLIC_BODY_TEXT_SIZE)
     color = (255, 255, 255, 255)
     text = body
-    x = 250
-    y = 395
-    maxX = 450
-    lineH = BODY_LG_LINEH
+    x = PUBLIC_BODY_L
+    y = PUBLIC_BODY_Y
+    maxX = CARD_W - PUBLIC_BODY_R
+    lineH = PUBLIC_BODY_TEXT_H
     y = wrapTextCenterHV(draw, font, text, x, y, maxX, color, lineH)
 
     return imageToJPEG(img)
@@ -297,14 +350,14 @@ def agendaCard(title, type, body):
     img = getImage('Agenda.jpg')
     draw = ImageDraw.Draw(img)
 
-    font = getFont('HandelGothicDBold.otf', TITLE_SIZE)
-    color = (255, 255, 255, 255)
+    font = getFont('HandelGothicDBold.otf', AGENDA_TITLE_TEXT_SIZE)
+    color = (149, 202, 255, 255)
     text = title
-    x = 250
-    y1 = 35
-    y2 = 15
-    maxX = 400
-    lineH = TITLE_LINEH
+    x = AGENDA_TITLE_L
+    y1 = AGENDA_TITLE_Y1
+    y2 = AGENDA_TITLE_Y2
+    maxX = CARD_W - AGENDA_TITLE_R
+    lineH = AGENDA_TITLE_TEXT_H
     y = nudgeY(font, text, maxX, y1, y2)
     wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
 
@@ -315,32 +368,35 @@ def agendaCard(title, type, body):
     color = (12, 12, 14, 255)
     draw.rectangle([(x, y), (x+w, y+h)], color)
 
-    font = getFont('MyriadProBold.ttf', TYPE_SIZE)
+    font = getFont('MyriadProBold.ttf', AGENDA_TYPE_TEXT_SIZE)
     color = (255, 255, 0, 255) if type.lower() == 'directive' else (221, 173, 99, 255)
     text = type
-    x = 250
-    y = 165
-    maxX = 400
-    lineH = TYPE_LINEH
+    x = AGENDA_TYPE_L
+    y = AGENDA_TYPE_Y
+    maxX = CARD_W - AGENDA_TYPE_R
+    lineH = AGENDA_TYPE_TEXT_H
     wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
 
-    font1 = getFont('MyriadProBold.ttf', BODY_SM_SIZE)
-    font2 = getFont('MyriadProSemibold.otf', BODY_SM_SIZE)
+    #font1 = getFont('MyriadProBold.ttf', AGENDA_BODY_TEXT_SIZE)
+    #font2 = getFont('MyriadProSemibold.otf', AGENDA_BODY_TEXT_SIZE)
+    font2 = getFont('MyriadProRegular.ttf', AGENDA_BODY_TEXT_SIZE)
     color = (0, 0, 0, 255)
     text = body
-    y = 220
-    lineH = BODY_SM_LINEH
+    y = AGENDA_BODY_Y
+    lineH = AGENDA_BODY_TEXT_H
     if 'Elect ' in text:
-        x = 250
-        maxX = 400
+        font1 = getFont('MyriadProSemibold.otf', AGENDA_BODY_TEXT_SIZE)
+        x = AGENDA_BODY_ELECT_L
+        maxX = CARD_W - AGENDA_BODY_ELECT_R
         for line in text.split('\n'):
             if line.startswith('Elect '):
                 y = wrapTextCenter(draw, font1, line, x, y, maxX, color, lineH)
             else:
                 y = wrapTextCenter(draw, font2, line, x, y, maxX, color, lineH)
     else:
-        x = 60
-        maxX = 430
+        font1 = getFont('MyriadProSemiboldItalic.ttf', AGENDA_BODY_TEXT_SIZE)
+        x = AGENDA_BODY_FORAGAINST_L
+        maxX = CARD_W - AGENDA_BODY_FORAGAINST_R
         for line in text.split('\n'):
             if line.startswith('For:') or line.startswith('Against:'):
                 y = wrapTextBoldStart(draw, font1, font2, line, x, y, maxX, color, lineH)
@@ -463,14 +519,52 @@ class TestActionHandler(webapp2.RequestHandler):
         title = 'Bribery'
         body = 'After the speaker votes on an agenda: Spend any number of trade goods. For each trade good spent, cast 1 additional vote for any outcome.'
         flavor = u'\u201CWe think that this initiative would spell disaster for the galaxy, not just the Creuss.\u201D Taivra said, quietly slipping Z\u2018eu an envelope. \u201CDon\u2019t you agree?\u201D'
-
         jpg = actionCard(title.upper(), body, flavor, False)
+        self.response.headers['Content-Type'] = 'image/jpeg'
+        self.response.out.write(jpg)
 
+class TestSecretHandler(webapp2.RequestHandler):
+    def get(self):
+        title = 'Become the Gatekeeper'
+        type = 'Status Phase'
+        body = 'Have 1 or more ships in a system that contains an alpha wormhole and 1 or more ships in a system that contains a beta wormhole.'
+        jpg = secretObjectiveCard(title.upper(), type.upper(), body)
+        self.response.headers['Content-Type'] = 'image/jpeg'
+        self.response.out.write(jpg)
+
+class TestPublicHandler(webapp2.RequestHandler):
+    def get(self):
+        stage = 1
+        title = 'Lead From the Front'
+        body = 'Spend a total of 3 tokens from your tactic and/or strategy pools.'
+        jpg = publicObjectiveCard(stage, title.upper(), body)
+        self.response.headers['Content-Type'] = 'image/jpeg'
+        self.response.out.write(jpg)
+
+class TestAgenda1Handler(webapp2.RequestHandler):
+    def get(self):
+        title = 'Research Team: Propulsion'
+        type = 'law'
+        body = u'Elect Industrial Planet\nAttach this card to the elected planet\u2019s card.\nWhen the owner of this planet researches technology, he may exhaust this card to ignore 1 blue prerequisite.'
+        jpg = agendaCard(title.upper(), type.upper(), body)
+        self.response.headers['Content-Type'] = 'image/jpeg'
+        self.response.out.write(jpg)
+
+class TestAgenda2Handler(webapp2.RequestHandler):
+    def get(self):
+        title = 'Economic Equality'
+        type = 'directive'
+        body = 'For: Each player returns all of his trade goods to the supply. Then, each player gains 5 trade goods.\nAgainst: Each player returns all of his trade goods to the supply.'
+        jpg = agendaCard(title.upper(), type.upper(), body)
         self.response.headers['Content-Type'] = 'image/jpeg'
         self.response.out.write(jpg)
 
 app = webapp2.WSGIApplication([
     ('/img', CardHandler),
     ('/testaction', TestActionHandler),
+    ('/testsecret', TestSecretHandler),
+    ('/testpublic', TestPublicHandler),
+    ('/testagenda', TestAgenda1Handler),
+    ('/testagenda2', TestAgenda2Handler),
 
 ], debug=True)

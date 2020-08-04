@@ -16,6 +16,7 @@ from google.appengine.api import memcache
 import hashlib
 import io
 import logging
+import re
 import os
 import os.path
 import webapp2
@@ -117,28 +118,77 @@ def wrapTextCenterHV(draw, font, text, x, y, maxX, fill, lineH):
         y += lineH
     return y + (lineH * PARAGRAPH_LINE_HEIGHT_SCALE)
 
-def wrapTextBoldStart(draw, font1, font2, text, x, y, maxX, fill, lineH):
+def wrapTextCenterAlignBottom(draw, font, text, x, y, maxX, fill, lineH):
+    text = text.replace('\n', ' \n ')
+    lines = []
+    (spaceW, h) = font.getsize(' ')
+    words = filter(None, text.split(' '))
+    text = ''
+    lineWidth = 0
+    for word in words:
+        (w, h) = font.getsize(word)
+        if word == '\n' or lineWidth + w > maxX:
+            lines.append(text)
+            text = ''
+            lineWidth = 0
+        if word == '\n':
+            lines.append('')
+        else:
+            text += word + ' '
+            lineWidth += w + spaceW
+    lines.append(text)
+    top = y - (len(lines) * lineH)
+    y = top
+    for line in lines:
+        (lineWidth, h) = font.getsize(line)
+        x2 = x - (lineWidth / 2)
+        draw.text((x2, y), line, font=font, fill=fill)
+        y += lineH
+    return top
+
+FONT_3_WORDS = {
+    'SPACE',
+    'CANNON',
+    'BOMBARDMENT',
+    'SUSTAIN',
+    'DAMAGE',
+    'ANTI-FIGHTER',
+    'BARRAGE',
+    'PLANETARY',
+    'SHIELD'
+}
+
+def wrapTextBoldStart(draw, font1, font2, font3, text, x, y, maxX, fill, lineH, dyfont3):
     font = font1
     (spaceW, h) = font.getsize(' ')
     words = filter(None, text.split(' '))
     text = ''
     startX = x
     indent = 0
+    restoreFont = font1
+    i = 0
     for word in words:
+        dy = 0
+        if font == font3:
+            font = restoreFont
+        if word in FONT_3_WORDS or re.sub(r'[^\w\s]', '', word) in FONT_3_WORDS:
+            restoreFont = font
+            font = font3
+            dy = dyfont3
         (w, h) = font.getsize(word)
         if x + w > maxX:
             x = startX + indent
             y += lineH
-        draw.text((x, y), word, font=font, fill=fill)
+        draw.text((x, y + dy), word, font=font, fill=fill)
         x += w + spaceW
         if (word.endswith(':') or word.endswith('.')) and font == font1:
             font = font2
-            (spaceW, spaceH) = font.getsize(' ')
-            if word.lower() != 'action:' and word.lower() != 'for:' and word.lower() != 'against:':
+            if (word.lower() != 'action:' or i > 0) and word.lower() != 'for:' and word.lower() != 'against:':
                 x = startX
                 y += lineH * PARAGRAPH_LINE_HEIGHT_SCALE
             if word.lower() == 'for:' or word.lower() == 'against:':
                 indent = 20
+        i = i + 1
     return y + (lineH * PARAGRAPH_LINE_HEIGHT_SCALE)
 
 # -----------------------------------------------------------------------------
@@ -154,15 +204,16 @@ ACTION_TITLE_TEXT_SIZE = 39
 ACTION_TITLE_TEXT_H = 39
 
 ACTION_BODY_L = 70
-ACTION_BODY_R = 40
+ACTION_BODY_R = 25
 ACTION_BODY_Y = 206
 ACTION_BODY_TEXT_SIZE = 31
 ACTION_BODY_TEXT_H = 37
+ACTION_BODY_UPPER_TEXT_SIZE = 24
 
 ACTION_FLAVOR_L = 275
 ACTION_FLAVOR_R = 100
-ACTION_FLAVOR_LINE_Y = 559
-ACTION_FLAVOR_DY = 14
+ACTION_FLAVOR_LINE_DY = 15
+ACTION_FLAVOR_Y = 730
 ACTION_FLAVOR_TEXT_SIZE = 27
 ACTION_FLAVOR_TEXT_H = 31
 
@@ -210,6 +261,7 @@ AGENDA_TYPE_R = 100
 AGENDA_TYPE_Y = 165
 AGENDA_TYPE_TEXT_SIZE = 31
 AGENDA_TYPE_TEXT_H = 31
+AGENDA_BODY_UPPER_TEXT_SIZE = 24
 
 AGENDA_BODY_ELECT_L = 250
 AGENDA_BODY_ELECT_R = 90
@@ -233,6 +285,14 @@ def actionCard(title, body, flavor, isCodex):
     img = getImage('ActionCardCodex.jpg' if isCodex else 'ActionCard.jpg')
     draw = ImageDraw.Draw(img)
 
+    if isCodex == 2:
+        x = 443
+        y = 19
+        w = 18
+        h = 26
+        color = (6, 6, 6, 255)
+        draw.rectangle([(x, y), (x+w, y+h)], color)
+
     font = getFont('HandelGothicDBold.otf', ACTION_TITLE_TEXT_SIZE)
     color = (255, 232, 150, 255)
     text = title
@@ -244,8 +304,14 @@ def actionCard(title, body, flavor, isCodex):
     y = nudgeY(font, text, maxX, y1, y2)
     wrapText(draw, font, text, x, y, maxX, color, lineH)
 
-    font1 = getFont('MyriadProBold.ttf', ACTION_BODY_TEXT_SIZE)
+    body = body.replace('Action:', 'ACTION:')
+    if 'ACTION:' in body:
+        font1 = getFont('MyriadProBoldItalic.ttf', ACTION_BODY_TEXT_SIZE)
+    else:
+        font1 = getFont('MyriadProBold.ttf', ACTION_BODY_TEXT_SIZE)
     font2 = getFont('MyriadProSemibold.otf', ACTION_BODY_TEXT_SIZE)
+    font3 = getFont('HandelGothicDBold.otf', ACTION_BODY_UPPER_TEXT_SIZE)
+
     color = (255, 255, 255, 255)
     text = body
     x = ACTION_BODY_L
@@ -253,21 +319,19 @@ def actionCard(title, body, flavor, isCodex):
     maxX = CARD_W - ACTION_BODY_R
     lineH = ACTION_BODY_TEXT_H
     for line in text.split('\n'):
-        y = wrapTextBoldStart(draw, font1, font2, line, x, y, maxX, color, lineH)
-
-    y = max(y, ACTION_FLAVOR_LINE_Y)
-    draw.line([(107, y), (CARD_W - 69, y)], fill=(255, 255, 255, 255), width=3)
-
+        y = wrapTextBoldStart(draw, font1, font2, font3, line, x, y, maxX, color, lineH, 2)
 
     font = getFont('MyriadWebProItalic.ttf', ACTION_FLAVOR_TEXT_SIZE)
     color = (255, 255, 255, 255)
     text = flavor
     x = ACTION_FLAVOR_L
-    y = y + ACTION_FLAVOR_DY
+    y = ACTION_FLAVOR_Y
     maxX = CARD_W - ACTION_FLAVOR_R
     lineH = ACTION_FLAVOR_TEXT_H
-    for line in text.split('\n'):
-        y = wrapTextCenter(draw, font, line, x, y, maxX, color, lineH)
+    top = wrapTextCenterAlignBottom(draw, font, text, x, y, maxX, color, lineH)
+
+    y = top - ACTION_FLAVOR_LINE_DY
+    draw.line([(107, y), (CARD_W - 69, y)], fill=(255, 255, 255, 255), width=3)
 
     #img2 = getImage('Bribery.jpg')
     #img.putalpha(1)
@@ -395,11 +459,12 @@ def agendaCard(title, type, body):
                 y = wrapTextCenter(draw, font2, line, x, y, maxX, color, lineH)
     else:
         font1 = getFont('MyriadProSemiboldItalic.ttf', AGENDA_BODY_TEXT_SIZE)
+        font3 = getFont('HandelGothicDBold.otf', AGENDA_BODY_UPPER_TEXT_SIZE)
         x = AGENDA_BODY_FORAGAINST_L
         maxX = CARD_W - AGENDA_BODY_FORAGAINST_R
         for line in text.split('\n'):
             if line.startswith('For:') or line.startswith('Against:'):
-                y = wrapTextBoldStart(draw, font1, font2, line, x, y, maxX, color, lineH)
+                y = wrapTextBoldStart(draw, font1, font2, font3, line, x, y, maxX, color, lineH, 0)
             else:
                 y = wrapText(draw, font2, line, x, y, maxX, color, lineH)
 
@@ -514,12 +579,22 @@ class CardHandler(webapp2.RequestHandler):
         self.response.headers['Content-Type'] = 'image/jpeg'
         self.response.out.write(jpg)
 
+class getActionHandler(webapp2.RequestHandler):
+    def get(self):
+        title = self.request.get('title')
+        body = self.request.get('body')
+        flavor = self.request.get('flavor')
+        source = self.request.get('source')
+        jpg = actionCard(title.upper(), body, flavor, True if source.lower() == 'codex' else 2)
+        self.response.headers['Content-Type'] = 'image/jpeg'
+        self.response.out.write(jpg)
+
 class TestActionHandler(webapp2.RequestHandler):
     def get(self):
         title = 'Bribery'
         body = 'After the speaker votes on an agenda: Spend any number of trade goods. For each trade good spent, cast 1 additional vote for any outcome.'
         flavor = u'\u201CWe think that this initiative would spell disaster for the galaxy, not just the Creuss.\u201D Taivra said, quietly slipping Z\u2018eu an envelope. \u201CDon\u2019t you agree?\u201D'
-        jpg = actionCard(title.upper(), body, flavor, False)
+        jpg = actionCard(title.upper(), body, flavor, 2)
         self.response.headers['Content-Type'] = 'image/jpeg'
         self.response.out.write(jpg)
 
@@ -561,6 +636,7 @@ class TestAgenda2Handler(webapp2.RequestHandler):
 
 app = webapp2.WSGIApplication([
     ('/img', CardHandler),
+    ('/getaction', getActionHandler),
     ('/testaction', TestActionHandler),
     ('/testsecret', TestSecretHandler),
     ('/testpublic', TestPublicHandler),

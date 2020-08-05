@@ -186,14 +186,16 @@ local DEFAULT_ZONES = {
             },
             [7] = {{64, 50}, {64, 12.1}, {35.01, 12.1}, {35.01, 50}},
         },
+        extraRing = true,
         homeSystemPositions = {
-            [1] = {15.75, -9.09},
-            [2] = {0.00, -18.19},
-            [3] = {-15.75, -9.09},
-            [4] = {-15.75, 9.09},
-            [5] = {0.00, 18.19},
-            [6] = {15.75, 9.09},
-            [7] = {-5.25, 21.22}, -- wrong, placeholder outside outer ring
+            [1] = {21, 0},
+            [2] = {15.75, -15.16},
+            -- {0, -24.25},
+            [3] = {-15.75, -15.16},
+            [4] = {-21, 0},
+            [5] = {-15.75, 15.16},
+            [6] = {0.00, 24.25},
+            [7] = {15.75, 15.16},
         }
     },
     [8] = {
@@ -227,15 +229,16 @@ local DEFAULT_ZONES = {
             },
             [8] = {{64, 50}, {64, 12.1}, {35.01, 12.1}, {35.01, 50}},
         },
+        extraRing = true,
         homeSystemPositions = {
-            [1] = {15.75, -9.09},
-            [2] = {0.00, -18.19},
-            [3] = {-15.75, -9.09},
-            [4] = {-15.75, 9.09},
-            [5] = {0.00, 18.19},
-            [6] = {15.75, 9.09},
-            [7] = {-5.25, 21.22}, -- wrong, placeholder outside outer ring
-            [8] = {-10.50, 18.19}, -- wrong, placeholder outside outer ring
+            [1] = {21, 0},
+            [2] = {15.75, -15.16},
+            [3] = {0, -24.25},
+            [4] = {-15.75, -15.16},
+            [5] = {-21, 0},
+            [6] = {-15.75, 15.16},
+            [7] = {0.00, 24.25},
+            [8] = {15.75, 15.16},
         }
     },
 }
@@ -262,6 +265,7 @@ function setPlayerCount(playerCount, extraRing)
 
     if playerCount ~= #_zones then
         local zoneAttributes = assert(DEFAULT_ZONES[playerCount], 'invalid player count')
+        extraRing = extraRing or zoneAttributes.extraRing
         _zones = {}
         for i = 1, playerCount do
             local polygon = assert(zoneAttributes.zones[i])

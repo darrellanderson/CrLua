@@ -280,7 +280,9 @@ function setPlayerCount(playerCount, extraRing)
                 polygon = mutated
             end
             local bb = _boundingBox(polygon)
+            local homeXZ = assert(zoneAttributes.homeSystemPositions[i])
             table.insert(_zones, {
+                index = i,
                 color = false,
                 polygon = polygon,
                 boundingBox = bb,
@@ -289,7 +291,11 @@ function setPlayerCount(playerCount, extraRing)
                     y = _table.y,
                     z = (bb.min.z + bb.max.z) / 2
                 },
-                homeSystemPosition = assert(zoneAttributes.homeSystemPositions[i]),
+                homeSystemPosition = {
+                    x = assert(homeXZ[1]),
+                    y = assert(_table.y),
+                    z = assert(homeXZ[2])
+                },
             })
         end
         updateZoneColors()
@@ -419,6 +425,7 @@ end
 -- @param parameters table : { inset, clipToTable, thickness }
 function getBordersVectorLines(parameters)
     assert(type(parameters) == 'table')
+    assert(_table.y)
 
     local thickness = parameters.thickness or DEFAULT_VECTOR_LINE_THICKNESS
     local homeSystemThickness = parameters.homeSystemThickness or thickness
@@ -434,15 +441,15 @@ function getBordersVectorLines(parameters)
         end
         return pointsXYZ
     end
-    local function homeSystemXYZ(centerXZ)
+    local function homeSystemXYZ(centerXYZ)
         local pointsXYZ = {}
         for i = 1, 16 do
             local phi = i / 16 * math.pi * 2
             local r = 2
             table.insert(pointsXYZ, {
-                x = centerXZ[1] + math.sin(phi) * r,
+                x = centerXYZ.x + math.sin(phi) * r,
                 y = _table.y + elevateY,
-                z = centerXZ[2] + math.cos(phi) * r
+                z = centerXYZ.z + math.cos(phi) * r
             })
         end
         return pointsXYZ

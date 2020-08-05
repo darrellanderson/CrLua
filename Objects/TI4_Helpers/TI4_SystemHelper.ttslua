@@ -661,7 +661,7 @@ function _planetPosition(system, zoneBorders, planetIndex)
 
     -- If planet already has a position, use it.
     if planet.position then
-        return { x = planet.position.x, y = localY, z = planet.position.y }, localRadius
+        return { x = planet.position.x, y = localY, z = planet.position.z }, localRadius
     end
 
     -- Compute the default bearing and distance.

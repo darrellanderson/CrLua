@@ -42,7 +42,7 @@ function CrLua.TTS.Overlap.overlap(srcs, dsts)
             }
         }
         for _, src in ipairs(srcs) do
-            local p = src.getPosition()
+            local p = src.getBounds().center
             if src ~= dst and maybeInside(bb, src.getPosition()) then
                 if definitelyInside(src, dst) then
                     local srcs = dstToSrcs[dst]

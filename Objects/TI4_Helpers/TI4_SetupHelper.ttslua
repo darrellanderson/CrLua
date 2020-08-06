@@ -96,18 +96,17 @@ local SetupColor = {
         ['$COLOR Dreadnought'] = { x = 0, y = 1, z = 6.2 },
         ['$COLOR Flagship'] = { x = 0, y = 1, z = 9.6 },
         ['$COLOR War Sun'] = { x = 0, y = 1, z = 12.1 },
-    }
+    },
 }
 
 local SetupFaction = {
     NAME_TO_PLAYER_ZONE_OFFSET = {
-        ['$FACTION_NAME Sheet'] = { x = 4.5, z = 11-0.4 },
-        ['$TOKEN_NAME Command Tokens Bag'] = { x = -8-0.2, z = 11-0.5 },
-        ['$TOKEN_NAME Owner Tokens Bag'] = { x = -8+3, z = 5-0.5 },
-        ['$TOKEN_NAME Tech Bag'] = { x = 10, z = 2, unpack = true },
-        ['$TOKEN_NAME Promissory Bag'] = { x = 7, z = 2, unpack = true },
-        ['$TOKEN_NAME Planets Bag'] = { x = 7, z = 5, unpack = true, dx = true },
-        --other = { x = 4, z = 5, dx = 3 }
+        ['$FACTION_NAME Sheet'] = { x = 4.86, z = 10.6, lock = true },
+        ['$TOKEN_NAME Command Tokens Bag'] = { x = -8.2, z = 10.5, lock = true },
+        ['$TOKEN_NAME Owner Tokens Bag'] = { x = -5, z = 4.5, lock = true },
+        ['$TOKEN_NAME Tech Bag'] = { x = 10, y = 3, z = 2, unpack = true },
+        ['$TOKEN_NAME Promissory Bag'] = { x = 7, y = 3, z = 2, unpack = true },
+        ['$TOKEN_NAME Planets Bag'] = { x = 6, y = 3, z = -6, unpack = true, dx = 2.5 },
     },
     COMMAND_TOKENS_XZ_AND_FLIP = {
         -- In command sheet local space
@@ -119,7 +118,13 @@ local SetupFaction = {
         { x = -1.6, z = -1.7, flip=true },
         { x = -1, z = 0.3 },
         { x = -2.1, z = 0.3 }
-    }
+    },
+    STARTING_TECH_OFFSET = {
+        x = 10, z = -5, dz = -2.1
+    },
+    OTHER_OFFSET = {
+        x = 1, z = 2, dx = -3
+    },
 }
 
 -------------------------------------------------------------------------------
@@ -165,7 +170,7 @@ end
 local function offsetPosition(position, offset)
     return {
         x = position.x + (offset.x or 0) * (position.z > 0 and 1 or -1),
-        y = position.y + (offset.y or 1),
+        y = position.y + (offset.y or 0),
         z = position.z + (offset.z or 0) * (position.z > 0 and 1 or -1)
     }
 end
@@ -707,8 +712,8 @@ end
 
 --- Pack faction box into the container where it was found.
 function SetupFaction.packFactionBox(factionBox, factionBoxSrc)
-    debugLog('SetupFaction.packFactionBox: ' .. factionBox.getName())
     assert(factionBox.tag == 'Bag' and (not factionBoxSrc or factionBoxSrc.tag == 'Bag'))
+    debugLog('SetupFaction.packFactionBox: ' .. factionBox.getName())
 
     if factionBoxSrc then
         factionBox.setLock(false)
@@ -718,15 +723,15 @@ end
 
 --- Get faction box and where we found it.
 function SetupFaction.unpackFactionBox(faction, zoneCenter)
-    debugLog('SetupFaction.unpackFactionBox: ' .. faction.name)
     assert(type(faction) == 'table' and type(zoneCenter) == 'table')
+    debugLog('SetupFaction.unpackFactionBox: ' .. faction.name)
 
     local factionBoxNamePattern = '^' .. faction.tokenName:gsub('-', '%%-') .. ' Box$'
     local unpackPosition = { x = zoneCenter.x, y = zoneCenter.y + 10, z = zoneCenter.z }
 
     -- First see if the box is already on the table, if so leave it where it is.
     local otherBoxes = {}
-    local otherBoxNamePattern = ' Box$'
+    local otherBoxNamePattern = 'Factions$'
     for _, object in ipairs(getAllObjects()) do
         if object.tag == 'Bag' then
             local name = object.getName()
@@ -748,6 +753,7 @@ function SetupFaction.unpackFactionBox(faction, zoneCenter)
                 callback_function = function(object) object.setLock(true) end,
                 smooth            = false,
             })
+            debugLog('SetupFaction.unpackFactionBox inside ' .. otherBox.getName())
             return factionBox, otherBox
         end
     end
@@ -755,7 +761,23 @@ end
 
 function SetupFaction.unpack(faction, factionBox, zoneCenter)
     assert(type(faction) == 'table' and factionBox.tag == 'Bag' and type(zoneCenter) == 'table')
-    debugLog('SetupColor.unpack ' .. faction.name)
+    debugLog('SetupFaction.unpack ' .. faction.name)
+
+    local function nestedUnpack(bag, offset)
+        bag.translate({ x = 0, y = 5, z = 0 })
+        local p = offsetPosition(zoneCenter, offset)
+        for _, entry in ipairs(bag.getObjects()) do
+            print('nestedUnpack ' .. bag.getName() .. ' -> ' .. entry.name)
+            bag.takeObject({
+                position          = p,
+                rotation          = bag.getRotation(),
+                smooth            = false,
+            })
+            p.x = p.x + (offset.dx or 0)
+            p.z = p.z + (offset.dz or 0)
+        end
+        Wait.frames(function() factionBox.putObject(bag) end, 1)
+    end
 
     local nameToObject = {}
     for namePattern, offset in pairs(SetupFaction.NAME_TO_PLAYER_ZONE_OFFSET) do
@@ -763,11 +785,19 @@ function SetupFaction.unpack(faction, factionBox, zoneCenter)
         namePattern = string.gsub(namePattern, '$TOKEN_NAME', faction.tokenName)
         namePattern = namePattern:gsub('-', '%%-')
         local guid = assert(getEntryGuid(factionBox, namePattern), 'missing ' .. namePattern)
+        local function takeCallback(object)
+            if offset.unpack then
+                nameToObject[object.getName()] = nil
+                nestedUnpack(object, offset)
+            else
+                object.setLock(offset.lock or false)
+            end
+        end
         local object = factionBox.takeObject({
             guid              = guid,
             position          = offsetPosition(zoneCenter, offset),
             rotation          = offsetRotation(zoneCenter, offset),
-            callback_function = function(object) object.setLock(offset.lock or false) end,
+            callback_function = takeCallback,
             smooth            = false,
         })
         nameToObject[object.getName()] = object
@@ -856,6 +886,30 @@ function SetupFaction.unpackHomeSystemTile(faction, factionBox, homeSystemPositi
     return tile, extraTile
 end
 
+--- Unpack any non-faction bags still in the faction box.
+function SetupFaction.unpackOther(faction, factionBox, zoneCenter)
+    assert(factionBox.tag == 'Bag' and type(zoneCenter) == 'table')
+    debugLog('SetupFaction.unpackOther ' .. faction.name)
+
+    local offset = {
+        x = SetupFaction.OTHER_OFFSET.x,
+        y = SetupFaction.OTHER_OFFSET.y,
+        z = SetupFaction.OTHER_OFFSET.z,
+    }
+    for _, entry in ipairs(factionBox.getObjects()) do
+        if not string.match(entry.name, '^' .. faction.tokenName:gsub('-', '%%-') .. ' .* Bag$') then
+            local object = factionBox.takeObject({
+                guid              = entry.guid,
+                position          = offsetPosition(zoneCenter, offset),
+                rotation          = offsetRotation(zoneCenter, offset),
+                smooth            = false,
+            })
+            offset.x = offset.x + (SetupFaction.OTHER_OFFSET.dx or 0)
+            offset.z = offset.z + (SetupFaction.OTHER_OFFSET.dz or 0)
+        end
+    end
+end
+
 function SetupFaction.renameFlagship(color, faction)
     assert(type(color) == 'string' and type(faction) == 'table')
     debugLog('SetupColor.renameFlagship ' .. color)
@@ -930,6 +984,38 @@ function SetupFaction.unpackUnits(color, faction, homeSystemTile)
                 phi = phi + dPhi
             end
         end
+    end
+end
+
+function SetupFaction.unpackStartingTech(color, faction, zoneCenter)
+    assert(type(color) == 'string' and type(faction) == 'table' and type(zoneCenter) == 'table')
+    debugLog('SetupFaction.unpackStartingTech ' .. color)
+
+    local function getTechDeck()
+        local deckName = 'Technology Cards'
+        for _, object in ipairs(getAllObjects()) do
+            if object.tag == 'Deck' and object.getName() == deckName and _zoneHelper.zoneFromPosition(object.getPosition()) == color then
+                return object
+            end
+        end
+        error('unpack faction starting tech: missing ' .. deckName)
+    end
+    local techDeck = getTechDeck()
+
+    local offset = {
+        x = SetupFaction.STARTING_TECH_OFFSET.x,
+        y = SetupFaction.STARTING_TECH_OFFSET.y,
+        z = SetupFaction.STARTING_TECH_OFFSET.z
+    }
+    for i, name in ipairs(faction.startingTech) do
+        local guid = assert(getEntryGuid(techDeck, name), 'missing starting technology ' .. name)
+        techDeck.takeObject({
+            guid              = guid,
+            position          = offsetPosition(zoneCenter, offset),
+            rotation          = offsetRotation(zoneCenter, offset),
+            smooth            = true,
+        })
+        offset.z = offset.z + SetupFaction.STARTING_TECH_OFFSET.dz
     end
 end
 
@@ -1011,37 +1097,64 @@ function unpackFactionCoroutine()
     end
     coroutine.yield(0)
 
+    -- Move the token out of the way in case faction sheet, etc moves on top.
+    tokenObject.translate({ x = 0, y = 5, z = 0 })
+    coroutine.yield(0)
+    tokenObject.setLock(true)
+
     local factionBox, factionBoxSrc = SetupFaction.unpackFactionBox(faction, zoneAttributes.center)
     if not factionBox then
         error('unpack faction: unable to find faction box for "' .. faction.name .. '"')
         return 1
     end
-
-    local nameToObject = SetupFaction.unpack(faction, factionBox, zoneAttributes.center)
     coroutine.yield(0)
 
+    SetupFaction.renameFlagship(color, faction)
+    coroutine.yield(0)
+
+    local nameToObject = SetupFaction.unpack(faction, factionBox, zoneAttributes.center)
     local commandTokensBag = nameToObject[faction.tokenName .. ' Command Tokens Bag']
+    local ownerTokensBag = nameToObject[faction.tokenName .. ' Owner Tokens Bag']
+    nameToObject = nil
+    coroutine.yield(0)
+
     SetupFaction.unpackCommandTokens(color, commandTokensBag)
     coroutine.yield(0)
 
     local homeSystemTile, extraTile = SetupFaction.unpackHomeSystemTile(faction, factionBox, zoneAttributes.homeSystemPosition)
     coroutine.yield(0)
-    while not homeSystemTile.getLock() do coroutine.yield(0) end
 
-    SetupFaction.renameFlagship(color, faction)
+    SetupFaction.unpackOther(faction, factionBox, zoneAttributes.center)
     coroutine.yield(0)
+
+    SetupFaction.unpackStartingTech(color, faction, zoneAttributes.center)
+    coroutine.yield(0)
+
+    SetupFaction.placeScoreCounters(ownerTokensBag, zoneAttributes.center, zoneAttributes.index)
+    coroutine.yield(0)
+
+    if factionBoxSrc then
+        factionBoxSrc.putObject(factionBox)
+        coroutine.yield(0)
+    end
+    factionBox = nil
+
+    tokenObject.setLock(false)
+    coroutine.yield(0)
+    tokenObject.translate({ x = 0, y = 1, z = 0 })
+
+    -- Wait for home system to land before unpacking units.
+    while not homeSystemTile.getLock() do coroutine.yield(0) end
 
     SetupFaction.unpackUnits(color, faction, homeSystemTile)
     coroutine.yield(0)
 
-    local ownerTokensBag = nameToObject[faction.tokenName .. ' Owner Tokens Bag']
-    SetupFaction.placeScoreCounters(ownerTokensBag, zoneAttributes.center, zoneAttributes.index)
-    coroutine.yield(0)
+    if faction.startMessage then
+        broadcastToColor(faction.tokenName .. ': ' .. faction.startMessage, color, color)
+    end
 
     return 1
 end
-
-
 
 -------------------------------------------------------------------------------
 -------------------------------------------------------------------------------

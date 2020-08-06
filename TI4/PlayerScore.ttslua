@@ -129,7 +129,7 @@ CrLua.TI4.PlayerScore.SCOREBOARD = 'Scoreboard'
 local _factionHelper = CrLua.TTS.HelperClient.get('TI4_FACTION_HELPER')
 local _zoneHelper = CrLua.TTS.HelperClient.get('TI4_ZONE_HELPER')
 
-
+local _custodians = false
 
 --- Get map from scoring relevant object name to lists of objects with name.
 function CrLua.TI4.PlayerScore.getNameToScoreObjects()
@@ -162,6 +162,9 @@ function CrLua.TI4.PlayerScore.getNameToScoreObjects()
             local objects = nameToScoreObjects[object.getName()]
             if objects then
                 table.insert(objects, object)
+                if object.getName() == CrLua.TI4.PlayerScore.MECATOL then
+                    _custodians = object
+                end
             end
         end
     end
@@ -206,7 +209,6 @@ function CrLua.TI4.PlayerScore.score(scoreboard, ownerToken)
 
     -- Scoreboard local space x.
     local p = scoreboard.positionToLocal(center)
-    -- print ('xxx ' .. ownerToken.getName() .. ' x=' .. p.x .. ' z=' .. p.z)
     local u = -(p.x - 3.25) / 6.5
     return u * (scoreboard.is_face_down and 15 or 11)
 end
@@ -362,25 +364,24 @@ function CrLua.TI4.PlayerScore.getCells(PHASE1objectives, PHASE2objectives, colo
         cells[factionCell] = factionNickname
         cells[scoreCell] = colorToScore[player.color]
         cells[strategyCell] = CrLua.TI4.PlayerScore.STRATEGY[colorToStrategy[player.color]]
-
     end
 
-    for _, val in ipairs(PHASE1objectives) do
-        cells[stageOneCells[_]] = CrLua.TI4.PlayerScore.PHASE1[val]
+    for i, val in ipairs(PHASE1objectives) do
+        cells[stageOneCells[i]] = CrLua.TI4.PlayerScore.PHASE1[val]
         local completed = stageOneMap[val]
         if completed then
             for x, color in ipairs(completed) do
-                cells[PublicCompletionCells[color] .. PublicCompletionCells.PHASE1row[_]] = CrLua.TI4.PlayerScore.colorAbbreviation[color]
+                cells[PublicCompletionCells[color] .. PublicCompletionCells.PHASE1row[i]] = CrLua.TI4.PlayerScore.colorAbbreviation[color]
             end
         end
     end
 
-    for _, val in ipairs(PHASE2objectives) do
-        cells[stageTwoCells[_]] = CrLua.TI4.PlayerScore.PHASE2[val]
+    for i, val in ipairs(PHASE2objectives) do
+        cells[stageTwoCells[i]] = CrLua.TI4.PlayerScore.PHASE2[val]
         local completed = stageTwoMap[val]
         if completed then
             for x, color in ipairs(completed) do
-                cells[PublicCompletionCells[color] .. PublicCompletionCells.PHASE2row[_]] = CrLua.TI4.PlayerScore.colorAbbreviation[color]
+                cells[PublicCompletionCells[color] .. PublicCompletionCells.PHASE2row[i]] = CrLua.TI4.PlayerScore.colorAbbreviation[color]
             end
         end
     end
@@ -423,7 +424,6 @@ function CrLua.TI4.PlayerScore.getCells(PHASE1objectives, PHASE2objectives, colo
     end
 
     return cells
-
 end
 
 function CrLua.TI4.PlayerScore.updatePublicOneObjectives(PHASE1objectives, nameToScoreObjects)
@@ -435,7 +435,6 @@ function CrLua.TI4.PlayerScore.updatePublicOneObjectives(PHASE1objectives, nameT
         local objective = CrLua.TI4.PlayerScore.PHASE1[key]
         if objective then table.insert(stageOne, key) end
     end
-
 
     local oldPHASE1 = PHASE1objectives or {}
     local newPHASE1 = stageOne or {}
@@ -453,7 +452,6 @@ function CrLua.TI4.PlayerScore.updatePublicTwoObjectives(PHASE2objectives, nameT
         local objective = CrLua.TI4.PlayerScore.PHASE2[key]
         if objective then table.insert(stageTwo, key) end
     end
-
 
     local oldPHASE2 = PHASE2objectives or {}
     local newPHASE2 = stageTwo or {}
@@ -590,29 +588,38 @@ function CrLua.TI4.PlayerScore.getMecatolPoints(currentMecatolPoints, nameToOwne
 
     local MecatolPoints = {}
 
-    for key, map in pairs(nameToOwnerTokens) do
-        if key == CrLua.TI4.PlayerScore.MECATOL then
-            for i, token in ipairs(map) do
-                local ownerToken = map[i].getName()
-                local faction = _factionHelper.fromTokenName(ownerToken)
-                local playerColor = faction.color
-                table.insert(MecatolPoints, playerColor)
-            end
+    -- The Custodians Token bounds are a little too large.  Restrict further.
+    local function insideCustodians(ownerToken)
+        if not _custodians then
+            return true
+        end
+        local p1 = ownerToken.getBounds().center
+        local p2 = _custodians.getPosition()
+        local d = math.sqrt((p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2)
+        return d < 1.5
+    end
+
+    local map = nameToOwnerTokens[CrLua.TI4.PlayerScore.MECATOL]
+    for i, token in ipairs(map) do
+        local ownerToken = map[i].getName()
+        local faction = _factionHelper.fromTokenName(ownerToken)
+        local playerColor = faction and faction.color
+        if playerColor and insideCustodians(token) then
+            table.insert(MecatolPoints, playerColor)
         end
     end
 
     local oldPoints = currentMecatolPoints or {}
     local newPoints = MecatolPoints or {}
     local updatedPoints = CrLua.List.pruneAndAppendMissing(oldPoints, newPoints) or {}
-    
+
     return updatedPoints
 end
 
 function CrLua.TI4.PlayerScore.mapOtherPoints(currentOtherPoints, nameToOwnerTokens)
     assert(type(currentOtherPoints) == 'table')
 
-    local otherPoints = {
-    }
+    local otherPoints = {}
 
     for key, map in pairs(nameToOwnerTokens) do
         if CrLua.TI4.PlayerScore.AGENDA[key] or CrLua.TI4.PlayerScore.ACTIONS[key] then

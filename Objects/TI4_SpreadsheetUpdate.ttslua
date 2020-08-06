@@ -1,5 +1,5 @@
 --- Keep track of each players' tech, and acquisition order.
--- @author Darrell
+-- @author Darrell, Milty
 --
 -- Assumes Nekro makes a copy of assimilated technology cards.
 -------------------------------------------------------------------------------
@@ -75,23 +75,6 @@ function onPlayerTurnStart(playerColorStart, playerColorPrevious)
     end
 end
 
-function onDrop(player_color)
-
-    --[[local nameToObjects = CrLua.TI4.PlayerScore._getNameToObjects()
-    for k, v in pairs(nameToObjects) do
-        print('xxx1 ' .. k)
-    end
-    local targetToOwnerTokens = CrLua.TI4.PlayerScore.targetToOwnerTokens(nameToObjects)
-    for k, v in pairs(targetToOwnerTokens) do
-        print('xxx2 ' .. k.getName() .. ' -> ' .. (#v))
-    end
-    local colorToScore = CrLua.TI4.PlayerScore.colorToScore(targetToOwnerTokens)
-    for k, v in pairs(colorToScore) do
-        print('xxx3 ' .. k .. ' -> ' .. v)
-    end]]--
-
-end
-
 -------------------------------------------------------------------------------
 
 function updateTechState()
@@ -113,19 +96,6 @@ function updateScoreState()
     _data.supportMap = CrLua.TI4.PlayerScore.mapSupports(nameToOwnerTokens)
     _data.MecatolPoints = CrLua.TI4.PlayerScore.getMecatolPoints(_data.MecatolPoints, nameToOwnerTokens)
     _data.otherPoints = CrLua.TI4.PlayerScore.mapOtherPoints(_data.otherPoints, nameToOwnerTokens)
-
-    --[[for k, v in pairs(nameToScoreObjects) do
-        print('nameToScoreObjects #' .. k .. ' ' .. #v)
-    end
-    for k, v in pairs(nameToOwnerTokens) do
-        print('nameToOwnerTokens #' .. k .. ' ' .. #v)
-        for i, j in ipairs(v) do
-          print(v[i].getName())
-        end
-    end]]--
-    -- for k, v in pairs(colorToScore) do
-    --    print('colorToScore ' .. k .. ' ' .. v)
-    --end
 end
 
 -------------------------------------------------------------------------------

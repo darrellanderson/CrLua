@@ -1079,14 +1079,17 @@ end
 local _unpackFactionQueue = {}
 
 --- Entry point for faction unpack.
-function unpackFaction(color)
-    assert(type(color) == 'string')
-    table.insert(_unpackFactionQueue, color)
+function unpackFaction(params)
+    assert(type(params) == 'table')
+    assert(type(params.unpackButtonGuid) == 'string')
+    assert(type(params.color) == 'string')
+    table.insert(_unpackFactionQueue, params)
     startLuaCoroutine(self, 'unpackFactionCoroutine')
 end
 
 function unpackFactionCoroutine()
-    local color = assert(table.remove(_unpackFactionQueue))
+    local params = assert(table.remove(_unpackFactionQueue))
+    local color = params.color
     local zoneAttributes = _zoneHelper.zoneAttributes(color)
     assert(zoneAttributes, 'no zone for ' .. color)
 
@@ -1096,6 +1099,20 @@ function unpackFactionCoroutine()
         return 1
     end
     coroutine.yield(0)
+
+    -- Delete the unpack button object.
+    local deletedItems = false
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Bag' and object.getName() == 'TI4 Deleted Items' then
+            deletedItems = object
+            break
+        end
+    end
+    if deletedItems then
+        deletedItems.call('ignoreGuid', params.unpackButtonGuid)
+    end
+    local unpackButton = assert(getObjectFromGUID(params.unpackButtonGuid))
+    destroyObject(unpackButton)
 
     -- Move the token out of the way in case faction sheet, etc moves on top.
     tokenObject.translate({ x = 0, y = 5, z = 0 })

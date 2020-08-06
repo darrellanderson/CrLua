@@ -420,9 +420,15 @@ function SetupColor.pack(color, colorBox)
     debugLog('SetupColor.pack ' .. color)
 
     local namePatterns = {}
-    for _, namePattern in ipairs(allNamePatterns(SetupColor)) do
-        namePattern = string.gsub(namePattern, '$COLOR', '(.*)')
+    for namePattern, offset in pairs(SetupColor.NAME_TO_PLAYER_ZONE_OFFSET) do
         table.insert(namePatterns, namePattern)
+    end
+    for namePattern, offset in pairs(SetupColor.NAME_TO_PLAYER_AGENDA_ZONE_OFFSET) do
+        table.insert(namePatterns, namePattern)
+    end
+
+    for i, namePattern in ipairs(namePatterns) do
+        namePatterns[i] = string.gsub(namePattern, '$COLOR', '(.*)')
     end
 
     for _, object in ipairs(getAllObjects()) do
@@ -1177,6 +1183,77 @@ end
 -------------------------------------------------------------------------------
 -------------------------------------------------------------------------------
 
+local UNIT_SCALE = {
+    ['Infantry'] = { unit = 0.75, bag = 1 },
+    ['Fighter'] = { unit = 0.75, bag = 1 },
+    ['Space Dock'] = { unit = 0.75, bag = 1 },
+    ['PDS'] = { unit = 0.75, bag = 1 },
+    ['Carrier'] = { unit = 0.75, bag = 1 },
+    ['Destroyer'] = { unit = 0.75, bag = 1 },
+    ['Cruiser'] = { unit = 0.75, bag = 1 },
+    ['Dreadnought'] = { unit = 0.75, bag = 1 },
+    ['War Sun'] = { unit = 0.75, bag = 1 },
+    ['Flagship'] = { unit = 0.75, bag = 1 },
+}
+
+function fixUnitScale()
+    startLuaCoroutine(self, 'fixUnitScaleCoroutine')
+end
+
+function fixUnitScaleCoroutine()
+    local unitBagNameSet = {}
+    for unitName, _ in pairs(UNIT_SCALE) do
+        for _, color in ipairs(Player.getColors()) do
+            unitBagNameSet[color .. ' ' .. unitName] = true
+        end
+    end
+
+    -- Bags need to be on the table, unpack any unused colors manually.
+    -- Assumes no faction unpack yet so can use generic flagship name.
+    local unitBags = {}
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Bag' and unitBagNameSet[object.getName()] then
+            table.insert(unitBags, object)
+        end
+    end
+    coroutine.yield(0)
+
+    for _, unitBag in ipairs(unitBags) do
+        local unitName = string.match(unitBag.getName(), '^[^ ]* (.*)$')
+        local scales = assert(UNIT_SCALE[unitName])
+        local bagScale = scales.bag
+        local unitScale = scales.unit
+
+        unitBag.setScale({ x = bagScale, y = bagScale, z = bagScale })
+        unitBag.use_grid = false
+        unitBag.use_snap_points = true
+        unitBag.sticky = false
+
+        local pos = unitBag.getPosition()
+        for i, entry in ipairs(unitBag.getObjects()) do
+            local unit = unitBag.takeObject({
+                guid              = entry.guid,
+                position          = { x = pos.x, y = pos.y + 5 + i, z = pos.z },
+                rotation          = unitBag.getRotation(),
+                callback_function = function(object) unitBag.putObject(object) end,
+                smooth            = false,
+            })
+            unit.setScale({ x = unitScale, y = unitScale, z = unitScale })
+            unit.use_grid = false
+            unit.use_snap_points = false
+            unit.sticky = false
+        end
+        coroutine.yield(0)
+    end
+    coroutine.yield(0)
+
+    return 1
+end
+
+-------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+
 function draw3Pcircle()
     Global.setVectorLines({
         -- player1 spot
@@ -1445,6 +1522,8 @@ function onLoad(saveState)
         end
     end
     self.setInvisibleTo(invisibleTo)
+
+    self.addContextMenuItem('Fix unit scale', fixUnitScale, false)
 end
 
 -------------------------------------------------------------------------------

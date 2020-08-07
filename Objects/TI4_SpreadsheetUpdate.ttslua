@@ -25,9 +25,10 @@ local _data = {
     StageOneMap = {},
     stageTwoObjectives = {},
     StageTwoMap = {},
+    secretsOrder = {},
     playerSecrets = {},
     supportMap = {},
-    MecatolPoints = {},
+    mecatolPoints = {},
     otherPoints = {}
 }
 
@@ -91,21 +92,27 @@ function updateScoreState()
     _data.StageOneMap = CrLua.TI4.PlayerScore.mapStageOne(nameToOwnerTokens)
     _data.stageTwoObjectives = CrLua.TI4.PlayerScore.updatePublicTwoObjectives(_data.stageTwoObjectives, nameToScoreObjects)
     _data.StageTwoMap = CrLua.TI4.PlayerScore.mapStageTwo(nameToOwnerTokens)
-    _data.playerSecrets = CrLua.TI4.PlayerScore.updateSecrets(_data.playerSecrets, nameToOwnerTokens)
+
+    -- Lua does not let one update two fields this way, but locals then move to fields separately works.
+    local secretsOrder, playerSecrets = CrLua.TI4.PlayerScore.updateSecrets(_data.secretsOrder, _data.playerSecrets, nameToOwnerTokens)
+    _data.secretsOrder = assert(secretsOrder)
+    _data.playerSecrets = assert(playerSecrets)
+
     _data.playerColorToStrategy = CrLua.TI4.PlayerScore.updateStrategy()
     _data.supportMap = CrLua.TI4.PlayerScore.mapSupports(nameToOwnerTokens)
-    _data.MecatolPoints = CrLua.TI4.PlayerScore.getMecatolPoints(_data.MecatolPoints, nameToOwnerTokens)
+    _data.mecatolPoints = CrLua.TI4.PlayerScore.getMecatolPoints(_data.mecatolPoints, nameToOwnerTokens)
     _data.otherPoints = CrLua.TI4.PlayerScore.mapOtherPoints(_data.otherPoints, nameToOwnerTokens)
 end
 
 -------------------------------------------------------------------------------
 
 function _sheetId(idOrUrl)
+    assert(type(idOrUrl) == 'string')
     local id = idOrUrl
     if string.match(id, '^http') then
         id = CrLua.TTS.Spreadsheet.idFromUrl(id)
     end
-    return id
+    return string.len(id) > 0 and id
 end
 
 function validateSpreadsheetTech()
@@ -122,7 +129,7 @@ function updateSpreadsheetTech()
     local sheetName = _data.sheetNameTech
     local cells = CrLua.TI4.PlayerTech.getCells(_data.playerColorToTechs)
 
-    if sheetId and string.len(sheetId) > 0 then
+    if sheetId then
         CrLua.Log.d(TAG, 'updating tech spreadsheet')
         CrLua.TTS.Spreadsheet.update('tech', sheetId, sheetName, cells)
     else
@@ -133,9 +140,9 @@ end
 function updateSpreadsheetScore()
     local sheetId = _sheetId(_data.sheetIdScore)
     local sheetName = _data.sheetNameScore
-    local cells = CrLua.TI4.PlayerScore.getCells(_data.stageOneObjectives, _data.stageTwoObjectives, _data.playerScores, _data.playerSecrets, _data.playerColorToStrategy, _data.StageOneMap, _data.StageTwoMap, _data.supportMap, _data.MecatolPoints, _data.otherPoints)
+    local cells = CrLua.TI4.PlayerScore.getCells(_data.stageOneObjectives, _data.stageTwoObjectives, _data.playerScores, _data.secretsOrder, _data.playerSecrets, _data.playerColorToStrategy, _data.StageOneMap, _data.StageTwoMap, _data.supportMap, _data.mecatolPoints, _data.otherPoints)
 
-    if sheetId and string.len(sheetId) > 0 then
+    if sheetId then
         CrLua.Log.d(TAG, 'updating score spreadsheet')
         CrLua.TTS.Spreadsheet.update('score', sheetId, sheetName, cells)
     else

@@ -114,19 +114,19 @@ function validateSpreadsheetTech()
             error('either cannot access sheet or sheet is not the tech sheet (j5 not "Sarween")')
         end
     end
-    CrLua.TTS.Spreadsheet.get(_sheetIdTech, _sheetNameTech, 'j5', callback)
+    CrLua.TTS.Spreadsheet.get('tech', _sheetIdTech, _sheetNameTech, 'j5', callback)
 end
 
 function updateSpreadsheetTech()
     local sheetId = _sheetId(_data.sheetIdTech)
     local sheetName = _data.sheetNameTech
-
     local cells = CrLua.TI4.PlayerTech.getCells(_data.playerColorToTechs)
-    if sheetId then
-        CrLua.Log.i(TAG, 'updating tech spreadsheet')
-        CrLua.TTS.Spreadsheet.update(sheetId, sheetName, cells)
+
+    if sheetId and string.len(sheetId) > 0 then
+        CrLua.Log.d(TAG, 'updating tech spreadsheet')
+        CrLua.TTS.Spreadsheet.update('tech', sheetId, sheetName, cells)
     else
-        CrLua.Log.i(TAG, 'no tech spreadsheet, not updating tech')
+        CrLua.Log.d(TAG, 'no tech spreadsheet, not updating tech')
     end
 end
 
@@ -135,11 +135,11 @@ function updateSpreadsheetScore()
     local sheetName = _data.sheetNameScore
     local cells = CrLua.TI4.PlayerScore.getCells(_data.stageOneObjectives, _data.stageTwoObjectives, _data.playerScores, _data.playerSecrets, _data.playerColorToStrategy, _data.StageOneMap, _data.StageTwoMap, _data.supportMap, _data.MecatolPoints, _data.otherPoints)
 
-    if sheetId then
-        CrLua.Log.i(TAG, 'updating score spreadsheet')
-        CrLua.TTS.Spreadsheet.update(sheetId, sheetName, cells)
+    if sheetId and string.len(sheetId) > 0 then
+        CrLua.Log.d(TAG, 'updating score spreadsheet')
+        CrLua.TTS.Spreadsheet.update('score', sheetId, sheetName, cells)
     else
-        CrLua.Log.i(TAG, 'no score spreadsheet, not updating score')
+        CrLua.Log.d(TAG, 'no score spreadsheet, not updating score')
     end
 end
 -------------------------------------------------------------------------------

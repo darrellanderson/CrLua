@@ -7,8 +7,11 @@ CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
 CrLua.TI4 = CrLua.TI4 or {}
 CrLua.TI4.PlayerScore = assert(not CrLua.TI4.PlayerScore) and {
     _require = { 'List', 'TTS.HelperClient', 'TTS.Overlap' },
-    _allowMissingKeys = {'PHASE1', 'PHASE2', 'SECRET', 'STRATEGY', 'AGENDA', 'ACTIONS'}
+    _allowMissingKeys = { 'PHASE1', 'PHASE2', 'SECRET', 'STRATEGY', 'AGENDA', 'ACTIONS' }
 }
+
+-- Use this value when no value for a field (e.g. no strategy card taken).
+CrLua.TI4.PlayerScore.MISSING = 'N/A'
 
 CrLua.TI4.PlayerScore.PHASE1 = {
     ['Diversify Research'] = '2 TECH 2 COLORS',
@@ -113,14 +116,14 @@ CrLua.TI4.PlayerScore.factionNicknames = {
 }
 
 CrLua.TI4.PlayerScore.colorAbbreviation = {
-    ['Blue'] = 'B',
-    ['Purple'] = 'P',
-    ['Yellow'] = 'Y',
-    ['Red'] = 'R',
-    ['Green'] = 'G',
-    ['White'] = 'W',
-    --['Orange'] = 'O',
-    --['Pink'] = 'Pn',
+    ['Blue'] = 'Blue',
+    ['Purple'] = 'Purple',
+    ['Yellow'] = 'Yellow',
+    ['Red'] = 'Red',
+    ['Green'] = 'Green',
+    ['White'] = 'Black',
+    ['Orange'] = 'Orange',
+    ['Pink'] = 'Pink',
 }
 
 CrLua.TI4.PlayerScore.MECATOL = 'Custodians'
@@ -350,28 +353,42 @@ function CrLua.TI4.PlayerScore.getCells(PHASE1objectives, PHASE2objectives, colo
 
     local MecatolCells = {'S23', 'T23', 'U23', 'V23', 'W23', 'X23', 'Y23'}
 
-    for _, player in ipairs(Player.getPlayers()) do
-        local nameCell = colorToCellName[player.color]
-        local factionCell = colorToCellFaction[player.color]
-        local scoreCell = colorToCellScore[player.color]
-        local strategyCell = colorToCellStrategy[player.color]
+    for color, nameCell in pairs(colorToCellName) do
+        -- Not safe to access missing colors, scan.
+        local function steamName()
+            for _, player in ipairs(Player.getPlayers()) do
+                if player.color == color then
+                    return player.steam_name
+                end
+            end
+        end
+        cells[nameCell] = steamName() or CrLua.TI4.PlayerScore.MISSING
+    end
 
-        local faction = _factionHelper.fromColor(player.color)
-        local factionNickname = false
-        if faction then factionNickname = CrLua.TI4.PlayerScore.factionNicknames[faction.name] end
+    for color, factionCell in pairs(colorToCellFaction) do
+        local faction = _factionHelper.fromColor(color)
+        local factionNickname = faction and CrLua.TI4.PlayerScore.factionNicknames[faction.name]
+        cells[factionCell] = factionNickname or CrLua.TI4.PlayerScore.MISSING
+    end
 
-        cells[nameCell] = player.steam_name
-        cells[factionCell] = factionNickname
-        cells[scoreCell] = colorToScore[player.color]
-        cells[strategyCell] = CrLua.TI4.PlayerScore.STRATEGY[colorToStrategy[player.color]]
+    for color, scoreCell in pairs(colorToCellScore) do
+        cells[scoreCell] = colorToScore[color] or 0
+    end
+
+    for color, strategyCell in pairs(colorToCellStrategy) do
+        local strategy = colorToStrategy[color]
+        cells[strategyCell] = strategy and CrLua.TI4.PlayerScore.STRATEGY[strategy] or CrLua.TI4.PlayerScore.MISSING
     end
 
     for i, val in ipairs(PHASE1objectives) do
         cells[stageOneCells[i]] = CrLua.TI4.PlayerScore.PHASE1[val]
         local completed = stageOneMap[val]
         if completed then
-            for x, color in ipairs(completed) do
-                cells[PublicCompletionCells[color] .. PublicCompletionCells.PHASE1row[i]] = CrLua.TI4.PlayerScore.colorAbbreviation[color]
+            for _, color in ipairs(completed) do
+                local col = PublicCompletionCells[color]
+                local row = PublicCompletionCells.PHASE1row[i]
+                local value = CrLua.TI4.PlayerScore.colorAbbreviation[color]
+                cells[ col .. row ] = value
             end
         end
     end
@@ -380,8 +397,11 @@ function CrLua.TI4.PlayerScore.getCells(PHASE1objectives, PHASE2objectives, colo
         cells[stageTwoCells[i]] = CrLua.TI4.PlayerScore.PHASE2[val]
         local completed = stageTwoMap[val]
         if completed then
-            for x, color in ipairs(completed) do
-                cells[PublicCompletionCells[color] .. PublicCompletionCells.PHASE2row[i]] = CrLua.TI4.PlayerScore.colorAbbreviation[color]
+            for _, color in ipairs(completed) do
+                local col = PublicCompletionCells[color]
+                local row = PublicCompletionCells.PHASE2row[i]
+                local value = CrLua.TI4.PlayerScore.colorAbbreviation[color]
+                cells[ col .. row ] = value
             end
         end
     end
@@ -599,7 +619,7 @@ function CrLua.TI4.PlayerScore.getMecatolPoints(currentMecatolPoints, nameToOwne
         return d < 1.5
     end
 
-    local map = nameToOwnerTokens[CrLua.TI4.PlayerScore.MECATOL]
+    local map = nameToOwnerTokens[CrLua.TI4.PlayerScore.MECATOL] or {}
     for i, token in ipairs(map) do
         local ownerToken = map[i].getName()
         local faction = _factionHelper.fromTokenName(ownerToken)

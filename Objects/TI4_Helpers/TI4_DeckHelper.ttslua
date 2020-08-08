@@ -29,14 +29,14 @@ local PLACEMAT_GUID = {
 }
 
 local DECKS = {
-    {
-        deckName = 'Public Objectives I',
-        parentGuid = PLACEMAT_GUID.SCORE,
-        deckTransform = {
-            position = {},
-            rotation = {},
+    ['Public Objectives I'] = {
+        transform = {
+            parentGuid = PLACEMAT_GUID.SCORE,
+            deck = {
+                position = {},
+                rotation = {},
+            }
         },
-        discardTransform = false,
         cardNames = {
             'Corner the Market',
             'Develop Weaponry',
@@ -50,14 +50,14 @@ local DECKS = {
             'Sway the Council',
         },
     },
-    {
-        deckName = 'Public Objectives II',
-        parentGuid = PLACEMAT_GUID.SCORE,
-        deckTransform = {
-            position = {},
-            rotation = {},
+    ['Public Objectives II'] = {
+        transform = {
+            parentGuid = PLACEMAT_GUID.SCORE,
+            deck = {
+                position = {},
+                rotation = {},
+            }
         },
-        discardTransform = false,
         cardNames = {
             'Centralize Galactic Trade',
             'Conquer the Weak',
@@ -71,14 +71,14 @@ local DECKS = {
             'Unify the Colonies',
         },
     },
-    {
-        deckName = 'Secret Objectives',
-        parentGuid = PLACEMAT_GUID.DECKS,
-        deckTransform = {
-            position = {},
-            rotation = {},
+    ['Secret Objectives'] = {
+        transform = {
+            parentGuid = PLACEMAT_GUID.DECKS,
+            deck = {
+                position = {},
+                rotation = {},
+            }
         },
-        discardTransform = false,
         shuffleOnDiscard = true,
         cardNames = {
             'Adapt New Strategies',
@@ -103,16 +103,17 @@ local DECKS = {
             'Unveil Flagship',
         },
     },
-    {
-        deckName = 'Agenda',
-        parentGuid = PLACEMAT_GUID.DECKS,
-        deckTransform = {
-            position = {},
-            rotation = {},
-        },
-        discardTransform = {
-            position = {},
-            rotation = {},
+    ['Agenda'] = {
+        transform = {
+            parentGuid = PLACEMAT_GUID.DECKS,
+            deck = {
+                position = {},
+                rotation = {},
+            },
+            discard = {
+                position = {},
+                rotation = {},
+            }
         },
         cardNames = {
             'Anti-Intellectual Revolution',
@@ -167,16 +168,17 @@ local DECKS = {
             'Wormhole Research',
         },
     },
-    {
-        deckName = 'Actions',
-        parentGuid = PLACEMAT_GUID.DECKS,
-        deckTransform = {
-            position = {},
-            rotation = {},
-        },
-        discardTransform = {
-            position = {},
-            rotation = {},
+    ['Actions'] = {
+        transform = {
+            parentGuid = PLACEMAT_GUID.DECKS,
+            deck = {
+                position = {},
+                rotation = {},
+            },
+            discard = {
+                position = {},
+                rotation = {},
+            }
         },
         cardNames = {
             'Ancient Burial Sites',
@@ -286,11 +288,11 @@ local DECKS = {
 
 local _lowerCardNameToDeckAttributes = false
 
-local function _getDeck(cardName)
+local function _getDeckAttributes(cardName)
     assert(type(cardName) == 'string')
     if not _lowerCardNameToDeckAttributes then
         _lowerCardNameToDeckAttributes = {}
-        for _, attributes in ipairs(DECKS) do
+        for _, attributes in pairs(DECKS) do
             for _, cardName in ipairs(attributes.cardNames) do
                 _lowerCardNameToDeckAttributes[string.lower(cardName)] = attributes
             end
@@ -299,13 +301,51 @@ local function _getDeck(cardName)
     return _lowerCardNameToDeckAttributes[string.lower(cardName)]
 end
 
---- Discard this card, keeping its Y but moving XZ above discard pile.
--- (keep Y to prevent grouping when discarding many.)
-function discard(cardGuid)
-    assert(type(cardGuid) == 'string')
-    local cardObject = assert(getObjectFromGUID(cardGuid))
-    local deckAttributes = _getDeck(cardObject.getName())
+local function _getTransform(deckAttributes, deckOrDiscard)
+    assert(type(deckAttributes) == 'table' and not deckOrDiscard or type(deckOrDiscard) == 'string')
 
+    -- Get the requested transform.  If the request is for 'discard' and the
+    -- deck does not have a discard, use the main deck instead.
+    local transform = deckAttributes.transform[deckOrDiscard]
+    if not transform and deckOrDiscard == 'discard' then
+        transform = deckAttributes.transform['deck']
+    end
+    assert(transform)
+
+    local parentGuid = deckAttributes.transform.parentGuid
+    local parent = parentGuid and getObjectFromGUID(deckAttributes.transform.parentGuid)
+    local parentRot = parent and parent.getRotation()
+
+    return {
+        position = parent and parent.positionToWorld(transform.position) or {
+            x = transform.position.x,  -- make a copy, caller may mutate!
+            y = transform.position.y,
+            z = transform.position.z
+        },
+        rotation = {
+            x = transform.rotation.x + (parentRot and parentRot.x or 0),
+            y = transform.rotation.y + (parentRot and parentRot.y or 0),
+            z = transform.rotation.z + (parentRot and parentRot.z or 0),
+        }
+    }
+end
+
+local function _getDeckTransform(deckAttributes)
+end
+
+-------------------------------------------------------------------------------
+
+--- Discard this card, optionally removing it from a contiainer.
+-- Caller should be careful not to call this during onObjectEnterContainer,
+-- as the object won't actually be in it until the next frame.
+function discardCard(params)
+    assert(type(params) == 'table')
+    assert(type(params.guid) == 'string')
+    assert(type(params.name) == 'string')
+    assert(not params.index or type(params.index) == 'number')
+    assert(not params.containerGuid or type(params.containerGuid) == 'string')
+
+    local deckAttributes = _getDeckAttributes(params.name)
     if not deckAttributes then
         return false
     end
@@ -319,13 +359,75 @@ function discard(cardGuid)
         z = parent.getRotation().z + transform.rotation.z
     }
 
-    pos.y = cardObject.y
-    local collide = false
-    local fast = true
-    cardObject.setPositionSmooth(pos, collide, fast)
-    cardObject.setRotationSmooth(rot, collide, fast)
+    pos.y = pos.y + 3 + (params.index or 0) / 10
+
+    if params.containerGuid then
+        local container = assert(getObjectFromGUID(params.containerGuid))
+        -- Watch out for taking the last card from a deck.  In that case,
+        -- 'remainder' is the last card, take does not work.
+        if container.tag == 'Deck' and container.remainder then
+            local cardObject = container.remainder
+            assert(cardObject.getGUID() == params.guid)
+            local collide = false
+            local fast = true
+            cardObject.setPositionSmooth(pos, collide, fast)
+            cardObject.setRotationSmooth(rot, collide, fast)
+        else
+            container.takeObject({
+                guid              = params.guid,
+                position          = pos,
+                rotation          = rot,
+                smooth            = false,
+            })
+        end
+    else
+        cardObject = getObjectFromGUID(cardGuid)
+        local collide = false
+        local fast = true
+        cardObject.setPositionSmooth(pos, collide, fast)
+        cardObject.setRotationSmooth(rot, collide, fast)
+    end
 
     return true
+end
+
+function discardDeck(params)
+    assert(type(params) == 'table')
+    assert(type(params.guid) == 'string')
+    assert(not params.index or type(params.index) == 'number')
+    assert(not params.containerGuid or type(params.containerGuid) == 'string')
+
+    if params.containerGuid then
+        local container = assert(getObjectFromGUID(params.containerGuid))
+        local pos = container.getPosition()
+        pos.y = pos.y + 5 + (params.index or 0)
+        local function takeCallback(object)
+            assert(object.tag == 'Deck')
+            object.setLock(true)
+            discardDeck({
+                guid = object.getGUID(),
+            })
+            Wait.frames(function() object.setLock(false) end, 4)
+        end
+        local takeParams = {
+            guid              = params.guid,
+            position          = pos,
+            rotation          = rot,
+            smooth            = false,
+            callback_function = takeCallback,
+        }
+    else
+        local deck = getObjectFromGUID(params.guid)
+        assert(deck.tag == 'Deck')
+        for i, entry in ipairs(deck.getObjects()) do
+            discardCard({
+                guid = entry.guid,
+                name = entry.name,
+                index = i,
+                containerGuid = deck.getGUID()
+            })
+        end
+    end
 end
 
 function draw(parameters)
@@ -334,4 +436,84 @@ function draw(parameters)
     assert(type(parameters.count) == 'number')
 end
 
--- TODO XXX AGENDA TOP/BOTTOM BELONGS HERE
+-------------------------------------------------------------------------------
+-- Add top/bottom context menu on Agenda cards to discard to top/bottom.
+
+local function _isAgendaCard(object)
+    assert(type(cardObject) == 'userdata')
+    assert(DECKS['Agenda'], 'No agenda deck??')
+    if object.tag == 'Card' then
+        local deckAttributes = _getDeckAttributes(object.getName())
+        return deckAttributes and deckAttributes.deckName == 'Agenda'
+    end
+end
+
+local function _putAgendaCard(cardObject, onTop)
+    assert(type(cardObject) == 'userdata' and cardObject.tag == 'Card' and type(onTop) == 'boolean')
+
+    -- Cannot use normal discard method as this is not going to the discard pile.
+    local transform = _getDeckTransform(DECKS['Agenda'])
+
+    -- Teleport to near (jump out of hand, if in hand).
+    local nearby = { x = transform.position.x * 0.8, y = transform.position.y + 5, z = transform.position.z * 0.8 }
+    cardObject.setPosition(nearby)
+    cardObject.setRotation(transform.rotation)
+
+    -- Wait a moment for card to leave hand, then place.
+    local function finishPut()
+        -- Smooth to final position.
+        transform.position.y = transform.position.y + (onTop and 3 or 0)
+        local collide = false
+        local fast = true
+        cardObject.setPositionSmooth(transform.position, collide, fast)
+    end
+    Wait.frames(finishPut, 2)
+end
+
+function onObjectLeaveContainer(container, leaveObject)
+    if _isAgendaCard(leaveObject) then
+        local function putTop(playerColor)
+            printToAll('Put agenda top', playerColor)
+            _putAgendaCard(leaveObject, true)
+        end
+        local function putBottom(playerColor)
+            printToAll('Put agenda bottom', playerColor)
+            _putAgendaCard(leaveObject, false)
+        end
+        local function clearMenu(playerColor)
+            leaveObject.clearContextMenu()
+        end
+        leaveObject.addContextMenuItem('Place Agenda Top', putTop, false)
+        leaveObject.addContextMenuItem('Place Agenda Bottom', putBottom, false)
+        leaveObject.addContextMenuItem('Clear Place Options', clearMenu, false)
+    end
+end
+
+function onObjectEnterContainer(container, enterObject)
+    if _isAgendaCard(enterObject) then
+        enterObject.clearContextMenu()
+    end
+end
+
+-------------------------------------------------------------------------------
+
+function onLoad(saveState)
+    self.setColorTint({ r = 0.25, g = 0.25, b = 0.25 })
+    self.setScale({ x = 2, y = 0.01, z = 2 })
+    self.setName('TI4_DECK_HELPER')
+    self.setDescription('Shared helper functions used by other objects, PLEASE LEAVE ON TABLE! This object is only visible to the black (GM) player.')
+
+    -- Only the GM/black player can see this object.  Others can still interact!
+    local invisibleTo = {}
+    for _, color in ipairs(Player.getColors()) do
+        if color ~= 'Black' then
+            table.insert(invisibleTo, color)
+        end
+    end
+    self.setInvisibleTo(invisibleTo)
+
+    -- Add deck names to attributes.
+    for deckName, attributes in pairs(DECKS) do
+        attributes.deckName = deckName
+    end
+end

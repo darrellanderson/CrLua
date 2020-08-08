@@ -101,6 +101,29 @@ local ACTION_CARDS = {
     { name ='Warfare Rider', desc = '' },
 }
 
+local CODEX = {
+    'Blitz',
+    'Counterstroke',
+    'Fighter Conscription',
+    'Forward Supply Base',
+    'Ghost Squad',
+    'Hack Election',
+    'Harness Energy',
+    'Impersonation',
+    'Insider Information',
+    'Master Plan',
+    'Plagiarize',
+    'Rally',
+    'Reflective Shielding',
+    'Sanction',
+    'Scramble Frequency',
+    'Solar Flare',
+    'War Machine (1)',
+    'War Machine (2)',
+    'War Machine (3)',
+    'War Machine (4)',
+}
+
 function onDrop(player_color)
     startLuaCoroutine(self, 'renameActionsCoroutine')
 end
@@ -131,6 +154,20 @@ function renameActionsCoroutine()
         coroutine.yield(0)
         coroutine.yield(0)
         coroutine.yield(0)
+    end
+
+    local codexSet = {}
+    for _, name in ipairs(CODEX) do
+        codexSet[name] = true
+    end
+    local pos = deck.getPosition()
+    for i, entry in ipairs(deck.getObjects()) do
+        if codexSet[entry.name] then
+            deck.takeObject({
+                guid = entry.guid,
+                position = { x = pos.x + 5, y = pos.y + i / 10, z = pos.z }
+            })
+        end
     end
 
     return 1

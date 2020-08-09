@@ -419,7 +419,7 @@ function createCustomSelectionUiLuaCoroutine()
         local col = {{ name = name }}
         for _, entry in ipairs(entries) do
             table.insert(col, entry)
-            if #col > entriesPerColumn then
+            if #col >= entriesPerColumn then
                 table.insert(cols, col)
                 col = {{ name = '...' }}
             end

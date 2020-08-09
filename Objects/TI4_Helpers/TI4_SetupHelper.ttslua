@@ -227,6 +227,13 @@ local function allNamePatterns(t)
     return result
 end
 
+local function yieldForSeconds(seconds)
+    local now = Time.time
+    while Time.time < now + seconds do
+        coroutine.yield(0)
+    end
+end
+
 -------------------------------------------------------------------------------
 
 --- Find the "Setup Bag".
@@ -606,8 +613,7 @@ function SetupColor.unpackNew(setupBag)
     coroutine.yield(0)
 
     -- About to wait for resting, give a little extra time for gravity.
-    coroutine.yield(0)
-    coroutine.yield(0)
+    yieldForSeconds(0.5)
 
     for color, state in pairs(colorToState) do
         -- Units were unpacked ABOVE directionaliser.  Wait for them to fall.
@@ -1149,6 +1155,9 @@ function unpackFactionCoroutine()
 
     SetupFaction.unpackOther(faction, factionBox, zoneAttributes.center)
     coroutine.yield(0)
+
+    -- Give earlier unpack steps a moment to finish.
+    yieldForSeconds(2.5)
 
     SetupFaction.unpackStartingTech(color, faction, zoneAttributes.center)
     coroutine.yield(0)

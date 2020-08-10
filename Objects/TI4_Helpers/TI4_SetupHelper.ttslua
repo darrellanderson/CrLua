@@ -1287,18 +1287,6 @@ end
 
 function draw3Pcircle()
     Global.setVectorLines({
-        -- player1 spot
-        {points = getCircleVectorPoints({15.75, -2, -9.09},1.75, 32, 1),color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=true,square=false,}, -- purple circle
-        {points={{0.2,-1.0,-12.1},{0.2,-1.0,-71.6},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,}, -- purple horizontal
-        {points={{18.4,-1.0,-12.1},{64,-1.0,-12.1},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,}, -- purple vertical
-        -- player2 spot
-        {points = getCircleVectorPoints({-15.75, -2, -9.09},1.75, 32, 1),color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=true,square=false,}, -- white circle
-        {points={{-0.2,-1.0,-12.1},{-0.2,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,}, -- white vertical
-        {points={{-18.4,-1.0,-12.1},{-64,-1.0,-12.1},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,}, -- white horizontal
-        -- player3 spot
-        {points = getCircleVectorPoints({0, -2, 18.2},1.75, 32, 1),color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=true,square=false,}, -- red circle
-        {points={{18.4,-1.0,12.1},{64.0,-1.0,12.1},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,}, -- red horizontal
-        {points={{-18.4,-1.0,12.1},{-64,-1.0,12.1},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,}, -- red horizontal
         {points = getHexagonVectorPoints({0,-2,0},6,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false}, -- grey ring hexagons
         {points = getHexagonVectorPoints({0,-2,0},18,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
         {points = getHexagonVectorPoints({0,-2,0},12,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
@@ -1309,26 +1297,6 @@ end
 
 function draw4Pcircle()
     Global.setVectorLines({
-        -- player1 spot
-        {points = getCircleVectorPoints({5.25,-2,-15.15},1.75,32,1),color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{18.4,-1.0,-12.1},{64.0,-1.0,-12.1},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{0.2,-1.0,-12.1},{0.2,-1.0,-71.6},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-
-        -- player2 spot
-        {points=getCircleVectorPoints({-15.75,-2,-3.03}, 1.75, 32, 1),color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{-18.4,-1.0,-12.1},{-64,-1.0,-12.1},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-0.2,-1.0,-12.1},{-0.2,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-
-        -- player3 spot
-        {points = getCircleVectorPoints({-5.25,-2,15.15},1.75,32,1),color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{-0.2,-1.0,12.1},{-0.2,-1.0,71.6},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-18.4,-1.0,12.1},{-64,-1.0,12.1},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-
-        -- player4 spot
-        {points= getCircleVectorPoints({15.75,-2,3.03},1.75,32,1),color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{0.2,-1.0,12.1},{0.2,-1.0,71.6},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{18.4,-1.0,12.1},{64,-1.0,12.1},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-
         --grey ring hexagons and agenda box
         {points = getHexagonVectorPoints({0,-2,0},6,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
         {points = getHexagonVectorPoints({0,-2,0},18,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
@@ -1340,31 +1308,6 @@ end
 
 function draw5Pcircle()
     Global.setVectorLines({
-        -- player1 spot
-        {points = getCircleVectorPoints({15.75, -2, -9.09},1.75, 32, 1),color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{22.2,-1.0,-12.1},{22.2,-1.0,-71.6},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{18.4,-1.0,-12.1},{64,-1.0,-12.1},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-
-        -- player2 spot
-        {points = getCircleVectorPoints({0,-2,-18.25},1.75,32,1),color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{21.8,-1.0,-12.1},{21.8,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-21.8,-1.0,-12.1},{-21.8,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-
-        -- player3 spot
-        {points=getCircleVectorPoints({-15.75,-2,-9.09}, 1.75, 32, 1),color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{-18.4,-1.0,-12.1},{-64,-1.0,-12.1},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-22.2,-1.0,-12.1},{-22.2,-1.0,-71.6},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-
-        -- player4 spot
-        {points = getCircleVectorPoints({-15.75, -2, 9.09},1.75, 32, 1),color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{-0.2,-1.0,12.1},{-0.2,-1.0,71.6},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-18.4,-1.0,12.1},{-64,-1.0,12.1},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-
-        -- player5spot
-        {points = getCircleVectorPoints({15.75, -2, 9.09},1.75, 32, 1),color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{0.2,-1.0,12.1},{0.2,-1.0,71.6},},color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{18.4,-1.0,12.1},{64,-1.0,12.1},},color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-
         --grey ring hexagons and agenda box
         {points = getHexagonVectorPoints({0,-2,0},6,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
         {points = getHexagonVectorPoints({0,-2,0},18,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
@@ -1384,31 +1327,6 @@ end
 
 function draw6Pcircle()
     Global.setVectorLines({
-        -- player1 spot
-        {points = getCircleVectorPoints({15.75, -2, -9.09},1.75, 32, 1),color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{22.2,-1.0,-12.1},{22.2,-1.0,-71.6},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{18.4,-1.0,-12.1},{64,-1.0,-12.1},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player2 spot
-        {points = getCircleVectorPoints({0,-2,-18.25},1.75,32,1),color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{21.8,-1.0,-12.1},{21.8,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-21.8,-1.0,-12.1},{-21.8,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player3 spot
-        {points=getCircleVectorPoints({-15.75,-2,-9.09}, 1.75, 32, 1),color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{-18.4,-1.0,-12.1},{-64,-1.0,-12.1},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-22.2,-1.0,-12.1},{-22.2,-1.0,-71.6},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player4 spot
-        {points = getCircleVectorPoints({-15.75, -2, 9.09},1.75, 32, 1),color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{-18.4,-1.0,12.1},{-64,-1.0,12.1},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-22.2,-1.0,12.1},{-22.2,-1.0,71.6},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player5 spot
-        {points = getCircleVectorPoints({0,-2,18.25},1.75,32,1),color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{21.8,-1.0,12.1},{21.8,-1.0,71.6},},color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-21.8,-1.0,12.1},{-21.8,-1.0,71.6},},color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player6 spot
-        {points = getCircleVectorPoints({15.75, -2, 9.09},1.75, 32, 1),color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{18.4,-1.0,12.1},{64,-1.0,12.1},},color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{22.2,-1.0,12.1},{22.2,-1.0,71.6},},color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-
         --grey ring hexagons and agenda box
         {points = getHexagonVectorPoints({0,-2,0},6,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
         {points = getHexagonVectorPoints({0,-2,0},18,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
@@ -1420,35 +1338,6 @@ end
 
 function draw7Pcircle()
     Global.setVectorLines({
-        -- player1 spot
-        {points = getCircleVectorPoints({15.75, -2, -15},1.75, 32, 1),color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{18.4,-1.0,-12.1},{64,-1.0,-12.1},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{32.2,-1.0,-12.1},{32.2,-1.0,-71.6},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player2 spot
-        {points = getCircleVectorPoints({0,-2,-24.25},1.75,32,1),color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{31.8,-1.0,-12.1},{31.8,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{0.2,-1.0,-12.1},{0.2,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player3 spot
-        {points = getCircleVectorPoints({-15.75, -2, -15},1.75, 32, 1),color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{-0.2,-1.0,-12.1},{-0.2,-1.0,-71.6},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-31.8,-1.0,-12.1},{-31.8,-1.0,-71.6},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player4 spot
-        {points=getCircleVectorPoints({-21,-2,0}, 1.75, 32, 1),color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{-18.4,-1.0,-12.1},{-64,-1.0,-12.1},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-32.2,-1.0,-12.1},{-32.2,-1.0,-71.6},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player5 spot
-        {points = getCircleVectorPoints({-15.75, -2, 15},1.75, 32, 1),color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{-18.4,-1.0,12.1},{-64,-1.0,12.1},},color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-22.2,-1.0,12.1},{-22.2,-1.0,71.6},},color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player6 spot
-        {points = getCircleVectorPoints({15.75, -2, 15},1.75, 32, 1),color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{21.8,-1.0,12.1},{21.8,-1.0,71.6},},color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-21.8,-1.0,12.1},{-21.8,-1.0,71.6},},color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        --purple circle, vertical, horizontals
-        {points = getCircleVectorPoints({21, -2, 0},1.75, 32, 1),color=_playerList[7],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{18.4,-1.0,12.1},{64,-1.0,12.1},},color=_playerList[7],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{22.2,-1.0,12.1},{22.2,-1.0,71.6},},color=_playerList[7],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-
         --grey ring hexagons and agenda box
         {points = getHexagonVectorPoints({0,-2,0},6,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
         {points = getHexagonVectorPoints({0,-2,0},18,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
@@ -1469,38 +1358,6 @@ end
 
 function draw8Pcircle()
     Global.setVectorLines({
-        -- player1 spot
-        {points = getCircleVectorPoints({15.75, -2, -15},1.75, 32, 1),color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{18.4,-1.0,-12.1},{64,-1.0,-12.1},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{32.2,-1.0,-12.1},{32.2,-1.0,-71.6},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player2 spot
-        {points = getCircleVectorPoints({0,-2,-24.25},1.75,32,1),color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{31.8,-1.0,-12.1},{31.8,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{0.2,-1.0,-12.1},{0.2,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player3 spot
-        {points = getCircleVectorPoints({-15.75, -2, -15},1.75, 32, 1),color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{-0.2,-1.0,-12.1},{-0.2,-1.0,-71.6},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-31.8,-1.0,-12.1},{-31.8,-1.0,-71.6},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player4 spot
-        {points=getCircleVectorPoints({-21,-2,0}, 1.75, 32, 1),color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{-18.4,-1.0,-12.1},{-64,-1.0,-12.1},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-32.2,-1.0,-12.1},{-32.2,-1.0,-71.6},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player5 spot
-        {points = getCircleVectorPoints({-15.75, -2, 15},1.75, 32, 1),color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{-18.4,-1.0,12.1},{-64,-1.0,12.1},},color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-32.2,-1.0,12.1},{-32.2,-1.0,71.6},},color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player6 spot
-        {points = getCircleVectorPoints({0,-2,24.25},1.75,32,1),color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{-0.2,-1.0,12.1},{-0.2,-1.0,71.6},},color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-31.8,-1.0,12.1},{-31.8,-1.0,71.6},},color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player7 spot
-        {points = getCircleVectorPoints({15.75, -2, 15},1.75, 32, 1),color=_playerList[7],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{31.8,-1.0,12.1},{31.8,-1.0,71.6},},color=_playerList[7],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{0.2,-1.0,12.1},{0.2,-1.0,71.6},},color=_playerList[7],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player8 spot
-        {points = getCircleVectorPoints({21, -2, 0},1.75, 32, 1),color=_playerList[8],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{18.4,-1.0,12.1},{64,-1.0,12.1},},color=_playerList[8],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{32.3,-1.0,12.1},{32.2,-1.0,71.6},},color=_playerList[8],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
         --grey ring hexagons and agenda box
         {points = getHexagonVectorPoints({0,-2,0},6,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
         {points = getHexagonVectorPoints({0,-2,0},18,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},

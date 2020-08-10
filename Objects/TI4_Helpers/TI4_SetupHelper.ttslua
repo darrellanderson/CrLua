@@ -681,6 +681,23 @@ function setupCoroutine()
     return 1 -- REQUIRED!  MUST RETURN 1 TO STOP COROUTINE!
 end
 
+function hideSetupButton()
+    debugLog('hideSetupButton')
+    local setupBag = false
+    local setupButton = false
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        if object.tag == 'Bag' and name == 'Setup Bag' then
+            setupBag = object
+        elseif name == 'Game Setup Button' then
+            setupButton = object
+        end
+    end
+    if setupBag and setupButton then
+        setupBag.putObject(setupButton)
+    end
+end
+
 -------------------------------------------------------------------------------
 -------------------------------------------------------------------------------
 -------------------------------------------------------------------------------
@@ -1112,6 +1129,10 @@ function unpackFactionCoroutine()
     end
     coroutine.yield(0)
 
+    -- Hide the setup game button object (move to setup bag).
+    hideSetupButton()
+    coroutine.yield(0)
+
     -- Delete the unpack button object.
     local deletedItems = false
     for _, object in ipairs(getAllObjects()) do
@@ -1125,6 +1146,7 @@ function unpackFactionCoroutine()
     end
     local unpackButton = assert(getObjectFromGUID(params.unpackButtonGuid))
     destroyObject(unpackButton)
+    coroutine.yield(0)
 
     -- Move the token out of the way in case faction sheet, etc moves on top.
     tokenObject.translate({ x = 0, y = 5, z = 0 })

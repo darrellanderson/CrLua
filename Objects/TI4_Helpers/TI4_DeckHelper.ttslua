@@ -24,17 +24,17 @@ end
 
 -- Find decks based on placemats, that way can move mats and it just works.
 local PLACEMAT_GUID = {
-    SCORE = '',
-    DECKS = '',
+    SCORE = '7b15c0',
+    DECKS = '6dac8e',
 }
 
 local DECKS = {
     ['Public Objectives I'] = {
         transform = {
-            parentGuid = PLACEMAT_GUID.SCORE,
+            parentGuid = PLACEMAT_GUID.SCORE,  -- {-91.22, 0.01, -0.86} @ {7.13, 1.00, 7.13}
             deck = {
-                position = {},
-                rotation = {},
+                position = { x = 1.23, y = 0, z = -0.53 },
+                rotation = { x = 0, y = 0, z = 180 },
             }
         },
         cardNames = {
@@ -54,8 +54,8 @@ local DECKS = {
         transform = {
             parentGuid = PLACEMAT_GUID.SCORE,
             deck = {
-                position = {},
-                rotation = {},
+                position = { x = 1.23, y = 0, z = 0.53 },
+                rotation = { x = 0, y = 0, z = 180 },
             }
         },
         cardNames = {
@@ -75,8 +75,8 @@ local DECKS = {
         transform = {
             parentGuid = PLACEMAT_GUID.DECKS,
             deck = {
-                position = {},
-                rotation = {},
+                position = { x = 0.95, y = 0, z = -0.5 },  -- {-89.74, 0.02, 19.46}
+                rotation = { x = 0, y = 0, z = 180 },
             }
         },
         shuffleOnDiscard = true,
@@ -107,12 +107,12 @@ local DECKS = {
         transform = {
             parentGuid = PLACEMAT_GUID.DECKS,
             deck = {
-                position = {},
-                rotation = {},
+                position = { x = 0.01, y = 0, z = -0.5 },
+                rotation = { x = 0, y = 0, z = 180 },
             },
             discard = {
-                position = {},
-                rotation = {},
+                position = { x = 0.01, y = 0, z = 0.5 },
+                rotation = { x = 0, y = 0, z = 0 },
             }
         },
         cardNames = {
@@ -170,14 +170,14 @@ local DECKS = {
     },
     ['Actions'] = {
         transform = {
-            parentGuid = PLACEMAT_GUID.DECKS,
+            parentGuid = PLACEMAT_GUID.DECKS,  -- {-91.73, 0.01, 15.59} @ {3.97, 1.00, 3.97}
             deck = {
-                position = {},
-                rotation = {},
+                position = { x = -0.97, y = 0, z = -0.5 },  -- {-93.41, 0.41, 19.38}
+                rotation = { x = 0, y = 0, z = 180 },
             },
             discard = {
-                position = {},
-                rotation = {},
+                position = { x = -0.97, y = 0, z = 0.5 },  -- {-89.74, 0.02, 19.46}
+                rotation = { x = 0, y = 0, z = 0 },
             }
         },
         cardNames = {
@@ -287,6 +287,8 @@ local DECKS = {
 }
 
 local _lowerCardNameToDeckAttributes = false
+local _discardCardQueue = {}
+local _discardDeckQueue = {}
 
 local function _getDeckAttributes(cardName)
     assert(type(cardName) == 'string')
@@ -310,10 +312,10 @@ local function _getTransform(deckAttributes, deckOrDiscard)
     if not transform and deckOrDiscard == 'discard' then
         transform = deckAttributes.transform['deck']
     end
-    assert(transform)
+    transform = deckAttributes.transform['deck']
 
     local parentGuid = deckAttributes.transform.parentGuid
-    local parent = parentGuid and getObjectFromGUID(deckAttributes.transform.parentGuid)
+    local parent = parentGuid and assert(getObjectFromGUID(parentGuid))
     local parentRot = parent and parent.getRotation()
 
     return {
@@ -323,9 +325,9 @@ local function _getTransform(deckAttributes, deckOrDiscard)
             z = transform.position.z
         },
         rotation = {
-            x = transform.rotation.x + (parentRot and parentRot.x or 0),
-            y = transform.rotation.y + (parentRot and parentRot.y or 0),
-            z = transform.rotation.z + (parentRot and parentRot.z or 0),
+            x = transform.rotation.x + (parentRot and parentRot.x) or 0,
+            y = transform.rotation.y + (parentRot and parentRot.y) or 0,
+            z = transform.rotation.z + (parentRot and parentRot.z) or 0,
         }
     }
 end
@@ -336,8 +338,6 @@ end
 -------------------------------------------------------------------------------
 
 --- Discard this card, optionally removing it from a contiainer.
--- Caller should be careful not to call this during onObjectEnterContainer,
--- as the object won't actually be in it until the next frame.
 function discardCard(params)
     assert(type(params) == 'table')
     assert(type(params.guid) == 'string')
@@ -346,49 +346,67 @@ function discardCard(params)
     assert(not params.containerGuid or type(params.containerGuid) == 'string')
 
     local deckAttributes = _getDeckAttributes(params.name)
-    if not deckAttributes then
-        return false
+    if deckAttributes then
+        params.deckAttributes = deckAttributes
+        table.insert(_discardCardQueue, params)
+        Wait.frames(processCardDiscardQueue, 2 + params.index)
+        return true
+    end
+end
+
+function processCardDiscardQueue()
+    local params = table.remove(_discardCardQueue)
+    if not params then
+        return
     end
 
-    local transform = deckAttributes.discardTransform or deckAttributes.deckTransform
-    local parent = getObjectFromGUID(deckAttributes.parentGuid)
-    local pos = parent.positionToWorld(transform.position)
-    local rot = {
-        x = parent.getRotation().x + transform.rotation.x,
-        y = parent.getRotation().y + transform.rotation.y,
-        z = parent.getRotation().z + transform.rotation.z
-    }
+    local deckAttributes = assert(params.deckAttributes)
+    local transform = assert(_getTransform(deckAttributes, 'discard'))
+    transform.position.y = transform.position.y + 3 + (params.index or 0) / 10
 
-    pos.y = pos.y + 3 + (params.index or 0) / 10
-
+    local container = false
+    local cardObject = false
     if params.containerGuid then
-        local container = assert(getObjectFromGUID(params.containerGuid))
-        -- Watch out for taking the last card from a deck.  In that case,
-        -- 'remainder' is the last card, take does not work.
-        if container.tag == 'Deck' and container.remainder then
-            local cardObject = container.remainder
-            assert(cardObject.getGUID() == params.guid)
-            local collide = false
-            local fast = true
-            cardObject.setPositionSmooth(pos, collide, fast)
-            cardObject.setRotationSmooth(rot, collide, fast)
+        container = getObjectFromGUID(params.containerGuid)
+        if not container then
+            -- Container does not exist anymore.
+            cardObject = getObjectFromGUID(params.guid)
+        elseif container.tag == 'Deck' and container.remainder and container.remainder.getGUID() == params.guid then
+            -- Card is the last card in the deck.
+            cardObject = container.remainder
         else
-            container.takeObject({
-                guid              = params.guid,
-                position          = pos,
-                rotation          = rot,
-                smooth            = false,
-            })
+            -- Card is presumably in the container.  Verify.
+            local found = false
+            for _, entry in ipairs(container.getObjects()) do
+                if entry.guid == params.guid then
+                    found = true
+                    break
+                end
+            end
+            assert(found)
         end
     else
-        cardObject = getObjectFromGUID(cardGuid)
-        local collide = false
-        local fast = true
-        cardObject.setPositionSmooth(pos, collide, fast)
-        cardObject.setRotationSmooth(rot, collide, fast)
+        -- Find card on the table.
+        cardObject = getObjectFromGUID(params.guid)
     end
 
-    return true
+    if cardObject then
+        local collide = false
+        local fast = true
+        cardObject.setLock(false)
+        cardObject.setPositionSmooth(transform.position, collide, fast)
+        cardObject.setRotationSmooth(transform.rotation, collide, fast)
+    elseif container then
+        cardObject = container.takeObject({
+            guid              = params.guid,
+            position          = transform.position,
+            rotation          = transform.rotation,
+            smooth            = false,
+        })
+        assert(cardObject)
+    else
+        error('no card or container to look for one')
+    end
 end
 
 function discardDeck(params)
@@ -440,7 +458,7 @@ end
 -- Add top/bottom context menu on Agenda cards to discard to top/bottom.
 
 local function _isAgendaCard(object)
-    assert(type(cardObject) == 'userdata')
+    assert(type(object) == 'userdata')
     assert(DECKS['Agenda'], 'No agenda deck??')
     if object.tag == 'Card' then
         local deckAttributes = _getDeckAttributes(object.getName())
@@ -452,9 +470,11 @@ local function _putAgendaCard(cardObject, onTop)
     assert(type(cardObject) == 'userdata' and cardObject.tag == 'Card' and type(onTop) == 'boolean')
 
     -- Cannot use normal discard method as this is not going to the discard pile.
-    local transform = _getDeckTransform(DECKS['Agenda'])
+    local transform = _getTransform(DECKS['Agenda'], 'deck')
+    assert(transform)
 
     -- Teleport to near (jump out of hand, if in hand).
+    -- DO NOT SET POSITION SMOOTH, GETS PULLED BACK TO HAND!
     local nearby = { x = transform.position.x * 0.8, y = transform.position.y + 5, z = transform.position.z * 0.8 }
     cardObject.setPosition(nearby)
     cardObject.setRotation(transform.rotation)
@@ -464,7 +484,7 @@ local function _putAgendaCard(cardObject, onTop)
         -- Smooth to final position.
         transform.position.y = transform.position.y + (onTop and 3 or 0)
         local collide = false
-        local fast = true
+        local fast = false  -- slow so can see it go bottom/top
         cardObject.setPositionSmooth(transform.position, collide, fast)
     end
     Wait.frames(finishPut, 2)
@@ -516,4 +536,34 @@ function onLoad(saveState)
     for deckName, attributes in pairs(DECKS) do
         attributes.deckName = deckName
     end
+
+    -- Test methods.
+    self.addContextMenuItem('Discard cards', testDiscardCards, false)
 end
+
+function testDiscardCards()
+    local cards = {}
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Card' then
+            print('found ' .. object.getName())
+            table.insert(cards, object)
+        end
+    end
+    for i, card in ipairs(cards) do
+        discardCard({
+            guid = card.getGUID(),
+            name = card.getName(),
+            index = i
+        })
+    end
+end
+
+-------------------------------------------------------------------------------
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

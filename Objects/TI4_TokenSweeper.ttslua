@@ -75,7 +75,7 @@ function clickTokens(_, playerColor)
     local tokenBag = false
     local tokens = {}
 
-    for _, object in ipairs(allObjects) do
+    for _, object in ipairs(getAllObjects()) do
         local name = object.getName()
         if object.tag == 'Bag' and name == bagName then
             tokenBag = object

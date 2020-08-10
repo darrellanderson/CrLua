@@ -117,14 +117,14 @@ CrLua.TI4.PlayerScore.factionNicknames = {
 }
 
 CrLua.TI4.PlayerScore.colorAbbreviation = {
-    ['Blue'] = 'Blue',
-    ['Purple'] = 'Purple',
-    ['Yellow'] = 'Yellow',
-    ['Red'] = 'Red',
-    ['Green'] = 'Green',
-    ['White'] = 'Black',
-    ['Orange'] = 'Orange',
-    ['Pink'] = 'Pink',
+    ['Blue'] = 'B',
+    ['Purple'] = 'P',
+    ['Yellow'] = 'Y',
+    ['Red'] = 'R',
+    ['Green'] = 'G',
+    ['White'] = 'W',
+    ['Orange'] = 'O',
+    ['Pink'] = 'K',
 }
 
 CrLua.TI4.PlayerScore.MECATOL = 'Custodians'
@@ -222,6 +222,17 @@ function CrLua.TI4.PlayerScore.colorToScore(nameToScoreObjects, nameToOwnerToken
     local scoreboard = nameToScoreObjects[CrLua.TI4.PlayerScore.SCOREBOARD][1]
     assert(scoreboard)
     local ownerTokens = nameToOwnerTokens[CrLua.TI4.PlayerScore.SCOREBOARD] or {}
+
+    -- The scoreboard bounding box is larger than the image.  Prune out extras.
+    if #ownerTokens > 0 then
+        for i = #ownerTokens, 1, -1 do
+            local center = ownerTokens[i].getBounds().center
+            local p = scoreboard.positionToLocal(center)
+            if math.abs(p.z) > 0.5 then
+                table.remove(ownerTokens, i)
+            end
+        end
+    end
 
     local ownerTokenNameToColor = {}
     for color, faction in pairs(_factionHelper.allFactions()) do

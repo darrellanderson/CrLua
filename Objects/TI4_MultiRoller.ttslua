@@ -321,6 +321,7 @@ end
 modeList = {CMBT="COMBAT", AFB="ANTI-FIGHTER BARRAGE", SPC="SPACE CANNON", BOMB="BOMBARDMENT"}
 
 function rollDice(color, mode)
+    detectCards(color)
     updateHitValues()
     applyMods(color, mode)
     local inputs = self.getInputs()
@@ -790,8 +791,6 @@ modValue["CMBT"]["Tekklar Legion (Opponent)"] = {}
 modValue["CMBT"]["Tekklar Legion (Opponent)"]["Infantry"] = -1
 
 -- Include lowercase p version for now.
-modValue["CMBT"]["Fighter prototype"] = {}
-modValue["CMBT"]["Fighter prototype"]["Fighter"] = 2
 modValue["CMBT"]["Fighter Prototype"] = {}
 modValue["CMBT"]["Fighter Prototype"]["Fighter"] = 2
 
@@ -972,7 +971,6 @@ rollMod = {}
 function resetMods()
     rollMod["Morale Boost"] = false
     rollMod["Prophecy of Ixth"] = false
-    rollMod["Fighter prototype"] = false
     rollMod["Fighter Prototype"] = false
     rollMod["Unrelenting"] = false
     rollMod["Fragile"] = false
@@ -1018,7 +1016,6 @@ end
 rollModDesc = {}
 rollModDesc["Morale Boost"] = "+1 to all COMBAT rolls"
 rollModDesc["Prophecy of Ixth"] = "+1 to fighter's COMBAT rolls"
-rollModDesc["Fighter prototype"] = "+2 to fighter's COMBAT rolls"
 rollModDesc["Fighter Prototype"] = "+2 to fighter's COMBAT rolls"
 rollModDesc["Unrelenting"] =  "+1 to all COMBAT rolls"
 rollModDesc["Fragile"] = "-1 to all COMBAT rolls"

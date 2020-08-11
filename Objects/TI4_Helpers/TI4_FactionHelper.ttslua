@@ -366,7 +366,7 @@ function fromTokenName(tokenName)
     assert(type(tokenName) == 'string')
     tokenName = string.match(tokenName, '^(.*) .* Token$') or tokenName
     _maybeUpdate()
-    for color, faction in pairs(_colorToFaction) do
+    for _, faction in pairs(_factionAttributes) do
         if faction.tokenName == tokenName then
             return faction
         end

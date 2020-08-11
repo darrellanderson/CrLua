@@ -289,6 +289,7 @@ local DECKS = {
 local _lowerCardNameToDeckAttributes = false
 local _discardCardQueue = {}
 local _discardDeckQueue = {}
+local _waitForDestroy = {}
 
 local function _getDeckAttributes(cardName)
     assert(type(cardName) == 'string')
@@ -331,7 +332,28 @@ local function _getTransform(deckAttributes, deckOrDiscard)
     }
 end
 
-local function _getDeckTransform(deckAttributes)
+local function _getDeck(deckTransform)
+    assert(type(deckTransform) == 'table')
+    local hits = Physics.cast({
+        origin       = deckTransform.position,
+        direction    = { x = 0, y = -1, z = 0 },
+        type         = 3,  -- box
+        size         = { x = 0.1, y = 4, z = 0.1 },
+    })
+
+    -- First look for a deck.
+    for _, hit in ipairs(hits or {}) do
+        if hit.hit_object.tag == 'Deck' then
+            return hit.hit_object
+        end
+    end
+
+    -- Failing that check if there is a single card.
+    for _, hit in ipairs(hits or {}) do
+        if hit.hit_object.tag == 'Card' then
+            return hit.hit_object
+        end
+    end
 end
 
 -------------------------------------------------------------------------------
@@ -343,18 +365,24 @@ function discardCard(params)
     assert(type(params.name) == 'string')
     assert(not params.index or type(params.index) == 'number')
     assert(not params.containerGuid or type(params.containerGuid) == 'string')
+    assert(not params.waitForDestroy or type(params.waitForDestroy) == 'boolean')
 
     local deckAttributes = _getDeckAttributes(params.name)
     if deckAttributes then
         params.deckAttributes = deckAttributes
-        table.insert(_discardCardQueue, params)
-        Wait.frames(processCardDiscardQueue, 2 + params.index)
+        if params.waitForDestroy then
+            params.waitForDestroy = nil
+            _waitForDestroy[params.guid] = function() discardCard(params) end
+        else
+            table.insert(_discardCardQueue, params)
+            Wait.frames(processCardDiscardQueue, 2 + 2 * (params.index or 0))
+        end
         return true
     end
 end
 
 function processCardDiscardQueue()
-    local params = table.remove(_discardCardQueue)
+    local params = table.remove(_discardCardQueue, 1)
     if not params then
         return
     end
@@ -390,60 +418,137 @@ function processCardDiscardQueue()
     end
 
     if cardObject then
-        local collide = false
-        local fast = true
         cardObject.setLock(false)
-        cardObject.setPositionSmooth(transform.position, collide, fast)
-        cardObject.setRotationSmooth(transform.rotation, collide, fast)
+        cardObject.setPosition(transform.position)
+        cardObject.setRotation(transform.rotation)
     elseif container then
+        local isLocked = container.getLock()
+        container.setLock(false)
         cardObject = container.takeObject({
             guid              = params.guid,
             position          = transform.position,
             rotation          = transform.rotation,
             smooth            = false,
         })
+        container.setLock(isLocked)
         assert(cardObject)
     else
-        error('no card or container to look for one')
+        error('discard card: no card or container to look for one ("' .. (params.name or '') .. '")')
+    end
+
+    if deckAttributes.shuffleOnDiscard then
+        if deckAttributes._waitShuffleId then
+            Wait.stop(deckAttributes._waitShuffleId)
+        end
+        local function delayedShuffle()
+            deckAttributes._waitShuffleId = nil
+            local transform = _getTransform(deckAttributes, 'discard')
+            local deck = _getDeck(transform)
+            if deck and deck.tag == 'Deck' then
+                deck.shuffle()
+            end
+        end
+        deckAttributes._waitShuffleId = Wait.time(delayedShuffle, 2)
     end
 end
 
 function discardDeck(params)
     assert(type(params) == 'table')
     assert(type(params.guid) == 'string')
+    assert(type(params.name) == 'string')
     assert(not params.index or type(params.index) == 'number')
     assert(not params.containerGuid or type(params.containerGuid) == 'string')
+    assert(not params.waitForDestroy or type(params.waitForDestroy) == 'boolean')
 
-    if params.containerGuid then
-        local container = assert(getObjectFromGUID(params.containerGuid))
-        local pos = container.getPosition()
-        pos.y = pos.y + 5 + (params.index or 0)
-        local function takeCallback(object)
-            assert(object.tag == 'Deck')
-            object.setLock(true)
-            discardDeck({
-                guid = object.getGUID(),
-            })
-            Wait.frames(function() object.setLock(false) end, 4)
-        end
-        local takeParams = {
-            guid              = params.guid,
-            position          = pos,
-            rotation          = rot,
-            smooth            = false,
-            callback_function = takeCallback,
-        }
-    else
+    -- The "wait for destroy" flag means the deck is being added to a container
+    -- and we should wait for TTS to destroy the (old) version being added to
+    -- the bag before retrieving the (new) version from the bag.
+    --
+    -- In that case, only process it if will discard at least one card.
+    local function hasCandidateCard()
         local deck = getObjectFromGUID(params.guid)
-        assert(deck.tag == 'Deck')
-        for i, entry in ipairs(deck.getObjects()) do
-            discardCard({
-                guid = entry.guid,
-                name = entry.name,
-                index = i,
-                containerGuid = deck.getGUID()
+        if not deck then
+            error('discard deck: missing deck "' .. params.name .. '" (' .. params.guid .. ')')
+        end
+        if deck.tag ~= 'Deck' then
+            error('discard deck: "' .. deck.getName() .. '" is not a deck')
+        end
+        for _, entry in ipairs(deck.getObjects()) do
+            if _getDeckAttributes(entry.name) then
+                return true
+            end
+        end
+    end
+
+    if params.waitForDestroy then
+        if hasCandidateCard() then
+            params.waitForDestroy = nil
+            _waitForDestroy[params.guid] = function() discardDeck(params) end
+            return true
+        end
+    else
+        table.insert(_discardDeckQueue, params)
+        Wait.frames(processDeckDiscardQueue, 2 + 2 * (params.index or 0))
+        return true
+    end
+end
+
+function processDeckDiscardQueue()
+    local params = table.remove(_discardDeckQueue, 1)
+    if not params then
+        return
+    end
+
+    local container = false
+    local deckObject = false
+    if params.containerGuid then
+        container = getObjectFromGUID(params.containerGuid)
+        if container then
+            local pos = container.getPosition()
+            deckObject = container.takeObject({
+                guid              = params.guid,
+                position          = { x = pos.x, y = pos.y + 5 + (params.index or 0), z = pos.z },
+                smooth            = false,
             })
         end
+    else
+        deckObject = getObjectFromGUID(params.guid)
+    end
+
+    if not deckObject then
+        error('discard deck: no deck ("' .. (params.name or '') .. '")')
+    end
+    Wait.frames(function() deckObject.setLock(true) end, 1)
+
+    local numAccepted = 0
+    local numRejected = 0
+    for i, entry in ipairs(deckObject.getObjects()) do
+        local accepted = discardCard({
+            guid = entry.guid,
+            name = entry.name,
+            containerGuid = deckObject.getGUID(),
+            index = i
+        })
+        if accepted then
+            numAccepted = numAccepted + 1
+        else
+            numRejected = numRejected + 1
+        end
+    end
+
+    -- If any cards were not discarded, return the remaining deck to any container.
+    if numRejected > 0 then
+        local function delayedFinish()
+            deckObject.setLock(false)
+            if deckObject.remainder then
+                deckObject = deckObject.remainder
+                deckObject.setLock(false)
+            end
+            if container then
+                container.putObject(deckObject)
+            end
+        end
+        Wait.frames(delayedFinish, 6 + 2 * numAccepted)
     end
 end
 
@@ -499,18 +604,25 @@ function onObjectLeaveContainer(container, leaveObject)
             printToAll('Put agenda bottom', playerColor)
             _putAgendaCard(leaveObject, false)
         end
-        local function clearMenu(playerColor)
-            leaveObject.clearContextMenu()
-        end
         leaveObject.addContextMenuItem('Place Agenda Top', putTop, false)
         leaveObject.addContextMenuItem('Place Agenda Bottom', putBottom, false)
-        leaveObject.addContextMenuItem('Clear Place Options', clearMenu, false)
     end
 end
 
 function onObjectEnterContainer(container, enterObject)
     if _isAgendaCard(enterObject) then
         enterObject.clearContextMenu()
+    end
+end
+
+-------------------------------------------------------------------------------
+
+function onObjectDestroy(dyingObject)
+    local guid = dyingObject.getGUID()
+    if _waitForDestroy[guid] then
+        local callback = _waitForDestroy[guid]
+        _waitForDestroy[guid] = nil
+        callback()
     end
 end
 
@@ -538,6 +650,7 @@ function onLoad(saveState)
 
     -- Test methods.
     self.addContextMenuItem('Discard cards', testDiscardCards, false)
+    self.addContextMenuItem('Discard deck', testDiscardDeck, false)
 end
 
 function testDiscardCards()
@@ -552,6 +665,7 @@ function testDiscardCards()
             table.insert(decks, object)
         end
     end
+
     for i, card in ipairs(cards) do
         discardCard({
             guid = card.getGUID(),
@@ -574,6 +688,26 @@ function testDiscardCards()
                 name = entry.name,
                 index = i,
                 containerGuid = deck.getGUID()
+            })
+        end
+    end
+end
+
+function testDiscardDeck()
+    local decks = {}
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Deck' then
+            table.insert(decks, object)
+        end
+    end
+
+    -- Test discard deck.
+    for _, deck in ipairs(decks) do
+        if deck.getName() == 'Actions' then
+            discardDeck({
+                guid = deck.getGUID(),
+                name = deck.getName(),
+                index = nil
             })
         end
     end

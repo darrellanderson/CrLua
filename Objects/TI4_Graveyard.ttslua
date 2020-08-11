@@ -95,7 +95,6 @@ local function getNonCardDestination(objectName)
     -- If "FACTION Owner Token" and no bag, put in the "Pick a Faction to Play"
     -- bag (scan again to make earlier, more common scan do less work).
     local faction = (not bag) and _factionHelper.fromTokenName(objectName)
-    print('xxx ' .. objectName .. ' ' .. (faction and faction.name or '-'))
     if not bag and faction then
         local bagGuid = data.pickFactionTokenBagGuid
         bag = bagGuid and getObjectFromGUID(bagGuid)

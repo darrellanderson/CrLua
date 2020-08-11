@@ -312,7 +312,6 @@ local function _getTransform(deckAttributes, deckOrDiscard)
     if not transform and deckOrDiscard == 'discard' then
         transform = deckAttributes.transform['deck']
     end
-    transform = deckAttributes.transform['deck']
 
     local parentGuid = deckAttributes.transform.parentGuid
     local parent = parentGuid and assert(getObjectFromGUID(parentGuid))
@@ -542,11 +541,15 @@ function onLoad(saveState)
 end
 
 function testDiscardCards()
+    -- Discard any loose cards.
     local cards = {}
+    local decks = {}
     for _, object in ipairs(getAllObjects()) do
         if object.tag == 'Card' then
             print('found ' .. object.getName())
             table.insert(cards, object)
+        elseif object.tag == 'Deck' then
+            table.insert(decks, object)
         end
     end
     for i, card in ipairs(cards) do
@@ -555,6 +558,24 @@ function testDiscardCards()
             name = card.getName(),
             index = i
         })
+    end
+
+    -- Find and discard all the Sabotage cards from inside a deck.
+    for _, deck in ipairs(decks) do
+        local entries = {}
+        for _, entry in ipairs(deck.getObjects()) do
+            if string.match(entry.name, '^Sabotage') then
+                table.insert(entries, entry)
+            end
+        end
+        for i, entry in ipairs(entries) do
+            discardCard({
+                guid = entry.guid,
+                name = entry.name,
+                index = i,
+                containerGuid = deck.getGUID()
+            })
+        end
     end
 end
 

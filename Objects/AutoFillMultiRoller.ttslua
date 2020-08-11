@@ -462,7 +462,6 @@ function autoFill(params)
     local autofillTypeAttributes = assert(AUTOFILL_TYPE[params.autoFillType])
 
     updateColorToMultiRoller()
-    CrLua.TI4.Faction.update()
 
     local multiRoller = data.colorToMultiRoller[params.clickerColor]
     if not multiRoller then
@@ -737,12 +736,12 @@ end
 #include <~/CrLua/CrLua>
 #include <~/CrLua/LockGlobals>
 
-#include <~/CrLua/TI4/Faction>
 #include <~/CrLua/TI4/Hex>
 #include <~/CrLua/TI4/Unit>
 #include <~/CrLua/TI4/Wormhole>
 
 #include <~/CrLua/TTS/ClickButtonHack>
+#include <~/CrLua/TTS/HelperClient>
 #include <~/CrLua/TTS/Object>
 #include <~/CrLua/TTS/Player>
 

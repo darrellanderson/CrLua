@@ -594,7 +594,6 @@ function updateCache()
         end
     end
 
-    CrLua.TI4.Faction.update()
     local hexToOwners = getSystemOwners()
 
     _cache.originalPolygons.planets = {}
@@ -1401,9 +1400,10 @@ end
 #include <~/CrLua/CrLua>
 #include <~/CrLua/LockGlobals>
 
-#include <~/CrLua/TI4/Faction>
 #include <~/CrLua/TI4/Hex>
 #include <~/CrLua/TI4/Unit>
+
+#include <~/CrLua/TTS/HelperClient>
 
 #include <~/CrLua/List>
 #include <~/CrLua/LockTable>

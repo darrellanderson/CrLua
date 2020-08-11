@@ -360,83 +360,105 @@ function onLoad(saveState)
     self.addContextMenuItem('Custom Franken..', createCustomSelectionUi)
     self.addContextMenuItem('Remove hidden zones', removeHiddenZones)
 
-    createCustomSelectionUi()  -- TODO DELE XXX
+    --createCustomSelectionUi() -- for testing
 end
 
 -------------------------------------------------------------------------------
 
-function createCustomSelectionUi()
+local _nameList = false
+local _nameToEntries = false
+local _tabName
+
+local function getNameToEntries()
+    if not _nameToEntries then
+        local function sortEntries(a, b)
+            return a.name < b.name
+        end
+
+        _nameList = {}
+        _nameToEntries = {}
+
+        for name, count in pairs(UNPACK_TO_BAGS) do
+            table.insert(_nameList, name)
+            local object = takeToAbove(self, name)
+            assert(object)
+            coroutine.yield(0)
+            local entries = {}
+            for _, entry in ipairs(object.getObjects()) do
+                table.insert(entries, {
+                    guid = entry.guid,
+                    name = entry.name
+                })
+            end
+            assert(#entries > 0)
+            table.sort(entries, sortEntries)
+            _nameToEntries[name] = entries
+            self.putObject(object)
+            coroutine.yield(0)
+        end
+        table.sort(_nameList)
+    end
+    return _nameList, _nameToEntries
+end
+
+local function createAndCheckAllToggles(nameToEntries)
+    assert(type(nameToEntries) == 'table')
+    _toggles = {}
+    for name, entries in pairs(nameToEntries) do
+        for _, entry in ipairs(entries) do
+            if entry.guid then
+                _toggles[entry.guid] = true
+            end
+        end
+    end
+end
+
+function createCustomSelectionUi(tabName)
+    _tabName = tabName
     startLuaCoroutine(self, 'createCustomSelectionUiLuaCoroutine')
 end
 
 function createCustomSelectionUiLuaCoroutine()
-    local function sortEntries(a, b)
-        return a.name < b.name
-    end
-    local nameList = {}
-    local nameToEntries = {}
-    for name, count in pairs(UNPACK_TO_BAGS) do
-        table.insert(nameList, name)
-        local object = takeToAbove(self, name)
-        assert(object)
-        coroutine.yield(0)
-        local entries = {}
-        for _, entry in ipairs(object.getObjects()) do
-            table.insert(entries, {
-                guid = entry.guid,
-                name = entry.name
-            })
-        end
-        table.sort(entries, sortEntries)
-        nameToEntries[name] = entries
-        self.putObject(object)
-        coroutine.yield(0)
-    end
-
+    local nameList, nameToEntries = getNameToEntries()
     if not _toggles then
-        _toggles = {}
-        for name, entries in pairs(nameToEntries) do
-            for _, entry in ipairs(entries) do
-                if entry.guid then
-                    _toggles[entry.guid] = true
-                end
-            end
-        end
+        createAndCheckAllToggles(nameToEntries)
     end
 
-    -- Split into columns, wrapping long lists.
-    -- Place a header as first entry or false for wrapped.
-    local cols = {}
-    table.sort(nameList)
-    for _, name in ipairs(nameList) do
-        local entries = nameToEntries[name]
-        local entriesPerColumn = #entries + 1  -- +1 for heading
-        local div = 1
-        while entriesPerColumn > MAX_UI_ROWS do
-            div = div + 1
-            entriesPerColumn = math.ceil(#entries / div) + 1
-        end
-        local col = {{ name = name }}
-        for _, entry in ipairs(entries) do
-            table.insert(col, entry)
-            if #col >= entriesPerColumn then
-                table.insert(cols, col)
-                col = {{ name = '...' }}
-            end
-        end
-        if #col > 1 then
-            table.insert(cols, col)
-        end
-    end
+    local tabName = nameToEntries[_tabName] and _tabName or nameList[1]
 
-    local numCols = #cols
+    -- Compute the max number of rows needed when split into #tab columns.
+    local numCols = math.ceil(#nameList / 2)
     local numRows = 1
-    for _, col in ipairs(cols) do
-        numRows = math.max(numRows, #col)
+    for _, entries in pairs(nameToEntries) do
+        local entriesPerColumn = math.ceil(#entries / numCols)
+        print('xxx ' .. (#entries) .. ' ' .. entriesPerColumn .. ' ' .. (#entries / numCols) .. ' ' .. numRows)
+        numRows = math.max(numRows, entriesPerColumn + 4)
     end
-    --print('ui ' .. numCols .. 'x' .. numRows)
+    print('Table ' .. numCols .. 'x' .. numRows)
 
-    numRows = numRows + 1
+    -- Create columns and add tabs.
+    local cols = {}
+    for i = 1, numCols do
+        local tab1 = nameList[i]
+        local tab2 = nameList[i + numCols]
+        cols[i] = {
+            tab1 and { name = tab1, id = tab1 } or false,
+            tab2 and { name = tab2, id = tab2 } or false,
+            i == 1 and { name = tabName } or false,
+        }
+    end
+
+    -- Get tab contents.
+    local entries = nameToEntries[tabName]
+    local entriesPerColumn = math.ceil(#entries / numCols)
+    for i, entry in ipairs(entries) do
+        local colIdx = math.floor((i - 1) / entriesPerColumn) + 1
+        assert(colIdx <= numCols, 'colIdx ' .. colIdx)
+        local col = cols[colIdx]
+        table.insert(col, entry)
+    end
+
+    -- Add footer buttons.
     local centerColIdx = math.floor(numCols / 2)
     cols[centerColIdx][numRows] = { name = 'Cancel', id = 'cancel' }
     cols[centerColIdx+1][numRows] = { name = 'Unpack', id = 'doCustomSetup' }
@@ -542,7 +564,8 @@ function onButtonClick(player, input, id)
         _useToggles = true
         doSetup()
     else
-        error('unknown id "' .. id .. '"')
+        --error('unknown id "' .. id .. '"')
+        createCustomSelectionUi(id)
     end
 end
 

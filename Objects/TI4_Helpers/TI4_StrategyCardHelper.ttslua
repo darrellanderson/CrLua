@@ -45,9 +45,7 @@ local ALLOCATE_COMMAND_TOKENS = {
     localDX = -0.4
 }
 
-local DISCARD_SHEET_GUID = '26ca2a'
-
-STRATEGY_CARD_INITIATIVE = {
+local STRATEGY_CARD_INITIATIVE = {
     ['Zero Strategy Token'] = 0,
     ['Leadership'] = 1,
     ['Diplomacy'] = 2,
@@ -60,6 +58,24 @@ STRATEGY_CARD_INITIATIVE = {
     ['Logistics'] = 6.5,
     ['Technology'] = 7,
     ['Imperial'] = 8
+}
+
+local STRATEGY_CARD_SHEET_GUID = '26ca2a'  -- {68.76, 0.10, -9.20} @ {8.50, 1.00, 6.00}
+
+local STRATEGY_CARD_RETURN_POSITION = {
+    ['Leadership'] = { x = -0.75, y = 0, z = -0.47 },
+    ['Diplomacy'] = { x = -0.28, y = 0, z = -0.47 },
+    ['Diplomacy (Revised)'] = { x = -0.28, y = 0, z = -0.47 },
+    ['Politics'] = { x = 0.19, y = 0, z = -0.47 },
+    ['Construction'] = { x = 0.66, y = 0, z = -0.47 },
+
+    ['Trade'] = { x = -0.75, y = 0, z = 0.45 },
+    ['Warfare'] = { x = -0.28, y = 0, z = 0.45 },
+    ['Technology'] = { x = 0.19, y = 0, z = 0.45 },
+    ['Imperial'] = { x = 0.66, y = 0, z = 0.45 },
+
+    ['Industry'] = { x = -0.28, y = 0, z = 0.9 },
+    ['Logistics'] = { x = 0.19, y = 0, z = 0.9 },
 }
 
 local _guidToParameters = {}
@@ -291,11 +307,17 @@ function _returnStrategyCard(playerColor, strategyCard, parameters)
         return
     end
 
+    local sheet = assert(getObjectFromGUID(STRATEGY_CARD_SHEET_GUID))
+    local offset = assert(STRATEGY_CARD_RETURN_POSITION[strategyCard.getName()])
+
+    local position = sheet.positionToWorld(offset)
+    local rotation = sheet.getRotation()
+
     local collide = false
     local fast = true
-    local abovePos = { x = parameters.position.x, y = parameters.position.y + 1, z = parameters.position.z}
+    local abovePos = { x = position.x, y = position.y + 1, z = position.z}
     strategyCard.setPositionSmooth(abovePos, collide, fast)
-    strategyCard.setRotationSmooth(parameters.rotation, collide, fast)
+    strategyCard.setRotationSmooth(rotation, collide, fast)
     _safeBroadcastToColor('Returned Strategy Card.', playerColor, {1,1,1})
 end
 

@@ -377,13 +377,13 @@ function discardCard(params)
             _waitForDestroy[params.guid] = function() discardCard(params) end
         else
             table.insert(_discardCardQueue, params)
-            Wait.frames(processCardDiscardQueue, 2 + 2 * (params.index or 0))
+            Wait.frames(_processCardDiscardQueue, 2 + 2 * (params.index or 0))
         end
         return true
     end
 end
 
-function processCardDiscardQueue()
+function _processCardDiscardQueue()
     local params = table.remove(_discardCardQueue, 1)
     if not params then
         return
@@ -490,12 +490,12 @@ function discardDeck(params)
         end
     else
         table.insert(_discardDeckQueue, params)
-        Wait.frames(processDeckDiscardQueue, 2 + 2 * (params.index or 0))
+        Wait.frames(_processDeckDiscardQueue, 2 + 2 * (params.index or 0))
         return true
     end
 end
 
-function processDeckDiscardQueue()
+function _processDeckDiscardQueue()
     local params = table.remove(_discardDeckQueue, 1)
     if not params then
         return
@@ -567,6 +567,51 @@ function isDiscard(cardGuid)
     local p2 = discardTransform.position
     local d = math.sqrt((p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2)
     return d < 1
+end
+
+--- Make sure dropped card it not going to wrong deck/discard.
+function _verifyCardDrop(cardObject)
+    assert(type(cardObject) == 'userdata' and cardObject.tag == 'Card')
+
+    local function insideDeckTransform(deckTransform)
+        local p1 = cardObject.getPosition()
+        local p2 = deckTransform.position
+        local d = math.sqrt((p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2)
+        return d < 1 and deckTransform.rotation
+    end
+
+    local function insideDeckOrDiscard(deckAttributes)
+        local deckTransform = _getTransform(deckAttributes, 'deck')
+        local discardTransform = _getTransform(deckAttributes, 'discard')
+        return insideDeckTransform(deckTransform) or insideDeckTransform(discardTransform)
+    end
+
+    local deckAttributes = _getDeckAttributes(cardObject.getName())
+    if not deckAttributes then
+        return  -- does not belong to a known deck
+    else
+        local rotation = insideDeckOrDiscard(deckAttributes)
+        if rotation then
+            -- Make sure it has the correct rotation.
+            local collide = false
+            local fast = true
+            cardObject.setRotationSmooth(rotation, collide, fast)
+            return  -- dropped in the expected deck area.
+        end
+    end
+
+    for name, otherDeckAttributes in pairs(DECKS) do
+        if name ~= deckAttributes.deckName and insideDeckOrDiscard(otherDeckAttributes) then
+            local message = {
+                'Warning: card from the "',
+                deckAttributes.deckName,
+                '" deck was dropped in the "',
+                otherDeckAttributes.deckName,
+                '" area'
+            }
+            broadcastToAll(table.concat(message, ''), 'Red')
+        end
+    end
 end
 
 -------------------------------------------------------------------------------
@@ -705,6 +750,14 @@ function onObjectDestroy(dyingObject)
         local callback = _waitForDestroy[guid]
         _waitForDestroy[guid] = nil
         callback()
+    end
+end
+
+-------------------------------------------------------------------------------
+
+function onObjectDrop(playerColor, droppedObject)
+    if droppedObject.tag == 'Card' then
+        _verifyCardDrop(droppedObject)
     end
 end
 

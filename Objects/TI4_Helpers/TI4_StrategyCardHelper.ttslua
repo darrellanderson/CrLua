@@ -60,7 +60,7 @@ local STRATEGY_CARD_INITIATIVE = {
     ['Imperial'] = 8
 }
 
-local STRATEGY_CARD_SHEET_GUID = '26ca2a'  -- {68.76, 0.10, -9.20} @ {8.50, 1.00, 6.00}
+local STRATEGY_CARD_SHEET_GUID = '9273af'  -- {68.76, 0.10, -9.20} @ {8.50, 1.00, 6.00}
 
 local STRATEGY_CARD_RETURN_POSITION = {
     ['Leadership'] = { x = -0.75, y = 0, z = -0.47 },
@@ -493,7 +493,11 @@ function _allocateCommandTokens(playerColor, commandSheet, commandTokensBag, num
             break
         end
         local token = commandTokensBag.takeObject({
-            position = commandSheet.positionToWorld({ x = pos.x + (i * dx), y = pos.y + 1 + (i * 0.25), z = pos.z })
+            position = commandSheet.positionToWorld({
+                x = pos.x + (i * dx),
+                y = pos.y + 1 + (i * 0.25),
+                z = pos.z
+            })
         })
         _addUnallocatedCommandToken(token, playerColor)
     end
@@ -627,10 +631,15 @@ local function _doEndOfStatusPhaseCoroutineBody(playerColor)
 
     local numCommandTokens = _getAllocateCommandTokensCount(playerColor, faction, lowerNameToInZoneCards)
     if commandTokensBag then
+        -- Allocate new tokens before returning old.  There's a race where new
+        -- tokens get destroyed/replaced if competing with an active put.
+        _allocateCommandTokens(playerColor, commandSheet, commandTokensBag, numCommandTokens)
+        coroutine.yield(0)
+        coroutine.yield(0)
+        coroutine.yield(0)
+
         _returnCommandTokens(playerColor, commandTokens, commandTokensBag)
         coroutine.yield(0)
-        coroutine.yield(0)
-        _allocateCommandTokens(playerColor, commandSheet, commandTokensBag, numCommandTokens)
     else
         _safeBroadcastToColor('No token bag detected.', playerColor, {0.8,0.2,0.2})
     end

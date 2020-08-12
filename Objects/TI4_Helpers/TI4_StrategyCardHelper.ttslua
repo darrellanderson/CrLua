@@ -282,6 +282,62 @@ function endStatusPhaseInInitiativeOrder()
     _doEndOfStatusPhase(initiativeOrder.order)
 end
 
+function recomputeInfluence(playerColor)
+    assert(type(playerColor) == 'string')
+
+    local voteCounterName = playerColor .. ' Player Votes'
+    local voteCounter = false
+    local lowerNameToCards = {}
+
+    -- Gather other relevant objects in a single pass.
+    local inHandGuidSet = _zoneHelper.inHand()
+    for _, object in ipairs(getAllObjects()) do
+        if not inHandGuidSet[object.getGUID()] then
+            local name = object.getName()
+            -- Unlike the other generic influence count, this one looks at face up only.
+            if object.tag == 'Card' and not object.is_face_down then
+                local lowerName = string.lower(name)
+                local cards = lowerNameToCards[lowerName]
+                if not cards then
+                    cards = {}
+                    lowerNameToCards[lowerName] = cards
+                end
+                table.insert(cards, object)
+            elseif name == voteCounterName then
+                voteCounter = object
+            end
+        end
+    end
+
+    -- Get just the cards in this player's zone.
+    local guidToPosition = {}
+    for _, cards in pairs(lowerNameToCards) do
+        for _, object in ipairs(cards) do
+            guidToPosition[object.getGUID()] = object.getPosition()
+        end
+    end
+    local guidToZone = _zoneHelper.zonesFromPositions(guidToPosition)
+    local lowerNameToInZoneCards = {}
+    for lowerName, cards in pairs(lowerNameToCards) do
+        for _, object in ipairs(cards) do
+            if guidToZone[object.getGUID()] == playerColor then
+                local inZoneCards = lowerNameToInZoneCards[lowerName]
+                if not inZoneCards then
+                    inZoneCards = {}
+                    lowerNameToInZoneCards[lowerName] = inZoneCards
+                end
+                table.insert(inZoneCards, object)
+            end
+        end
+    end
+
+    if voteCounter then
+        _countInfluence(voteCounter, lowerNameToCards, lowerNameToInZoneCards)
+    else
+        _safeBroadcastToColor('No vote counter detected.', playerColor, {0.8,0.2,0.2})
+    end
+end
+
 -------------------------------------------------------------------------------
 
 function _returnStrategyCard(playerColor, strategyCard, parameters)

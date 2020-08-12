@@ -290,6 +290,8 @@ local _lowerCardNameToDeckAttributes = false
 local _discardCardQueue = {}
 local _discardDeckQueue = {}
 local _waitForDestroy = {}
+local _dealQueue = {}
+local _dealCoroutineIsActive = false
 
 local function _getDeckAttributes(cardName)
     assert(type(cardName) == 'string')
@@ -363,7 +365,7 @@ function discardCard(params)
     assert(type(params) == 'table')
     assert(type(params.guid) == 'string')
     assert(type(params.name) == 'string')
-    assert(not params.index or type(params.index) == 'number')
+    assert(not params.index or (type(params.index) == 'number' and params.index > 0))
     assert(not params.containerGuid or type(params.containerGuid) == 'string')
     assert(not params.waitForDestroy or type(params.waitForDestroy) == 'boolean')
 
@@ -456,7 +458,7 @@ function discardDeck(params)
     assert(type(params) == 'table')
     assert(type(params.guid) == 'string')
     assert(type(params.name) == 'string')
-    assert(not params.index or type(params.index) == 'number')
+    assert(not params.index or (type(params.index) == 'number' and params.index > 0))
     assert(not params.containerGuid or type(params.containerGuid) == 'string')
     assert(not params.waitForDestroy or type(params.waitForDestroy) == 'boolean')
 
@@ -552,10 +554,90 @@ function processDeckDiscardQueue()
     end
 end
 
-function draw(parameters)
-    assert(type(parameters) == 'table')
-    assert(type(parameters.color) == 'string')
-    assert(type(parameters.count) == 'number')
+-------------------------------------------------------------------------------
+
+--- Is the given card in its discard pile?
+function isDiscard(cardGuid)
+    assert(type(cardGuid) == 'string')
+    local cardObject = assert(getObjectFromGUID(cardGuid))
+    assert(cardObject.tag == 'Card')
+    local deckAttributes = assert(_getDeckAttributes(cardObject.getName()))
+    local discardTransform = assert(_getTransform(deckAttributes, 'discard'))
+    local p1 = cardObject.getPosition()
+    local p2 = discardTransform.position
+    local d = math.sqrt((p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2)
+    return d < 1
+end
+
+-------------------------------------------------------------------------------
+
+function deal(params)
+    assert(type(params) == 'table')
+    assert(type(params.deck) == 'string')
+    assert(type(params.color) == 'string')
+    assert(type(params.count) == 'number' and params.count > 0)
+
+    params.deckAttributes = assert(DECKS[params.deck], 'bad deck name')
+
+    table.insert(_dealQueue, params)
+    if not _dealCoroutineIsActive then
+        startLuaCoroutine(self, 'dealCoroutine')
+    end
+end
+
+function dealCoroutine()
+    _dealCoroutineIsActive = true
+
+    while #_dealQueue > 0 do
+        local params = table.remove(_dealQueue, 1)
+        local deckTransform = _getTransform(params.deckAttributes, 'deck')
+        local deck = _getDeck(deckTransform)
+
+        -- Deal as many cards as able.
+        if deck then
+            local dealCount = 0
+            if deck.tag == 'Deck' then
+                dealCount = math.min(params.count, deck.getQuantity())
+            elseif deck.tag == 'Card' then
+                dealCount = 1
+            end
+            params.count = params.count - dealCount
+            deck.deal(dealCount, params.color)
+            coroutine.yield(0)
+        end
+
+        -- If not able to deal all cards shuffle discard.
+        if params.count > 0 then
+            local discardTransform = _getTransform(params.deckAttributes, 'discard')
+            local discard = _getDeck(discardTransform)
+
+            if discard then
+                local bounds = discard.getBoundsNormalized()
+                discard.setPosition({
+                    x = deckTransform.position.x,
+                    y = deckTransform.position.y + bounds.size.y / 2,
+                    z = deckTransform.position.z
+                })
+                discard.setRotation(deckTransform.rotation)
+                discard.setName(params.deckAttributes.deckName)
+                coroutine.yield(0)
+
+                if discard.tag == 'Deck' then
+                    discard.shuffle()
+                    coroutine.yield(0)
+                end
+
+                -- Re-add to front of queue, reattempt next service.
+                table.insert(_dealQueue, 1, params)
+            else
+                -- Not able to deal all and no discard pile?
+                printToAll('Warning: not able to deal ' .. params.count .. ' card' .. (params.count > 1 and 's' or '' ) .. ' from "' .. params.deck .. '" deck to ' .. params.color, 'Red')
+            end
+        end
+    end
+
+    _dealCoroutineIsActive = false
+    return 1
 end
 
 -------------------------------------------------------------------------------
@@ -651,6 +733,8 @@ function onLoad(saveState)
     -- Test methods.
     self.addContextMenuItem('Discard cards', testDiscardCards, false)
     self.addContextMenuItem('Discard deck', testDiscardDeck, false)
+    self.addContextMenuItem('Deal 1', function(color) testDeal(color, 1) end, false)
+    self.addContextMenuItem('Deal 3', function(color) testDeal(color, 3) end, false)
 end
 
 function testDiscardCards()
@@ -711,6 +795,14 @@ function testDiscardDeck()
             })
         end
     end
+end
+
+function testDeal(color, count)
+    deal({
+        deck = 'Actions',
+        color = color,
+        count = count,
+    })
 end
 
 -------------------------------------------------------------------------------

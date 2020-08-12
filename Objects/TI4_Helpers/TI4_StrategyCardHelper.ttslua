@@ -29,6 +29,7 @@ function getHelperClient(helperObjectName)
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
 
+local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
@@ -43,20 +44,9 @@ local ALLOCATE_COMMAND_TOKENS = {
     localPosition = { x = -0.1, y = 1, z = -3.3 },
     localDX = -0.4
 }
-local ACTION_DECK = {
-    deck = {
-        position = { x = -70.91, y = 2, z = 19.16 },
-        rotation = { x = 0, y = 90, z = 180 },
-    },
-    discard = {
-        position = { x = -67.04, y = 2, z = 19.26 },
-    }
-}
-local AGENDA_DECK = {
-    discard = {
-        position = { x = -66.97, y = 2, z = 15.42 },
-    }
-}
+
+local DISCARD_SHEET_GUID = '26ca2a'
+
 STRATEGY_CARD_INITIATIVE = {
     ['Zero Strategy Token'] = 0,
     ['Leadership'] = 1,
@@ -373,7 +363,7 @@ function _countInfluence(voteCounter, lowerNameToCards, lowerNameToInZoneCards)
     local cards = lowerNameToCards['representative government']
     if cards then
         for _, card in ipairs(cards) do
-            if not card.is_face_down and not _isAgendaDiscard(card) then
+            if not card.is_face_down and not _deckHelper.isDiscard(card.getGUID()) then
                 _safeBroadcastToColor('Representative Government active.', playerColor, {0.1,0.5,0.1})
                 influence = 1
                 break
@@ -577,33 +567,11 @@ local function _doEndOfStatusPhaseCoroutineBody(playerColor)
     end
 
     local numActionCards = _getDealActionCardsCount(playerColor, faction, lowerNameToInZoneCards)
-    while numActionCards > 0 do
-        local actionDeck = _getActionDeck()
-        if not actionDeck then
-            actionDeck = _getActionDeckFromDiscard()
-            if actionDeck then
-                waitOneSecond()
-            end
-        end
-        local quantity = actionDeck and actionDeck.getQuantity()
-        if actionDeck then
-            local dealCount = _dealActionCards(playerColor, actionDeck, numActionCards)
-            numActionCards = numActionCards - dealCount
-            if dealCount == quantity then
-                actionDeck = _getActionDeckFromDiscard()
-                if actionDeck then
-                    waitOneSecond()
-                end
-            end
-        else
-            _safeBroadcastToColor('No action deck.', playerColor, {0.8,0.2,0.2})
-            break
-        end
-        coroutine.yield(0)
-    end
-
-    -- Return the number of action cards still needed by player.
-    return numActionCards
+    _deckHelper.deal({
+        deck = 'Actions',
+        count = numActionCards,
+        color = playerColor
+    })
 end
 
 -------------------------------------------------------------------------------
@@ -621,72 +589,13 @@ function _doEndOfStatusPhaseCoroutine()
     assert(type(playerColors) == 'table')
 
     -- Do all end of status phase actions.
-    local needActionCards = false
     for _, playerColor in ipairs(playerColors) do
         assert(type(playerColor) == 'string')
-        local count = _doEndOfStatusPhaseCoroutineBody(playerColor)
-        if count > 0 then
-            needActionCards = needActionCards or {}
-            table.insert(needActionCards, { color = playerColor, count = count })
-        end
+        _doEndOfStatusPhaseCoroutineBody(playerColor)
         coroutine.yield(0)
     end
 
-    -- Report a single summary of missing action cards.
-    if needActionCards then
-        local message = {}
-        for _, entry in ipairs(needActionCards) do
-            table.insert(message, entry.color .. ':' .. entry.count)
-        end
-        message = 'PLAYERS NEED ACTION CARDS: ' .. table.concat(message, ', ')
-        broadcastToAll(message, 'Red')
-    end
-
     return 1 -- REQUIRED to exit coroutine
-end
-
--------------------------------------------------------------------------------
-
-function _isAgendaDiscard(cardObject)
-    assert(type(cardObject) == 'userdata' and cardObject.tag == 'Card')
-    local p1 = cardObject.getPosition()
-    local p2 = AGENDA_DECK.discard.position
-    local d = math.sqrt((p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2)
-    return d < 1
-end
-
-function _getCardOrDeck(position)
-    -- Ray cast not always reliable, use box.
-    local hits = Physics.cast({
-        origin = position,
-        direction = { x = 0, y = -1, z = 0 },
-        type = 3, -- box
-        size = { 0.1, 10, 0.1 }
-    })
-    for _, hit in ipairs(hits) do
-        local object = hit.hit_object
-        if object.tag == 'Deck' or object.tag == 'Card' then
-            return object
-        end
-    end
-end
-
-function _getActionDeck()
-    return _getCardOrDeck(ACTION_DECK.deck.position)
-end
-
-function _getActionDeckFromDiscard()
-    local discard = _getCardOrDeck(ACTION_DECK.discard.position)
-    if discard then
-        if discard.tag == 'Deck' then
-            discard.shuffle()
-            discard.setName('Actions')
-            broadcastToAll('Reshuffled Action deck', 'Red')
-        end
-        discard.setPosition(ACTION_DECK.deck.position)
-        discard.setRotation(ACTION_DECK.deck.rotation)
-        return discard
-    end
 end
 
 -------------------------------------------------------------------------------

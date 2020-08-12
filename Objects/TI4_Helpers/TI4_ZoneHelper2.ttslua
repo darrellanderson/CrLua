@@ -430,7 +430,7 @@ function getBordersVectorLines(parameters)
     local thickness = parameters.thickness or DEFAULT_VECTOR_LINE_THICKNESS
     local homeSystemThickness = parameters.homeSystemThickness or thickness
     local inset = parameters.inset or (thickness / 2)
-    local elevateY = 0.01
+    local elevateY = 0.02
 
     local function polygonToPointsXYZ(polygon)
         local pointsXYZ = {}

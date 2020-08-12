@@ -84,8 +84,6 @@ local _allocatedTokenGuidToColor = {}
 function register(parameters)
     assert(type(parameters) == 'table')
     assert(type(parameters.guid) == 'string')
-    assert(type(parameters.position) == 'table' and type(parameters.position.x) == 'number')
-    assert(type(parameters.rotation) == 'table' and type(parameters.rotation.x) == 'number')
     assert(type(parameters.ui) == 'string')
     assert(type(parameters.onPlayCallback) == 'string')
 

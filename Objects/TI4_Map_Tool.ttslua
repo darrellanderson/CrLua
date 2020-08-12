@@ -26,6 +26,8 @@ end
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
+local ROTATE_TILES_FOR_Z = false
+
 cur_input = ""
 slice_datalabel_name = "slice_data_label"
 do_lock = true
@@ -365,7 +367,13 @@ function place_tiles(buildlist)
 
     local hex_itr = spiral_hex_iterator(origin.position, origin.rotation)
     for i, info in ipairs(buildlist) do
-        place_tile(info, hex_itr(), origin.rotation)
+        local position = hex_itr()
+        local rotation = {
+            x = origin.rotation.x,
+            y = origin.rotation.y + ((position.z < 0 and ROTATE_TILES_FOR_Z) and 180 or 0),
+            z = origin.rotation.z
+        }
+        place_tile(info, position, rotation)
     end
 end
 
@@ -735,20 +743,34 @@ function draw6P()
 end
 
 function drawAuto()
-    local _thickness = 0.1
-    local lines = {}
-    for _, color in ipairs(_zoneHelper.zones()) do
-        table.insert(lines, {
-            points = _zoneHelper.zoneBorder({
+
+    local function isZoneHelper2()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == 'TI4_ZONE_HELPER' then
+                return object.getVar('getBordersVectorLines') and true
+            end
+        end
+    end
+
+    local lines = false
+    if isZoneHelper2() then
+        lines = _zoneHelper.getBordersVectorLines({})
+    else
+        lines = {}
+        local _thickness = 0.1
+        for _, color in ipairs(_zoneHelper.zones()) do
+            table.insert(lines, {
+                points = _zoneHelper.zoneBorder({
+                    color = color,
+                    inset = _thickness / 2.0,
+                    clipToTable = true,
+                }),
                 color = color,
-                inset = _thickness / 2.0,
-                clipToTable = true,
-            }),
-            color = color,
-            thickness = _thickness,
-            loop = true,
-            square = true
-        })
+                thickness = _thickness,
+                loop = true,
+                square = true
+            })
+        end
     end
     Global.setVectorLines(lines)
 end

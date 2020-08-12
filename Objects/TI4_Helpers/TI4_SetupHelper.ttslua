@@ -77,7 +77,7 @@ local SetupColor = {
 
     NAME_TO_PLAYER_ZONE_OFFSET = {
         ['Notes %($COLOR%)'] = { x = 7, z = 2 },
-        ['Active/Passed %($COLOR%)'] = { x = 4, y = 1, z = 2 },
+        ['Active/Passed %($COLOR%)'] = { x = 4, y = 1, z = 2, flip = true },
         ['Command Sheet %($COLOR%)'] = { x = -8, z = 11, lock = true },
         ['Directionaliser %($COLOR%)'] = { x = 0, y = 0.46, z = -2, yRot = 270, lock = true },
     },
@@ -190,6 +190,9 @@ local function offsetRotation(position, offset)
         result.y = z > 0 and 0 or 180
     end
     result.y = result.y + (offset.yRot or 0)
+    if offset.flip then
+        result.z = result.z + 180
+    end
     return result
 end
 
@@ -613,7 +616,7 @@ function SetupColor.unpackNew(setupBag)
     coroutine.yield(0)
 
     -- About to wait for resting, give a little extra time for gravity.
-    yieldForSeconds(0.5)
+    yieldForSeconds(1.5)
 
     for color, state in pairs(colorToState) do
         -- Units were unpacked ABOVE directionaliser.  Wait for them to fall.
@@ -881,11 +884,17 @@ function SetupFaction.unpackHomeSystemTile(faction, factionBox, homeSystemPositi
         tileName = 'Creuss Gate Tile'
     end
 
+    local rotation = {
+        x = 0,
+        y = homeSystemPosition.z > 0 and 0 or 180,
+        z = 0
+    }
+
     local guid = assert(getEntryGuid(factionBox, tileName), 'missing ' .. tileName)
     local tile = factionBox.takeObject({
         guid              = guid,
         position          = homeSystemPosition,
-        rotation          = { x = 0, y = 0, z = 0 },
+        rotation          = rotation,
         smooth            = true,
         callback_function = function(object) object.setLock(true) end,
     })
@@ -906,7 +915,7 @@ function SetupFaction.unpackHomeSystemTile(faction, factionBox, homeSystemPositi
                 y = homeSystemPosition.y,
                 z = homeSystemPosition.z + 4.57 * (homeSystemPosition.z > 0 and 1 or -1)
             },
-            rotation          = { x = 0, y = 0, z = 0 },
+            rotation          = rotation,
             smooth            = true,
             callback_function = function(object) object.setLock(true) end,
         })

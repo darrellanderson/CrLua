@@ -657,7 +657,7 @@ end
 function setupCoroutine()
     debugLog('setupCoroutine')
 
-    Global.setVectorLines({})
+    _zoneHelper.clearBordersVectorLines()
 
     local params = assert(table.remove(_setupQueue))
     local playerCount = assert(params.playerCount)
@@ -679,7 +679,7 @@ function setupCoroutine()
     _zoneHelper.updateZoneColors()
     coroutine.yield(0)
 
-    Global.setVectorLines(_zoneHelper.getBordersVectorLines({}))
+    _zoneHelper.drawBordersVectorLines()
 
     return 1 -- REQUIRED!  MUST RETURN 1 TO STOP COROUTINE!
 end

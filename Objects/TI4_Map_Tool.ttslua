@@ -747,16 +747,15 @@ function drawAuto()
     local function isZoneHelper2()
         for _, object in ipairs(getAllObjects()) do
             if object.getName() == 'TI4_ZONE_HELPER' then
-                return object.getVar('getBordersVectorLines') and true
+                return object.getVar('drawBordersVectorLines') and true
             end
         end
     end
 
-    local lines = false
     if isZoneHelper2() then
-        lines = _zoneHelper.getBordersVectorLines({})
+        _zoneHelper.drawBordersVectorLines({})
     else
-        lines = {}
+        local lines = {}
         local _thickness = 0.1
         for _, color in ipairs(_zoneHelper.zones()) do
             table.insert(lines, {
@@ -771,6 +770,6 @@ function drawAuto()
                 square = true
             })
         end
+        Global.setVectorLines(lines)
     end
-    Global.setVectorLines(lines)
 end

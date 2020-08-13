@@ -1213,7 +1213,7 @@ function unpackFactionCoroutine()
     coroutine.yield(0)
 
     if faction.startMessage then
-        broadcastToColor(faction.tokenName .. ': ' .. faction.startMessage, color, color)
+        _safeBroadcastToColor(faction.tokenName .. ': ' .. faction.startMessage, color, color)
     end
 
     return 1

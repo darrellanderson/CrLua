@@ -453,9 +453,18 @@ end
 function _returnCommandTokens(playerColor, commandTokens, commandTokensBag)
     assert(type(playerColor) == 'string' and type(commandTokens) == 'table' and type(commandTokensBag) == 'userdata')
 
-    -- Only return command tokens in the table area.
+    -- Only return command tokens not in a player zone.  Allow them to live
+    -- in other player zones, just not on the map.
+    local guidToCommandToken = {}
+    local guidToPosition = {}
     for _, commandToken in ipairs(commandTokens) do
-        if _zoneHelper.inTableZone(commandToken.getPosition()) then
+        local guid = commandToken.getGUID()
+        guidToCommandToken[guid] = commandToken
+        guidToPosition[guid] = commandToken.getPosition()
+    end
+    local guidToZone = _zoneHelper.zonesFromPositions(guidToPosition)
+    for guid, commandToken in pairs(guidToCommandToken) do
+        if not guidToZone[guid] then
             commandTokensBag.putObject(commandToken)
         end
     end
@@ -773,3 +782,13 @@ end
 function onObjectDestroy(dyingObject)
     _clearUnallocatedCommandToken(dyingObject)
 end
+
+-------------------------------------------------------------------------------
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

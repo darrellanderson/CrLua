@@ -77,7 +77,7 @@ local SetupColor = {
 
     NAME_TO_PLAYER_ZONE_OFFSET = {
         ['Notes %($COLOR%)'] = { x = 7, z = 2 },
-        ['Active/Passed %($COLOR%)'] = { x = 4, y = 1, z = 2, flip = true },
+        ['Active/Passed %($COLOR%)'] = { x = 4, y = 1, z = 2, flip = false },  -- do not flip, changing setup can lead to unflipped tokens
         ['Command Sheet %($COLOR%)'] = { x = -8, z = 11, lock = true },
         ['Directionaliser %($COLOR%)'] = { x = 0, y = 0.46, z = -2, yRot = 270, lock = true },
     },

@@ -680,6 +680,15 @@ function setupCoroutine()
     coroutine.yield(0)
 
     _zoneHelper.drawBordersVectorLines()
+    coroutine.yield(0)
+
+    -- Tell any other listeners about the change.
+    for _, object in ipairs(getAllObjects()) do
+        if object.getVar('onSetupHelperPlayerCountChanged') then
+            object.call('onSetupHelperPlayerCountChanged')
+        end
+    end
+    coroutine.yield(0)
 
     return 1 -- REQUIRED!  MUST RETURN 1 TO STOP COROUTINE!
 end

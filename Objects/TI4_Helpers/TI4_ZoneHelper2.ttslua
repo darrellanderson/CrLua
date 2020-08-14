@@ -99,7 +99,13 @@ local DEFAULT_ZONES = {
                 {0, 50}
             },
         },
-        homeSystemPositions = {
+        homeSystemPositions = {  -- home system positions in TI4 rulebook
+            [1] = {5.25, -15.16},
+            [2] = {-15.75, -3.03},
+            [3] = {-5.25, 15.16},
+            [4] = {15.75, 3.03},
+        },
+        homeSystemPositions_POK = {  -- home system in 6p slots without top/bottom
             [1] = {15.75, -9.09},
             [2] = {-15.75, -9.09},
             [3] = {-15.75, 9.09},

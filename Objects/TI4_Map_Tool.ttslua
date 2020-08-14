@@ -472,7 +472,7 @@ function place_cards(_, color)
         local tile = tile_itr()
         if tile ~= nil then
             local planets = tile.info.planets
-            if planets ~= nil then
+            if planets ~= nil and not tile.info.home then
                 local num = #planets
                 rot = tile.obj.getRotation()
                 rot.z = 180

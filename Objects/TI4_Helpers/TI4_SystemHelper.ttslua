@@ -661,7 +661,7 @@ function _planetPosition(system, zoneBorders, planetIndex)
 
     -- If planet already has a position, use it.
     if planet.position then
-        return { x = planet.position.x, y = localY, z = planet.position.y }, localRadius
+        return { x = planet.position.x, y = localY, z = planet.position.z }, localRadius
     end
 
     -- Compute the default bearing and distance.
@@ -730,6 +730,7 @@ function _fillMissingSystemData(guid, system)
     if not system.guid then
         system.guid = guid
         system.string = _systemToString(system)
+        system.y = system.localY or LOCAL_SYSTEM_TILE_Y
 
         -- Fill zone edge positions, points on edge diving per-planet zones.
         local zoneBorders = _getZoneBorders(system)

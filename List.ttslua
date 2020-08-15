@@ -204,26 +204,31 @@ end
 function CrLua.List.pruneAndAppendMissing(oldList, newList)
     assert(type(oldList) == 'table' and type(newList) == 'table')
 
-    local oldSet = {}
+    local oldCounts = {}
     for _, oldItem in ipairs(oldList) do
-        oldSet[oldItem] = true
+        oldCounts[oldItem] = (oldCounts[oldItem] or 0) + 1
     end
-    local newSet = {}
+    local newCounts = {}
     for _, newItem in ipairs(newList) do
-        newSet[newItem] = true
+        newCounts[newItem] = (newCounts[newItem] or 0) + 1
     end
 
     -- Start by copying over old items in order, prune any missing from new.
     local result = {}
     for _, item in ipairs(oldList) do
-        if newSet[item] then
+        local newCount = newCounts[item]
+        if newCount then
+            newCounts[item] = newCount > 1 and (newCount - 1)
             table.insert(result, item)
         end
     end
 
     -- Then add any new entries.
     for _, item in ipairs(newList) do
-        if not oldSet[item] then
+        local oldCount = oldCounts[item]
+        if oldCount then
+            oldCounts[item] = oldCount > 1 and (oldCount - 1)
+        else
             table.insert(result, item)
         end
     end
@@ -236,6 +241,14 @@ function CrLua.List._testPruneAndAppendMissing()
     local b = { 3, 5, 1, 7, 9 }
     local c = CrLua.List.pruneAndAppendMissing(a, b)
     for i, v in ipairs({ 1, 3, 5, 7, 9 }) do
-        assert(c[i] == v)
+        assert(c[i] == v, 'first: ' .. table.concat(c, ', '))
+    end
+
+    -- Again, this time with some repeating values.
+    local a = { 1, 2, 2, 3, 3, 3, 4, 4, 4, 4 }
+    local b = { 3, 3, 5, 1, 1, 7, 9 }
+    local c = CrLua.List.pruneAndAppendMissing(a, b)
+    for i, v in ipairs({ 1, 3, 3, 5, 1, 7, 9 }) do
+        assert(c[i] == v, 'second: ' .. table.concat(c, ', '))
     end
 end

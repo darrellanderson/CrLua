@@ -7,6 +7,34 @@
 
 -- TI4 Frankenstein MultiRoller
 
+local CREATE_BAGS = {
+    {
+        position = { 4, 3, -6 },
+        color = 'Yellow'
+    },
+    {
+        position = {0,3,-6},
+        color = 'Red'
+    },
+    {
+        position = {-4,3,-6},
+        color = 'Green'
+    },
+    {
+        position = {4,3,6},
+        color = 'Purple'
+    },
+    {
+        position = {0,3,6},
+        color = 'Blue'
+    },
+    {
+        position = {-4,3,6},
+        color = 'White'
+    },
+}
+
+-- Unpack items directly to these positions.
 local UNPACK_TRANSFORMS = {
     ['Faction Sheets/Tokens'] = {
         position = {70, 2, 18},
@@ -17,31 +45,6 @@ local UNPACK_TRANSFORMS = {
     ['Non Draft Parts'] = {
         position = {70, 2, 12},
     },
-    ['Promissory Notes'] = {
-        position = {73, 2, 18},
-    },
-    ['Home Systems'] = {
-        position = {73, 2, 15},
-    },
-    ['Flagships'] = {
-        position = {73, 2, 12},
-    },
-    ['Starting Techs'] = {
-        position = {73, 2, 9},
-    },
-    ['Commodity Tiles'] = {
-        position = {73, 2, 6},
-    },
-    ['Faction Abilities'] = {
-        position = {73, 2, 3},
-    },
-    ['Starting Units'] = {
-        position = {73, 2, 0},
-    },
-    ['Faction Techs'] = {
-        position = {73, 2, -3},
-    },
-
     ['A. Draft'] = {
         position = {79, 2, -17},
         rotation = {0, 90, 0},
@@ -58,15 +61,26 @@ local UNPACK_TRANSFORMS = {
         position = {70, 5, -17},
         rotation = {0, 90, 0},
     },
-
     ['Home Planet Cards'] = {
         position = {61.23, 1.85, 2.05},
         rotation = {0, 90, 0},
     },
-    ['6p FrankenBag Builder'] = {
-        position = {63.91, 1.71, -6.42},
-        rotation = {0, 90, 0},
-    },
+}
+
+local UNPACK_TO_BAGS = {
+    ['Promissory Notes'] = 2,
+    ['Home Systems'] = 2,
+    ['Flagships'] = 2,
+    ['Starting Techs'] = 2,
+    ['Commodity Tiles'] = 2,
+    ['Starting Units'] = 2,
+    ['Faction Abilities'] = 3,
+    ['Faction Techs'] = 3,
+}
+
+local EXTERNAL_TO_BAGS = {
+    ['Blue Planet Tiles'] = 3,
+    ['Red Anomaly Tiles'] = 2
 }
 
 local CLONE_TO_HIDDEN = {
@@ -103,6 +117,13 @@ local HIDDEN_ZONE_TRANSFORMS = {
 }
 
 local HIDDEN_ZONE_NAME = 'FrankenZone'
+
+local MAX_UI_ROWS = 25
+
+local _useToggles = false
+local _toggles = false
+
+-------------------------------------------------------------------------------
 
 local function getEntryGuid(container, name)
     for _, entry in ipairs(container.getObjects()) do
@@ -191,7 +212,7 @@ local function createHiddenBags()
     end
 end
 
-local function unpack()
+local function unpackToTable()
     for name, transform in pairs(UNPACK_TRANSFORMS) do
         local guid = getEntryGuid(self, name)
         self.takeObject({
@@ -211,43 +232,94 @@ local function replaceMultiRollers(name)
         end
     end
 
-    --[[
-    local object = takeToAbove(self, name)
-    coroutine.yield(0)
-    local json = object.getJSON()
-    destroyObject(object)
-    coroutine.yield(0)
-
-    for _, object in ipairs(toReplace) do
-        local params = {
-            json = json,
-            position = object.getPosition(),
-            rotation = object.getRotation(),
-            scale = object.getScale(),
-            sound = false,
-            snap_to_grid = false,
-        }
-        destroyObject(object)
-        coroutine.yield(0)
-
-        local clone = spawnObjectJSON(params)
-        clone.use_grid = false
-        clone.use_snap_points = false
-        clone.sticky = false
-        coroutine.yield(0)
-        clone.setLock(true)
-    end
-    --]]
-
     -- MultiRoller is now Franken aware.
     for _, object in ipairs(toReplace) do
         object.call('setFranken')
     end
-
 end
 
-function setupCoroutine()
+-------------------------------------------------------------------------------
+
+local function createBags()
+    local result = {}
+    for _, rule in ipairs(CREATE_BAGS) do
+        local bag = spawnObject({
+            type              = 'Bag',
+            position          = rule.position,
+            sound             = false,
+            snap_to_grid      = false,
+        })
+        bag.use_grid = false
+        bag.use_snap_points = false
+        bag.setColorTint(rule.color)
+        table.insert(result, bag)
+    end
+    return result
+end
+
+local function unpackToBags(bags)
+    for name, count in pairs(UNPACK_TO_BAGS) do
+        local container = takeToAbove(self, name)
+        assert(container, 'missing ' .. name)
+        coroutine.yield(0)
+        container.setLock(true)
+
+        while container.spawning do
+            coroutine.yield(0)
+        end
+        coroutine.yield(0)
+
+        container.shuffle()
+
+        -- Get available guids (after shuffle).
+        -- IF TOO FEW, TAKE WILL GET AN ENTRY AT RANDOM.
+        local guids = {}
+        for _, entry in ipairs(container.getObjects()) do
+            if (not _useToggles) or _toggles[entry.guid] then
+                table.insert(guids, entry.guid)
+            end
+        end
+
+        if #guids < (#bags * count) then
+            error('too few "' .. name .. '" entries selected')
+        end
+
+        for _, bag in ipairs(bags) do
+            for _ = 1, count do
+                local pos = bag.getPosition()
+                local object = container.takeObject({
+                    guid = table.remove(guids),
+                    position = { x = pos.x, y = pos.y + 5, z = pos.z },
+                    smooth = false,
+                    callback_function = function(object) bag.putObject(object) end
+                })
+                coroutine.yield(0)
+            end
+            coroutine.yield(0)
+        end
+
+        for _ = 1, 30 do
+            coroutine.yield(0)
+        end
+        container.setLock(false)
+        self.putObject(container)
+    end
+end
+
+-------------------------------------------------------------------------------
+
+function doSetup()
+    startLuaCoroutine(self, 'doSetupCoroutine')
+end
+
+function doSetupCoroutine()
     packFactions()
+    coroutine.yield(0)
+
+    local bags = createBags()
+    coroutine.yield(0)
+
+    unpackToBags(bags)
     coroutine.yield(0)
 
     createHiddenZones()
@@ -256,7 +328,7 @@ function setupCoroutine()
     createHiddenBags()
     coroutine.yield(0)
 
-    unpack()
+    unpackToTable()
     coroutine.yield(0)
 
     local pos = self.getPosition()
@@ -280,9 +352,237 @@ function removeHiddenZones()
 end
 
 function onLoad(saveState)
-    local function go()
-        startLuaCoroutine(self, 'setupCoroutine')
+    local function doSimpleSetup()
+        _useToggles = false
+        doSetup()
     end
-    self.addContextMenuItem('Setup Franken', go)
+    self.addContextMenuItem('Setup Franken', doSimpleSetup)
+    self.addContextMenuItem('Custom Franken..', createCustomSelectionUi)
     self.addContextMenuItem('Remove hidden zones', removeHiddenZones)
+
+    --createCustomSelectionUi() -- for testing
 end
+
+-------------------------------------------------------------------------------
+
+local _nameList = false
+local _nameToEntries = false
+local _tabName
+
+local function getNameToEntries()
+    if not _nameToEntries then
+        local function sortEntries(a, b)
+            return a.name < b.name
+        end
+
+        _nameList = {}
+        _nameToEntries = {}
+
+        for name, count in pairs(UNPACK_TO_BAGS) do
+            table.insert(_nameList, name)
+            local object = takeToAbove(self, name)
+            assert(object)
+            coroutine.yield(0)
+            local entries = {}
+            for _, entry in ipairs(object.getObjects()) do
+                table.insert(entries, {
+                    guid = entry.guid,
+                    name = entry.name
+                })
+            end
+            assert(#entries > 0)
+            table.sort(entries, sortEntries)
+            _nameToEntries[name] = entries
+            self.putObject(object)
+            coroutine.yield(0)
+        end
+        table.sort(_nameList)
+    end
+    return _nameList, _nameToEntries
+end
+
+local function createAndCheckAllToggles(nameToEntries)
+    assert(type(nameToEntries) == 'table')
+    _toggles = {}
+    for name, entries in pairs(nameToEntries) do
+        for _, entry in ipairs(entries) do
+            if entry.guid then
+                _toggles[entry.guid] = true
+            end
+        end
+    end
+end
+
+function createCustomSelectionUi(tabName)
+    _tabName = tabName
+    startLuaCoroutine(self, 'createCustomSelectionUiLuaCoroutine')
+end
+
+function createCustomSelectionUiLuaCoroutine()
+    local nameList, nameToEntries = getNameToEntries()
+    if not _toggles then
+        createAndCheckAllToggles(nameToEntries)
+    end
+
+    local tabName = nameToEntries[_tabName] and _tabName or nameList[1]
+
+    -- Compute the max number of rows needed when split into #tab columns.
+    local numCols = math.ceil(#nameList / 2)
+    local numRows = 1
+    for _, entries in pairs(nameToEntries) do
+        local entriesPerColumn = math.ceil(#entries / numCols)
+        print('xxx ' .. (#entries) .. ' ' .. entriesPerColumn .. ' ' .. (#entries / numCols) .. ' ' .. numRows)
+        numRows = math.max(numRows, entriesPerColumn + 4)
+    end
+    print('Table ' .. numCols .. 'x' .. numRows)
+
+    -- Create columns and add tabs.
+    local cols = {}
+    for i = 1, numCols do
+        local tab1 = nameList[i]
+        local tab2 = nameList[i + numCols]
+        cols[i] = {
+            tab1 and { name = tab1, id = tab1 } or false,
+            tab2 and { name = tab2, id = tab2 } or false,
+            i == 1 and { name = tabName } or false,
+        }
+    end
+
+    -- Get tab contents.
+    local entries = nameToEntries[tabName]
+    local entriesPerColumn = math.ceil(#entries / numCols)
+    for i, entry in ipairs(entries) do
+        local colIdx = math.floor((i - 1) / entriesPerColumn) + 1
+        assert(colIdx <= numCols, 'colIdx ' .. colIdx)
+        local col = cols[colIdx]
+        table.insert(col, entry)
+    end
+
+    -- Add footer buttons.
+    local centerColIdx = math.floor(numCols / 2)
+    cols[centerColIdx][numRows] = { name = 'Cancel', id = 'cancel' }
+    cols[centerColIdx+1][numRows] = { name = 'Unpack', id = 'doCustomSetup' }
+
+    local function getValue(rowIdx, colIdx)
+        local col = cols[colIdx]
+        return col and col[rowIdx]
+    end
+
+    local function makeCell(rowIdx, colIdx)
+        local value = getValue(rowIdx, colIdx)
+        assert(not value or value.name)
+        return {
+            tag = 'Cell',
+            children = value and {
+                {
+                    tag = (value.guid and 'Toggle') or (value.id and 'Button') or 'Text',
+                    attributes = {
+                        id = value.guid or value.id or nil,
+                        isOn = value.guid and (_toggles[value.guid] or false) or nil,
+                    },
+                    value = value.name,
+                }
+            } or nil
+        }
+    end
+
+    local rows = {}
+    for rowIdx = 1, numRows do
+        local row = {}
+        for colIdx = 1, numCols do
+            if getValue(rowIdx, colIdx) ~= false then
+                table.insert(row, makeCell(rowIdx, colIdx))
+            end
+        end
+        table.insert(rows, {
+            tag = 'Row',
+            children = row
+        })
+    end
+
+    local tableLayout = {
+        tag = 'TableLayout',
+        attributes = {
+            cellPadding = '15 15 0 0',
+        },
+        children = rows
+    }
+
+    local defaults = {
+        tag = 'Defaults',
+        children = {
+            {
+                tag = 'Text',
+                attributes = {
+                    fontSize = 16,
+                    fontStyle = 'Bold',
+                }
+            },
+            {
+                tag = 'Toggle',
+                attributes = {
+                    fontSize = 14,
+                    onValueChanged = 'onToggleValueChanged',
+                }
+            },
+            {
+                tag = 'Button',
+                attributes = {
+                    fontSize = 20,
+                    fontStyle = 'Bold',
+                    onClick = 'onButtonClick'
+                }
+            },
+        }
+    }
+
+    local panel = {
+        tag = 'Panel',
+        attributes = {
+            id = 'ui',
+            active = 'true',
+            position = '0 -' .. (numRows * 25) .. ' -350',
+            rotation = '180 180 0',
+            width = numCols * 200,
+            height = numRows * 50,
+            color = '#ffffff',
+        },
+        children = {
+            tableLayout
+        }
+    }
+
+    self.UI.setXmlTable({ defaults, panel })
+    return 1
+end
+
+function onButtonClick(player, input, id)
+    if id == 'cancel' then
+        self.UI.setXmlTable({{}})
+    elseif id == 'doCustomSetup' then
+        self.UI.setXmlTable({{}})
+        _useToggles = true
+        doSetup()
+    else
+        --error('unknown id "' .. id .. '"')
+        createCustomSelectionUi(id)
+    end
+end
+
+function onToggleValueChanged(player, value, id)
+    local valueAsBool = string.lower(value) == 'true' and true or false
+    assert(type(valueAsBool) == 'boolean')
+    _toggles[id] = valueAsBool or nil
+end
+
+
+-------------------------------------------------------------------------------
+
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

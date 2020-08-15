@@ -75,7 +75,7 @@ function clickTokens(_, playerColor)
     local tokenBag = false
     local tokens = {}
 
-    for _, object in ipairs(allObjects) do
+    for _, object in ipairs(getAllObjects()) do
         local name = object.getName()
         if object.tag == 'Bag' and name == bagName then
             tokenBag = object
@@ -369,10 +369,19 @@ function unpackCoroutine(playerColor)
     unpackStartingTech(techDeck, faction.startingTech, commandSheet)
     coroutine.yield(0)
 
-    -- Rename flaship, unpack starting units.
+    -- Get unit bags.
     local unitBags = getUnitBags(playerColor)
-    renameFlagship(unitBags['Flagship'], faction.flagship, faction.flagshipDescription)
     coroutine.yield(0)
+
+    -- Rename flagship, wait for rename to finish before unpacking in case flagship is needed.
+    local flagshipBag = unitBags['Flagship']
+    local numFlagships = flagshipBag.getQuantity()
+    renameFlagship(flagshipBag, faction.flagship, faction.flagshipDescription)
+    coroutine.yield(0)
+    while flagshipBag.getQuantity() < numFlagships do
+        coroutine.yield(0)
+    end
+
     unpackStartingUnits(unitBags, faction.startingUnits, homeSystemTile)
     coroutine.yield(0)
 
@@ -619,15 +628,17 @@ function renameFlagship(flagshipBag, name, desc)
 
     flagshipBag.setName(name)
     flagshipBag.setDescription(desc)
+
     local pos = flagshipBag.getPosition()
     for _, entry in ipairs(flagshipBag.getObjects()) do
         local flagship = flagshipBag.takeObject({
             guid = entry.guid,
-            position = { x = pos.x, y = pos.y + 5, z = pos.z }
+            position = { x = pos.x, y = pos.y + 5, z = pos.z },
+            smooth = false,
+            callback_function = function(object) flagshipBag.putObject(object) end
         })
         flagship.setName(name)
         flagship.setDescription(desc)
-        flagshipBag.putObject(flagship)
     end
 end
 

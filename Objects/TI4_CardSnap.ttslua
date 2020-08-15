@@ -1,0 +1,86 @@
+--- Snap cards to grid.  Resize object (via scale x/z), will reset snap points on next load.
+-- @author Darrell
+
+function onLoad(save_state)
+    self.addContextMenuItem('Reset Snap Points', resetSnapPoints)
+    self.addContextMenuItem('Draw Snap Points', resetSnapPoints)
+    resetSnapPoints()
+    drawSnapPoints()
+end
+
+function resetSnapPoints()
+    -- Bounds in global space.
+    local bounds = self.getBoundsNormalized()
+    print('bounds ' .. bounds.size.x .. 'x' .. bounds.size.z)
+
+    local scale = self.getScale()
+    print('scale ' .. scale.x .. 'x' .. scale.z)
+
+    local cardSize = {
+        x = 2.5,
+        z = 3.5
+    }
+    local cardToLocal = {
+        x = cardSize.x / scale.x,
+        z = cardSize.z / scale.z,
+    }
+
+    local points = {}
+    local numCols = math.floor((bounds.size.x / cardSize.x) - 0.5)
+    local numRows = math.floor((bounds.size.z / cardSize.z) - 0.5)
+    for i = 0, numCols do
+        for j = 0, numRows do
+            table.insert(points, {
+                position = {
+                    x = ((i - (numCols / 2)) * cardToLocal.x),
+                    y = 0,
+                    z = ((j - (numRows / 2)) * cardToLocal.z),
+                },
+                rotation = {
+                    x = 0,
+                    y = self.getRotation().y - 90,
+                    z = 180
+                },
+                rotation_snap = true
+            })
+        end
+    end
+    self.setSnapPoints(points)
+end
+
+function drawSnapPoints()
+    local thickness = 0.01
+    local color = { r = 0.3, g = 0.3, b = 0.3 }
+
+    local lines = {}
+    local dx = 0.5 / self.getScale().x
+    local dz = 0.5 / self.getScale().z
+    for _, point in ipairs(self.getSnapPoints()) do
+        local p = point.position
+        local y = p.y + 0.03
+        table.insert(lines, {
+            points = {
+                { x = p.x - dx, y = y, z = p.z - dz },
+                { x = p.x - dx, y = y, z = p.z + dz },
+                { x = p.x + dx, y = y, z = p.z + dz },
+                { x = p.x + dx, y = y, z = p.z - dz },
+            },
+            thickness = thickness,
+            color = color,
+            loop = true,
+            square = true
+        })
+    end
+    self.setVectorLines(lines)
+end
+
+-------------------------------------------------------------------------------
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

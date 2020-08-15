@@ -21,8 +21,8 @@ function CrLua.TTS.Spreadsheet.idFromUrl(url)
 end
 
 --- Push only changed cells to the sheet.
-function CrLua.TTS.Spreadsheet.update(id, sheet, cells)
-    assert(type(id) == 'string' and type(cells) == 'table')
+function CrLua.TTS.Spreadsheet.update(label, id, sheet, cells)
+    assert(type(label) == 'string' and type(id) == 'string' and type(cells) == 'table')
     assert(not sheet or type(sheet) == 'string')
 
     -- Get the subset of changed cells.
@@ -45,9 +45,9 @@ function CrLua.TTS.Spreadsheet.update(id, sheet, cells)
     -- Update persistent cells content ONLY ON SUCCESS.
     local function callback(webRequest)
         if webRequest.is_error or webRequest.text ~= 'ok' then
-            CrLua.Log.w(TAG, 'update failed')
+            CrLua.Log.w(TAG, 'update "' .. label .. '" failed')
         else
-            CrLua.Log.d(TAG, 'update success')
+            CrLua.Log.i(TAG, 'update "' .. label .. '" success')
             for k, v in pairs(updatedCells) do
                 persistentCells[k] = v
             end
@@ -56,6 +56,7 @@ function CrLua.TTS.Spreadsheet.update(id, sheet, cells)
     end
 
     if updatedCells then
+        CrLua.Log.i(TAG, 'updating "' .. label .. '"')
         local postData = {
             id = id,
             sheet = sheet,
@@ -63,11 +64,13 @@ function CrLua.TTS.Spreadsheet.update(id, sheet, cells)
         }
         --CrLua.Log.d(TAG, 'postData', postData)
         WebRequest.post(CrLua.TTS.Spreadsheet.GAS_PROXY, JSON.encode(postData), callback)
+    else
+        CrLua.Log.i(TAG, 'no changes for "' .. label .. '", skipping update')
     end
 end
 
-function CrLua.TTS.Spreadsheet.get(id, sheet, cell, callback)
-    assert(type(id) == 'string' and type(cell) == 'string')
+function CrLua.TTS.Spreadsheet.get(label, id, sheet, cell, callback)
+    assert(type(label) == 'string' and type(id) == 'string' and type(cell) == 'string')
     assert(not sheet or type(sheet) == 'string')
     assert(not callback or type(callback) == 'function')
 
@@ -80,9 +83,9 @@ function CrLua.TTS.Spreadsheet.get(id, sheet, cell, callback)
 
     local function callbackWrapper(webRequest)
         if webRequest.is_error then
-            CrLua.Log.w(TAG, 'get failed')
+            CrLua.Log.w(TAG, 'get failed ("' .. label .. '")')
         else
-            CrLua.Log.d(TAG, 'get success')
+            CrLua.Log.i(TAG, 'get success ("' .. label .. '")')
         end
         if callback then
             callback(webRequest.text)

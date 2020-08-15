@@ -497,13 +497,9 @@ function _getAllocateCommandTokensCount(playerColor, faction, lowerNameToInZoneC
     if lowerNameToInZoneCards['cybernetic enhancements ω'] and ownerFaction.name ~= 'The L1Z1X Mindnet' then
         _safeBroadcastToColor('Cybernetic Enhancements Ω used. Returning to L1Z1X Mindnet player.', playerColor, {0.1,0.5,0.1})
         result = result + 1
-        local factionList = _factionHelper.allFactions()
-        for color, factionInfo in pairs(factionList) do
-            if factionInfo.name == 'The L1Z1X Mindnet' then
-                lowerNameToInZoneCards['cybernetic enhancements ω'][1].deal(1, color)
-                _safeBroadcastToColor('Cybernetic Enhancements Ω used. Returned to your hand.', color, {0.1,0.5,0.1})
-            end
-        end
+        local mindnetColor = _factionHelper.fromTokenName('L1Z1X Mindnet').color
+        lowerNameToInZoneCards['cybernetic enhancements ω'][1].deal(1, mindnetColor)
+        _safeBroadcastToColor('Cybernetic Enhancements Ω used. Returned to your hand.', mindnetColor, {0.1,0.5,0.1})
     end
     return result
 end

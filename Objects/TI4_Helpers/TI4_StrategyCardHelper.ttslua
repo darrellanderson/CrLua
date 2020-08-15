@@ -400,6 +400,7 @@ end
 function _getAllocateCommandTokensCount(playerColor, faction, lowerNameToInZoneCards)
     assert(type(playerColor) == 'string' and type(lowerNameToInZoneCards) == 'table')
     local result = 2
+    local ownerFaction = _factionHelper.fromColor(playerColor)
     if faction and faction.extraCommandTokens then
         _safeBroadcastToColor('Faction extra command token active.', playerColor, {0.1,0.5,0.1})
         result = result + faction.extraCommandTokens
@@ -412,7 +413,7 @@ function _getAllocateCommandTokensCount(playerColor, faction, lowerNameToInZoneC
         _safeBroadcastToColor('Versatile active.', playerColor, {0.1,0.5,0.1})
         result = result + 1
     end
-    if lowerNameToInZoneCards['cybernetic enhancements ω'] and faction.name ~= 'The L1Z1X Mindnet' then
+    if lowerNameToInZoneCards['cybernetic enhancements ω'] and ownerFaction.name ~= 'The L1Z1X Mindnet' then
         _safeBroadcastToColor('Cybernetic Enhancements Ω used. Returning to L1Z1X Mindnet player.', playerColor, {0.1,0.5,0.1})
         result = result + 1
         local factionList = _factionHelper.allFactions()

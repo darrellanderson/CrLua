@@ -32,114 +32,309 @@ function getHelperClient(helperObjectName)
 end
 
 local _factionAttributes = {
+
     ['The Arborec'] = {
+        tokenName = 'Arborec',
+        startingUnits = { Infantry = 4, Fighter = 2, Cruiser = 1, Carrier = 1, Space_Dock = 1, PDS = 1 },
+        startingTech = { 'Magen Defense Grid' },
         flagship = 'Duha Menaimon',
+        flagshipDescription = 'After you activate this system, you may produce up to 5 units in this system.',
     },
+
     ['The Barony Of Letnev'] = {
+        tokenName = 'Barony of Letnev',
+        startingUnits = { Infantry = 3, Fighter = 1, Destroyer = 1, Carrier = 1, Dreadnought = 1, Space_Dock = 1 },
+        startingTech = { 'Antimass Deflectors', 'Plasma Scoring' },
         flagship = 'Arc Secundus',
+        flagshipDescription = "Other players’ units in this system lose PLANETARY SHIELD.  At the start of each space combat round, repair this ship.  BOMBARDMENT 5 (X3)",
     },
+
     ['The Clan Of Saar'] = {
+        tokenName = 'Clan of Saar',
+        startingUnits = { Infantry = 4, Fighter = 2, Cruiser = 1, Carrier = 2, Space_Dock = 1 },
+        startingTech = { 'Antimass Deflectors' },
         flagship = 'Son of Ragh',
+        flagshipDescription = 'ANTI-FIGHTER BARRAGE 6 (X4)'
     },
+
     ['The Embers Of Muaat'] = {
+        tokenName = 'Embers of Muaat',
+        startingUnits = { Infantry = 4, Fighter = 2, War_Sun = 1, Space_Dock = 1 },
+        startingTech = { 'Plasma Scoring' },
         flagship = 'The Inferno',
+        flagshipDescription = "ACTION: Spend 1 token from your strategy pool to place 1 cruiser in this unit’s system.",
     },
+
     ['The Emirates Of Hacan'] = {
+        tokenName = 'Emirates of Hacan',
+        startingUnits = { Infantry = 4, Fighter = 2, Cruiser = 1, Carrier = 2, Space_Dock = 1 },
+        startingTech = { 'Antimass Deflectors', 'Sarween Tools' },
         flagship = 'Wrath of Kenara',
+        flagshipDescription = 'After you roll a die during a space combat in this system, you may spend 1 trade good to apply +1 to the result.',
     },
+
     ['The Federation Of Sol'] = {
+        tokenName = 'Federation of Sol',
+        startingUnits = { Infantry = 5, Fighter = 3, Destroyer = 1, Carrier = 2, Space_Dock = 1 },
+        startingTech = { 'Antimass Deflectors', 'Neural Motivator' },
         flagship = 'Genesis',
+        flagshipDescription = "At the end of the status phase, place 1 infantry from your reinforcements in this system’s space area.",
         extraCommandTokens = 1,
     },
+
     ['The Ghosts Of Creuss'] = {
+        tokenName = 'Ghosts of Creuss',
+        startingUnits = { Infantry = 4, Fighter = 2, Destroyer = 2, Carrier = 1, Space_Dock = 1 },
+        startingTech = { 'Gravity Drive' },
         flagship = 'Hil Colish',
+        flagshipDescription = "This ship’s system contains a delta wormhole.  During movement, this ship may move before or after your other ships.",
     },
+
     ['The L1Z1X Mindnet'] = {
+        tokenName = 'L1Z1X Mindnet',
+        startingUnits = { Infantry = 5, Fighter = 3, Carrier = 1, Dreadnought = 1, Space_Dock = 1, PDS = 1 },
+        startingTech = { 'Neural Motivator', 'Plasma Scoring' },
         flagship = '[0.0.1]',
+        flagshipDescription = 'During a space combat, hits produced by this ship and by your dreadnoughts in this system must be assigned to non-fighter ships if able.',
     },
+
     ['The Mentak Coalition'] = {
+        tokenName = 'Mentak Coalition',
+        startingUnits = { Infantry = 4 ,Fighter = 3, Cruiser = 2, Carrier = 1, Space_Dock = 1, PDS = 1 },
+        startingTech = { 'Sarween Tools', 'Plasma Scoring' },
         flagship = 'Fourth Moon',
+        flagshipDescription = "Other players’ ships in this system cannot use SUSTAIN DAMAGE.",
     },
+
     ['The Naalu Collective'] = {
+        tokenName = 'Naalu Collective',
+        startingUnits = { Infantry = 4, Fighter = 3, Destroyer = 1, Cruiser = 1, Carrier = 1, Space_Dock = 1, PDS = 1 },
+        startingTech = { 'Neural Motivator', 'Sarween Tools' },
         flagship = 'Matriarch',
+        flagshipDescription = 'During an invasion in this system, you may commit fighters to planets as if they were ground forces.  When combat ends, return those units to the space area.',
     },
+
     ['The Nekro Virus'] = {
+        tokenName = 'Nekro Virus',
+        startingUnits = { Infantry = 2, Fighter = 2, Cruiser = 1, Carrier = 1, Dreadnought = 1, Space_Dock = 1 },
+        startingTech = { 'Dacxive Animators', 'Valefar Assimilator X', 'Valefar Assimilator Y' },
         flagship = 'The Alastor',
+        flagshipDescription = 'At the start of space combat, choose any number of your ground forces in this system to participate in that combat as is they were ships.  These ground forces do not count against fleet supply.',
     },
+
     ["The Sardakk N'orr"] = {
+        tokenName = "Sardakk N'orr",
+        startingUnits = { Infantry = 5, Cruiser = 1, Carrier = 2, Space_Dock = 1, PDS = 1 },
+        startingTech = {},
         flagship = "C'morran N'orr",
+        flagshipDescription = "Apply +1 to the result of each of your other ship’s combat rolls in this system.",
     },
+
     ['The Universities of Jol-Nar'] = {
+        tokenName = 'Universities of Jol-Nar',
+        startingUnits = { Infantry = 2, Fighter = 1, Carrier = 2, Dreadnought = 1, Space_Dock = 1, PDS = 2 },
+        startingTech = { 'Antimass Deflectors', 'Neural Motivator', 'Sarween Tools', 'Plasma Scoring' },
         flagship = 'J.N.S. Hylarim',
+        flagshipDescription = 'When making a combat roll for this ship, each result of 9 or 10, before applying modifiers, produces 2 extra hits.',
     },
+
     ['The Winnu'] = {
+        tokenName = 'Winnu',
+        startingUnits = { Infantry = 2, Fighter = 2, Cruiser = 1, Carrier = 1, Space_Dock = 1, PDS = 1 },
+        startingTech = { 'Antimass Deflectors', 'Neural Motivator', 'Sarween Tools', 'Plasma Scoring' },
         flagship = 'Salai Sai Corian',
+        flagshipDescription = "When this unit makes a combat roll, it rolls a number of dice equal to the number of your opponent’s non-fighter ships in this system.",
+        startMessage = 'Pick 1 technology and return the other 3 to your deck.'
     },
+
     ['The Xxcha Kingdom'] = {
+        tokenName = 'Xxcha Kingdom',
+        startingUnits = { Infantry = 4, Fighter = 3, Cruiser = 2, Carrier = 1, Space_Dock = 1, PDS = 1 },
+        startingTech = { 'Graviton Laser System' },
         flagship = 'Loncara Ssodu',
+        flagshipDescription = "You may use this unit’s SPACE CANNON against ships that are in adjacent systems.  SPACE CANNON 5 (X3)",
     },
+
     ['The Yin Brotherhood'] = {
+        tokenName = 'Yin Brotherhood',
+        startingUnits = { Infantry = 4, Fighter = 4, Destroyer = 1, Carrier = 2, Space_Dock = 1 },
+        startingTech = { 'Sarween Tools' },
         flagship = 'Van Hauge',
+        flagshipDescription = 'When this ship is destroyed, destroy all ships in this system.',
     },
+
     ['The Yssaril Tribes'] = {
+        tokenName = 'Yssaril Tribes',
+        startingUnits = { Infantry = 5, Fighter = 2, Cruiser = 1, Carrier = 2, Space_Dock = 1, PDS = 1 },
+        startingTech = { 'Neural Motivator' },
         flagship = "Y'sia Y'ssrila",
+        flagshipDescription = "This ship can move through systems that contain another players’ ships.",
         extraActionCards = 1,
     },
 
     -- Tactic Blue's homebrew
-    ['The Drahn Consortium'] = {
-        flagship = 'Nightingale II',
-    },
-    ['The Fremen'] = {
-        flagship = 'Shai-Hulud',
-    },
-    ['The Khet Drakkol Union'] = {
-        flagship = 'Khage',
-    },
-    ['The Veldyr Sovereignty'] = {
-        flagship = 'Richtyrian',
-    },
-    ['The Mandalorian Clans'] = {
-        flagship = "Kyr'tsad",
-    },
     ['The Advent'] = {
+        source = 'Blue Space',
+        tokenName = 'Advent',
+        startingUnits = { Infantry = 2, Fighter = 6, Destroyer = 1, Carrier = 2, Space_Dock = 1 },
+        startingTech = { 'Neural Motivator', 'Sarween Tools' },
         flagship = 'Advent Flagship',
+        flagshipDescription = '',
     },
+
+    ['The Drahn Consortium'] = {
+        source = 'Blue Space',
+        tokenName = 'Drahn Consortium',
+        startingUnits = { Infantry = 4, Fighter = 3, Destroyer = 1, Carrier = 2, Space_Dock = 1 },
+        startingTech = { 'Neural Motivator', 'Plasma Scoring' },
+        flagship = 'Nightingale II',
+        flagshipDescription = 'Other players cannot play action cards during a space combat in this system.',
+    },
+
     ['The Free Systems Alliance'] = {
+        source = 'Blue Space',
+        tokenName = 'Free Systems Alliance',
+        startingUnits = { Infantry = 4, Fighter = 2, Cruiser = 2, Carrier = 1, Space_Dock = 1, PDS = 1 },
+        startingTech = { 'Neural Motivator' },
         flagship = 'Vox',
+        flagshipDescription = 'When this unit makes a combat roll, it rolls 1 additional die for each planet in this system of any single trait.',
     },
-    ["The Navigators' Guild"] = {
-        flagship = 'Chogra Tuhn',
+
+    ['The Fremen'] = {
+        source = 'Blue Space',
+        tokenName = 'Fremen',
+        startingUnits = { Infantry = 7, Fighter = 2, Cruiser = 2, Carrier = 1, Space_Dock = 1 },
+        startingTech = { 'Antimass Deflectors' },
+        flagship = 'Shai-Hulud',
+        flagshipDescription = 'During a round of combat in the system, 1 unit you control may roll 1 additional combat die.',
     },
-    ['The Vasari Empire'] = {
-        flagship = 'Vasari Flagship',
-    },
-    ['The Trader Emergency Coalition'] = {
-        flagship = 'Trader Flagship',
-    },
-    ['The Kortali Horde'] = {
-        flagship = "For'xdar",
-    },
-    ['The Rhodyn Migrant Fleet'] = {
-        flagship = 'Mho Rhodyn',
-    },
-    ['The HCEN Defense System'] = {
-        flagship = 'Locus',
-    },
+
     ['The Gheldor Authority'] = {
+        source = 'Blue Space',
+        tokenName = 'Gheldor Authority',
+        startingUnits = { Infantry = 4, Fighter = 2, Destroyer = 1, Carrier = 2, Space_Dock = 1 },
+        startingTech = { 'Magen Defense Grid' },
         flagship = "Gheld'Atar",
+        flagshipDescription = 'Units you control that are on planets adjacent to this system cannot lose PLANETARY SHIELD.',
     },
-    ['The Zeth Contingency'] = {
-        flagship = "Eru'Ishon",
+
+    ['The HCEN Defense System'] = {
+        source = 'Blue Space',
+        tokenName = 'HCEN Defense System',
+        startingUnits = { Infantry = 3, Cruiser = 1, Carrier = 1, PDS = 2, Space_Dock = 1 },
+        startingTech = { 'Graviton Laser System' },
+        flagship = 'Locus',
+        flagshipDescription = 'At the start of your turn, you may move 1 of your PDS to a planet you control in this system.',
     },
+
+    ['The Khet Drakkol Union'] = {
+        source = 'Blue Space',
+        tokenName = 'Khet Drakkol Union',
+        startingUnits = { Infantry = 4, Fighter = 3, Destroyer = 1, Dreadnought = 2, Space_Dock = 1, PDS = 1 },
+        startingTech = { 'Sarween Tools' },
+        flagship = 'Khage',
+        flagshipDescription = '',
+    },
+
+    ['The Kortali Horde'] = {
+        source = 'Blue Space',
+        tokenName = 'Kortali Horde',
+        startingUnits = { Infantry = 5, Fighter = 3, Cruiser = 1, Carrier = 2, Space_Dock = 1 },
+        startingTech = { 'Dacxive Animators' },
+        flagship = "For'xdar",
+        flagshipDescription = 'Planets controlled by other players in this system cannot be readied.',
+    },
+
     ['The Lazax'] = {
+        source = 'Blue Space',
+        tokenName = 'Lazax',
+        startingUnits = { Infantry = 3, Fighter = 2, Cruiser = 1, Carrier = 1, Dreadnought = 1, Space_Dock = 1, PDS = 1 },
+        startingTech = { 'Antimass Deflectors', 'Neural Motivator', 'Sarween Tools', 'Plasma Scoring' },
         flagship = 'Regulus',
+        flagshipDescription = 'When this unit makes a combat roll, it rolls 1 additional die for each victory point you have.',
+        startMessage = 'Pick 1 technology and return the other 3 to your deck.'
     },
+
     ['The Mahact Sorcerer Kings'] = {
+        source = 'Blue Space',
+        tokenName = '',
+        startingUnits = { Infantry = 4, Fighter = 2, Cruiser = 1, Carrier = 2, Space_Dock = 1, PDS = 2 },
+        startingTech = { },
         flagship = "Noctul H'rgan",
+        flagshipDescription = "Other units you control in this system may instead have the abilities and attributes of another player’s units of the same type in this system.",
     },
+
+    ['The Mandalorian Clans'] = {
+        source = 'Blue Space',
+        tokenName = 'Mandalorian Clans',
+        startingUnits = { Infantry = 5, Fighter = 2, Cruiser = 2, Carrier = 1, Space_Dock = 1 },
+        startingTech = { 'Neural Motivator', 'Antimass Deflectors' },
+        flagship = "Kyr'tsad",
+        flagshipDescription = 'This ship cannot be destroyed by Direct Hit action cards.',
+    },
+
+    ["The Navigators' Guild"] = {
+        source = 'Blue Space',
+        tokenName = "Navigators' Guild",
+        startingUnits = { Infantry = 4, Fighter = 1, Cruiser = 1, Carrier = 2, Space_Dock = 1 },
+        startingTech = { 'Antimass Deflectors', 'Sarween Tools' },
+        flagship = 'Chogra Tuhn',
+        flagshipDescription = "Other players' ships cannot move through this unit’s system.",
+    },
+
+    ['The Rhodyn Migrant Fleet'] = {
+        source = 'Blue Space',
+        tokenName = 'Rhodyn Migrant Fleet',
+        startingUnits = { Infantry = 4, Fighter = 2, Destroyer = 1, Space_Dock = 1, Flagship = 1 },
+        startingTech = { 'Gravity Drive' },
+        flagship = 'Mho Rhodyn',
+        flagshipDescription = "At the end of the status phase, place 1 fighter from your reinforcements into this system’s space area."
+    },
+
+    ['The Trader Emergency Coalition'] = {
+        source = 'Blue Space',
+        tokenName = 'Trader Emergency Coalition',
+        startingUnits = { Infantry = 2, Fighter = 2, Cruiser = 1, Destroyer = 1, Carrier = 1, Space_Dock = 2 },
+        startingTech = { 'Sarween Tools', 'Plasma Scoring' },
+        flagship = 'Trader Flagship',
+        flagshipDescription = '',
+    },
+
+    ['The Vasari Empire'] = {
+        source = 'Blue Space',
+        tokenName = 'Vasari Empire',
+        startingUnits = { Infantry = 3, Fighter = 2, Destroyer = 1, Carrier = 1, Dreadnought = 1, Space_Dock = 1 },
+        startingTech = { 'Antimass Deflectors', 'Plasma Scoring' },
+        flagship = 'Vasari Flagship',
+        flagshipDescription = '',
+    },
+
+    ['The Veldyr Sovereignty'] = {
+        source = 'Blue Space',
+        tokenName = 'Veldyr Sovereignty',
+        startingUnits = { Infantry = 3, Fighter = 2, Destroyer = 1 ,Dreadnought = 1, Carrier = 1, Space_Dock = 1, PDS = 1 },
+        startingTech = { 'Plasma Scoring' },
+        flagship = 'Richtyrian',
+        flagshipDescription = 'When this ship makes a combat roll, it rolls 1 additional die for each round of space combat that has been resolved this combat.',
+    },
+
+    ['The Zeth Contingency'] = {
+        source = 'Blue Space',
+        tokenName = 'Zeth Contingency',
+        startingUnits = { Infantry = 3, Fighter = 2, Destroyer = 2, Carrier = 1, Space_Dock = 1, PDS = 1 },
+        startingTech = { 'Antimass Deflectors', 'Neural Motivator', 'Sarween Tools', 'Plasma Scoring' },
+        flagship = "Eru'Ishon",
+        flagshipDescription = 'When this unit makes a combat roll, it rolls a number of dice equal to the greatest number of technologies you control in any color.',
+        startMessage = 'Pick 2 technologies and return the other 2 to your deck.'
+    },
+
     ['The Savages of Cymiae'] = {
+        source = 'Other Homebrew',
+        tokenName = 'Savages of Cymiae',
+        startingUnits = { Infantry = 2, Fighter = 2, Cruiser = 1, Carrier = 1, Space_Dock = 1, PDS = 1 },
+        startingTech = { 'Plasma Scoring', 'Magen Defense Grid' },
         flagship = 'Robotic Reprocessing Center',
+        flagshipDescription = 'Your infantry in this system gain SUSTAIN DAMAGE during ground combat.',
     },
 }
 
@@ -150,15 +345,32 @@ local _update = {
     periodicUpdateSeconds = 10,
 }
 
-function allFactions()
-    _maybeUpdate()
-    return _colorToFaction
+function allFactions(includeFactionsNotAtTable)
+    assert(not includeFactionsNotAtTable or type(includeFactionsNotAtTable) == 'boolean')
+    if includeFactionsNotAtTable then
+        return _factionAttributes
+    else
+        _maybeUpdate()
+        return _colorToFaction
+    end
 end
 
 function fromColor(color)
     assert(type(color) == 'string')
     _maybeUpdate()
     return _colorToFaction[color]
+end
+
+--- Get faction from token name (strips off any "owner token" or "command token" suffix, if present)
+function fromTokenName(tokenName)
+    assert(type(tokenName) == 'string')
+    tokenName = string.match(tokenName, '^(.*) .* Token$') or tokenName
+    _maybeUpdate()
+    for _, faction in pairs(_factionAttributes) do
+        if faction.tokenName == tokenName then
+            return faction
+        end
+    end
 end
 
 function _maybeUpdate()
@@ -176,8 +388,6 @@ function _maybeUpdate()
         local colorToCommandSheet = {}
         local factionSheetGuidToFactionSheet = {}
         local factionSheetGuidToFactionName = {}
-        local tokenBagGuidToBag = {}
-        local tokenBagGuidToTokenFactionName = {}
         for _, object in ipairs(getAllObjects()) do
             local name = object.getName()
             local guid = object.getGUID()
@@ -195,13 +405,6 @@ function _maybeUpdate()
             if factionName then
                 factionSheetGuidToFactionSheet[guid] = object
                 factionSheetGuidToFactionName[guid] = factionName
-            end
-
-            -- "TOKEN_FACTION Command Tokens Bag"
-            local tokenFactionName, tokenType = string.match(name, '^(.*) (%u%a+) Tokens Bag$')
-            if tokenType == 'Command' then
-                tokenBagGuidToBag[guid] = object
-                tokenBagGuidToTokenFactionName[guid] = tokenFactionName
             end
         end
 
@@ -263,24 +466,14 @@ function _maybeUpdate()
 
         -- Map command sheet color to nearest faction, tokenFaction, and seated player.
         local colorToFactionSheetGuid = colorToClosestKey(factionSheetGuidToFactionSheet)
-        local colorToTokenBagGuid = colorToClosestKey(tokenBagGuidToBag)
-
-        local colorToFactionName = {}
-        for color, guid in pairs(colorToFactionSheetGuid) do
-            colorToFactionName[color] = factionSheetGuidToFactionName[guid]
-        end
-        local colorToTokenFactionName = {}
-        for color, guid in pairs(colorToTokenBagGuid) do
-            colorToTokenFactionName[color] = tokenBagGuidToTokenFactionName[guid]
-        end
 
         _colorToFaction = {}
-        for color, _ in pairs(colorToFactionSheetGuid) do
-            local factionName = colorToFactionName[color]
+        for color, factionSheetGuid in pairs(colorToFactionSheetGuid) do
+            local factionName = factionSheetGuidToFactionName[factionSheetGuid]
             local attributes = {
-                name = factionName,
-                tokenName = colorToTokenFactionName[color],
                 color = color,
+                commandSheetGuid = colorToCommandSheet[color].getGUID(),
+                factionSheetGuid = colorToFactionSheetGuid[color],
             }
             for k, v in pairs(_factionAttributes[factionName]) do
                 attributes[k] = v
@@ -304,4 +497,9 @@ function onLoad(saveState)
         end
     end
     self.setInvisibleTo(invisibleTo)
+
+    -- Add faction names to attributes.
+    for factionName, attributes in pairs(_factionAttributes) do
+        attributes.name = factionName
+    end
 end

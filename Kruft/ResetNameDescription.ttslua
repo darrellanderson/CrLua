@@ -1,0 +1,95 @@
+local BLUE_SPACE = {
+    "Advent",
+    "Drahn Consortium",
+    "Free Systems Alliance",
+    "Fremen",
+    "Gheldor Authority",
+    "HCEN Defense System",
+    "Khet Drakkol Union",
+    "Kortali Horde",
+    "Lazax",
+    "Mahact Sorcerer Kings",
+    "Mandalorian Clans",
+    "Navigators' Guild",
+    "Rhodyn Migrant Fleet",
+    "Trader Emergency Coalition",
+    "Vasari Empire",
+    "Veldyr Sovereignty",
+    "Zeth Contingency",
+}
+local STANDARD = {
+    "Arborec",
+    "Barony of Letnev",
+    "Clan of Saar",
+    "Embers of Muaat",
+    "Emirates of Hacan",
+    "Federation of Sol",
+    "Ghosts of Creuss",
+    "L1Z1X Mindnet",
+    "Mentak Coalition",
+    "Naalu Collective",
+    "Nekro Virus",
+    "Sardakk N'orr",
+    "Universities of Jol-Nar",
+    "Winnu",
+    "Xxcha Kingdom",
+    "Yin Brotherhood",
+    "Yssaril Tribes",
+}
+
+local NAME_TO_DESC_JSON = "{\"Advent\":\"Neural Motivator, Sarween Tools\\n-\\n2 carriers\\n1 destroyer\\n6 fighters\\n2 infantry\\n1 space dock\",\"Arborec\":\"Magen Defense Grid\\n-\\n1 carrier\\n1 cruiser\\n2 fighters\\n4 infantry\\n1 space dock\\n1 PDS\",\"Barony of Letnev\":\"Antimass Deflectors, Plasma Scoring\\n-\\n1 dreadnought\\n1 carrier\\n1 destroyer\\n1 fighter\\n3 infantry\\n1 space dock\",\"Clan of Saar\":\"Antimass Deflectors\\n-\\n2 carriers\\n1 cruiser\\n2 fighters\\n4 infantry\\n1 space dock\",\"Drahn Consortium\":\"Neural Motivator, Plasma Scoring\\n-\\n2 carriers\\n1 destroyer\\n3 fighters\\n4 infantry\\n1 space dock\",\"Embers of Muaat\":\"Plasma Scoring\\n-\\n1 war sun\\n2 fighters\\n4 infantry\\n1 space dock\",\"Emirates of Hacan\":\"Antimass Deflectors, Sarween Tools\\n-\\n2 carriers\\n1 cruiser\\n2 fighters\\n4 infantry\\n1 space dock\",\"Federation of Sol\":\"Neural Motivator, Antimass Deflectors\\n-\\n2 carriers\\n1 destroyer\\n3 fighters\\n5 infantry\\n1 space dock\",\"Free Systems Alliance\":\"Neural Motivator\\n-\\n1 carrier\\n2 cruisers\\n2 fighters\\n4 infantry\\n1 space dock\\n1 PDS\",\"Fremen\":\"Antimass Deflectors\\n-\\n1 carrier\\n2 cruisers\\n2 fighters\\n7 infantry\\n1 space dock\",\"Gheldor Authority\":\"Magen Defense Grid\\n-\\n2 carriers\\n1 destroyer\\n2 fighters\\n4 infantry\\n1 space dock\",\"Ghosts of Creuss\":\"Gravity Drive\\n-\\n1 carrier\\n2 destroyers\\n2 fighters\\n4 infantry\\n1 space dock\",\"HCEN Defense System\":\"Graviton Laser System\\n-\\n1 carrier\\n1 cruiser\\n3 infantry\\n1 space dock\\n2 PDS\",\"Khet Drakkol Union\":\"Sarween Tools\\n-\\n2 dreadnoughts\\n1 destroyer\\n3 fighters\\n4 infantry\\n1 PDS\\n1 space dock\",\"L1Z1X Mindnet\":\"Neural Motivator, Plasma Scoring\\n-\\n1 dreadnought\\n1 carrier\\n3 fighters\\n5 infantry\\n1 space dock\\n1 PDS\",\"Lazax\":\"Choose 1 technology with no prerequisites.\\n-\\n1 dreadnought\\n1 carrier\\n1 cruiser\\n2 fighter\\n3 infantry\\n1 space dock\\n1 PDS\",\"Mahact Sorcerer Kings\":\"None\\n-\\n2 carriers\\n1 cruiser\\n2 fighters\\n4 infantry\\n1 space dock\\n2 PDS\",\"Mandalorian Clans\":\"Neural Motivator, Antimass Deflectors\\n-\\n1 carrier\\n2 cruisers\\n2 fighters\\n5 infantry\\n1 space dock\",\"Mentak Coalition\":\"Sarween Tools, Plasma Scoring\\n-\\n1 carrier\\n2 cruisers\\n3 fighters\\n4 infantry\\n1 space dock\\n1 PDS\",\"Naalu Collective\":\"Neural Motivator, Sarween Tools\\n-\\n1 carrier\\n1 cruiser\\n1 destroyer\\n3 fighters\\n4 infantry\\n1 space dock\\n1 PDS\",\"Navigators' Guild\":\"Antimass Deflectors, Sarween Tools\\n-\\n2 carriers\\n1 cruiser\\n1 fighter\\n4 infantry\\n1 space dock\",\"Nekro Virus\":\"Dacxive Animators, Valefar Assimilator X, Valefar Assimilator Y\\n-\\n1 dreadnought\\n1 carrier\\n1 cruiser\\n2 fighters\\n2 infantry\\n1 space dock\",\"Rhodyn Migrant Fleet\":\"Gravity Drive\\n--\\n1 flagship\\n1 destroyer\\n2 fighters\\n4 infantry\\n1 space dock\",\"Sardakk N'orr\":\"None\\n-\\n2 carriers\\n1 cruiser\\n5 infantry\\n1 space dock\\n1 PDS\",\"Trader Emergency Coalition\":\"Sarween Tools, Plasma Scoring\\n-\\n1 carrier\\n1 cruiser\\n1 destroyer\\n2 fighters\\n2 infantry\\n2 space docks\",\"Universities of Jol-Nar\":\"Neural Motivator, Antimass Deflectors, Sarween Tools, Plasma Scoring\\n-\\n1 dreadnought\\n2 carriers\\n1 fighter\\n2 infantry\\n1 space dock\\n2 PDS\",\"Vasari Empire\":\"Antimass Deflectors, Plasma Scoring\\n-\\n1 dreadnought\\n1 carrier\\n1 destroyer\\n2 fighters\\n3 infantry\\n1 space dock\",\"Veldyr Sovereignty\":\"Plasma Scoring\\n-\\n1 dreadnought\\n1 carrier\\n1 destroyer\\n2 fighters\\n3 infantry\\n1 space dock\\n1 PDS\",\"Winnu\":\"Choose 1 technology with no prerequisites.\\n-\\n1 carrier\\n1 cruiser\\n2 fighters\\n2 infantry\\n1 space dock\\n1 PDS\",\"Xxcha Kingdom\":\"Graviton Laser System\\n-\\n1 carrier\\n2 cruisers \\n3 fighters\\n4 infantry\\n1 space dock\\n1 PDS\",\"Yin Brotherhood\":\"Sarween Tools\\n-\\n2 carriers\\n1 destroyer\\n4 fighters\\n4 infantry\\n1 space dock\",\"Yssaril Tribes\":\"Neural Motivator\\n-\\n2 carriers\\n1 cruiser\\n2 fighters\\n5 infantry\\n1 space dock\\n1 PDS\",\"Zeth Contingency\":\"Choose 2 technologies with no prerequisites.\\n-\\n1 carrier\\n2 destroyers\\n2 fighters\\n3 infantry \\n1 space dock\\n1 PDS\",\"Kortali Horde\":\"Dacxive Animators\\n-\\n2 carriers\\n1 cruiser\\n3 fighters\\n5 infantry\\n1 space dock\"}"
+
+
+local _nameToDesc = false
+local _cardNames = {}
+
+function onLoad(saveState)
+    _nameToDesc = JSON.decode(NAME_TO_DESC_JSON)
+
+    -- Add card names in deck image order.
+    for _, name in ipairs(STANDARD) do
+        table.insert(_cardNames, name)
+    end
+    for _, name in ipairs(BLUE_SPACE) do
+        table.insert(_cardNames, name)
+    end
+
+    self.createButton({
+        click_function = 'doReset',
+        function_owner = self,
+        label          = 'RESET',
+        position       = { x = 0, y = 0.51, z = 0 },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1, y = 1, z = 1},
+        width          = 400,
+        height         = 200,
+        font_size      = 80,
+    })
+end
+
+function doReset()
+    local deck = false
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Deck' and object.getName() == 'RESET DECK' then
+            deck = object
+        end
+    end
+    if not deck then
+        error('did not find "RESET DECK"')
+    end
+
+    if deck.getQuantity() ~= #_cardNames then
+        error('deck must have ' .. (#_cardNames) .. ' cards')
+    end
+
+    local pos = deck.getPosition()
+    for i = 1, deck.getQuantity() do
+        local name = _cardNames[i]
+        local desc = _nameToDesc[name]
+        local card = deck.remainder or deck.takeObject({
+            position = { x = pos.x, y = pos.y + 5 + i + 1, z = pos.z },
+        })
+        card.setName(name)
+        card.setDescription(desc)
+    end
+end

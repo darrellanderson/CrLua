@@ -15,298 +15,1296 @@ function getHelperClient(helperObjectName)
         end
         error('missing object "' .. helperObjectName .. '"')
     end
+    -- Nested tables are considered cross script.  Make a local copy.
+    local function copyTable(t)
+        if t and type(t) == 'table' then
+            local copy = {}
+            for k, v in pairs(t) do
+                copy[k] = type(v) == 'table' and copyTable(v) or v
+            end
+            t = copy
+        end
+        return t
+    end
     local helperObject = false
     local function getCallWrapper(functionName)
         helperObject = helperObject or getHelperObject()
         if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
-        return function(parameters) return helperObject.call(functionName, parameters) end
+        return function(parameters) return copyTable(helperObject.call(functionName, parameters)) end
     end
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
 
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
+local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
+
+local PRINT_DEBUG_LOG_MESSAGES = true
+
+local SetupGeneric = {
+    NAME_TO_PLAYER_ZONE_OFFSET = {
+        ['^Technology Cards$'] = { x = 10, z = 2 },
+        ['^TI4 Unpacker$'] = { x = -10, z = 2 },
+        ['^TI4 MultiRoller'] = { x = 0, z = 42, lock = true },
+    },
+    NAME_TO_PLAYER_AGENDA_ZONE_OFFSET = {
+        ['^Any Whens%?$'] = { x = -0.6, z = 3 },
+        ['^Any Afters%?$'] = { x = 0.6, z = 3 },
+    },
+    NAME_TO_AGENDA_ZONE_OFFSET = {
+        ['^For:$'] = { x = -4.25, lock = true },
+        ['^Against:$'] = { x = 4.25, lock = true },
+        ['^Votes$'] = { x = -9.25 },
+        ['^Speaker Token %- Agenda$'] = { x = 0 },
+    }
+}
+
+local SetupColor = {
+    DEFAULT_COLOR_LIST = { 'White', 'Blue', 'Purple', 'Yellow', 'Red', 'Green', 'Orange', 'Pink', 'Brown' },
+
+    HAND = {
+        ACTIVE = {
+            OFFSET = { x = 0, y = 4, z = 21, dzMiddle = 5, yRot = 180 },
+            SCALE = { x = 20, y = 8, z = 4 }
+        },
+        INACTIVE = {
+            POSITION = { x = 148, y = 4, z = 80, dx = 3 },
+            SCALE = { x = 1, y = 4, z = 1 }
+        }
+    },
+
+    -- The box with per-color items, hover above the player area.
+    COLOR_BOX_OFFSET = { x = 0, y = 5, z = 0, lock = true },
+
+    NAME_TO_PLAYER_ZONE_OFFSET = {
+        ['Notes %($COLOR%)'] = { x = 7, z = 2 },
+        ['Active/Passed %($COLOR%)'] = { x = 4, y = 1, z = 2, flip = false },  -- do not flip, changing setup can lead to unflipped tokens
+        ['Command Sheet %($COLOR%)'] = { x = -8, z = 11, lock = true },
+        ['Directionaliser %($COLOR%)'] = { x = 0, y = 0.46, z = -2, yRot = 270, lock = true },
+    },
+    NAME_TO_PLAYER_AGENDA_ZONE_OFFSET = {
+        ['$COLOR Player Votes'] = { x = 0, y = 1, z = 1, yRot = 180 },
+    },
+    NAME_TO_DIRECTIONALISER_OFFSET = {
+        -- These are in Directionaliser local coordinate space.
+        ['$COLOR Infantry'] = { x = 0, y = 1, z = -12.2 },
+        ['$COLOR Fighter'] = { x = 0, y = 1, z = -10.6 },
+        ['$COLOR Space Dock'] = { x = 0, y = 1, z = -8.4 },
+        ['$COLOR PDS'] = { x = 0, y = 1, z = -6.1 },
+        ['$COLOR Carrier'] = { x = 0, y = 1, z = -2.6 },
+        ['$COLOR Destroyer'] = { x = 0, y = 1, z = -0.1 },
+        ['$COLOR Cruiser'] = { x = 0, y = 1, z = 3.0 },
+        ['$COLOR Dreadnought'] = { x = 0, y = 1, z = 6.2 },
+        ['$COLOR Flagship'] = { x = 0, y = 1, z = 9.6 },
+        ['$COLOR War Sun'] = { x = 0, y = 1, z = 12.1 },
+    },
+}
+
+local SetupFaction = {
+    NAME_TO_PLAYER_ZONE_OFFSET = {
+        ['$FACTION_NAME Sheet'] = { x = 4.86, z = 10.6, lock = true },
+        ['$TOKEN_NAME Command Tokens Bag'] = { x = -8.2, z = 10.5, lock = true },
+        ['$TOKEN_NAME Owner Tokens Bag'] = { x = -5, z = 4.5, lock = true },
+        ['$TOKEN_NAME Tech Bag'] = { x = 10, y = 3, z = 2, unpack = true },
+        ['$TOKEN_NAME Promissory Bag'] = { x = 7, y = 3, z = 2, unpack = true },
+        ['$TOKEN_NAME Planets Bag'] = { x = 6, y = 3, z = -6, unpack = true, dx = 2.5 },
+    },
+    COMMAND_TOKENS_XZ_AND_FLIP = {
+        -- In command sheet local space
+        { x = 0.4, z = -2.1 },
+        { x = -0.7, z = -2.1 },
+        { x = -0.2, z = -1.2 },
+        { x = -1, z = -0.7, flip=true },
+        { x = -2.1, z = -0.7, flip=true },
+        { x = -1.6, z = -1.7, flip=true },
+        { x = -1, z = 0.3 },
+        { x = -2.1, z = 0.3 }
+    },
+    STARTING_TECH_OFFSET = {
+        x = 10, z = -5, dz = -2.1
+    },
+    OTHER_OFFSET = {
+        x = 1, z = 2, dx = -3
+    },
+}
 
 -------------------------------------------------------------------------------
 
-DEFAULT_COLOR_LIST = {"White","Blue","Purple","Yellow","Red","Green",'Orange','Pink'}
-
-_agendaCenter = false
-_playerList = false
-_mapColorToPlayer = false
-_agendaSpot = false
-
-local function debugLog(message)
-    print(message)
+--- Normal broadcastToColor throws an error if the color is not seated.
+function _safeBroadcastToColor(message, playerColor, messageColor)
+    for _, player in ipairs(Player.getPlayers()) do
+        if player.color == playerColor then
+            broadcastToColor(message, playerColor, messageColor)
+            return
+        end
+    end
+    broadcastToAll(message, messageColor)
 end
 
-function setZoneList(playerCount)
-    debugLog('setZoneList')
+--- Toggle'able debug messages.
+-- @param message string
+local function debugLog(message)
+    assert(type(message) == 'string')
+    if PRINT_DEBUG_LOG_MESSAGES then
+        print(message)
+    end
+end
+
+--- Find the guid of an object inside a container from a matching name pattern.
+-- @param contiainer object : either a bag or deck.
+-- @param namePattern string : for string.match on entry names.
+-- @return string : guid, or nil if not found.
+local function getEntryGuid(container, namePattern)
+    assert(type(container) == 'userdata' and type(namePattern) == 'string')
+    for _, entry in ipairs(container.getObjects()) do
+        if string.match(entry.name, namePattern) then
+            return entry.guid
+        end
+    end
+end
+
+--- Compute position from a zone center and offset.
+-- Flip offset Z when position has negative Z (scale out from middle).
+-- @param position table : {x,y,z}.
+-- @param offset table : {x,y,z}, all keys are optional.
+-- @return table : {x,y,z}.
+local function offsetPosition(position, offset)
+    return {
+        x = position.x + (offset.x or 0) * (position.z > 0 and 1 or -1),
+        y = position.y + (offset.y or 0),
+        z = position.z + (offset.z or 0) * (position.z > 0 and 1 or -1)
+    }
+end
+
+--- Compute a rotation from zone center and offset.
+-- Uses "natural" offset for the seat, apply offset.yRot if given.
+-- @param position table : {x,y,z}.
+-- @param offset table : {x,y,z,yRot}, all keys are optional.
+-- @return table : {x,y,z}.
+local function offsetRotation(position, offset)
+    local result = { x = 0, y = 0, z = 0 }
+
+    local z = offsetPosition(position, offset).z
+    if z == 0 then
+        result.y = 270
+    else
+        result.y = z > 0 and 0 or 180
+    end
+    result.y = result.y + (offset.yRot or 0)
+    if offset.flip then
+        result.z = result.z + 180
+    end
+    return result
+end
+
+--- Get the agenda zone for the given player count.
+local function agendaCenter(playerCount)
     assert(type(playerCount) == 'number')
-    assert(_agendaCenter, '_agendaCenter not set')
+    return {
+        x = playerCount <= 6 and -42.75 or -44.75,
+        y = 0,
+        z = 0
+    }
+end
 
-    -- assigns half the players rounded up to the 'north' side of the table
-    local zoneCenters = _zoneHelper.getPlayerCountZoneCenters(playerCount)
+--- Get the per-player player agenda zone for the player/player count.
+local function agendaCenterPlayer(agendaZoneCenter, playerZoneCenter)
+    assert(type(agendaZoneCenter) == 'table' and type(playerZoneCenter) == 'table')
+    return {
+        x = agendaZoneCenter.x + playerZoneCenter.x / 10,
+        y = agendaZoneCenter.y,
+        z = agendaZoneCenter.z + 4 * (playerZoneCenter.z > 0 and 1 or -1)
+    }
+end
 
-    -- empties the table of zone coordinates
-    _agendaSpot = {}
-    -- generates zone corners for each player, starting from 'northwest' at 1 clockwise
-    for i, zoneCenter in ipairs(zoneCenters) do
-        local zFlip = zoneCenter.z < 0 and 1 or -1
-        table.insert(_agendaSpot, {
-            x = zoneCenter.x / 10 + _agendaCenter.x,
-            y = zoneCenter.y + _agendaCenter.y,
-            z = -3.75 * zFlip + _agendaCenter.z,
+--- Get all "NAME_TO_" sub-table keys.
+-- Setup tables have "NAME_TO_" sub-tables from name pattern to attributes.
+local function allNamePatterns(t)
+    local result = {}
+    for k, v in pairs(t) do
+        if type(k) == 'string' and type(v) == 'table' and string.match(k, '^NAME_TO_') then
+            for namePattern, _ in pairs(v) do
+                table.insert(result, namePattern)
+            end
+        end
+    end
+    return result
+end
+
+local function yieldForSeconds(seconds)
+    local now = Time.time
+    while Time.time < now + seconds do
+        coroutine.yield(0)
+    end
+end
+
+-------------------------------------------------------------------------------
+
+--- Find the "Setup Bag".
+function SetupGeneric.getSetupBag()
+    for _, object in ipairs(getAllObjects()) do
+        if object.getName() == 'Setup Bag' then
+            return object
+        end
+    end
+end
+
+--- Pack non-color objects into the setup bag.
+function SetupGeneric.pack(setupBag)
+    assert(setupBag.tag == 'Bag')
+    debugLog('SetupGeneric.pack')
+
+    local nameToObjects = {}
+    for _, namePattern in ipairs(allNamePatterns(SetupGeneric)) do
+        nameToObjects[namePattern] = {}
+    end
+
+    local deletedItems = false
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        if name == 'TI4 Deleted Items' then
+            deletedItems = object
+        end
+        for namePattern, objects in pairs(nameToObjects) do
+            if string.match(name, namePattern) then
+                table.insert(objects, object)
+            end
+        end
+    end
+
+    -- Pack only one copy of each object, delete the rest.
+    for namePattern, objects in pairs(nameToObjects) do
+        for i, object in ipairs(objects) do
+            if i == 1 and not getEntryGuid(setupBag, namePattern) then
+                object.setLock(false)
+                setupBag.putObject(object)
+            else
+                if deletedItems then
+                    deletedItems.call('ignoreGuid', object.getGUID())
+                end
+                destroyObject(object)
+            end
+        end
+    end
+end
+
+--- Unpack non-color objects from the setup bag.
+function SetupGeneric.unpack(setupBag)
+    assert(setupBag.tag == 'Bag')
+    debugLog('SetupGeneric.unpack')
+
+    -- Get per-object json.  Leave the "master" copies of the objects in the
+    -- setup bag, spawn new copies from the json.
+    local pos = setupBag.getPosition()
+    local nameToJson = {}
+    for i, namePattern in ipairs(allNamePatterns(SetupGeneric)) do
+        local guid = assert(getEntryGuid(setupBag, namePattern), 'setup bag missing ' .. namePattern)
+        local object = setupBag.takeObject({
+            guid = guid,
+            position = { x = pos.x, y = pos.y - (5 * i), z = pos.z }
+        })
+        nameToJson[namePattern] = object.getJSON()
+        object.setLock(false)
+        setupBag.putObject(object)
+    end
+
+    local zonesAttributes = _zoneHelper.zonesAttributes()
+    local agendaZoneCenter = agendaCenter(#zonesAttributes)
+
+    -- Per player objects.
+    for _, zone in ipairs(zonesAttributes) do
+        for namePattern, offset in pairs(SetupGeneric.NAME_TO_PLAYER_ZONE_OFFSET) do
+            local json = assert(nameToJson[namePattern], 'no json for ' .. namePattern)
+            spawnObjectJSON({
+                json              = json,
+                position          = offsetPosition(zone.center, offset),
+                rotation          = offsetRotation(zone.center, offset),
+                callback_function = function(object) object.setLock(offset.lock or false) end,
+                sound             = false,
+            })
+        end
+        local agendaPosPlayer = agendaCenterPlayer(agendaZoneCenter, zone.center)
+        for namePattern, offset in pairs(SetupGeneric.NAME_TO_PLAYER_AGENDA_ZONE_OFFSET) do
+            local json = assert(nameToJson[namePattern], 'no json for ' .. namePattern)
+            spawnObjectJSON({
+                json              = json,
+                position          = offsetPosition(agendaPosPlayer, offset),
+                rotation          = offsetRotation(agendaPosPlayer, offset),
+                callback_function = function(object) object.setLock(offset.lock or false) end,
+                sound             = false,
+            })
+        end
+    end
+
+    -- Singleton agenda zone objects.
+    for namePattern, offset in pairs(SetupGeneric.NAME_TO_AGENDA_ZONE_OFFSET) do
+        local json = assert(nameToJson[namePattern], 'no json for ' .. namePattern)
+        spawnObjectJSON({
+            json              = json,
+            position          = offsetPosition(agendaZoneCenter, offset),
+            rotation          = offsetRotation(agendaZoneCenter, offset),
+            callback_function = function(object) object.setLock(offset.lock or false) end,
+            sound             = false,
         })
     end
 end
 
-function setPlayerColors(playerCount)
-    debugLog('setPlayerColors')
-    assert(type(playerCount) == 'number')
+-------------------------------------------------------------------------------
 
-    _playerList = {}
-    _mapColorToPlayer = {}
+--- Move hands to zone
+function SetupColor.transformHands()
+    debugLog('SetupColor.transformHands')
 
-    for x = 1, playerCount do
-        local defaultColor = DEFAULT_COLOR_LIST[x]
-        _playerList[x] = defaultColor
-        _mapColorToPlayer[defaultColor] = x
-    end
-end
+    local zonesAttributes = _zoneHelper.zonesAttributes()
+    local playerCount = #zonesAttributes
 
-function transformHands(playerCount)
-    debugLog('transformHands')
-    assert(type(playerCount) == 'number')
-    assert(_mapColorToPlayer, '_mapColorToPlayer not set')
+    for i, color in ipairs(SetupColor.DEFAULT_COLOR_LIST) do
+        if i <= playerCount then
+            local zoneCenter = zonesAttributes[i].center
+            local position = offsetPosition(zoneCenter, SetupColor.HAND.ACTIVE.OFFSET)
 
-    local allPlayers = Player.getAvailableColors()
-    local zoneCenters = _zoneHelper.getPlayerCountZoneCenters(playerCount)
-    local x = 0
-    for i, color in pairs(allPlayers) do
-        local playerIndex = _mapColorToPlayer[color]
-        if playerIndex then
-            local zoneCenter = zoneCenters[playerIndex]
-            local handpos = false
-            local handrot = false
-            if zoneCenter.z < 0 then
-                handpos = {zoneCenter.x, 5, -61.5}
-                handrot = {0, 0, 0}
-            else
-                handpos = {zoneCenter.x, 5, 61.5}
-                handrot = {0, 180, 0}
+            -- If this zone is between two like-center-z zones, move hand to
+            -- avoid cards flying between left/right neighbors from hitting
+            -- this hand.  NOTE: this fails if there are 5 players on a side!
+            -- Give a little wiggle room in case zones are built programatically
+            -- and could have floating point error differences for "same".
+            local thisZ = zoneCenter.z
+            local prevZ = zonesAttributes[i - 1] and zonesAttributes[i - 1].center.z or math.huge
+            local nextZ = zonesAttributes[i + 1] and zonesAttributes[i + 1].center.z or math.huge
+            local epsilon = 0.1
+            if math.abs(thisZ - prevZ) < epsilon and math.abs(thisZ - nextZ) < epsilon then
+                local dz = SetupColor.HAND.ACTIVE.OFFSET.dzMiddle
+                position.z = position.z + dz * (position.z > 0 and 1 or -1)
             end
+
             Player[color].setHandTransform({
-                position = handpos,
-                rotation = handrot,
-                scale    = {12.00, 10.00, 5.00}
+                position = position,
+                rotation = offsetRotation(zoneCenter, SetupColor.HAND.ACTIVE.OFFSET),
+                scale    = SetupColor.HAND.ACTIVE.SCALE
             })
         else
-            local x = x + 1
-            local handpos = {148 - 3 * x, 0, 80}
+            local nonPlayerIndex = (i - playerCount) - 1
             Player[color].setHandTransform({
-                position = handpos,
-                rotation = {0, 0, 0},
-                scale = {1, 5, 1}
+                position = {
+                    x = SetupColor.HAND.INACTIVE.POSITION.x + SetupColor.HAND.INACTIVE.POSITION.dx,
+                    y = SetupColor.HAND.INACTIVE.POSITION.y,
+                    z = SetupColor.HAND.INACTIVE.POSITION.z
+                },
+                rotation = { 0, 0, 0 },
+                scale = SetupColor.HAND.INACTIVE.SCALE
             })
         end
     end
 end
 
-function getAgendaSpot(playerColor)
-    return _agendaSpot[_mapColorToPlayer[playerColor]]
+--- Keep per-player pack/unpack independent so color change can use it too!
+
+--- Pack per-color box into setup bag.
+function SetupColor.packColorBoxIntoSetupBag(setupBag, box)
+    assert(setupBag.tag == 'Bag' and box.tag == 'Bag')
+    debugLog('SetupColor.packColorBox ' .. box.getName())
+
+    box.setLock(false)
+    setupBag.putObject(box)
 end
 
-function moveUnpackersandMultirollers(playerCount)
-    debugLog('moveUnpackersandMultirollers')
-    local setupBag = getObjectFromGUID('ef04ca')
-    local zoneCenters = _zoneHelper.getPlayerCountZoneCenters(playerCount)
-    for i, item in ipairs(getAllObjects()) do
-        if item.getName() == "TI4 Unpacker" or string.match(item.getName(), '^TI4 MultiRoller ') then
-            setupBag.putObject(item)
-        end
-    end
-    local unpackers = {}
-    local rollers = {}
-    for i, item in ipairs(setupBag.getObjects()) do
-        local name = item.name
-        if name == "TI4 Unpacker" then
-            table.insert(unpackers, item.guid)
-        elseif string.match(name, '^TI4 MultiRoller ') then
-            table.insert(rollers, item.guid)
-        end
-    end
-    for x = 1, playerCount do
-        local playerColor = _playerList[x]
-        local playerIndex = _mapColorToPlayer[playerColor]
-        local zoneCenter = zoneCenters[playerIndex]
-        local yRotation = zoneCenter.z < 0 and 180 or 0
-        local zUnpacker = false
-        local zRoller = false
-        if yRotation == 180 then
-            zUnpacker = zoneCenter.z - 1.5
-            zRoller = zoneCenter.z - 54
-        else
-            zUnpacker = zoneCenter.z + 1.5
-            zRoller = zoneCenter.z + 54
-        end
-        local takeParamsUnpackers = {
-            position = { x = zoneCenter.x, y = -1.6, z = zUnpacker },
-            rotation = { 0, yRotation, 0 },
-            guid = table.remove(unpackers),
-            callback_function = function(obj) take_callbackLock(obj) end,
-        }
-        local takeParamsRoller = {
-            position = { x = zoneCenter.x, y = -1.6, z = zRoller },
-            rotation = { 0, yRotation, 0 },
-            guid = table.remove(rollers),
-            callback_function = function(obj) take_callbackLock(obj) end,
-        }
-        setupBag.takeObject(takeParamsUnpackers)
-        setupBag.takeObject(takeParamsRoller)
-    end
+--- Unpack per-color box from setup bag, place over player area.
+function SetupColor.unpackColorBoxFromSetupBag(setupBag, color, zoneCenter)
+    debugLog('SetupColor.unpackColorBoxFromSetupBag ' .. color)
+    assert(setupBag.tag == 'Bag' and type(color) == 'string' and type(zoneCenter) == 'table')
+
+    local offset = SetupColor.COLOR_BOX_OFFSET
+    local guid = assert(getEntryGuid(setupBag, '^' .. color .. ' Box$'), ' missing box for ' .. color)
+    local box = setupBag.takeObject({
+        guid              = guid,
+        position          = offsetPosition(zoneCenter, offset),
+        rotation          = offsetRotation(zoneCenter, offset),
+        callback_function = function(object) object.setLock(offset.lock or false) end,
+        smooth            = false,
+    })
+    return box
 end
 
-function moveCommandSheets(playerCount)
-    debugLog('moveCommandSheets')
-    local setupBag = getObjectFromGUID('ef04ca')
-    local zoneCenters = _zoneHelper.getPlayerCountZoneCenters(playerCount)
-    for i,item in ipairs(getAllObjects()) do
-        local name = item.getName()
-        local color = string.match(name, '^Command Sheet %((%a+)%)$')
-        if color then
-            setupBag.putObject(item)
-        end
-    end
-    local commandSheetGUIDs = {}
-    for i, item in ipairs(setupBag.getObjects()) do
-        local name = item.name
-        local color = string.match(name, '^Command Sheet %((%a+)%)$')
-        if color then
-            commandSheetGUIDs[color] = item.guid
-        end
-    end
-    for x = 1, playerCount do
-        local playerColor = _playerList[x]
-        local playerIndex = _mapColorToPlayer[playerColor]
-        local zoneCenter = zoneCenters[playerIndex]
-        local yRotation = zoneCenter.z < 0 and 180 or 0
-        local xpoint = false
-        local zpoint = false
-        if yRotation == 180 then
-            xpoint = zoneCenter.x + 9
-            zpoint = zoneCenter.z - 16
-        else
-            xpoint = zoneCenter.x - 9
-            zpoint = zoneCenter.z + 16
-        end
-        local takeParams = {
-            position = { x = xpoint, y = -1.6, z = zpoint },
-            rotation = { 0, yRotation, 0 },
-            guid = commandSheetGUIDs[playerColor],
-            callback_function = function(obj) take_callbackLock(obj) end,
-        }
-        setupBag.takeObject(takeParams)
-    end
-end
+--- Pack per-color items into color box.
+function SetupColor.pack(color, colorBox)
+    assert(type(color) == 'string' and colorBox.tag == 'Bag')
+    debugLog('SetupColor.pack ' .. color)
 
-function take_callbackLock(object_spawned)
-    object_spawned.setLock(true)
-end
+    local namePatterns = {}
+    for namePattern, offset in pairs(SetupColor.NAME_TO_PLAYER_ZONE_OFFSET) do
+        table.insert(namePatterns, namePattern)
+    end
+    for namePattern, offset in pairs(SetupColor.NAME_TO_PLAYER_AGENDA_ZONE_OFFSET) do
+        table.insert(namePatterns, namePattern)
+    end
 
-function setupAgendaZone(playerCount)
-    debugLog('setupAgendaZone')
-    if playerCount <= 6 then
-        _agendaCenter = { x = -42.75, y = -1.6, z = 0 }
-    else
-        _agendaCenter = { x = -44.75, y = -1.6, z = 0 }
+    for i, namePattern in ipairs(namePatterns) do
+        namePatterns[i] = string.gsub(namePattern, '$COLOR', '(.*)')
     end
-    local agendaZoneOffsets = {
-        ["Against:"] = { x = 4.25 },
-        ["Speaker Token"] = { x = 0 },
-        ["For:"] = { x = -4.25 },
-        ["Votes"] = { x = -9.25 }
-    }
-    local setupBag = getObjectFromGUID('ef04ca')
-    for i, item in ipairs(getAllObjects()) do
-        local itemName = item.getName()
-        local itemGUID = item.getGUID()
-        if itemName == "Against:" or itemName == "Votes" or itemName == "For:" or itemName == "Speaker Token - Agenda" then
-            setupBag.putObject(item)
-        end
-    end
-    local setupBagContents = setupBag.getObjects()
-    for j, item in pairs(setupBagContents) do
-        local compType = false
-        local takeParamsAgenda = false
-        local itemName = item.name
-        local itemGUID = item.guid
-        for key, thing in pairs(agendaZoneOffsets) do
-            local start, finish = string.find(itemName, key)
-            if start then
-                compType = string.sub(itemName, start, finish)
-                takeParamsAgenda = {
-                    guid = itemGUID,
-                    position = {
-                        x = _agendaCenter.x + agendaZoneOffsets[compType].x,
-                        y = _agendaCenter.y,
-                        z = _agendaCenter.z
-                    },
-                    rotation = {0, 270, 0},
-                }
+
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        for _, namePattern in ipairs(namePatterns) do
+            if string.match(name, namePattern) == color then
+                object.setLock(false)
+                colorBox.putObject(object)
             end
         end
-        if compType then
-            setupBag.takeObject(takeParamsAgenda)
-            compType = nil
+    end
+end
+
+--- Unpack per-color items from color box.
+function SetupColor.unpack(color, colorBox, zoneCenter, agendaZoneCenter)
+    assert(type(color) == 'string' and colorBox.tag == 'Bag' and type(zoneCenter) == 'table' and type(agendaZoneCenter) == 'table')
+    debugLog('SetupColor.unpack ' .. color)
+
+    local nameToObject = {}
+    for namePattern, offset in pairs(SetupColor.NAME_TO_PLAYER_ZONE_OFFSET) do
+        namePattern = string.gsub(namePattern, '$COLOR', color)
+        local guid = assert(getEntryGuid(colorBox, namePattern), 'missing ' .. namePattern)
+        local object = colorBox.takeObject({
+            guid              = guid,
+            position          = offsetPosition(zoneCenter, offset),
+            rotation          = offsetRotation(zoneCenter, offset),
+            callback_function = function(object) object.setLock(offset.lock or false) end,
+            smooth            = false,
+        })
+        nameToObject[object.getName()] = object
+    end
+    local agendaPosPlayer = agendaCenterPlayer(agendaZoneCenter, zoneCenter)
+    for namePattern, offset in pairs(SetupColor.NAME_TO_PLAYER_AGENDA_ZONE_OFFSET) do
+        namePattern = string.gsub(namePattern, '$COLOR', color)
+        local guid = assert(getEntryGuid(colorBox, namePattern), 'missing ' .. namePattern)
+        local object = colorBox.takeObject({
+            guid              = guid,
+            position          = offsetPosition(agendaPosPlayer, offset),
+            rotation          = offsetRotation(agendaPosPlayer, offset),
+            callback_function = function(object) object.setLock(offset.lock or false) end,
+            smooth            = false,
+        })
+        nameToObject[object.getName()] = object
+    end
+    return nameToObject
+end
+
+--- Pack per-color units into color box.
+function SetupColor.packUnits(color, colorBox)
+    assert(type(color) == 'string' and colorBox.tag == 'Bag')
+    debugLog('SetupColor.packUnits ' .. color)
+
+    local unitBagSet = {}
+    for namePattern, offset in pairs(SetupColor.NAME_TO_DIRECTIONALISER_OFFSET) do
+        namePattern = string.gsub(namePattern, '$COLOR', color)
+        unitBagSet[namePattern] = true
+    end
+
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Bag' and unitBagSet[object.getName()] then
+            object.setLock(false)
+            object.jointTo() -- break joints
+            colorBox.putObject(object)
         end
     end
 end
 
-function setupGame(playerColor, playerCount)
-    debugLog('setupGame')
-    assert(type(playerColor) == 'string' and type(playerCount) == 'number')
+--- Unpack per-color units from color box.  Units get placed on directionaliser.
+function SetupColor.unpackUnits(color, colorBox, directionaliser)
+    assert(type(color) == 'string' and colorBox.tag == 'Bag' and type(directionaliser) == 'userdata')
+    debugLog('SetupColor.unpackUnits ' .. color)
 
-    local LineDrawFunctions = {
-        [3] = function() draw3Pcircle() end,
-        [4] = function() draw4Pcircle() end,
-        [5] = function() draw5Pcircle() end,
-        [6] = function() draw6Pcircle() end,
-        [7] = function() draw7Pcircle() end,
-        [8] = function() draw8Pcircle() end
-    }
-    setupAgendaZone(playerCount)
-    setZoneList(playerCount)
-    setPlayerColors(playerCount)
-    moveUnpackersandMultirollers(playerCount)
-    moveCommandSheets(playerCount)
-    transformHands(playerCount)
-    local lineDraw = LineDrawFunctions[playerCount]
-    --lineDraw()
-    UI.setAttribute("startup", "active", false)
+    local unitBags = {}
+    for namePattern, offset in pairs(SetupColor.NAME_TO_DIRECTIONALISER_OFFSET) do
+        namePattern = string.gsub(namePattern, '$COLOR', color)
+        local guid = assert(getEntryGuid(colorBox, namePattern), 'missing ' .. namePattern)
+        local object = colorBox.takeObject({
+            guid              = guid,
+            position          = directionaliser.positionToWorld(offset),
+            rotation          = directionaliser.getRotation(),
+            callback_function = function(object) object.setLock(offset.lock or false) end,
+            smooth            = false,
+        })
+        object.use_grid = false
+        table.insert(unitBags, object)
+    end
+    return unitBags
 end
 
---- This is the primary entry point for using the helper object.
+-------------------------------------------------------------------------------
+
+--- Do color and generic packing, leaving an empty table.  THIS IS INTENDED FOR
+-- RESETTING A STARTER TABLE TO A DIFFERENT PLAYER COUNT.  DOES NOT DO FACTIONS!
+-- Gets zone count from zone helper.  Do not change zone count until after this!
+function SetupColor.packOld(setupBag)
+    assert(setupBag.tag == 'Bag')
+    debugLog('packOld')
+
+    -- Zone helper gets current zones / colors.
+    _zoneHelper.updateZoneColors()
+    coroutine.yield(0)
+
+    local colorToBox = {}
+    for _, zone in ipairs(_zoneHelper.zonesAttributes()) do
+        if zone.color then
+            colorToBox[zone.color] = SetupColor.unpackColorBoxFromSetupBag(setupBag, zone.color, zone.center)
+            assert(colorToBox[zone.color], 'missing box for ' .. zone.color)
+        end
+    end
+    coroutine.yield(0)
+
+    for color, box in pairs(colorToBox) do
+        SetupColor.packUnits(color, box)
+    end
+    coroutine.yield(0)
+
+    for color, box in pairs(colorToBox) do
+        SetupColor.pack(color, box)
+    end
+    coroutine.yield(0)
+
+    for color, box in pairs(colorToBox) do
+        SetupColor.packColorBoxIntoSetupBag(setupBag, box)
+    end
+
+    SetupGeneric.pack(setupBag)
+    coroutine.yield(0)
+end
+
+--- Color and generic unpacking, for an N-player table.  THIS IS INTENDED FOR
+-- RESETTING A STARTER TABLE TO A DIFFERENT PLAYER COUNT.  DOES NOT DO FACTIONS!
+-- Gets zone count from zone helper.  Make sure to set zone count before this!
+function SetupColor.unpackNew(setupBag)
+    assert(setupBag.tag == 'Bag')
+    debugLog('unpackNew')
+
+    SetupGeneric.unpack(setupBag)
+    coroutine.yield(0)
+
+    -- Zone helper gets current zones but they do not have colors yet.
+    local zonesAttributes = _zoneHelper.zonesAttributes()
+    local agendaZoneCenter = agendaCenter(#zonesAttributes)
+    local colorToState = {}
+
+    for i, zone in ipairs(zonesAttributes) do
+        local color = assert(SetupColor.DEFAULT_COLOR_LIST[i])
+        colorToState[color] = {
+            box = SetupColor.unpackColorBoxFromSetupBag(setupBag, color, zone.center),
+            zoneCenter = zone.center,
+            directionaliser = false,
+            unitBags = false
+        }
+        assert(colorToState[color].box, 'missing box for ' .. color)
+    end
+    coroutine.yield(0)
+
+    for color, state in pairs(colorToState) do
+        local nameToObject = SetupColor.unpack(color, state.box, state.zoneCenter, agendaZoneCenter)
+        local name = 'Directionaliser (' .. color .. ')'
+        state.directionaliser = nameToObject[name]
+        assert(state.directionaliser, 'missing ' .. name)
+    end
+    coroutine.yield(0)
+
+    for color, state in pairs(colorToState) do
+        state.unitBags = SetupColor.unpackUnits(color, state.box, state.directionaliser)
+        assert(state.unitBags, 'missing unit bags')
+        assert(#state.unitBags > 0, 'empty unit bags')
+    end
+    coroutine.yield(0)
+
+    for color, state in pairs(colorToState) do
+        SetupColor.packColorBoxIntoSetupBag(setupBag, state.box)
+    end
+    coroutine.yield(0)
+
+    -- About to wait for resting, give a little extra time for gravity.
+    yieldForSeconds(1.5)
+
+    for color, state in pairs(colorToState) do
+        -- Units were unpacked ABOVE directionaliser.  Wait for them to fall.
+        for _, unitBag in ipairs(state.unitBags) do
+            while not unitBag.resting do
+                coroutine.yield(0)
+            end
+            -- Instead of `unitBag.setLock(true)`, create a joint.  Can now
+            -- pick up and move directionaliser by dragging a unit bag on it.
+            -- Caution: rotating the directionalizer will break the joints!
+            unitBag.jointTo(state.directionaliser, {
+                type = 'Fixed',
+                collision = false,
+                break_force = 10000,
+                break_torque = 10000
+            })
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
+
+local _setupQueue = {}
+
+--- This is the primary entry point for using the helper object.  Packs up the
+-- current (no factions unpacked) table the unpacks for new player count.
 function setup(params)
     assert(type(params) == 'table')
     assert(type(params.playerColor) == 'string')
     assert(type(params.playerCount) == 'number')
-    setupGame(params.playerColor, params.playerCount)
+
+    table.insert(_setupQueue, params)
+    startLuaCoroutine(self, 'setupCoroutine')
+
+    UI.setAttribute('startup', 'active', false)
 end
+
+function setupCoroutine()
+    debugLog('setupCoroutine')
+
+    _zoneHelper.clearBordersVectorLines()
+
+    local params = assert(table.remove(_setupQueue))
+    local playerCount = assert(params.playerCount)
+
+    local setupBag = assert(SetupGeneric.getSetupBag())
+    coroutine.yield(0)
+
+    SetupColor.packOld(setupBag)
+    coroutine.yield(0)
+
+    _zoneHelper.setPlayerCount(playerCount)
+
+    SetupColor.transformHands()
+    coroutine.yield(0)
+
+    SetupColor.unpackNew(setupBag)
+    coroutine.yield(0)
+
+    _zoneHelper.updateZoneColors()
+    coroutine.yield(0)
+
+    _zoneHelper.drawBordersVectorLines()
+    coroutine.yield(0)
+
+    -- Tell any other listeners about the change.
+    for _, object in ipairs(getAllObjects()) do
+        if object.getVar('onSetupHelperPlayerCountChanged') then
+            object.call('onSetupHelperPlayerCountChanged')
+        end
+    end
+    coroutine.yield(0)
+
+    return 1 -- REQUIRED!  MUST RETURN 1 TO STOP COROUTINE!
+end
+
+function hideSetupButton()
+    debugLog('hideSetupButton')
+    local setupBag = false
+    local setupButton = false
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        if object.tag == 'Bag' and name == 'Setup Bag' then
+            setupBag = object
+        elseif name == 'Game Setup Button' then
+            setupButton = object
+        end
+    end
+    if setupBag and setupButton then
+        setupBag.putObject(setupButton)
+    end
+end
+
+-------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+
+--- Find "pick a faction to play" or other token.
+function SetupFaction.getFactionAndTokenObject(zoneColor)
+    assert(type(zoneColor) == 'string')
+    debugLog('SetupFaction.getFactionTokenObject: ' .. zoneColor)
+
+    local inHandGuidSet = _zoneHelper.inHand()
+    local tokenNameToFaction = {}
+    for _, faction in pairs(_factionHelper.allFactions(true)) do
+        tokenNameToFaction[faction.tokenName] = faction
+    end
+
+    -- Filter to only not-in-hand, yes-in-zone.
+    local function isCandidate(object)
+        if inHandGuidSet[object.getGUID()] then
+            return false
+        end
+        return _zoneHelper.zoneFromPosition(object.getPosition()) == zoneColor
+    end
+
+    for _, object in ipairs(getAllObjects()) do
+        if isCandidate(object) then
+            local name = object.getName()
+            local faction = tokenNameToFaction[name]
+            if faction then
+                debugLog('SetupFaction.getFactionTokenObject: found ' .. object.getName())
+                return faction, object
+            end
+            local tokenName = string.match(name, '^(.+) Owner Token$')
+            local faction = tokenName and tokenNameToFaction[tokenName]
+            if faction then
+                debugLog('SetupFaction.getFactionTokenObject: found ' .. object.getName())
+                return faction, object
+            end
+        end
+    end
+end
+
+--- Pack faction box into the container where it was found.
+function SetupFaction.packFactionBox(factionBox, factionBoxSrc)
+    assert(factionBox.tag == 'Bag' and (not factionBoxSrc or factionBoxSrc.tag == 'Bag'))
+    debugLog('SetupFaction.packFactionBox: ' .. factionBox.getName())
+
+    if factionBoxSrc then
+        factionBox.setLock(false)
+        factionBoxSrc.putObject(factionBox)
+    end
+end
+
+--- Get faction box and where we found it.
+function SetupFaction.unpackFactionBox(faction, zoneCenter)
+    assert(type(faction) == 'table' and type(zoneCenter) == 'table')
+    debugLog('SetupFaction.unpackFactionBox: ' .. faction.name)
+
+    local factionBoxNamePattern = '^' .. faction.tokenName:gsub('-', '%%-') .. ' Box$'
+    local unpackPosition = { x = zoneCenter.x, y = zoneCenter.y + 10, z = zoneCenter.z }
+
+    -- First see if the box is already on the table, if so leave it where it is.
+    local otherBoxes = {}
+    local otherBoxNamePattern = 'Factions$'
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Bag' then
+            local name = object.getName()
+            if string.match(name, factionBoxNamePattern) then
+                return object, false
+            elseif string.match(name, otherBoxNamePattern) then
+                table.insert(otherBoxes, object)  -- remember for later, if needed
+            end
+        end
+    end
+
+    -- Did not find box on the table.  Look in other boxes for it.
+    for _, otherBox in ipairs(otherBoxes) do
+        local guid = getEntryGuid(otherBox, factionBoxNamePattern)
+        if guid then
+            local factionBox = otherBox.takeObject({
+                guid              = guid,
+                position          = unpackPosition,
+                callback_function = function(object) object.setLock(true) end,
+                smooth            = false,
+            })
+            debugLog('SetupFaction.unpackFactionBox inside ' .. otherBox.getName())
+            return factionBox, otherBox
+        end
+    end
+end
+
+function SetupFaction.unpack(faction, factionBox, zoneCenter)
+    assert(type(faction) == 'table' and factionBox.tag == 'Bag' and type(zoneCenter) == 'table')
+    debugLog('SetupFaction.unpack ' .. faction.name)
+
+    local function nestedUnpack(bag, offset)
+        bag.translate({ x = 0, y = 5, z = 0 })
+        local p = offsetPosition(zoneCenter, offset)
+        for _, entry in ipairs(bag.getObjects()) do
+            print('nestedUnpack ' .. bag.getName() .. ' -> ' .. entry.name)
+            bag.takeObject({
+                position          = p,
+                rotation          = bag.getRotation(),
+                smooth            = false,
+            })
+            p.x = p.x + (offset.dx or 0)
+            p.z = p.z + (offset.dz or 0)
+        end
+        Wait.frames(function() factionBox.putObject(bag) end, 1)
+    end
+
+    local nameToObject = {}
+    for namePattern, offset in pairs(SetupFaction.NAME_TO_PLAYER_ZONE_OFFSET) do
+        namePattern = string.gsub(namePattern, '$FACTION_NAME', faction.name)
+        namePattern = string.gsub(namePattern, '$TOKEN_NAME', faction.tokenName)
+        namePattern = namePattern:gsub('-', '%%-')
+        local guid = assert(getEntryGuid(factionBox, namePattern), 'missing ' .. namePattern)
+        local function takeCallback(object)
+            if offset.unpack then
+                nameToObject[object.getName()] = nil
+                nestedUnpack(object, offset)
+            else
+                object.setLock(offset.lock or false)
+            end
+        end
+        local object = factionBox.takeObject({
+            guid              = guid,
+            position          = offsetPosition(zoneCenter, offset),
+            rotation          = offsetRotation(zoneCenter, offset),
+            callback_function = takeCallback,
+            smooth            = false,
+        })
+        nameToObject[object.getName()] = object
+    end
+    return nameToObject
+end
+
+function SetupFaction.unpackCommandTokens(color, commandTokensBag)
+    if not commandTokensBag then
+        error('unpack command tokens: no command tokens bag')
+    end
+    assert(type(color) == 'string' and commandTokensBag.tag == 'Bag')
+    assert(commandTokensBag.getQuantity() >= #SetupFaction.COMMAND_TOKENS_XZ_AND_FLIP)
+    debugLog('SetupColor.unpackCommandTokens ' .. color)
+
+    -- Faction was not found the "normal" way, does not have command sheet guid.
+    -- Instead, find it the hard way.
+    local function getCommandSheet()
+        local commandSheetName = 'Command Sheet (' .. color .. ')'
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == commandSheetName then
+                return object
+            end
+        end
+        error('unpack faction command counters: missing ' .. commandSheetName)
+    end
+    local commandSheet = getCommandSheet()
+
+    for _, xzAndFlip in ipairs(SetupFaction.COMMAND_TOKENS_XZ_AND_FLIP) do
+        commandTokensBag.takeObject({
+            position          = commandSheet.positionToWorld({
+                x = xzAndFlip.x,
+                y = 1,
+                z = xzAndFlip.z
+            }),
+            rotation          = {
+                x = (xzAndFlip.flip and 180 or 0),
+                y = commandSheet.getRotation().y,
+                z = 0
+            },
+            smooth            = true,
+        })
+    end
+end
+
+function SetupFaction.unpackHomeSystemTile(faction, factionBox, homeSystemPosition)
+    assert(type(faction) == 'table' and factionBox.tag == 'Bag' and type(homeSystemPosition) == 'table')
+    debugLog('SetupColor.unpackHomeSystemTile ' .. faction.tokenName)
+
+    local tileName = faction.tokenName:gsub('-', '%%-') .. ' Tile'
+    if tileName == 'Ghosts of Creuss Tile' then
+        tileName = 'Creuss Gate Tile'
+    end
+
+    local rotation = {
+        x = 0,
+        y = homeSystemPosition.z > 0 and 0 or 180,
+        z = 0
+    }
+
+    local guid = assert(getEntryGuid(factionBox, tileName), 'missing ' .. tileName)
+    local tile = factionBox.takeObject({
+        guid              = guid,
+        position          = homeSystemPosition,
+        rotation          = rotation,
+        smooth            = true,
+        callback_function = function(object) object.setLock(true) end,
+    })
+
+    local extraTile = false
+    if faction.tokenName == 'Ghosts of Creuss' then
+        extraTile = tile
+        tileName = 'Ghosts of Creuss Tile'
+        local guid = assert(getEntryGuid(factionBox, tileName), 'missing ' .. tileName)
+        local xDir = homeSystemPosition.x > 0 and 1 or -1
+        if homeSystemPosition.x == 0 and homeSystemPosition.z > 0 then
+            xDir = -xDir
+        end
+        tile = factionBox.takeObject({
+            guid              = guid,
+            position          = {
+                x = homeSystemPosition.x + 6.6 * xDir,
+                y = homeSystemPosition.y,
+                z = homeSystemPosition.z + 4.57 * (homeSystemPosition.z > 0 and 1 or -1)
+            },
+            rotation          = rotation,
+            smooth            = true,
+            callback_function = function(object) object.setLock(true) end,
+        })
+    end
+
+    return tile, extraTile
+end
+
+--- Unpack any non-faction bags still in the faction box.
+function SetupFaction.unpackOther(faction, factionBox, zoneCenter)
+    assert(factionBox.tag == 'Bag' and type(zoneCenter) == 'table')
+    debugLog('SetupFaction.unpackOther ' .. faction.name)
+
+    local offset = {
+        x = SetupFaction.OTHER_OFFSET.x,
+        y = SetupFaction.OTHER_OFFSET.y,
+        z = SetupFaction.OTHER_OFFSET.z,
+    }
+    for _, entry in ipairs(factionBox.getObjects()) do
+        if not string.match(entry.name, '^' .. faction.tokenName:gsub('-', '%%-') .. ' .* Bag$') then
+            local object = factionBox.takeObject({
+                guid              = entry.guid,
+                position          = offsetPosition(zoneCenter, offset),
+                rotation          = offsetRotation(zoneCenter, offset),
+                smooth            = false,
+            })
+            offset.x = offset.x + (SetupFaction.OTHER_OFFSET.dx or 0)
+            offset.z = offset.z + (SetupFaction.OTHER_OFFSET.dz or 0)
+        end
+    end
+end
+
+function SetupFaction.renameFlagship(color, faction)
+    assert(type(color) == 'string' and type(faction) == 'table')
+    debugLog('SetupColor.renameFlagship ' .. color)
+
+    local function getFlagshipBag()
+        local flagshipBagName = color .. ' Flagship'
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == flagshipBagName then
+                return object
+            end
+        end
+        error('unpack rename flagship: missing ' .. flagshipBagName)
+    end
+    local flagshipBag = getFlagshipBag()
+
+    flagshipBag.setName(faction.flagship)
+    flagshipBag.setDescription(faction.flagshipDescription)
+
+    local pos = flagshipBag.getPosition()
+    for i, entry in ipairs(flagshipBag.getObjects()) do
+        local flagship = flagshipBag.takeObject({
+            guid = entry.guid,
+            position = { x = pos.x, y = pos.y + 4 + i, z = pos.z },
+            smooth = false,
+            callback_function = function(object) flagshipBag.putObject(object) end
+        })
+        flagship.setName(faction.flagship)
+        flagship.setDescription(faction.flagshipDescription)
+    end
+end
+
+function SetupFaction.unpackUnits(color, faction, homeSystemTile)
+    assert(type(color) == 'string' and type(faction) == 'table' and type(homeSystemTile) == 'userdata')
+    debugLog('SetupColor.unpackUnits ' .. color)
+
+    local unitNameToBagName = {}
+    local bagNameSet = {}
+    local totalCount = 0
+    for unitName, count in pairs(faction.startingUnits) do
+        unitName = string.gsub(unitName, '_', ' ')
+        local bagName = unitName == 'Flagship' and faction.flagship or (color .. ' ' .. unitName)
+        unitNameToBagName[unitName] = bagName
+        bagNameSet[bagName] = true
+        totalCount = totalCount + count
+    end
+
+    local bagNameToBag = {}
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        if object.tag == 'Bag' and bagNameSet[name] then
+            bagNameToBag[name] = object
+        end
+    end
+
+    if totalCount > 0 then
+        local dPhi = math.pi * 2.0 / totalCount
+        local phi = 0
+        local r = 1.5
+        for unitName, count in pairs(faction.startingUnits) do
+            unitName = string.gsub(unitName, '_', ' ')
+            local bagName = assert(unitNameToBagName[unitName], 'no bag name for ' .. unitName)
+            local unitBag = assert(bagNameToBag[bagName], 'no bag for ' .. bagName)
+            for _ = 1, count do
+                unitBag.takeObject({
+                    position = homeSystemTile.positionToWorld({
+                        x = math.cos(phi) * r,
+                        y = 1,
+                        z = math.sin(phi) * r
+                    }),
+                    smooth = true,
+                })
+                phi = phi + dPhi
+            end
+        end
+    end
+end
+
+function SetupFaction.unpackStartingTech(color, faction, zoneCenter)
+    assert(type(color) == 'string' and type(faction) == 'table' and type(zoneCenter) == 'table')
+    debugLog('SetupFaction.unpackStartingTech ' .. color)
+
+    local function getTechDeck()
+        local deckName = 'Technology Cards'
+        for _, object in ipairs(getAllObjects()) do
+            if object.tag == 'Deck' and object.getName() == deckName and _zoneHelper.zoneFromPosition(object.getPosition()) == color then
+                return object
+            end
+        end
+        error('unpack faction starting tech: missing ' .. deckName)
+    end
+    local techDeck = getTechDeck()
+
+    local offset = {
+        x = SetupFaction.STARTING_TECH_OFFSET.x,
+        y = SetupFaction.STARTING_TECH_OFFSET.y,
+        z = SetupFaction.STARTING_TECH_OFFSET.z
+    }
+    for i, name in ipairs(faction.startingTech) do
+        local guid = assert(getEntryGuid(techDeck, name), 'missing starting technology ' .. name)
+        techDeck.takeObject({
+            guid              = guid,
+            position          = offsetPosition(zoneCenter, offset),
+            rotation          = offsetRotation(zoneCenter, offset),
+            smooth            = true,
+        })
+        offset.z = offset.z + SetupFaction.STARTING_TECH_OFFSET.dz
+    end
+end
+
+function SetupFaction.placeScoreCounters(ownerTokensBag, zoneCenter, zoneIndex)
+    assert(ownerTokensBag.tag == 'Infinite' and type(zoneCenter) == 'table')
+    debugLog('SetupFaction.placeScoreCounters')
+
+    local function getScoreboard()
+        local scoreboardName = 'Scoreboard'
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == scoreboardName then
+                return object
+            end
+        end
+        error('unpack faction place score counters: missing ' .. scoreboardName)
+    end
+    local scoreboard = getScoreboard()
+
+    -- Place token stack near scoreboard.  Follow board positioning similar
+    -- to the mini-board layout agenda stuff users.
+    local factionOrigin = scoreboard.positionToWorld({
+        x = 4.25 * (scoreboard.is_face_down and -1 or 1),
+        y = 0.5 * (scoreboard.is_face_down and -1 or 1),
+        z = 0
+    })
+    local scale = {
+        x = 0.05,
+        z = 0.03
+    }
+    local p = {
+        x = factionOrigin.x + zoneCenter.x * scale.x,
+        y = factionOrigin.y,
+        z = factionOrigin.z + zoneCenter.z * scale.z,
+    }
+
+    local OWNER_TOKEN_COUNT = 10
+    for i = 1, OWNER_TOKEN_COUNT do
+        p.y = p.y + 0.11
+        ownerTokensBag.takeObject({
+            position = p,
+            rotation = { x = 0, y = scoreboard.getRotation().y + 90, z = 0 }
+        })
+    end
+
+    -- Place token on score zero.
+    local SPACING_X = 0.3
+    local SPACING_Z = 0.2
+    local dx = ((zoneIndex - 1) % 2) * SPACING_X
+    local dz = math.floor((zoneIndex - 1) / 2) * SPACING_Z
+    local p = scoreboard.positionToWorld({
+        x = (2.75 + dx) * (scoreboard.is_face_down and -1 or 1),
+        y = (0.5 + (zoneIndex * 0.2)) * (scoreboard.is_face_down and -1 or 1),
+        z = -0.4 + dz
+    })
+    ownerTokensBag.takeObject({
+        position = p,
+        rotation = { x = 0, y = scoreboard.getRotation().y + 90, z = 0 }
+    })
+end
+
+local _unpackFactionQueue = {}
+
+--- Entry point for faction unpack.
+function unpackFaction(params)
+    assert(type(params) == 'table')
+    assert(type(params.unpackButtonGuid) == 'string')
+    assert(type(params.color) == 'string')
+    table.insert(_unpackFactionQueue, params)
+    startLuaCoroutine(self, 'unpackFactionCoroutine')
+end
+
+function unpackFactionCoroutine()
+    local params = assert(table.remove(_unpackFactionQueue))
+    local color = params.color
+    local zoneAttributes = _zoneHelper.zoneAttributes(color)
+    assert(zoneAttributes, 'no zone for ' .. color)
+
+    local faction, tokenObject = SetupFaction.getFactionAndTokenObject(color)
+    if not faction or not tokenObject then
+        error('unpack faction: no faction token for ' .. color)
+        return 1
+    end
+    coroutine.yield(0)
+
+    -- Hide the setup game button object (move to setup bag).
+    hideSetupButton()
+    coroutine.yield(0)
+
+    -- Delete the unpack button object.
+    local deletedItems = false
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Bag' and object.getName() == 'TI4 Deleted Items' then
+            deletedItems = object
+            break
+        end
+    end
+    if deletedItems then
+        deletedItems.call('ignoreGuid', params.unpackButtonGuid)
+    end
+    local unpackButton = assert(getObjectFromGUID(params.unpackButtonGuid))
+    destroyObject(unpackButton)
+    coroutine.yield(0)
+
+    -- Move the token out of the way in case faction sheet, etc moves on top.
+    tokenObject.translate({ x = 0, y = 5, z = 0 })
+    coroutine.yield(0)
+    tokenObject.setLock(true)
+
+    local factionBox, factionBoxSrc = SetupFaction.unpackFactionBox(faction, zoneAttributes.center)
+    if not factionBox then
+        error('unpack faction: unable to find faction box for "' .. faction.name .. '"')
+        return 1
+    end
+    coroutine.yield(0)
+
+    SetupFaction.renameFlagship(color, faction)
+    coroutine.yield(0)
+
+    local nameToObject = SetupFaction.unpack(faction, factionBox, zoneAttributes.center)
+    local commandTokensBag = nameToObject[faction.tokenName .. ' Command Tokens Bag']
+    local ownerTokensBag = nameToObject[faction.tokenName .. ' Owner Tokens Bag']
+    nameToObject = nil
+    coroutine.yield(0)
+
+    SetupFaction.unpackCommandTokens(color, commandTokensBag)
+    coroutine.yield(0)
+
+    local homeSystemTile, extraTile = SetupFaction.unpackHomeSystemTile(faction, factionBox, zoneAttributes.homeSystemPosition)
+    coroutine.yield(0)
+
+    SetupFaction.unpackOther(faction, factionBox, zoneAttributes.center)
+    coroutine.yield(0)
+
+    -- Give earlier unpack steps a moment to finish.
+    yieldForSeconds(2.5)
+
+    SetupFaction.unpackStartingTech(color, faction, zoneAttributes.center)
+    coroutine.yield(0)
+
+    SetupFaction.placeScoreCounters(ownerTokensBag, zoneAttributes.center, zoneAttributes.index)
+    coroutine.yield(0)
+
+    if factionBoxSrc then
+        factionBoxSrc.putObject(factionBox)
+        coroutine.yield(0)
+    end
+    factionBox = nil
+
+    tokenObject.setLock(false)
+    coroutine.yield(0)
+    tokenObject.translate({ x = 0, y = 1, z = 0 })
+
+    -- Wait for home system to land before unpacking units.
+    while not homeSystemTile.getLock() do coroutine.yield(0) end
+
+    SetupFaction.unpackUnits(color, faction, homeSystemTile)
+    coroutine.yield(0)
+
+    if faction.startMessage then
+        _safeBroadcastToColor(faction.tokenName .. ': ' .. faction.startMessage, color, color)
+    end
+
+    return 1
+end
+
+-------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+
+local UNIT_SCALE = {
+    ['Infantry'] = { unit = 0.75, bag = 1 },
+    ['Fighter'] = { unit = 0.75, bag = 1 },
+    ['Space Dock'] = { unit = 0.75, bag = 1 },
+    ['PDS'] = { unit = 0.75, bag = 1 },
+    ['Carrier'] = { unit = 0.75, bag = 1 },
+    ['Destroyer'] = { unit = 0.75, bag = 1 },
+    ['Cruiser'] = { unit = 0.75, bag = 1 },
+    ['Dreadnought'] = { unit = 0.75, bag = 1 },
+    ['War Sun'] = { unit = 0.75, bag = 1 },
+    ['Flagship'] = { unit = 0.75, bag = 1 },
+}
+
+function fixUnitScale()
+    startLuaCoroutine(self, 'fixUnitScaleCoroutine')
+end
+
+function fixUnitScaleCoroutine()
+    local unitBagNameSet = {}
+    for unitName, _ in pairs(UNIT_SCALE) do
+        for _, color in ipairs(Player.getColors()) do
+            unitBagNameSet[color .. ' ' .. unitName] = true
+        end
+    end
+
+    -- Bags need to be on the table, unpack any unused colors manually.
+    -- Assumes no faction unpack yet so can use generic flagship name.
+    local unitBags = {}
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Bag' and unitBagNameSet[object.getName()] then
+            table.insert(unitBags, object)
+        end
+    end
+    coroutine.yield(0)
+
+    for _, unitBag in ipairs(unitBags) do
+        local unitName = string.match(unitBag.getName(), '^[^ ]* (.*)$')
+        local scales = assert(UNIT_SCALE[unitName])
+        local bagScale = scales.bag
+        local unitScale = scales.unit
+
+        unitBag.setScale({ x = bagScale, y = bagScale, z = bagScale })
+        unitBag.use_grid = false
+        unitBag.use_snap_points = true
+        unitBag.sticky = false
+
+        local pos = unitBag.getPosition()
+        for i, entry in ipairs(unitBag.getObjects()) do
+            local unit = unitBag.takeObject({
+                guid              = entry.guid,
+                position          = { x = pos.x, y = pos.y + 5 + i, z = pos.z },
+                rotation          = unitBag.getRotation(),
+                callback_function = function(object) unitBag.putObject(object) end,
+                smooth            = false,
+            })
+            unit.setScale({ x = unitScale, y = unitScale, z = unitScale })
+            unit.use_grid = false
+            unit.use_snap_points = false
+            unit.sticky = false
+        end
+        coroutine.yield(0)
+    end
+    coroutine.yield(0)
+
+    return 1
+end
+
+-------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 
 function draw3Pcircle()
     Global.setVectorLines({
-        -- player1 spot
-        {points = getCircleVectorPoints({15.75, -2, -9.09},1.75, 32, 1),color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=true,square=false,}, -- purple circle
-        {points={{0.2,-1.0,-12.1},{0.2,-1.0,-71.6},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,}, -- purple horizontal
-        {points={{18.4,-1.0,-12.1},{64,-1.0,-12.1},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,}, -- purple vertical
-        -- player2 spot
-        {points = getCircleVectorPoints({-15.75, -2, -9.09},1.75, 32, 1),color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=true,square=false,}, -- white circle
-        {points={{-0.2,-1.0,-12.1},{-0.2,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,}, -- white vertical
-        {points={{-18.4,-1.0,-12.1},{-64,-1.0,-12.1},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,}, -- white horizontal
-        -- player3 spot
-        {points = getCircleVectorPoints({0, -2, 18.2},1.75, 32, 1),color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=true,square=false,}, -- red circle
-        {points={{18.4,-1.0,12.1},{64.0,-1.0,12.1},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,}, -- red horizontal
-        {points={{-18.4,-1.0,12.1},{-64,-1.0,12.1},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,}, -- red horizontal
         {points = getHexagonVectorPoints({0,-2,0},6,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false}, -- grey ring hexagons
         {points = getHexagonVectorPoints({0,-2,0},18,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
         {points = getHexagonVectorPoints({0,-2,0},12,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
@@ -317,26 +1315,6 @@ end
 
 function draw4Pcircle()
     Global.setVectorLines({
-        -- player1 spot
-        {points = getCircleVectorPoints({5.25,-2,-15.15},1.75,32,1),color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{18.4,-1.0,-12.1},{64.0,-1.0,-12.1},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{0.2,-1.0,-12.1},{0.2,-1.0,-71.6},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-
-        -- player2 spot
-        {points=getCircleVectorPoints({-15.75,-2,-3.03}, 1.75, 32, 1),color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{-18.4,-1.0,-12.1},{-64,-1.0,-12.1},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-0.2,-1.0,-12.1},{-0.2,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-
-        -- player3 spot
-        {points = getCircleVectorPoints({-5.25,-2,15.15},1.75,32,1),color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{-0.2,-1.0,12.1},{-0.2,-1.0,71.6},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-18.4,-1.0,12.1},{-64,-1.0,12.1},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-
-        -- player4 spot
-        {points= getCircleVectorPoints({15.75,-2,3.03},1.75,32,1),color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{0.2,-1.0,12.1},{0.2,-1.0,71.6},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{18.4,-1.0,12.1},{64,-1.0,12.1},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-
         --grey ring hexagons and agenda box
         {points = getHexagonVectorPoints({0,-2,0},6,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
         {points = getHexagonVectorPoints({0,-2,0},18,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
@@ -348,31 +1326,6 @@ end
 
 function draw5Pcircle()
     Global.setVectorLines({
-        -- player1 spot
-        {points = getCircleVectorPoints({15.75, -2, -9.09},1.75, 32, 1),color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{22.2,-1.0,-12.1},{22.2,-1.0,-71.6},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{18.4,-1.0,-12.1},{64,-1.0,-12.1},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-
-        -- player2 spot
-        {points = getCircleVectorPoints({0,-2,-18.25},1.75,32,1),color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{21.8,-1.0,-12.1},{21.8,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-21.8,-1.0,-12.1},{-21.8,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-
-        -- player3 spot
-        {points=getCircleVectorPoints({-15.75,-2,-9.09}, 1.75, 32, 1),color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{-18.4,-1.0,-12.1},{-64,-1.0,-12.1},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-22.2,-1.0,-12.1},{-22.2,-1.0,-71.6},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-
-        -- player4 spot
-        {points = getCircleVectorPoints({-15.75, -2, 9.09},1.75, 32, 1),color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{-0.2,-1.0,12.1},{-0.2,-1.0,71.6},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-18.4,-1.0,12.1},{-64,-1.0,12.1},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-
-        -- player5spot
-        {points = getCircleVectorPoints({15.75, -2, 9.09},1.75, 32, 1),color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{0.2,-1.0,12.1},{0.2,-1.0,71.6},},color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{18.4,-1.0,12.1},{64,-1.0,12.1},},color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-
         --grey ring hexagons and agenda box
         {points = getHexagonVectorPoints({0,-2,0},6,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
         {points = getHexagonVectorPoints({0,-2,0},18,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
@@ -392,31 +1345,6 @@ end
 
 function draw6Pcircle()
     Global.setVectorLines({
-        -- player1 spot
-        {points = getCircleVectorPoints({15.75, -2, -9.09},1.75, 32, 1),color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{22.2,-1.0,-12.1},{22.2,-1.0,-71.6},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{18.4,-1.0,-12.1},{64,-1.0,-12.1},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player2 spot
-        {points = getCircleVectorPoints({0,-2,-18.25},1.75,32,1),color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{21.8,-1.0,-12.1},{21.8,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-21.8,-1.0,-12.1},{-21.8,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player3 spot
-        {points=getCircleVectorPoints({-15.75,-2,-9.09}, 1.75, 32, 1),color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{-18.4,-1.0,-12.1},{-64,-1.0,-12.1},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-22.2,-1.0,-12.1},{-22.2,-1.0,-71.6},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player4 spot
-        {points = getCircleVectorPoints({-15.75, -2, 9.09},1.75, 32, 1),color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{-18.4,-1.0,12.1},{-64,-1.0,12.1},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-22.2,-1.0,12.1},{-22.2,-1.0,71.6},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player5 spot
-        {points = getCircleVectorPoints({0,-2,18.25},1.75,32,1),color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{21.8,-1.0,12.1},{21.8,-1.0,71.6},},color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-21.8,-1.0,12.1},{-21.8,-1.0,71.6},},color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player6 spot
-        {points = getCircleVectorPoints({15.75, -2, 9.09},1.75, 32, 1),color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{18.4,-1.0,12.1},{64,-1.0,12.1},},color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{22.2,-1.0,12.1},{22.2,-1.0,71.6},},color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-
         --grey ring hexagons and agenda box
         {points = getHexagonVectorPoints({0,-2,0},6,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
         {points = getHexagonVectorPoints({0,-2,0},18,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
@@ -428,35 +1356,6 @@ end
 
 function draw7Pcircle()
     Global.setVectorLines({
-        -- player1 spot
-        {points = getCircleVectorPoints({15.75, -2, -15},1.75, 32, 1),color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{18.4,-1.0,-12.1},{64,-1.0,-12.1},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{32.2,-1.0,-12.1},{32.2,-1.0,-71.6},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player2 spot
-        {points = getCircleVectorPoints({0,-2,-24.25},1.75,32,1),color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{31.8,-1.0,-12.1},{31.8,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{0.2,-1.0,-12.1},{0.2,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player3 spot
-        {points = getCircleVectorPoints({-15.75, -2, -15},1.75, 32, 1),color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{-0.2,-1.0,-12.1},{-0.2,-1.0,-71.6},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-31.8,-1.0,-12.1},{-31.8,-1.0,-71.6},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player4 spot
-        {points=getCircleVectorPoints({-21,-2,0}, 1.75, 32, 1),color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{-18.4,-1.0,-12.1},{-64,-1.0,-12.1},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-32.2,-1.0,-12.1},{-32.2,-1.0,-71.6},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player5 spot
-        {points = getCircleVectorPoints({-15.75, -2, 15},1.75, 32, 1),color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{-18.4,-1.0,12.1},{-64,-1.0,12.1},},color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-22.2,-1.0,12.1},{-22.2,-1.0,71.6},},color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player6 spot
-        {points = getCircleVectorPoints({15.75, -2, 15},1.75, 32, 1),color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{21.8,-1.0,12.1},{21.8,-1.0,71.6},},color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-21.8,-1.0,12.1},{-21.8,-1.0,71.6},},color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        --purple circle, vertical, horizontals
-        {points = getCircleVectorPoints({21, -2, 0},1.75, 32, 1),color=_playerList[7],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{18.4,-1.0,12.1},{64,-1.0,12.1},},color=_playerList[7],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{22.2,-1.0,12.1},{22.2,-1.0,71.6},},color=_playerList[7],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-
         --grey ring hexagons and agenda box
         {points = getHexagonVectorPoints({0,-2,0},6,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
         {points = getHexagonVectorPoints({0,-2,0},18,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
@@ -477,38 +1376,6 @@ end
 
 function draw8Pcircle()
     Global.setVectorLines({
-        -- player1 spot
-        {points = getCircleVectorPoints({15.75, -2, -15},1.75, 32, 1),color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{18.4,-1.0,-12.1},{64,-1.0,-12.1},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{32.2,-1.0,-12.1},{32.2,-1.0,-71.6},},color=_playerList[1],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player2 spot
-        {points = getCircleVectorPoints({0,-2,-24.25},1.75,32,1),color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{31.8,-1.0,-12.1},{31.8,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{0.2,-1.0,-12.1},{0.2,-1.0,-71.6},},color=_playerList[2],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player3 spot
-        {points = getCircleVectorPoints({-15.75, -2, -15},1.75, 32, 1),color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{-0.2,-1.0,-12.1},{-0.2,-1.0,-71.6},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-31.8,-1.0,-12.1},{-31.8,-1.0,-71.6},},color=_playerList[3],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player4 spot
-        {points=getCircleVectorPoints({-21,-2,0}, 1.75, 32, 1),color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{-18.4,-1.0,-12.1},{-64,-1.0,-12.1},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-32.2,-1.0,-12.1},{-32.2,-1.0,-71.6},},color=_playerList[4],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player5 spot
-        {points = getCircleVectorPoints({-15.75, -2, 15},1.75, 32, 1),color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{-18.4,-1.0,12.1},{-64,-1.0,12.1},},color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-32.2,-1.0,12.1},{-32.2,-1.0,71.6},},color=_playerList[5],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player6 spot
-        {points = getCircleVectorPoints({0,-2,24.25},1.75,32,1),color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{-0.2,-1.0,12.1},{-0.2,-1.0,71.6},},color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{-31.8,-1.0,12.1},{-31.8,-1.0,71.6},},color=_playerList[6],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player7 spot
-        {points = getCircleVectorPoints({15.75, -2, 15},1.75, 32, 1),color=_playerList[7],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{31.8,-1.0,12.1},{31.8,-1.0,71.6},},color=_playerList[7],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{0.2,-1.0,12.1},{0.2,-1.0,71.6},},color=_playerList[7],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        -- player8 spot
-        {points = getCircleVectorPoints({21, -2, 0},1.75, 32, 1),color=_playerList[8],thickness=0.1,rotation={0,0,0},loop=true,square=false,},
-        {points={{18.4,-1.0,12.1},{64,-1.0,12.1},},color=_playerList[8],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
-        {points={{32.3,-1.0,12.1},{32.2,-1.0,71.6},},color=_playerList[8],thickness=0.1,rotation={0,0,0},loop=false,square=false,},
         --grey ring hexagons and agenda box
         {points = getHexagonVectorPoints({0,-2,0},6,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
         {points = getHexagonVectorPoints({0,-2,0},18,30,1),color='Grey',thickness=0.1,rotation={0,0,0},loop=true,square=false},
@@ -547,18 +1414,6 @@ end
 
 -------------------------------------------------------------------------------
 
-function unpackColorBox(playerColor)
-    -- TODO XXX
-end
-
--------------------------------------------------------------------------------
-
-function unpackFactionBox(playerColor)
-    -- TODO XXX
-end
-
--------------------------------------------------------------------------------
-
 function onLoad(saveState)
     self.setColorTint({ r = 0.25, g = 0.25, b = 0.25 })
     self.setScale({ x = 2, y = 0.01, z = 2 })
@@ -573,6 +1428,8 @@ function onLoad(saveState)
         end
     end
     self.setInvisibleTo(invisibleTo)
+
+    self.addContextMenuItem('Fix unit scale', fixUnitScale, false)
 end
 
 -------------------------------------------------------------------------------

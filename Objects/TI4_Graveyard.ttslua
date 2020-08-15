@@ -6,6 +6,25 @@
 --
 -- v3.1: safer transition when two cards forming a deck, and vice versa.
 -- v3.2: wait for TTS before moving to final destination in order to preserve guid.
+-- v3.3 [August 2020]: migrate to deck helper.
+
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
+        return function(parameters) return helperObject.call(functionName, parameters) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+local _deckHelper = getHelperClient('TI4_DECK_HELPER')
+local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 
 -- Token bags use inconsistent name to bag, hard code for simplicity.
 local TOKEN_BAGS = {
@@ -18,237 +37,11 @@ local TOKEN_BAGS = {
 }
 
 -- Bag with faction tokens.
-local PICK_FACTION_BAG = {
-    'Pick a Race to Play',
-    'Pick a Faction to Play',
-}
-
--- Decks with discard location and card names.
-local DECKS = {
-    {
-        name = 'Secret Objectives',
-        shuffleOnDiscard = true,
-        discardTransforms = {
-            [6] = {
-                position = { x = -70.72, y = 1.7, z = 11.60 },
-                rotation = { x = 0, y = 90, z = 180 },
-            },
-            [8] = {
-                position = { x = 83.3, y = 5.8, z = -12.5 },
-                rotation = { x = 0, y = 90, z = 180 },
-            }
-        },
-        cards = {
-            'Adapt New Strategies',
-            'Become the Gatekeeper',
-            'Control the Region',
-            'Cut Supply Lines',
-            'Destroy Their Greatest Ship',
-            'Establish A Perimeter',
-            'Forge An Alliance',
-            'Form a Spy Network',
-            'Fuel the War Machine',
-            'Gather A Mighty Fleet',
-            'Learn Secrets of the Cosmos',
-            'Make an Example of Their World',
-            'Master the Laws of Physics',
-            'Mine Rare Metals',
-            'Monopolize Production',
-            'Occupy the Seat of the Empire',
-            'Spark a Rebellion',
-            'Threaten Enemies',
-            'Turn Their Fleets to Dust',
-            'Unveil Flagship',
-        },
-    },
-    {
-        name = 'Agenda',
-        discardTransforms = {
-            [6] = {
-                position = { x = -66.97, y = 1.7, z = 15.42 },
-                rotation = { x = 0, y = 90, z = 0 },
-            },
-            [8] = {
-                position = { x = 79.6, y = 5.7, z = -16.4 },
-                rotation = { x = 0, y = 270, z = 0 },
-            }
-        },
-        cards = {
-            'Anti-Intellectual Revolution',
-            'Archived Secret',
-            'Arms Reduction',
-            'Classified Document Leaks',
-            'Colonial Redistribution',
-            'Committee Formation',
-            'Compensated Disarmament',
-            'Conventions of War',
-            'Core Mining',
-            'Demilitarized Zone',
-            'Economic Equality',
-            'Enforced Travel Ban',
-            'Executive Sanctions',
-            'Fleet Regulations',
-            'Holy Planet of Ixth',
-            'Homeland Defense Act',
-            'Imperial Arbiter',
-            'Incentive Program',
-            'Ixthian Artifact',
-            'Judicial Abolishment',
-            'Minister of Commerce',
-            'Minister of Exploration',
-            'Minister of Industry',
-            'Minister of Peace',
-            'Minister of Policy',
-            'Minister of Sciences',
-            'Minister of War',
-            'Miscount Disclosed',
-            'Mutiny',
-            'New Constitution',
-            'Prophecy of Ixth',
-            'Public Execution',
-            'Publicize Weapon Schematics',
-            'Regulated Conscription',
-            'Representative Government',
-            'Research Team - Biotic',
-            'Research Team - Cybernetic',
-            'Research Team - Propulsion',
-            'Research Team - Warfare',
-            'Seed of an Empire',
-            'Senate Sanctuary',
-            'Shard of the Throne',
-            'Shared Research',
-            'Swords to Plowshares',
-            'Terraforming Initiative',
-            'The Crown of Emphidia',
-            'The Crown of Thanlos',
-            'Unconventional Measures',
-            'Wormhole Reconstruction',
-            'Wormhole Research',
-        },
-    },
-    {
-        name = 'Actions',
-        discardTransforms = {
-            [6] = {
-                position = { x = -67.03, y = 1.7, z = 19.25 },
-                rotation = { x = 0, y = 90, z = 0 },
-            },
-            [8] = {
-                position = { x = 79.7, y = 5.7, z = -20.2 },
-                rotation = { x = 0, y = 270, z = 0 },
-            }
-        },
-        cards = {
-            'Ancient Burial Sites',
-            'Assassinate Representative',
-            'Bribery',
-            'Bunker',
-            'Confusing Legal Text',
-            'Construction Rider',
-            'Courageous to the End',
-            'Cripple Defenses',
-            'Diplomacy Rider',
-            'Direct Hit (1)',
-            'Direct Hit (2)',
-            'Direct Hit (3)',
-            'Direct Hit (4)',
-            'Disable',
-            'Distinguished Councilor',
-            'Economic Initiative',
-            'Emergency Repairs',
-            'Experimental Battlestation',
-            'Fighter prototype',
-            'Fire Team',
-            'Flank Speed (1)',
-            'Flank Speed (2)',
-            'Flank Speed (3)',
-            'Flank Speed (4)',
-            'Focused Research',
-            'Frontline Deployment',
-            'Ghost Ship',
-            'Imperial Rider',
-            'In the Silence of Space',
-            'Industrial Initiative',
-            'Infiltrate',
-            'Insubordination',
-            'Intercept',
-            'Leadership Rider',
-            'Lost Star Chart',
-            'Lucky Shot',
-            'Maneuvering Jets (1)',
-            'Maneuvering Jets (2)',
-            'Maneuvering Jets (3)',
-            'Maneuvering Jets (4)',
-            'Mining Initiative',
-            'Morale Boost (1)',
-            'Morale Boost (2)',
-            'Morale Boost (3)',
-            'Morale Boost (4)',
-            'Parley',
-            'Plague',
-            'Political Stability',
-            'Politics Rider',
-            'Public Disgrace',
-            'Reactor Meltdown',
-            'Reparations',
-            'Repeal Law',
-            'Rise of a Messiah',
-            'Sabotage (1)',
-            'Sabotage (2)',
-            'Sabotage (3)',
-            'Sabotage (4)',
-            'Salvage',
-            'Shields Holding (1)',
-            'Shields Holding (2)',
-            'Shields Holding (3)',
-            'Shields Holding (4)',
-            'Signal Jamming',
-            'Skilled Retreat (1)',
-            'Skilled Retreat (2)',
-            'Skilled Retreat (3)',
-            'Skilled Retreat (4)',
-            'Spy',
-            'Summit',
-            'Tactical Bombardment',
-            'Technology Rider',
-            'Trade Rider',
-            'Unexpected Action',
-            'Unstable Planet',
-            'Upgrade',
-            'Uprising',
-            'Veto',
-            'War Effort',
-            'Warfare Rider',
-            -- Codex action cards
-            'Hack Election',
-            'Harness Energy',
-            'Blitz',
-            'Fighter Conscription',
-            'Forward Supply Base',
-            'Rally',
-            'War Machine (1)',
-            'War Machine (2)',
-            'War Machine (3)',
-            'War Machine (4)',
-            'Master Plan',
-            'Insider Information',
-            'Plagiarize',
-            'Scramble Frequency',
-            'Solar Flare',
-            'Reflective Shielding',
-            'Impersonation',
-            'Sanction',
-            'Counterstroke',
-            'Ghost Squad',
-        },
-    }
-}
+local PICK_FACTION_BAG = 'Pick a Faction to Play'
 
 -------------------------------------------------------------------------------
 
 local data = {
-    tableSize = false,
-    cardNameToDeckAttributes = false,
     objectNameToBagGuid = {},
     pickFactionTokenBagGuid = nil,
 
@@ -264,23 +57,6 @@ local data = {
 }
 
 -------------------------------------------------------------------------------
-
---- Get discard pile transform (position, rotation) for given card.
-local function getCardDestination(cardName)
-    assert(type(cardName) == 'string')
-
-    -- The first time a card is discarded create a fast-lookup name->deck map.
-    if not data.cardNameToDeckAttributes then
-        data.cardNameToDeckAttributes = {}
-        for _, deckAttributes in ipairs(DECKS) do
-            for _, cardName in ipairs(deckAttributes.cards) do
-                data.cardNameToDeckAttributes[cardName] = deckAttributes
-            end
-        end
-    end
-
-    return data.cardNameToDeckAttributes[cardName]
-end
 
 --- Get bag for object.
 local function getNonCardDestination(objectName)
@@ -318,16 +94,15 @@ local function getNonCardDestination(objectName)
 
     -- If "FACTION Owner Token" and no bag, put in the "Pick a Faction to Play"
     -- bag (scan again to make earlier, more common scan do less work).
-    if not bag and string.match(objectName, ' Owner Token$') then
+    local faction = (not bag) and _factionHelper.fromTokenName(objectName)
+    if not bag and faction then
         local bagGuid = data.pickFactionTokenBagGuid
         bag = bagGuid and getObjectFromGUID(bagGuid)
         if not bag then
             for _, candidate in ipairs(getAllObjects()) do
-                for _, pickFactionBag in ipairs(PICK_FACTION_BAG) do
-                    if candidate.getName() == pickFactionBag then
-                        bag = candidate
-                        break
-                    end
+                if candidate.getName() == PICK_FACTION_BAG then
+                    bag = candidate
+                    break
                 end
             end
         end
@@ -338,181 +113,6 @@ local function getNonCardDestination(objectName)
 end
 
 -------------------------------------------------------------------------------
-
-local function getDiscardPile(deckAttributes)
-    assert(type(deckAttributes) == 'table')
-    local discardTransform = deckAttributes.discardTransforms[data.tableSize]
-    local p = discardTransform.position
-    local castPosition = { x = p.x, y = p.y + 10, z = p.z }
-    local hits = Physics.cast({
-        origin       = castPosition,
-        direction    = { x = 0, y = -1, z = 0 },
-        type         = 1,  -- ray
-        max_distance = 11,
-        debug        = false
-    })
-
-    -- Get location above first hit.
-    local firstPoint = castPosition
-    if hits and hits[1] then
-        firstPoint = hits[1].point
-    end
-    local abovePoint = { x = firstPoint.x, y = firstPoint.y + 0.5, z = firstPoint.z }
-
-    -- For some reason physics cast does not always see decks when putting
-    -- a lot of cards.  Use a minimum Y value as a safety.
-    abovePoint.y = math.max(abovePoint.y, discardTransform.position.y + 3)
-
-    -- Get the first deck or card encountered.
-    local deckOrCard = false
-    for _, hit in ipairs(hits or {}) do
-        local object = hit.hit_object
-        if object.tag == 'Deck' or object.tag == 'Card' then
-            deckOrCard = object
-            break
-        end
-    end
-
-    return deckOrCard, abovePoint
-end
-
-local function shuffle(deckAttributes)
-    local function delayedShuffle()
-        deckAttributes._shuffleWaitId = nil
-        local deckOrCard, firstPoint = getDiscardPile(deckAttributes)
-        if deckOrCard and deckOrCard.tag == 'Deck' then
-            deckOrCard.shuffle()
-        end
-    end
-    if deckAttributes._shuffleWaitId then
-        Wait.stop(deckAttributes._shuffleWaitId)
-    end
-    deckAttributes._shuffleWaitId = Wait.time(delayedShuffle, 2)
-end
-
--------------------------------------------------------------------------------
-
---- Put cards into the deck discard pile.
-local function putCard(cardObject, deckAttributes, index)
-    assert(type(cardObject) == 'userdata' and cardObject.tag == 'Card' and type(deckAttributes) == 'table')
-
-    local discardTransform = deckAttributes.discardTransforms[data.tableSize]
-    local deckOrCard, abovePoint = getDiscardPile(deckAttributes)
-
-    -- Always move over discard pile location and drop.  Deck.putObject will
-    -- place on the top or bottom depending on closer Y, so unless we wait
-    -- for the setPosition to finish it can go to the wrong end.  Since we're
-    -- already waiting for the move, let gravity finish the job.
-    cardObject.setPosition(abovePoint)
-    cardObject.setRotation(discardTransform.rotation)
-
-    if deckAttributes.shuffleOnDiscard then
-        shuffle(deckAttributes)
-    end
-end
-
---- Given a deck, return map from deck attributes to guid list for cards.
--- Does not mutate the deck, ok to use the onObjectEnterContainer object.
-local function shouldPutCardsFromDeck(deckObject)
-    assert(type(deckObject) == 'userdata' and deckObject.tag == 'Deck')
-    local deckAttributesToCardGuids = false
-    for i, card in ipairs(deckObject.getObjects()) do
-        local deckAttributes = getCardDestination(card.name)
-        if deckAttributes then
-            deckAttributesToCardGuids = deckAttributesToCardGuids or {}
-            local cardGuids = deckAttributesToCardGuids[deckAttributes]
-            if not cardGuids then
-                cardGuids = {}
-                deckAttributesToCardGuids[deckAttributes] = cardGuids
-            end
-            table.insert(cardGuids, card.guid)
-        end
-    end
-    return deckAttributesToCardGuids
-end
-
---- Put cards from a deck into their respective discard piles.
--- Mutates the deck, must remove from graveyard bag first!
-local function putCardsFromDeck(deckObject, deckAttributesToCardGuids)
-    assert(type(deckObject) == 'userdata' and deckObject.tag == 'Deck' and type(deckAttributesToCardGuids) == 'table')
-    deckObject.setLock(true)
-
-    for deckAttributes, cardGuids in pairs(deckAttributesToCardGuids) do
-        local discardTransform = deckAttributes.discardTransforms[data.tableSize]
-        local deckOrCard, abovePoint = getDiscardPile(deckAttributes)
-
-        local numCardGuids = #cardGuids
-        for i, cardGuid in ipairs(cardGuids) do
-            local position = { x = abovePoint.x, y = abovePoint.y + 1 * i * 0.01, z = abovePoint.z }
-
-            -- Take card from deck.
-            local cardObject = false
-            if deckObject.tag == 'Deck' then
-                cardObject = deckObject.takeObject({
-                    guid = cardGuid,
-                    position = position,
-                    rotation = discardTransform.rotation
-                })
-                if deckObject.remainder then
-                    deckObject.setLock(false)
-                    deckObject = deckObject.remainder
-                    coroutine.yield(0)
-                end
-            elseif deckObject.tag == 'Card' and deckObject.getGUID() == cardGuid then
-                cardObject = deckObject
-                deckObject = false
-                cardObject.setPositionSmooth(position, false, true)
-                cardObject.setRotation(discardTransform.rotation)
-            end
-
-            -- Wait a frame after take to enforce logical leave/enter order.
-            -- Also gives TTS a little breathing room when moving a lot of cards.
-            coroutine.yield(0)
-
-            -- Give it a little MORE breathing room, can struggle with very
-            -- large decks and small decks are still fine.
-            if (i % 20) == 0 or (i > 20 and i == numCardGuids) then
-                local now = Time.time
-                while Time.time - now < 0.5 do
-                    coroutine.yield(0)
-                end
-                -- Also skip upward slightly in case of lagging physics.
-                abovePoint.y = abovePoint.y + 0.05
-            end
-
-            -- We *could* try to be clever and put cards into the deck.  There
-            -- are a few gotchas such as if the deck is empty or a deck is
-            -- forming after joining two cards.  Moreover large deck puts are
-            -- not common enough to warrant the complexity.
-        end
-
-        if deckAttributes.shuffleOnDiscard then
-            shuffle(deckAttributes)
-        end
-    end
-
-    -- Any any remaining card(s) they have nowhere to go.  Put in self.
-    if deckObject then
-        deckObject.setLock(false)
-        self.putObject(deckObject)
-    end
-end
-
--------------------------------------------------------------------------------
-
-function onLoad(saveState)
-    -- Hard code deck positions for "normal" table as well as "8 player madness".
-    -- I started going down the road of finding the decks by name on first load,
-    -- then using onSave -> onLoad(saveState) to remember when loading games in
-    -- progress where the deck names might not be there... but be simple & safe.
-    local commandSheetCount = 0
-    for _, object in ipairs(getAllObjects()) do
-        if string.match(object.getName(), '^Command Sheet %(%a+%)$') then
-            commandSheetCount = commandSheetCount + 1
-        end
-    end
-    data.tableSize = commandSheetCount == 8 and 8 or 6  -- only allow 8 or 6
-end
 
 function onObjectEnterContainer(container, enterObject)
     if container == self then
@@ -526,16 +126,17 @@ function onObjectEnterContainer(container, enterObject)
             }
         end
 
-        if enterObject.tag == 'Card' then
-            local deckAttributes = getCardDestination(enterObject.getName())
-            if deckAttributes then
-                waitForDestroy(enterObject, deckAttributes)
-            end
-        elseif enterObject.tag == 'Deck' then
-            local shouldPut = shouldPutCardsFromDeck(enterObject)
-            if shouldPut then
-                waitForDestroy(enterObject, shouldPut)
-            end
+        local discardParams = {
+            guid = enterObject.getGUID(),
+            name = enterObject.getName(),
+            containerGuid = self.getGUID(),
+            waitForDestroy = true,
+        }
+
+        if enterObject.tag == 'Card' and _deckHelper.discardCard(discardParams) then
+            -- deck helper is handling it.
+        elseif enterObject.tag == 'Deck' and _deckHelper.discardDeck(discardParams) then
+            -- deck helper is handling it.
         else
             local bag = getNonCardDestination(enterObject.getName())
             if bag then
@@ -600,14 +201,8 @@ function processReadyCoroutine()
         coroutine.yield(0)
         object.setLock(false)
 
-        if object.tag == 'Card' then
-            putCard(object, objectData.state)
-        elseif object.tag == 'Deck' then
-            putCardsFromDeck(object, objectData.state, true)
-        else
-            object.setRotation(objectData.state.getRotation()) -- rotate to match bag
-            objectData.state.putObject(object)
-        end
+        object.setRotation(objectData.state.getRotation()) -- rotate to match bag
+        objectData.state.putObject(object)
     end
 
     -- Finished.  RETURN 1 TO STOP COROUTINE!

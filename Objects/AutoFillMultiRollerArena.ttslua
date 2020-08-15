@@ -115,18 +115,37 @@ function warpIn()
         error(TAG .. ': no activated system')
     end
 
+    local tokenToPos = {}
+    local unitToPos = {}
+
     local hex = CrLua.TI4.Hex.fromPosition(systemObject.getPosition())
     local bb = getBoundingBox(systemObject)
     local function checkUnit(unit)
         local p = unit.object.getPosition()
         if isInsideBoundingBox(p, bb) and hex == CrLua.TI4.Hex.fromPosition(p) then
             p = self.positionToWorld(systemObject.positionToLocal(p))
-            p.y = p.y + 2
-            local collide = false
-            unit.object.setPositionSmooth(p, collide, SMOOTH_POSITION_FAST)
+            if unit.object.tag == 'Tile' then
+                tokenToPos[unit] = p
+            else
+                unitToPos[unit] = p
+            end
         end
     end
     CrLua.TI4.Unit.getAllUnits(checkUnit)
+
+    local extraY = 0
+    for unit, p in pairs(tokenToPos) do
+        p.y = p.y + 1 + extraY
+        extraY = extraY + 0.05
+        local collide = false
+        unit.object.setPositionSmooth(p, collide, SMOOTH_POSITION_FAST)
+    end
+    for unit, p in pairs(unitToPos) do
+        p.y = p.y + 1 + extraY
+        extraY = extraY + 0.05
+        local collide = false
+        unit.object.setPositionSmooth(p, collide, SMOOTH_POSITION_FAST)
+    end
 end
 
 function warpOut()
@@ -137,7 +156,8 @@ function warpOut()
         error(TAG .. ': no activated system')
     end
 
-    local extraY = 0
+    local tokenToPos = {}
+    local unitToPos = {}
 
     local hex = CrLua.TI4.Hex.fromPosition(systemObject.getPosition())
     local bb = getBoundingBox(self)
@@ -146,14 +166,29 @@ function warpOut()
         if isInsideBoundingBox(p, bb) then
             p = systemObject.positionToWorld(self.positionToLocal(p))
             if hex == CrLua.TI4.Hex.fromPosition(p) then
-                p.y = p.y + 2 + extraY
-                extraY = extraY + 0.5
-                local collide = false
-                unit.object.setPositionSmooth(p, collide, SMOOTH_POSITION_FAST)
+                if unit.object.tag == 'Tile' then
+                    tokenToPos[unit] = p
+                else
+                    unitToPos[unit] = p
+                end
             end
         end
     end
     CrLua.TI4.Unit.getAllUnits(checkUnit)
+
+    local extraY = 0
+    for unit, p in pairs(tokenToPos) do
+        p.y = p.y + 1 + extraY
+        extraY = extraY + 0.05
+        local collide = false
+        unit.object.setPositionSmooth(p, collide, SMOOTH_POSITION_FAST)
+    end
+    for unit, p in pairs(unitToPos) do
+        p.y = p.y + 1 + extraY
+        extraY = extraY + 0.05
+        local collide = false
+        unit.object.setPositionSmooth(p, collide, SMOOTH_POSITION_FAST)
+    end
 end
 
 -------------------------------------------------------------------------------

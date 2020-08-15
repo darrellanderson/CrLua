@@ -8,8 +8,12 @@ local TAG = 'CrLua.TI4.Unit'
 CrLua = CrLua or {}  -- global, <include> wraps in a do .. end block
 CrLua.TI4 = CrLua.TI4 or {}
 CrLua.TI4.Unit = assert(not CrLua.TI4.Unit) and {
-    _require = { 'List', 'LockTable', 'Table', 'Util', 'TI4.Faction' },
-    _allowMissingKeys = { 'UNIT', 'FLAGSHIP', 'TOKEN', 'FACTION_OVERRIDES' }
+    _require = { 'List', 'LockTable', 'Table', 'Util', 'TTS.HelperClient' },
+    _allowMissingKeys = { 'UNIT', 'FLAGSHIP', 'TOKEN', 'FACTION_OVERRIDES' },
+    _data = {
+        factionHelper = false,
+        flagshipNameSet = false,
+    }
 }
 
 -- Expose keys by way of a (read-only, require keys) table.  External users
@@ -112,6 +116,25 @@ CrLua.TI4.Unit.FACTION_OVERRIDES = {
         ['Space Dock'] = { planetaryShield = true },
     },
 }
+
+local function factionHelper()
+    if not CrLua.TI4.Unit._data.factionHelper then
+        CrLua.TI4.Unit._data.factionHelper = CrLua.TTS.HelperClient.get('TI4_FACTION_HELPER')
+    end
+    return CrLua.TI4.Unit._data.factionHelper
+end
+
+local function getFlagshipNameSet()
+    if not CrLua.TI4.Unit._data.flagshipNameSet then
+        CrLua.TI4.Unit._data.flagshipNameSet = {}
+        for _, faction in pairs(factionHelper().allFactions(true)) do
+            if faction.flagship then
+                CrLua.TI4.Unit._data.flagshipNameSet[faction.flagship] = true
+            end
+        end
+    end
+    return CrLua.TI4.Unit._data.flagshipNameSet
+end
 
 -------------------------------------------------------------------------------
 --- Validate attribute table.
@@ -267,11 +290,17 @@ end
 function CrLua.TI4.Unit.fromObject(object)
     local name = object.getName()
 
-    local flagship = CrLua.TI4.Unit.FLAGSHIP[name]
-    if flagship then
+    if getFlagshipNameSet()[name] then
         -- Flagships do not have color in their name.  Find their faction
         -- sheet to get player color.  (Zone does this for us.)
-        local faction = CrLua.TI4.Faction.faction(flagship.faction)
+        local function getFactionFromFlagship(flagshipName)
+            for color, faction in pairs(factionHelper().allFactions()) do
+                if faction.flagship == name then
+                    return faction
+                end
+            end
+        end
+        local faction = getFactionFromFlagship(name)
         local color = faction and faction.color
         return CrLua.TI4.Unit.unit('Flagship', color, 1, object)
     end
@@ -344,7 +373,9 @@ function CrLua.TI4.Unit.attributes(unit)
         attributes = CrLua.Table.join(attributes, flagshipAttributes)
     end
 
-    local faction = unit.color and CrLua.TI4.Faction.fromColor(unit.color)
+    local colorToFaction = factionHelper().allFactions()
+
+    local faction = unit.color and colorToFaction[unit.color]
     local overrides = faction and CrLua.TI4.Unit.FACTION_OVERRIDES[faction.name]
     if overrides and overrides[unit.unitName] then
         attributes = CrLua.Table.join(attributes, overrides[unit.unitName])

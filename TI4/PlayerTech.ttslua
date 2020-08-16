@@ -75,6 +75,8 @@ CrLua.TI4.PlayerTech.TECHNOLOGIES = {
     ['X-89 Bacterial Weapon Ω'] = 'X-89 B.W.',
     ['X-89 Bacterial Weapon'] = 'X-89 B.W.',
     ['Yin Spinner'] = 'Yin Spin',
+    ['????_REDACTED_????'] = 'Scenario Destroyer',
+    ['???_EXCEPTION_NO_ID_???'] = 'Scenario Tech'
 }
 
 local _factionHelper = CrLua.TTS.HelperClient.get('TI4_FACTION_HELPER')
@@ -112,10 +114,23 @@ function CrLua.TI4.PlayerTech.updateAllPlayersToTech(playerColorToTechs)
         table.insert(entry, tech)
     end
 
+    local prunedColorToTechs = {}
+    for color, techList in pairs(colorToTechs) do
+        local hash = {}
+        local prunedTechList = {}
+        for _, tech in ipairs(techList) do
+            if (not hash[tech]) then
+                prunedTechList[#prunedTechList+1] = tech
+                hash[tech] = true 
+            end
+        end
+        prunedColorToTechs[color] = prunedTechList
+    end
+
     local updated = {}
     for color, _ in pairs(_factionHelper.allFactions()) do
         local oldTechs = playerColorToTechs[color] or {}
-        local newTechs = colorToTechs[color] or {}
+        local newTechs = prunedColorToTechs[color] or {}
         local updatedTechs = CrLua.List.pruneAndAppendMissing(oldTechs, newTechs)
         updated[color] = updatedTechs
     end

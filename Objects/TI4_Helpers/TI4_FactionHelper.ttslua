@@ -365,10 +365,12 @@ end
 function fromTokenName(tokenName)
     assert(type(tokenName) == 'string')
     tokenName = string.match(tokenName, '^(.*) .* Token$') or tokenName
-    _maybeUpdate()
-    for _, faction in pairs(_factionAttributes) do
-        if faction.tokenName == tokenName then
-            return faction
+    if string.len(tokenName) > 0 then
+        _maybeUpdate()
+        for _, faction in pairs(_factionAttributes) do
+            if faction.tokenName == tokenName then
+                return faction
+            end
         end
     end
 end

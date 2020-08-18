@@ -349,7 +349,7 @@ end
 --#include <~/CrLua/UnitTest>
 --CrLua.UnitTest.runTests('CrLua', CrLua, true)
 
-CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
+CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.WARNING)
 
 CrLua.assertRequired({ 'TI4.PlayerScore', 'TI4.PlayerTech', 'TTS.Spreadsheet' })
 CrLua.lock()

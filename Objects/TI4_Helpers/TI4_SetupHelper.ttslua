@@ -1126,9 +1126,14 @@ end
 local _unpackFactionQueue = {}
 
 --- Entry point for faction unpack.
+-- Params:
+-- - params.unpackButtonGuid (optional) if set, delete this object after unpack.
+-- - params.factionTokenName (optional) if set, unpack this faction (otherwise look for a token in zone).
+-- - params.color (required) unpack into this zone.
 function unpackFaction(params)
     assert(type(params) == 'table')
-    assert(type(params.unpackButtonGuid) == 'string')
+    assert(not params.unpackButtonGuid or type(params.unpackButtonGuid) == 'string')
+    assert(not params.factionTokenName or type(params.factionTokenName) == 'string')
     assert(type(params.color) == 'string')
     table.insert(_unpackFactionQueue, params)
     startLuaCoroutine(self, 'unpackFactionCoroutine')
@@ -1140,8 +1145,13 @@ function unpackFactionCoroutine()
     local zoneAttributes = _zoneHelper.zoneAttributes(color)
     assert(zoneAttributes, 'no zone for ' .. color)
 
-    local faction, tokenObject = SetupFaction.getFactionAndTokenObject(color)
-    if not faction or not tokenObject then
+    local faction, tokenObject
+    if params.factionTokenName then
+        faction = _factionHelper.fromTokenName(params.factionTokenName)
+    else
+        faction, tokenObject = SetupFaction.getFactionAndTokenObject(color)
+    end
+    if not faction then
         error('unpack faction: no faction token for ' .. color)
         return 1
     end
@@ -1152,24 +1162,28 @@ function unpackFactionCoroutine()
     coroutine.yield(0)
 
     -- Delete the unpack button object.
-    local deletedItems = false
-    for _, object in ipairs(getAllObjects()) do
-        if object.tag == 'Bag' and object.getName() == 'TI4 Deleted Items' then
-            deletedItems = object
-            break
+    if params.unpackButtonGuid then
+        local deletedItems = false
+        for _, object in ipairs(getAllObjects()) do
+            if object.tag == 'Bag' and object.getName() == 'TI4 Deleted Items' then
+                deletedItems = object
+                break
+            end
         end
+        if deletedItems then
+            deletedItems.call('ignoreGuid', params.unpackButtonGuid)
+        end
+        local unpackButton = assert(getObjectFromGUID(params.unpackButtonGuid))
+        destroyObject(unpackButton)
+        coroutine.yield(0)
     end
-    if deletedItems then
-        deletedItems.call('ignoreGuid', params.unpackButtonGuid)
-    end
-    local unpackButton = assert(getObjectFromGUID(params.unpackButtonGuid))
-    destroyObject(unpackButton)
-    coroutine.yield(0)
 
     -- Move the token out of the way in case faction sheet, etc moves on top.
-    tokenObject.translate({ x = 0, y = 5, z = 0 })
-    coroutine.yield(0)
-    tokenObject.setLock(true)
+    if tokenObject then
+        tokenObject.translate({ x = 0, y = 5, z = 0 })
+        coroutine.yield(0)
+        tokenObject.setLock(true)
+    end
 
     local factionBox, factionBoxSrc = SetupFaction.unpackFactionBox(faction, zoneAttributes.center)
     if not factionBox then

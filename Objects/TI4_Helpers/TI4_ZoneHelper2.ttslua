@@ -312,6 +312,24 @@ function setPlayerCountWithExtraRing(playerCount)
     setPlayerCount(playerCount, true)
 end
 
+function getHomeSystemPositions(playerCount)
+    if not playerCount then
+        playerCount = #_zones
+    end
+    local positionsXZ = DEFAULT_ZONES[playerCount].homeSystemPositions
+    local result = {}
+    for _, positionXZ in ipairs(positionsXZ) do
+        table.insert(result, {
+            x = positionXZ[1],
+            y = _table.y,
+            z = positionXZ[2]
+        })
+    end
+    return result
+end
+
+-------------------------------------------------------------------------------
+
 --- Update zone colors by scanning for command sheets.
 function updateZoneColors()
     _lastUpdateZoneColorTime = Time.time

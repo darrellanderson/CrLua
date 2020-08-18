@@ -116,15 +116,7 @@ function CrLua.TI4.PlayerTech.updateAllPlayersToTech(playerColorToTechs)
 
     local prunedColorToTechs = {}
     for color, techList in pairs(colorToTechs) do
-        local hash = {}
-        local prunedTechList = {}
-        for _, tech in ipairs(techList) do
-            if (not hash[tech]) then
-                prunedTechList[#prunedTechList+1] = tech
-                hash[tech] = true 
-            end
-        end
-        prunedColorToTechs[color] = prunedTechList
+        prunedColorToTechs[color] = CrLua.List.unique(techList)
     end
 
     local updated = {}

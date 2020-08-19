@@ -306,7 +306,7 @@ function placeTilesCoroutine()
 
     local dy = 0.1
     local positions = getSystemPositionsStartingAtOrigin(#buildList, dy)
-    local rotation = { x = 0, y = 0, z = 0 }
+    local rotation = { x = 0, y = 180, z = 0 }
 
     for i, tile in ipairs(buildList) do
         if tile ~= 0 then
@@ -879,7 +879,7 @@ function getSystemPositionsStartingAtOrigin(count, dy)
         local level = 1
         local dir = 120
         local steps = 0
-        local north = startrot.y + 180
+        local north = startrot.y
         local nextpos = move_in_dir(startpos, north)
         return function()
             local thispos = nextpos

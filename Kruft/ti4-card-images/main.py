@@ -12,6 +12,7 @@ from PIL import ImageFont
 from PIL import ImageDraw
 
 from google.appengine.api import memcache
+from google.appengine.api import urlfetch
 
 import hashlib
 import io
@@ -634,6 +635,29 @@ class TestAgenda2Handler(webapp2.RequestHandler):
         self.response.headers['Content-Type'] = 'image/jpeg'
         self.response.out.write(jpg)
 
+# Given a 3200x3200 system tile image, generate a 2048x1024 one.
+class MutateSystemTile(webapp2.RequestHandler):
+    def get(self):
+        imageUrl = self.request.get('image')
+        unique = self.request.get('unique')
+        result = urlfetch.fetch(imageUrl)
+        file = '/tmp/system ' + unique + '.jpg'
+        f = open(file, 'wb')
+        f.write(result.content)
+        f.close()
+        original = Image.open(file)
+        os.remove(file)
+        front = original.crop((1390, 1630, 3170, 3170))
+        front = front.resize((1014 - 9, 947 - 76))
+        back = original.crop((1382, 30, 3170, 1570))
+        back = back.resize((2038 - 1033, 947 - 76))
+        img = Image.new('RGB', (2048, 1024), 'black')
+        img.paste(front, (9, 76, 1014, 947))
+        img.paste(back, (1033, 76, 2038, 947))
+        jpg = imageToJPEG(img)
+        self.response.headers['Content-Type'] = 'image/jpeg'
+        self.response.out.write(jpg)
+
 app = webapp2.WSGIApplication([
     ('/img', CardHandler),
     ('/getaction', getActionHandler),
@@ -642,5 +666,6 @@ app = webapp2.WSGIApplication([
     ('/testpublic', TestPublicHandler),
     ('/testagenda', TestAgenda1Handler),
     ('/testagenda2', TestAgenda2Handler),
+    ('/mutatesystem', MutateSystemTile),
 
 ], debug=True)

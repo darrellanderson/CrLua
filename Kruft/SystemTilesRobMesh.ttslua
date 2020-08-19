@@ -61,6 +61,17 @@ function getGuidToSystem()
         }
     end
 
+    -- Regenerate only home systems? (they got clobbered via unrelated work).
+    if false then
+        local onlyHome = {}
+        for guid, system in pairs(guidToSystem) do
+            if system.home then
+                onlyHome[guid] = system
+            end
+        end
+        guidToSystem = onlyHome
+    end
+
     return guidToSystem
 end
 

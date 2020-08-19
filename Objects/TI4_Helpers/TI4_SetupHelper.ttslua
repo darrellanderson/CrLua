@@ -541,31 +541,45 @@ function SetupColor.packOld(setupBag)
     _zoneHelper.updateZoneColors()
     coroutine.yield(0)
 
+    debugLog('packOld: unpacking color boxes')
     local colorToBox = {}
     for _, zone in ipairs(_zoneHelper.zonesAttributes()) do
         if zone.color then
             colorToBox[zone.color] = SetupColor.unpackColorBoxFromSetupBag(setupBag, zone.color, zone.center)
             assert(colorToBox[zone.color], 'missing box for ' .. zone.color)
         end
+        coroutine.yield(0)
+        coroutine.yield(0)
     end
     coroutine.yield(0)
 
+    debugLog('packOld: packing unit bags')
     for color, box in pairs(colorToBox) do
         SetupColor.packUnits(color, box)
+        coroutine.yield(0)
+        coroutine.yield(0)
     end
     coroutine.yield(0)
 
+    debugLog('packOld: packing per-color items')
     for color, box in pairs(colorToBox) do
         SetupColor.pack(color, box)
+        coroutine.yield(0)
+        coroutine.yield(0)
     end
     coroutine.yield(0)
 
+    debugLog('packOld: repacking color boxes')
     for color, box in pairs(colorToBox) do
         SetupColor.packColorBoxIntoSetupBag(setupBag, box)
+        coroutine.yield(0)
+        coroutine.yield(0)
     end
 
     SetupGeneric.pack(setupBag)
     coroutine.yield(0)
+
+    debugLog('packOld: finished')
 end
 
 --- Color and generic unpacking, for an N-player table.  THIS IS INTENDED FOR
@@ -583,6 +597,7 @@ function SetupColor.unpackNew(setupBag)
     local agendaZoneCenter = agendaCenter(#zonesAttributes)
     local colorToState = {}
 
+    debugLog('unpackNew: unpacking color boxes')
     for i, zone in ipairs(zonesAttributes) do
         local color = assert(SetupColor.DEFAULT_COLOR_LIST[i])
         colorToState[color] = {
@@ -592,41 +607,76 @@ function SetupColor.unpackNew(setupBag)
             unitBags = false
         }
         assert(colorToState[color].box, 'missing box for ' .. color)
+        coroutine.yield(0)
+        coroutine.yield(0)
+    end
+    for color, state in pairs(colorToState) do
+        while state.box.spawning do
+            coroutine.yield(0)
+        end
     end
     coroutine.yield(0)
 
+    debugLog('unpackNew: unpacking per-color items from color boxes')
     for color, state in pairs(colorToState) do
         local nameToObject = SetupColor.unpack(color, state.box, state.zoneCenter, agendaZoneCenter)
         local name = 'Directionaliser (' .. color .. ')'
         state.directionaliser = nameToObject[name]
         assert(state.directionaliser, 'missing ' .. name)
+        coroutine.yield(0)
+        coroutine.yield(0)
+    end
+    for color, state in pairs(colorToState) do
+        while state.directionaliser.spawning do
+            coroutine.yield(0)
+        end
     end
     coroutine.yield(0)
 
+    debugLog('unpackNew: unpacking per-color unit bags')
     for color, state in pairs(colorToState) do
         state.unitBags = SetupColor.unpackUnits(color, state.box, state.directionaliser)
         assert(state.unitBags, 'missing unit bags')
         assert(#state.unitBags > 0, 'empty unit bags')
+        coroutine.yield(0)
+        coroutine.yield(0)
+    end
+    for color, state in pairs(colorToState) do
+        for _, bag in ipairs(state.unitBags) do
+            while bag.spawning do
+                coroutine.yield(0)
+            end
+        end
     end
     coroutine.yield(0)
 
+    debugLog('unpackNew: repacking color boxes')
     for color, state in pairs(colorToState) do
         SetupColor.packColorBoxIntoSetupBag(setupBag, state.box)
+        coroutine.yield(0)
+        coroutine.yield(0)
     end
     coroutine.yield(0)
 
     -- About to wait for resting, give a little extra time for gravity.
-    yieldForSeconds(1.5)
+    yieldForSeconds(2.5)
 
+    -- Units were unpacked ABOVE directionaliser.  Wait for them to fall.
+    debugLog('unpackNew: waiting for units')
     for color, state in pairs(colorToState) do
-        -- Units were unpacked ABOVE directionaliser.  Wait for them to fall.
-        for _, unitBag in ipairs(state.unitBags) do
-            while not unitBag.resting do
+        for _, bag in ipairs(state.unitBags) do
+            while not bag.resting do
                 coroutine.yield(0)
             end
-            -- Instead of `unitBag.setLock(true)`, create a joint.  Can now
-            -- pick up and move directionaliser by dragging a unit bag on it.
-            -- Caution: rotating the directionalizer will break the joints!
+        end
+    end
+    coroutine.yield(0)
+
+    -- Instead of `unitBag.setLock(true)`, create a joint.  Can pick up and
+    -- move directionaliser by dragging a unit bag on it.
+    debugLog('unpackNew: attaching unit bags to stand')
+    for color, state in pairs(colorToState) do
+        for _, unitBag in ipairs(state.unitBags) do
             unitBag.jointTo(state.directionaliser, {
                 type = 'Fixed',
                 collision = false,
@@ -635,6 +685,8 @@ function SetupColor.unpackNew(setupBag)
             })
         end
     end
+
+    debugLog('unpackNew: finished')
 end
 
 -------------------------------------------------------------------------------
@@ -690,6 +742,7 @@ function setupCoroutine()
     end
     coroutine.yield(0)
 
+    debugLog('setup finished')
     return 1 -- REQUIRED!  MUST RETURN 1 TO STOP COROUTINE!
 end
 
@@ -1225,9 +1278,11 @@ function unpackFactionCoroutine()
     end
     factionBox = nil
 
-    tokenObject.setLock(false)
-    coroutine.yield(0)
-    tokenObject.translate({ x = 0, y = 1, z = 0 })
+    if tokenObject then
+        tokenObject.setLock(false)
+        coroutine.yield(0)
+        tokenObject.translate({ x = 0, y = 1, z = 0 })
+    end
 
     -- Wait for home system to land before unpacking units.
     while not homeSystemTile.getLock() do coroutine.yield(0) end
@@ -1239,6 +1294,7 @@ function unpackFactionCoroutine()
         _safeBroadcastToColor(faction.tokenName .. ': ' .. faction.startMessage, color, color)
     end
 
+    debugLog('unpack faction finished')
     return 1
 end
 

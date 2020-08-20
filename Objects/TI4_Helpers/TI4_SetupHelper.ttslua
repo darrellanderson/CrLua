@@ -239,6 +239,29 @@ end
 
 -------------------------------------------------------------------------------
 
+--- Resize the 'project grid' circle object.
+function SetupGeneric.resizeGridCircle(extraRing)
+    assert(type(extraRing) == 'boolean')
+
+    local function getCircle()
+        local name = 'Map Grid Projection Circle'
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == name then
+                return object
+            end
+        end
+        error('no ' .. name)
+    end
+    local circle = getCircle()
+
+    local v = extraRing and 16.7 or 13
+    circle.setScale({
+        x = v,
+        y = circle.getScale().y,
+        z = v
+    })
+end
+
 --- Find the "Setup Bag".
 function SetupGeneric.getSetupBag()
     for _, object in ipairs(getAllObjects()) do
@@ -721,6 +744,7 @@ function setupCoroutine()
     coroutine.yield(0)
 
     _zoneHelper.setPlayerCount(playerCount)
+    SetupGeneric.resizeGridCircle(playerCount > 6 and true or false)
 
     SetupColor.transformHands()
     coroutine.yield(0)

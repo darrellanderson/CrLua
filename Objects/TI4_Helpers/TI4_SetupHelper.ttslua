@@ -130,6 +130,7 @@ local SetupFaction = {
 local _putPendingGuidSet = {}
 
 local function putPending(object)
+    assert(type(object) == 'userdata')
     _putPendingGuidSet[object.getGUID()] = true
 end
 
@@ -484,7 +485,7 @@ function SetupColor.pack(color, colorBox)
         local name = object.getName()
         for _, namePattern in ipairs(namePatterns) do
             if string.match(name, namePattern) == color then
-                putPending(object.getGUID)
+                putPending(object)
                 object.setLock(false)
                 colorBox.putObject(object)
             end
@@ -539,7 +540,7 @@ function SetupColor.packUnits(color, colorBox)
 
     for _, object in ipairs(getAllObjects()) do
         if object.tag == 'Bag' and unitBagSet[object.getName()] then
-            putPending(object.getGUID)
+            putPending(object)
             object.setLock(false)
             object.jointTo() -- break joints
             colorBox.putObject(object)
@@ -697,6 +698,14 @@ function SetupColor.unpackNew(setupBag)
     end
     coroutine.yield(0)
 
+    -- Help gravity move the bag down to the stand. (Does not work if still spawning)
+    for color, state in pairs(colorToState) do
+        for _, bag in ipairs(state.unitBags) do
+            bag.addForce({ x = 0, y = -5, z = 0 }, 4)
+        end
+    end
+    coroutine.yield(0)
+
     debugLog('unpackNew: repacking color boxes')
     for color, state in pairs(colorToState) do
         SetupColor.packColorBoxIntoSetupBag(setupBag, state.box)
@@ -706,7 +715,7 @@ function SetupColor.unpackNew(setupBag)
     coroutine.yield(0)
 
     -- About to wait for resting, give a little extra time for gravity.
-    yieldForSeconds(2.5)
+    yieldForSeconds(1.5)
 
     -- Units were unpacked ABOVE directionaliser.  Wait for them to fall.
     debugLog('unpackNew: waiting for units')

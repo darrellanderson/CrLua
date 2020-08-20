@@ -127,6 +127,22 @@ local SetupFaction = {
     },
 }
 
+local _putPendingGuidSet = {}
+
+local function putPending(object)
+    _putPendingGuidSet[object.getGUID()] = true
+end
+
+local function isPutPending()
+    for _, _ in pairs(_putPendingGuidSet) do
+        return true
+    end
+end
+
+function onObjectDestroy(dyingObject)
+    _putPendingGuidSet[dyingObject.getGUID()] = nil
+end
+
 -------------------------------------------------------------------------------
 
 --- Normal broadcastToColor throws an error if the color is not seated.
@@ -468,6 +484,7 @@ function SetupColor.pack(color, colorBox)
         local name = object.getName()
         for _, namePattern in ipairs(namePatterns) do
             if string.match(name, namePattern) == color then
+                putPending(object.getGUID)
                 object.setLock(false)
                 colorBox.putObject(object)
             end
@@ -522,6 +539,7 @@ function SetupColor.packUnits(color, colorBox)
 
     for _, object in ipairs(getAllObjects()) do
         if object.tag == 'Bag' and unitBagSet[object.getName()] then
+            putPending(object.getGUID)
             object.setLock(false)
             object.jointTo() -- break joints
             colorBox.putObject(object)
@@ -588,6 +606,12 @@ function SetupColor.packOld(setupBag)
     for color, box in pairs(colorToBox) do
         SetupColor.pack(color, box)
         coroutine.yield(0)
+        coroutine.yield(0)
+    end
+    coroutine.yield(0)
+
+    -- Wait for pending puts, TTS may still be adding items to color boxes.
+    while isPutPending() do
         coroutine.yield(0)
     end
     coroutine.yield(0)

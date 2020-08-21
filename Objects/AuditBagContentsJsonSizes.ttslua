@@ -1,0 +1,38 @@
+function onLoad(save_state)
+    self.addContextMenuItem('Audit JSON', auditJson)
+end
+
+function auditJson()
+    startLuaCoroutine(self, 'auditJsonCoroutine')
+end
+
+function auditJsonCoroutine()
+    local result = {}
+
+    local p = self.getPosition()
+    for _, entry in ipairs(self.getObjects()) do
+        local object = self.takeObject({
+            guid = entry.guid,
+            position = { x = p.x, y = p.y + 20, z = p.z },
+            smooth = false
+        })
+        coroutine.yield(0)
+
+        local json = object.getJSON()
+        table.insert(result, {
+            name = object.getName(),
+            size = string.len(json),
+            sizeMB = math.floor(string.len(json) / (1024 * 1024) * 100) / 100
+        })
+
+        self.putObject(object)
+        coroutine.yield(0)
+    end
+
+    table.sort(result, function(a, b) return a.size < b.size end)
+    for _, item in ipairs(result) do
+        print(item.sizeMB .. ' MB - ' .. item.name)
+    end
+
+    return 1
+end

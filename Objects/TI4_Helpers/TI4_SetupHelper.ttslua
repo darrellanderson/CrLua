@@ -44,6 +44,8 @@ local SetupGeneric = {
     NAME_TO_PLAYER_ZONE_OFFSET = {
         ['^Technology Cards$'] = { x = 10, z = 2 },
         ['^TI4 Unpacker$'] = { x = -10, z = 2 },
+        ['^Here/AFK$'] = { x = 1, z = 2 },
+
         ['^TI4 MultiRoller'] = { x = 0, z = 42, lock = true },
     },
     NAME_TO_PLAYER_AGENDA_ZONE_OFFSET = {
@@ -123,7 +125,7 @@ local SetupFaction = {
         x = 10, z = -5, dz = -2.1
     },
     OTHER_OFFSET = {
-        x = 1, z = 2, dx = -3
+        x = -2, z = 2, dx = -2
     },
 }
 
@@ -917,7 +919,7 @@ function SetupFaction.unpack(faction, factionBox, zoneCenter)
         bag.translate({ x = 0, y = 5, z = 0 })
         local p = offsetPosition(zoneCenter, offset)
         for _, entry in ipairs(bag.getObjects()) do
-            print('nestedUnpack ' .. bag.getName() .. ' -> ' .. entry.name)
+            debugLog('nestedUnpack ' .. bag.getName() .. ' -> ' .. entry.name)
             bag.takeObject({
                 position          = p,
                 rotation          = bag.getRotation(),

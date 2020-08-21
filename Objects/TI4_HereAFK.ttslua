@@ -24,15 +24,20 @@ local _timerId = false
 local _isFaceDown = false
 
 function onLoad(save_state)
-    _timerId = 'HereAFK:' .. self.getGUID()
     _isFaceDown = self.is_face_down
-    Timer.create({
-        identifier = _timerId,
-        function_owner = self,
-        function_name = 'timerCallback',
-        delay = 3,  -- seconds
-        repetitions = 0  -- repeat until explictly Timer.destroy'ed
-    })
+
+    -- Guid may change if there's a conflict.  Wait a moment before using.
+    local function delayedCreateTimer()
+        _timerId = 'HereAFK:' .. self.getGUID()
+        Timer.create({
+            identifier = _timerId,
+            function_owner = self,
+            function_name = 'timerCallback',
+            delay = 3,  -- seconds
+            repetitions = 0  -- repeat until explictly Timer.destroy'ed
+        })
+    end
+    Wait.frames(delayedCreateTimer, 10)
 end
 
 function onDestroy()

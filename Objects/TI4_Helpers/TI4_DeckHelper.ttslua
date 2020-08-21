@@ -358,6 +358,18 @@ local function _getDeck(deckTransform)
     end
 end
 
+--- Expose get deck method.
+function getDeck(name)
+    assert(type(name) == 'string')
+    local deckAttributes = DECKS[name]
+    if not deckAttributes then
+        error('no such deck "' .. name .. '"')
+    end
+    local deckTransform = _getTransform(deckAttributes, 'deck')
+    local deck = _getDeck(deckTransform)
+    return deck and deck.getGUID()
+end
+
 -------------------------------------------------------------------------------
 
 --- Discard this card, optionally removing it from a contiainer.

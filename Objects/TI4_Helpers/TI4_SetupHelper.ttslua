@@ -38,7 +38,7 @@ end
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 
-local PRINT_DEBUG_LOG_MESSAGES = true
+local PRINT_DEBUG_LOG_MESSAGES = false
 
 local SetupGeneric = {
     NAME_TO_PLAYER_ZONE_OFFSET = {
@@ -93,7 +93,7 @@ local SetupColor = {
         ['$COLOR Carrier'] = { x = 0, y = 1, z = -2.6 },
         ['$COLOR Destroyer'] = { x = 0, y = 1, z = -0.1 },
         ['$COLOR Cruiser'] = { x = 0, y = 1, z = 3.0 },
-        ['$COLOR Dreadnought'] = { x = 0, y = 1, z = 6.2 },
+        ['$COLOR Dreadnought'] = { x = 0, y = 1, z = 6 },
         ['$COLOR Flagship'] = { x = 0, y = 1, z = 9.6 },
         ['$COLOR War Sun'] = { x = 0, y = 1, z = 12.1 },
     },
@@ -753,7 +753,6 @@ local _setupQueue = {}
 -- current (no factions unpacked) table the unpacks for new player count.
 function setup(params)
     assert(type(params) == 'table')
-    assert(type(params.playerColor) == 'string')
     assert(type(params.playerCount) == 'number')
 
     table.insert(_setupQueue, params)
@@ -799,7 +798,7 @@ function setupCoroutine()
     end
     coroutine.yield(0)
 
-    debugLog('setup finished')
+    print('Setup finished')  -- always print when done
     return 1 -- REQUIRED!  MUST RETURN 1 TO STOP COROUTINE!
 end
 
@@ -811,7 +810,7 @@ function hideSetupButton()
         local name = object.getName()
         if object.tag == 'Bag' and name == 'Setup Bag' then
             setupBag = object
-        elseif name == 'Game Setup Button' then
+        elseif name == 'Game Setup Options' then
             setupButton = object
         end
     end

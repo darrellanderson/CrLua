@@ -103,7 +103,8 @@ local SetupColor = {
 
 local SetupFaction = {
     NAME_TO_PLAYER_ZONE_OFFSET = {
-        ['$FACTION_NAME Sheet'] = { x = 4.86, z = 10.6, lock = true },
+        --['$FACTION_NAME Sheet'] = { x = 4.86, z = 10.6, lock = true },
+        ['$FACTION_NAME Sheet'] = { x = 5.3, z = 11, lock = true },
         ['$TOKEN_NAME Command Tokens Bag'] = { x = -8.2, z = 10.5, lock = true },
         ['$TOKEN_NAME Owner Tokens Bag'] = { x = -5, z = 4.5, lock = true },
         ['$TOKEN_NAME Tech Bag'] = { x = 10, y = 3, z = 2, unpack = true },
@@ -112,14 +113,14 @@ local SetupFaction = {
     },
     COMMAND_TOKENS_XZ_AND_FLIP = {
         -- In command sheet local space
-        { x = 0.4, z = -2.1 },
-        { x = -0.7, z = -2.1 },
-        { x = -0.2, z = -1.2 },
-        { x = -1, z = -0.7, flip=true },
-        { x = -2.1, z = -0.7, flip=true },
-        { x = -1.6, z = -1.7, flip=true },
-        { x = -1, z = 0.3 },
-        { x = -2.1, z = 0.3 }
+        { x = 0.64, z = -2.8 },
+        { x = -0.9, z = -2.8 },
+        { x = -0.1, z = -1.9 },
+        { x = -1.6, z = -1.1, flip=true },
+        { x = -2.6, z = -1.1, flip=true },
+        { x = -2.2, z = -2.2, flip=true },
+        { x = -1.6, z = 0.8 },
+        { x = -2.8, z = 0.8 }
     },
     STARTING_TECH_OFFSET = {
         x = 10, z = -5, dz = -2.1
@@ -925,7 +926,7 @@ function SetupFaction.unpack(faction, factionBox, zoneCenter)
                 rotation          = bag.getRotation(),
                 smooth            = false,
             })
-            p.x = p.x + (offset.dx or 0)
+            p.x = p.x + (offset.dx or 0) * (p.z > 1 and -1 or 1)
             p.z = p.z + (offset.dz or 0)
         end
         Wait.frames(function() factionBox.putObject(bag) end, 1)
@@ -995,7 +996,7 @@ function SetupFaction.unpackCommandTokens(color, commandTokensBag)
     end
 end
 
-function SetupFaction.unpackHomeSystemTile(faction, factionBox, homeSystemPosition)
+function SetupFaction.unpackHomeSystemTile(faction, factionBox, homeSystemPosition, zoneCenter)
     assert(type(faction) == 'table' and factionBox.tag == 'Bag' and type(homeSystemPosition) == 'table')
     debugLog('SetupColor.unpackHomeSystemTile ' .. faction.tokenName)
 
@@ -1024,16 +1025,12 @@ function SetupFaction.unpackHomeSystemTile(faction, factionBox, homeSystemPositi
         extraTile = tile
         tileName = 'Ghosts of Creuss Tile'
         local guid = assert(getEntryGuid(factionBox, tileName), 'missing ' .. tileName)
-        local xDir = homeSystemPosition.x > 0 and 1 or -1
-        if homeSystemPosition.x == 0 and homeSystemPosition.z > 0 then
-            xDir = -xDir
-        end
         tile = factionBox.takeObject({
             guid              = guid,
             position          = {
-                x = homeSystemPosition.x + 6.6 * xDir,
+                x = zoneCenter.x + 10 * (zoneCenter.z < 1 and 1 or -1),
                 y = homeSystemPosition.y,
-                z = homeSystemPosition.z + 4.57 * (homeSystemPosition.z > 0 and 1 or -1)
+                z = zoneCenter.z + 8 * (zoneCenter.z < 1 and 1 or -1)
             },
             rotation          = rotation,
             smooth            = true,
@@ -1177,8 +1174,8 @@ function SetupFaction.unpackStartingTech(color, faction, zoneCenter)
     end
 end
 
-function SetupFaction.placeScoreCounters(ownerTokensBag, zoneCenter, zoneIndex)
-    assert(ownerTokensBag.tag == 'Infinite' and type(zoneCenter) == 'table')
+function SetupFaction.placeScoreCounters(ownerTokensBag, zoneCenter, zoneIndex, faction, color)
+    assert(ownerTokensBag.tag == 'Infinite' and type(zoneCenter) == 'table' and type(faction) == 'table' and type(color) == 'string')
     debugLog('SetupFaction.placeScoreCounters')
 
     local function getScoreboard()
@@ -1205,18 +1202,17 @@ function SetupFaction.placeScoreCounters(ownerTokensBag, zoneCenter, zoneIndex)
     }
     local p = {
         x = factionOrigin.x + zoneCenter.x * scale.x,
-        y = factionOrigin.y,
+        y = ownerTokensBag.getPosition().y,
         z = factionOrigin.z + zoneCenter.z * scale.z,
     }
 
-    local OWNER_TOKEN_COUNT = 10
-    for i = 1, OWNER_TOKEN_COUNT do
-        p.y = p.y + 0.11
-        ownerTokensBag.takeObject({
-            position = p,
-            rotation = { x = 0, y = scoreboard.getRotation().y + 90, z = 0 }
-        })
-    end
+    -- Instead of tokens, place a token bag!
+    local clone = ownerTokensBag.clone({
+        position     = p,
+        snap_to_grid = false,
+    })
+    clone.setName(faction.tokenName)
+    clone.setColorTint(color)
 
     -- Place token on score zero.
     local SPACING_X = 0.3
@@ -1315,7 +1311,7 @@ function unpackFactionCoroutine()
     SetupFaction.unpackCommandTokens(color, commandTokensBag)
     coroutine.yield(0)
 
-    local homeSystemTile, extraTile = SetupFaction.unpackHomeSystemTile(faction, factionBox, zoneAttributes.homeSystemPosition)
+    local homeSystemTile, extraTile = SetupFaction.unpackHomeSystemTile(faction, factionBox, zoneAttributes.homeSystemPosition, zoneAttributes.center)
     coroutine.yield(0)
 
     SetupFaction.unpackOther(faction, factionBox, zoneAttributes.center)
@@ -1327,7 +1323,7 @@ function unpackFactionCoroutine()
     SetupFaction.unpackStartingTech(color, faction, zoneAttributes.center)
     coroutine.yield(0)
 
-    SetupFaction.placeScoreCounters(ownerTokensBag, zoneAttributes.center, zoneAttributes.index)
+    SetupFaction.placeScoreCounters(ownerTokensBag, zoneAttributes.center, zoneAttributes.index, faction, color)
     coroutine.yield(0)
 
     if factionBoxSrc then

@@ -74,7 +74,7 @@ local UNPACK_TO_BAGS = {
     ['Starting Techs'] = 2,
     ['Commodity Tiles'] = 2,
     ['Starting Units'] = 2,
-    ['Faction Abilities'] = 3,
+    ['Faction Abilities'] = 4,
     ['Faction Techs'] = 3,
 }
 
@@ -304,6 +304,35 @@ local function unpackToBags(bags)
         container.setLock(false)
         self.putObject(container)
     end
+
+    for name, count in pairs(EXTERNAL_TO_BAGS) do
+        local function getExternal()
+            for _, object in ipairs(getAllObjects()) do
+                if object.getName() == name then
+                    return object
+                end
+            end
+            error('missing "' .. name .. '"')
+        end
+        local external = getExternal()
+        coroutine.yield(0)
+
+        external.shuffle()
+        coroutine.yield(0)
+
+        for _, bag in ipairs(bags) do
+            for i = 1, count do
+                local pos = external.getPosition()
+                local object = external.takeObject({
+                    position = { x = pos.x, y = pos.y + 5 + i, z = pos.z },
+                    smooth = false,
+                    callback_function = function(object) bag.putObject(object) end
+                })
+                coroutine.yield(0)
+            end
+        end
+    end
+
 end
 
 -------------------------------------------------------------------------------

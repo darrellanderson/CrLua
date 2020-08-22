@@ -37,7 +37,7 @@ local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 local _lowerNameToInfluence = false
 
 local ALLOCATE_COMMAND_TOKENS = {
-    localPosition = { x = -0.1, y = 1, z = -3.3 },
+    localPosition = { x = -0.1, y = 1, z = -5 },
     localDX = -0.4
 }
 
@@ -199,21 +199,14 @@ end
 
 -- Expose in case external wants to control end of phase.
 function endStatusPhaseInInitiativeOrder()
-    local initiativeOrder = getInitiativeOrder()
-
-    for guid, color in pairs(initiativeOrder.strategyCardGuidToPlayerColor) do
-        if color then
-            local strategyCard = getObjectFromGUID(guid)
-            local parameters = _guidToParameters[guid]
-            if strategyCard and parameters then
-                _returnStrategyCard(color, strategyCard, parameters)
-            else
-                broadcastToAll('Missing strategy card or parameters for ' .. returnParameters.guid, {0.8,0.2,0.2})
-            end
+    for guid, parameters in pairs(_guidToParameters) do
+        local strategyCard = getObjectFromGUID(guid)
+        if strategyCard then
+            local color = 'White' -- used for message printing, ignored now
+            _returnStrategyCard(color, strategyCard, parameters)
         end
     end
-
-    _doEndOfStatusPhase(initiativeOrder.order)
+    _doEndOfStatusPhase(Turns.order)
 end
 
 function recomputeInfluence(playerColor)
@@ -322,8 +315,7 @@ function dealAllActionCards()
         end
     end
 
-    local initiativeOrder = getInitiativeOrder()
-    for _, color in ipairs(initiativeOrder.order) do
+    for _, color in ipairs(Turns.order) do
         local faction = _factionHelper.fromColor(color)
         if not faction then
             _safeBroadcastToColor('No faction sheet detected for ' .. color .. '.', color, {0.8,0.2,0.2})
@@ -377,7 +369,7 @@ function _returnStrategyCard(playerColor, strategyCard, parameters)
     local abovePos = { x = position.x, y = position.y + 1, z = position.z}
     strategyCard.setPositionSmooth(abovePos, collide, fast)
     strategyCard.setRotationSmooth(rotation, collide, fast)
-    _safeBroadcastToColor('Returned Strategy Card ' .. strategyCard.getName() .. '.', playerColor, {1,1,1})
+    --_safeBroadcastToColor('Returned Strategy Card ' .. strategyCard.getName() .. '.', playerColor, {1,1,1})
 end
 
 -------------------------------------------------------------------------------

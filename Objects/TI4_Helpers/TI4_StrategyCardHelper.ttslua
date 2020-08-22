@@ -56,7 +56,7 @@ local STRATEGY_CARD_INITIATIVE = {
     ['Imperial'] = 8
 }
 
-local STRATEGY_CARD_SHEET_GUID = '9273af'  -- {68.76, 0.10, -9.20} @ {8.50, 1.00, 6.00}
+local STRATEGY_CARD_SHEET_GUID = '331d92'  -- {68.76, 0.10, -9.20} @ {8.50, 1.00, 6.00}
 
 local x0, dx = 0.67, -0.46
 local z0, dz = -0.26, 0.8
@@ -135,7 +135,6 @@ end
 
 function _onClickPlay(strategyCard, parameters, playerColor)
     assert(type(strategyCard) == 'userdata' and type(parameters) == 'table' and type('playerColor') == 'string')
-    _hideConfirmButtom(strategyCard)
 
     -- Toggle visibility
     local seated = {}

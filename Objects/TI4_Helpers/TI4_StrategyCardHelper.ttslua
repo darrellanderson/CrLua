@@ -56,7 +56,7 @@ local STRATEGY_CARD_INITIATIVE = {
     ['Imperial'] = 8
 }
 
-local STRATEGY_CARD_SHEET_GUID = '331d92'  -- {68.76, 0.10, -9.20} @ {8.50, 1.00, 6.00}
+local STRATEGY_CARD_SHEET_NAME = 'Strategy Card Mat'
 
 local x0, dx = 0.67, -0.46
 local z0, dz = -0.26, 0.8
@@ -79,9 +79,24 @@ local STRATEGY_CARD_RETURN_POSITION = {
 
 local _guidToParameters = {}
 local _allocatedTokenGuidToColor = {}
+local _strategyCardSheetGuid = false
+
+function getStrategyCardSheet()
+    local result = _strategyCardSheetGuid and getObjectFromGUID(_strategyCardSheetGuid)
+    if not result then
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == STRATEGY_CARD_SHEET_NAME then
+                _strategyCardSheetGuid = object.getGUID()
+                result = object
+                break
+            end
+        end
+    end
+    return result
+end
 
 function _setSnapPoints()
-    local sheet = assert(getObjectFromGUID(STRATEGY_CARD_SHEET_GUID))
+    local sheet = assert(getStrategyCardSheet())
     local snapPoints = {}
     local rotation = sheet.getRotation()
     rotation.y = rotation.y + 90
@@ -199,14 +214,14 @@ end
 
 -- Expose in case external wants to control end of phase.
 function endStatusPhaseInInitiativeOrder()
-    for guid, parameters in pairs(_guidToParameters) do
-        local strategyCard = getObjectFromGUID(guid)
-        if strategyCard then
-            local color = 'White' -- used for message printing, ignored now
-            _returnStrategyCard(color, strategyCard, parameters)
-        end
+for guid, parameters in pairs(_guidToParameters) do
+    local strategyCard = getObjectFromGUID(guid)
+    if strategyCard then
+        local color = 'White' -- used for message printing, ignored now
+        _returnStrategyCard(color, strategyCard, parameters)
     end
-    _doEndOfStatusPhase(Turns.order)
+end
+_doEndOfStatusPhase(Turns.order)
 end
 
 function recomputeInfluence(playerColor)
@@ -358,7 +373,7 @@ function _returnStrategyCard(playerColor, strategyCard, parameters)
         return
     end
 
-    local sheet = assert(getObjectFromGUID(STRATEGY_CARD_SHEET_GUID))
+    local sheet = assert(getStrategyCardSheet())
     local offset = assert(STRATEGY_CARD_RETURN_POSITION[strategyCard.getName()])
 
     local position = sheet.positionToWorld(offset)

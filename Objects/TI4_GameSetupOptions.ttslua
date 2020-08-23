@@ -36,6 +36,12 @@ function onLoad()
     Wait.frames(updateUiFromConfig, 4)
 end
 
+function onPlayerConnect(playerId)
+    -- UI does not seem to appear for new players, recreating it fixes.
+    Wait.frames(_createUI, 2)
+    Wait.frames(updateUiFromConfig, 4)
+end
+
 function _createUI()
     local scale = self.getScale()
     local uiScale = (4 / scale.x) .. ' ' .. (4 / scale.z) .. ' ' .. (1 / scale.y)

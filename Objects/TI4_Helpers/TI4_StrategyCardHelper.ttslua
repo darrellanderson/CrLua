@@ -600,7 +600,7 @@ local function _doEndOfStatusPhaseCoroutineBody(playerColor)
                 voteCounter = object
             elseif string.match(name, unitNamePattern) or name == flagshipName then
                 table.insert(units, object)
-            elseif (object.tag == 'Card' and not object.is_face_down) or name == 'Scheming' or name == 'Versatile' then
+            elseif object.tag == 'Card' or name == 'Scheming' or name == 'Versatile' then
                 local lowerName = string.lower(name)
                 local cards = lowerNameToCards[lowerName]
                 if not cards then
@@ -650,6 +650,7 @@ local function _doEndOfStatusPhaseCoroutineBody(playerColor)
     _readyCards(playerColor, lowerNameToInZoneCards)
     _repairUnits(playerColor, units)
 
+    -- Count ALL cards, may not be face up yet.
     if voteCounter then
         _countInfluence(voteCounter, lowerNameToCards, lowerNameToInZoneCards)
     else

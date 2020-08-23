@@ -123,10 +123,6 @@ function register(parameters)
     local strategyCard = assert(getObjectFromGUID(parameters.guid))
     strategyCard.clearButtons()
 
-    -- Uncomment following returnStrategyCard line to reset positions for tweaking.
-    -- COMMENT FOR PRODUCTION RELEASE, OTHERWISE WILL RETURN WHEN RESTORING SAVE!
-    --_returnStrategyCard('noColor', strategyCard, parameters)
-
     local BUTTON_WIDTH = 500
     local BUTTON_HEIGHT = 200
     local BUTTON_FONT_SIZE = 100
@@ -214,14 +210,13 @@ end
 
 -- Expose in case external wants to control end of phase.
 function endStatusPhaseInInitiativeOrder()
-for guid, parameters in pairs(_guidToParameters) do
-    local strategyCard = getObjectFromGUID(guid)
-    if strategyCard then
-        local color = 'White' -- used for message printing, ignored now
-        _returnStrategyCard(color, strategyCard, parameters)
+    for guid, parameters in pairs(_guidToParameters) do
+        local strategyCard = getObjectFromGUID(guid)
+        if strategyCard then
+            _returnStrategyCard(strategyCard)
+        end
     end
-end
-_doEndOfStatusPhase(Turns.order)
+    _doEndOfStatusPhase(Turns.order)
 end
 
 function recomputeInfluence(playerColor)
@@ -352,12 +347,12 @@ end
 
 -------------------------------------------------------------------------------
 
-function _returnStrategyCard(playerColor, strategyCard, parameters)
-    assert(type(strategyCard) == 'userdata' and type(parameters) == 'table')
+function _returnStrategyCard(strategyCard)
+    assert(type(strategyCard) == 'userdata')
 
     -- Look for political stability.  Would be nice to combine this with the
     -- other single-pass scan but keeping it separate makes it simpler.
-    local function hasPoliticalStability()
+    local function hasPoliticalStability(playerColor)
         for _, object in ipairs(getAllObjects()) do
             if object.getName() == 'Political Stability' and not object.is_face_down then
                 local inHandGuidSet = _zoneHelper.inHand()
@@ -368,7 +363,9 @@ function _returnStrategyCard(playerColor, strategyCard, parameters)
             end
         end
     end
-    if hasPoliticalStability() then
+
+    local playerColor = _zoneHelper.zoneFromPosition(strategyCard.getPosition())
+    if playerColor and hasPoliticalStability(playerColor) then
         broadcastToAll(playerColor .. ' has Political Stability, not returning strategy card(s)', {0.1,0.5,0.1})
         return
     end
@@ -379,12 +376,20 @@ function _returnStrategyCard(playerColor, strategyCard, parameters)
     local position = sheet.positionToWorld(offset)
     local rotation = sheet.getRotation()
 
-    local collide = false
-    local fast = true
-    local abovePos = { x = position.x, y = position.y + 1, z = position.z}
-    strategyCard.setPositionSmooth(abovePos, collide, fast)
-    strategyCard.setRotationSmooth(rotation, collide, fast)
-    --_safeBroadcastToColor('Returned Strategy Card ' .. strategyCard.getName() .. '.', playerColor, {1,1,1})
+    local dx = strategyCard.getPosition().x - position.x
+    local dz = strategyCard.getPosition().z - position.z
+    local d = math.sqrt(dx ^ 2 + dz ^ 2)
+
+    if d > 1 then
+        local collide = false
+        local fast = true
+        local abovePos = { x = position.x, y = position.y + 1, z = position.z}
+        strategyCard.setPositionSmooth(abovePos, collide, fast)
+        strategyCard.setRotationSmooth(rotation, collide, fast)
+        if playerColor then
+            _safeBroadcastToColor('Returned Strategy Card ' .. strategyCard.getName() .. '.', playerColor, {1,1,1})
+        end
+    end
 end
 
 -------------------------------------------------------------------------------

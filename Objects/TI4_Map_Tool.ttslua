@@ -637,7 +637,7 @@ function count_slices(count)
         return {
             x = p.x + normalized.x * tileDiameter * 1,
             y = p.y + 0.02,
-            z = p.z + normalized.z * tileDiameter * (p.z > 0 and 0.85 or 1.1)
+            z = p.z + normalized.z * tileDiameter * (p.z > 0 and 0.95 or 0.60)
         }
     end
 
@@ -724,11 +724,11 @@ function count_slices(count)
 
     for _, value in ipairs(hsValue) do
         local text = valueToString(value)
-        createLabel(value.position, {x=90,y=180,z=0}, text, 1.5)
+        createLabel(value.position, {x=90,y=0,z=0}, text, 1.5)
     end
     for _, value in ipairs(eqValue) do
         local text = '(' .. valueToString(value) .. ')'
-        createLabel(value.position, {x=90,y=180,z=0}, text, 1)
+        createLabel(value.position, {x=90,y=0,z=0}, text, 1)
     end
 end
 

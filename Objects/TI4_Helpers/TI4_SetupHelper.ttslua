@@ -49,12 +49,12 @@ local SetupGeneric = {
         ['^TI4 MultiRoller'] = { x = 0, z = 42, lock = true },
     },
     NAME_TO_PLAYER_AGENDA_ZONE_OFFSET = {
-        ['^Any Whens%?$'] = { x = -0.6, z = 3 },
-        ['^Any Afters%?$'] = { x = 0.6, z = 3 },
+        ['^Any Whens%?$'] = { x = 0.6, z = 3 },
+        ['^Any Afters%?$'] = { x = -0.6, z = 3 },
     },
     NAME_TO_AGENDA_ZONE_OFFSET = {
-        ['^For:$'] = { x = -4.25, lock = true },
-        ['^Against:$'] = { x = 4.25, lock = true },
+        ['^For:$'] = { x = 4.25, lock = true },
+        ['^Against:$'] = { x = -4.25, lock = true },
         ['^Votes$'] = { x = -9.25 },
         ['^Speaker Token %- Agenda$'] = { x = 0 },
     }
@@ -1357,17 +1357,19 @@ end
 -------------------------------------------------------------------------------
 
 local UNIT_SCALE = {
-    ['Infantry'] = { unit = 0.75, bag = 1 },
-    ['Fighter'] = { unit = 0.75, bag = 1 },
-    ['Space Dock'] = { unit = 0.75, bag = 1 },
-    ['PDS'] = { unit = 0.75, bag = 1 },
-    ['Carrier'] = { unit = 0.75, bag = 1 },
-    ['Destroyer'] = { unit = 0.75, bag = 1 },
-    ['Cruiser'] = { unit = 0.75, bag = 1 },
-    ['Dreadnought'] = { unit = 0.75, bag = 1 },
-    ['War Sun'] = { unit = 0.75, bag = 1 },
-    ['Flagship'] = { unit = 0.75, bag = 1 },
+    ['Infantry'] = { unit = 0.7, bag = 0.8 },
+    ['Fighter'] = { unit = 0.7, bag = 0.8 },
+    ['Space Dock'] = { unit = 0.7, bag = 0.8 },
+    ['PDS'] = { unit = 0.7, bag = 0.8 },
+    ['Carrier'] = { unit = 0.6, bag = 0.7 },
+    ['Destroyer'] = { unit = 0.6, bag = 0.70 },
+    ['Cruiser'] = { unit = 0.6, bag = 0.70 },
+    ['Dreadnought'] = { unit = 0.6, bag = 0.70 },
+    ['War Sun'] = { unit = 0.7, bag = 0.8 },
+    ['Flagship'] = { unit = 0.7, bag = 0.8 },
 }
+
+local DIRECTIONALISER_SCALE = 0.85
 
 function fixUnitScale()
     startLuaCoroutine(self, 'fixUnitScaleCoroutine')
@@ -1384,9 +1386,13 @@ function fixUnitScaleCoroutine()
     -- Bags need to be on the table, unpack any unused colors manually.
     -- Assumes no faction unpack yet so can use generic flagship name.
     local unitBags = {}
+    local directionalisers = {}
     for _, object in ipairs(getAllObjects()) do
         if object.tag == 'Bag' and unitBagNameSet[object.getName()] then
             table.insert(unitBags, object)
+        end
+        if string.match(object.getName(), '^Directionaliser (.*)$') then
+            table.insert(directionalisers, object)
         end
     end
     coroutine.yield(0)
@@ -1419,6 +1425,16 @@ function fixUnitScaleCoroutine()
         coroutine.yield(0)
     end
     coroutine.yield(0)
+
+    for _, directionaliser in ipairs(directionalisers) do
+        directionaliser.setScale({
+            x = DIRECTIONALISER_SCALE,
+            y = DIRECTIONALISER_SCALE,
+            z = DIRECTIONALISER_SCALE,
+        })
+    end
+
+    print('Fix unit scale finished.  If directionalizer scale changed please redo setup to reposition units.')
 
     return 1
 end

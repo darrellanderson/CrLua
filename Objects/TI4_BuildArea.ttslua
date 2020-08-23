@@ -65,7 +65,32 @@ local OBJECT_EFFECTS = {
             ['Infantry'] = { cost = 1 },
         },
     },
+
+    -- Actions
+    ['War Machine (1)'] = {
+        anywhereInPlayerZone = true,
+        requireFaceUp = true,
+        warmachine = true,
+    },
+    ['War Machine (2)'] = {
+        anywhereInPlayerZone = true,
+        requireFaceUp = true,
+        warmachine = true,
+    },
+    ['War Machine (3)'] = {
+        anywhereInPlayerZone = true,
+        requireFaceUp = true,
+        warmachine = true,
+    },
+    ['War Machine (4)'] = {
+        anywhereInPlayerZone = true,
+        requireFaceUp = true,
+        warmachine = true,
+    },
+
 }
+
+-------------------------------------------------------------------------------
 
 local _config = {
     defaultWidth = 8.37,
@@ -91,26 +116,8 @@ local _data = {
     }
 }
 
--------------------------------------------------------------------------------
-
-function getHelperClient(helperObjectName)
-    local function getHelperObject()
-        for _, object in ipairs(getAllObjects()) do
-            if object.getName() == helperObjectName then return object end
-        end
-        error('missing object "' .. helperObjectName .. '"')
-    end
-    local helperObject = false
-    local function getCallWrapper(functionName)
-        helperObject = helperObject or getHelperObject()
-        if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
-        return function(parameters) return helperObject.call(functionName, parameters) end
-    end
-    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
-end
-
-local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
-local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
+local _zoneHelper = false
+local _systemHelper = false
 
 -------------------------------------------------------------------------------
 
@@ -122,6 +129,10 @@ function onLoad(saveState)
     _data.width = math.max(_data.width, _config.minWidth)
     _data.height = math.max(_data.height, _config.minHeight)
     _data.playerColor = saveState and saveState.playerColor or _data.playerColor
+
+    _zoneHelper = CrLua.TTS.HelperClient.get('TI4_ZONE_HELPER')
+    _systemHelper = CrLua.TTS.HelperClient.get('TI4_SYSTEM_HELPER')
+
     Wait.frames(updateEverything, 2)
 end
 
@@ -319,6 +330,7 @@ function getProduceConsumeItems()
         production = BASE_PRODUCTION,
         sarween = false,
         hegemonic = false,
+        warmachine = false,
     }
     local function addUnit(unit)
         if result.produceUnitNameToUnitWithCount[unit.unitName] then
@@ -344,6 +356,7 @@ function getProduceConsumeItems()
             end
             result.sarween = result.sarween or objectEffects.sarween
             result.hegemonic = result.hegemonic or objectEffects.hegemonic
+            result.warmachine = result.warmachine or objectEffects.warmachine
             result.production = math.max(result.production, objectEffects.baseProduction or 0)
         end
     end
@@ -477,9 +490,18 @@ function drawUi(items, resourcesAndCost)
     local cornerPosition = trimFloat(cornerX) .. ' ' .. trimFloat(cornerY) .. ' ' .. trimFloat(-bounds.size.y * 50.0 + 1)
 
     local r1c1 = 'Build Cost: ' .. (resourcesAndCost and resourcesAndCost.cost or '-')
-    local r2c1 = 'Resources: ' .. (resourcesAndCost and (resourcesAndCost.resources .. (items.sarween and '+ST' or '')) or '-')
+    if resourcesAndCost and items and items.sarween then
+        r1c1 = r1c1 .. '-ST'
+    end
+    if resourcesAndCost and items and items.warmachine then
+        r1c1 = r1c1 .. '-WM'
+    end
+    local r2c1 = 'Resources: ' .. (resourcesAndCost and resourcesAndCost.resources or '-')
     local r1c2 = '# Units: ' .. (resourcesAndCost and resourcesAndCost.numUnits or '-')
     local r2c2 = 'Production: R+' .. (items and items.production or '-')
+    if items and items.warmachine then
+        r2c2 = r2c2 .. '+WM'
+    end
 
     local w = panelWidth - 30
     local w1 = w * 0.45
@@ -625,10 +647,12 @@ function announce(items, resourcesAndCost)
         ' producing ' .. resourcesAndCost.numUnits .. ' units',
         ' { ' .. table.concat(produce, ', ') .. ' }',
         ' with production R+' .. items.production,
+        items.warmachine and '+WM' or '',
         ' and total cost ' .. resourcesAndCost.cost,
+        items.sarween and '-ST' or '',
+        items.warmachine and '-WM' or '',
         ',',
         ' consuming ' .. resourcesAndCost.resources,
-        items.sarween and '+ST' or '',
         ' resources',
         ' { ' .. table.concat(consume, ', ') .. ' }',
         '.',
@@ -656,7 +680,8 @@ end
 #include <~/CrLua/Table>
 #include <~/CrLua/Util>
 
-#include <~/CrLua/TI4/Faction>
+#include <~/CrLua/TTS/HelperClient>
+
 #include <~/CrLua/TI4/Unit>
 
 --CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)

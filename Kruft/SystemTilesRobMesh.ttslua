@@ -33,7 +33,7 @@ local _deletePendingSet = {}
 -------------------------------------------------------------------------------
 
 function onLoad(save_state)
-    _deletedItems = assert(getDeletedItems())
+    _deletedItems = getDeletedItems()
     self.addContextMenuItem('Tile Search', tileSearch)
     self.addContextMenuItem('Mutate', mutate)
 end

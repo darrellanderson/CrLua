@@ -149,13 +149,17 @@ function CrLua.TI4.PlayerTech.getCells(playerColorToTechs)
         cells[col .. 4] = ''
     end
     for _, player in ipairs(Player.getPlayers()) do
-        local col = colorToColumn[player.color]
-        cells[col .. 3] = player.steam_name
+        local col = player.color and colorToColumn[player.color]
+        if col then
+            cells[col .. 3] = player.steam_name
+        end
     end
     for color, techs in pairs(playerColorToTechs) do
         local col = colorToColumn[color]
-        for i, tech in ipairs(techs) do
-            cells[col .. (i + 3)] = CrLua.TI4.PlayerTech.TECHNOLOGIES[tech]
+        if col then
+            for i, tech in ipairs(techs) do
+                cells[col .. (i + 3)] = CrLua.TI4.PlayerTech.TECHNOLOGIES[tech]
+            end
         end
     end
     return cells

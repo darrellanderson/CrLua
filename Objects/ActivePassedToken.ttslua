@@ -15,6 +15,9 @@ local TAG = 'ActivePassedToken'
 -------------------------------------------------------------------------------
 -- OBJECT EVENT METHODS
 
+local _timerId = false
+local _isFaceDown = false
+
 function onLoad()
     -- If already assigned to a color and there exists a different token also
     -- assigned to that color, unassign self (e.g., copy/paste).
@@ -45,6 +48,36 @@ function onLoad()
         Wait.time(delayedResetTokenForNewOwner, 4)
     end
     CrLua.Log.d(TAG, 'onLoad "' .. (self.getName() or '') .. '"')
+
+    _isFaceDown = self.is_face_down
+    -- Guid may change if there's a conflict.  Wait a moment before using.
+    local function delayedCreateTimer()
+        _timerId = 'Active/Passed:' .. self.getGUID()
+        Timer.create({
+            identifier = _timerId,
+            function_owner = self,
+            function_name = 'timerCallback',
+            delay = 1.5,  -- seconds
+            repetitions = 0  -- repeat until explictly Timer.destroy'ed
+        })
+    end
+    Wait.frames(delayedCreateTimer, 10)
+end
+
+function onDestroy()
+    Timer.destroy(_timerId)
+end
+
+function timerCallback()
+    if _isFaceDown ~= self.is_face_down then
+        _isFaceDown = self.is_face_down
+
+        local color = myColor()
+        if _isFaceDown and color then
+            local message = 'Active/Passed: ' .. color .. ' passes'
+            broadcastToAll(message, color)
+        end
+    end
 end
 
 function onDrop(player_color)

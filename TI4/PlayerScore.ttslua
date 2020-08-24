@@ -551,7 +551,7 @@ function CrLua.TI4.PlayerScore.updateSecrets(secretsOrder, playerSecrets, nameTo
             local ownerSet = {}
             for _, ownerToken in ipairs(map) do
                 local faction = _factionHelper.fromTokenName(ownerToken.getName())
-                if faction then
+                if faction and faction.color then
                     ownerSet[faction.color] = true
                 end
             end
@@ -578,7 +578,9 @@ function CrLua.TI4.PlayerScore.mapStageOne(nameToOwnerTokens)
                 local ownerToken = map[i].getName()
                 local faction = _factionHelper.fromTokenName(ownerToken)
                 local playerColor = faction.color
-                table.insert(tokenMap, playerColor)
+                if playerColor then
+                    table.insert(tokenMap, playerColor)
+                end
             end
             stageOneMap[key] = tokenMap
         end
@@ -597,7 +599,9 @@ function CrLua.TI4.PlayerScore.mapStageTwo(nameToOwnerTokens)
                 local ownerToken = map[i].getName()
                 local faction = _factionHelper.fromTokenName(ownerToken)
                 local playerColor = faction.color
-                table.insert(tokenMap, playerColor)
+                if playerColor then
+                    table.insert(tokenMap, playerColor)
+                end
             end
             stageTwoMap[key] = tokenMap
         end
@@ -638,7 +642,9 @@ function CrLua.TI4.PlayerScore.mapSupports(nameToOwnerTokens)
             local ownerToken = map[1].getName()
             local faction = _factionHelper.fromTokenName(ownerToken)
             local playerColor = faction.color
-            supportMap[color] = playerColor
+            if playerColor then
+                supportMap[color] = playerColor
+            end
         end
     end
 
@@ -690,7 +696,9 @@ function CrLua.TI4.PlayerScore.mapOtherPoints(currentOtherPoints, nameToOwnerTok
                 local ownerToken = map[i].getName()
                 local faction = _factionHelper.fromTokenName(ownerToken)
                 local playerColor = faction.color
-                table.insert(otherPoints[key], playerColor)
+                if playerColor then
+                    table.insert(otherPoints[key], playerColor)
+                end
             end
         end
     end

@@ -386,6 +386,16 @@ local _systems = {
     ['6a667a'] = { tile = 3018, planets = {
         { name = 'Cymiae', resources = 4, influence = 1 },
     }},
+
+    -- Hybrid Franken hexes
+    ['1ce414'] = { tile = 4001, planets = {
+        { name = "Tar'Mann", resources = 1, influence = 1, trait = 'industrial', tech = 'green' },
+        { name = 'Vefut II', resources = 2, influence = 2, trait = 'hazardous' },
+    }},
+    ['7fcee1'] = { tile = 4002, planets = {
+        { name = 'Lisis', resources = 2, influence = 2, trait = 'cultural' },
+        { name = 'Thibah', resources = 1, influence = 1, trait = 'industrial', tech = 'blue' },
+    }},
 }
 
 local _nonPlanetResourceInfluenceCards = {

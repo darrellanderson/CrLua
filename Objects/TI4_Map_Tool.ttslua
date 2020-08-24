@@ -46,7 +46,6 @@ local SLICE_DATALABEL_NAME = "slice_data_label"
 local MECATOL_TILE = 18
 local TILE_LIMIT = 61  -- full 4 ring map
 
-local MECATOL_PLANET_NAME = 'Mecatol Rex'
 local CUSTODIANS_TOKEN_GUID = '70642f'
 
 -- Check these first when looking for tiles.  Otherwise look in SYSTEM_BAG_GUIDS.
@@ -304,7 +303,7 @@ function placeTilesCoroutine()
     end
     coroutine.yield(0)
 
-    local dy = 0.1
+    local dy = 0.3
     local positions = getSystemPositionsStartingAtOrigin(#buildList, dy)
     local rotation = { x = 0, y = 180, z = 0 }
 
@@ -346,9 +345,12 @@ function placeTile(system, bag, position, rotation)
     else
         -- Look on table for object.
         local object = getObjectFromGUID(system.guid)
+        object.setLock(false)
         if object then
-            object.setPosition(position)
-            object.setRotation(rotation)
+            local collide = false
+            local fast = true
+            object.setPositionSmooth(position, collide, fast)
+            object.setRotationSmooth(rotation, collide, fast)
             delayedLock(object)
         else
             broadcastToAll('cannot find system tile for ' .. system.string, 'Red')

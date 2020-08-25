@@ -198,7 +198,7 @@ local _systems = {
     ['0216be'] = { tile = 49 },
     ['97ee53'] = { tile = 50 },
     ['f38182'] = { tile = 51, home = true, localY = 0.101, wormholes = { 'delta' }, planets = {
-        { name = 'Creuss', resources = 4, influence = 2, position = { x = 0.35, z = 0.18 }, radius = 0.8 },
+        { name = 'Creuss', resources = 4, influence = 2, position = { x = -0.05, z = -0.4 }, radius = 0.8 },
     }},
 
     -- TI3 systems.
@@ -405,9 +405,9 @@ local _nonPlanetResourceInfluenceCards = {
 }
 
 local LOCAL_DISTANCE_TO_PLANET = 1.1
-local LOCAL_PLANET_RADIUS = 0.9
+local LOCAL_PLANET_RADIUS = 0.8
 local LOCAL_SYSTEM_TILE_RADIUS = 2.26
-local LOCAL_SYSTEM_TILE_Y = 0.12
+local LOCAL_SYSTEM_TILE_Y = 0.08
 
 --- Get all systems.
 -- @return table: map from tile GUID to system table.
@@ -694,40 +694,40 @@ function _planetPosition(system, zoneBorders, planetIndex)
     local numZones = #zoneBorders - 1
     if numZones == 1 then
         if system.home then
-            distanceToPlanet = 0.35
-            bearingToPlanet = 345
+            distanceToPlanet = 0.25
+            bearingToPlanet = 0
         else
-            distanceToPlanet = 0.05
-            bearingToPlanet = 270
+            distanceToPlanet = 0.1
+            bearingToPlanet = 180
         end
     elseif numZones == 2 then
         if planetIndex == 1 then
             if system.home then
-                distanceToPlanet = distanceToPlanet + 0.1
-                bearingToPlanet = bearingToPlanet - 4
+                distanceToPlanet = distanceToPlanet - 0.05
+                bearingToPlanet = bearingToPlanet + 2
             else
-                distanceToPlanet = distanceToPlanet + 0.05
-                bearingToPlanet = bearingToPlanet - 3
+                distanceToPlanet = distanceToPlanet - 0.17
+                bearingToPlanet = bearingToPlanet - 0
             end
         elseif planetIndex == 2 then
             if system.home then
-                distanceToPlanet = distanceToPlanet - 0.05
-                bearingToPlanet = bearingToPlanet - 15
+                distanceToPlanet = distanceToPlanet - 0
+                bearingToPlanet = bearingToPlanet - 17
             else
-                distanceToPlanet = distanceToPlanet - 0.2
-                bearingToPlanet = bearingToPlanet + 5
+                distanceToPlanet = distanceToPlanet - 0.07
+                bearingToPlanet = bearingToPlanet - 1
             end
         end
     elseif numZones == 3 then
         if planetIndex == 1 then  -- hercant
-            distanceToPlanet = distanceToPlanet + 0.25
-            bearingToPlanet = bearingToPlanet + 9
+            distanceToPlanet = distanceToPlanet + 0.1
+            bearingToPlanet = bearingToPlanet + 5
         elseif planetIndex == 2 then
-            distanceToPlanet = distanceToPlanet + 0.07
-            bearingToPlanet = bearingToPlanet - 5
+            distanceToPlanet = distanceToPlanet + 0.01
+            bearingToPlanet = bearingToPlanet - 0
         elseif planetIndex == 3 then
             distanceToPlanet = distanceToPlanet + 0.22
-            bearingToPlanet = bearingToPlanet - 6
+            bearingToPlanet = bearingToPlanet - 7
         end
     end
 

@@ -192,7 +192,7 @@ local DEFAULT_ZONES = {
             },
             [7] = {{64, 50}, {64, 12.1}, {35.01, 12.1}, {35.01, 50}},
         },
-        extraRing = true,
+        extraRings = 1,
         homeSystemPositions = {
             [1] = {21, 0},
             [2] = {15.75, -15.16},
@@ -235,7 +235,7 @@ local DEFAULT_ZONES = {
             },
             [8] = {{64, 50}, {64, 12.1}, {35.01, 12.1}, {35.01, 50}},
         },
-        extraRing = true,
+        extraRings = 1,
         homeSystemPositions = {
             [1] = {21, 0},
             [2] = {15.75, -15.16},
@@ -262,7 +262,9 @@ local _lastUpdateZoneColorTime = false
 --- Reset the number of zones.
 -- @param playerCount number : player count.
 -- @param setPlayerCount boolean : helper cannot call directly, use setPlayerCountWithExtraRing
-function setPlayerCount(playerCount, extraRing)
+function setPlayerCount(playerCount, extraRings)
+    assert(type(playerCount) == 'number' and (not extraRings or type(extraRings) == 'number'))
+
     _table = {
         polygon = DEFAULT_TABLE_XZ,
         boundingBox = _boundingBox(DEFAULT_TABLE_XZ),
@@ -271,16 +273,16 @@ function setPlayerCount(playerCount, extraRing)
 
     if playerCount ~= #_zones then
         local zoneAttributes = assert(DEFAULT_ZONES[playerCount], 'invalid player count')
-        extraRing = extraRing or zoneAttributes.extraRing
+        extraRings = extraRings or zoneAttributes.extraRings or 0
         _zones = {}
         for i = 1, playerCount do
             local polygon = assert(zoneAttributes.zones[i])
-            if extraRing then
+            if extraRings then
                 local mutated = {}
                 for _, xz in ipairs(polygon) do
                     table.insert(mutated, {
                         xz[1],
-                        xz[2] + 7 * (xz[2] > 0 and 1 or -1)
+                        xz[2] + 7 * (xz[2] > 0 and 1 or -1) * extraRings
                     })
                 end
                 polygon = mutated

@@ -260,8 +260,8 @@ end
 -------------------------------------------------------------------------------
 
 --- Resize the 'project grid' circle object.
-function SetupGeneric.resizeGridCircle(extraRing)
-    assert(type(extraRing) == 'boolean')
+function SetupGeneric.resizeGridCircle(extraRings)
+    assert(type(extraRings) == 'number')
 
     local function getCircle()
         local name = 'Map Grid Projection Circle'
@@ -274,7 +274,7 @@ function SetupGeneric.resizeGridCircle(extraRing)
     end
     local circle = getCircle()
 
-    local v = extraRing and 16.7 or 13
+    local v = 13 + (3.7 * extraRings)
     circle.setScale({
         x = v,
         y = circle.getScale().y,
@@ -757,6 +757,7 @@ local _setupQueue = {}
 function setup(params)
     assert(type(params) == 'table')
     assert(type(params.playerCount) == 'number')
+    assert(not params.extraRings or type(params.extraRings) == number)
 
     table.insert(_setupQueue, params)
     startLuaCoroutine(self, 'setupCoroutine')
@@ -771,6 +772,7 @@ function setupCoroutine()
 
     local params = assert(table.remove(_setupQueue))
     local playerCount = assert(params.playerCount)
+    local extraRings = params.extraRings or 0
 
     local setupBag = assert(SetupGeneric.getSetupBag())
     coroutine.yield(0)
@@ -778,8 +780,8 @@ function setupCoroutine()
     SetupColor.packOld(setupBag)
     coroutine.yield(0)
 
-    _zoneHelper.setPlayerCount(playerCount)
-    SetupGeneric.resizeGridCircle(playerCount > 6 and true or false)
+    _zoneHelper.setPlayerCount(playerCount, extraRings)
+    SetupGeneric.resizeGridCircle(extraRings)
 
     SetupColor.transformHands()
     coroutine.yield(0)

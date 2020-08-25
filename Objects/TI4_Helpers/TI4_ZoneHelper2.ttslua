@@ -276,7 +276,7 @@ end
 -- @param extraRings number : push zones out to make room for extra map rings.
 function setPlayerCount(params)
     assert(type(params.playerCount) == 'number' and (not params.extraRings or type(params.extraRings) == 'number'))
-    print('Setting up for ' .. params.playerCount .. ' players with ' .. params.extraRings .. ' extra map rings')
+    --print('Setting up for ' .. params.playerCount .. ' players with ' .. params.extraRings .. ' extra map rings')
 
     _table = {
         polygon = DEFAULT_TABLE_XZ,

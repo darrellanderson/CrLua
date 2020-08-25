@@ -256,14 +256,27 @@ local DEFAULT_TABLE_Y = 0
 local _zones = {}
 local _table = {}
 local _lastUpdateZoneColorTime = false
+local _extraRings = 0
+
+-------------------------------------------------------------------------------
+
+function getPlayerCount()
+    _maybeUpdateZoneColors()
+    return #_zones
+end
+
+function getExtraRings()
+    return _extraRings
+end
 
 -------------------------------------------------------------------------------
 
 --- Reset the number of zones.
 -- @param playerCount number : player count.
--- @param setPlayerCount boolean : helper cannot call directly, use setPlayerCountWithExtraRing
-function setPlayerCount(playerCount, extraRings)
-    assert(type(playerCount) == 'number' and (not extraRings or type(extraRings) == 'number'))
+-- @param extraRings number : push zones out to make room for extra map rings.
+function setPlayerCount(params)
+    assert(type(params.playerCount) == 'number' and (not params.extraRings or type(params.extraRings) == 'number'))
+    print('Setting up for ' .. params.playerCount .. ' players with ' .. params.extraRings .. ' extra map rings')
 
     _table = {
         polygon = DEFAULT_TABLE_XZ,
@@ -271,47 +284,41 @@ function setPlayerCount(playerCount, extraRings)
         y = DEFAULT_TABLE_Y,
     }
 
-    if playerCount ~= #_zones then
-        local zoneAttributes = assert(DEFAULT_ZONES[playerCount], 'invalid player count')
-        extraRings = extraRings or zoneAttributes.extraRings or 0
-        _zones = {}
-        for i = 1, playerCount do
-            local polygon = assert(zoneAttributes.zones[i])
-            if extraRings then
-                local mutated = {}
-                for _, xz in ipairs(polygon) do
-                    table.insert(mutated, {
-                        xz[1],
-                        xz[2] + 7 * (xz[2] > 0 and 1 or -1) * extraRings
-                    })
-                end
-                polygon = mutated
+    local zoneAttributes = assert(DEFAULT_ZONES[params.playerCount], 'invalid player count')
+    _extraRings = params.extraRings or zoneAttributes.extraRings or 0
+    _zones = {}
+    for i = 1, params.playerCount do
+        local polygon = assert(zoneAttributes.zones[i])
+        if _extraRings then
+            local mutated = {}
+            for _, xz in ipairs(polygon) do
+                table.insert(mutated, {
+                    xz[1],
+                    xz[2] + 7 * (xz[2] > 0 and 1 or -1) * _extraRings
+                })
             end
-            local bb = _boundingBox(polygon)
-            local homeXZ = assert(zoneAttributes.homeSystemPositions[i])
-            table.insert(_zones, {
-                index = i,
-                color = false,
-                polygon = polygon,
-                boundingBox = bb,
-                center = {
-                    x = (bb.min.x + bb.max.x) / 2,
-                    y = _table.y,
-                    z = (bb.min.z + bb.max.z) / 2
-                },
-                homeSystemPosition = {
-                    x = assert(homeXZ[1]),
-                    y = assert(_table.y),
-                    z = assert(homeXZ[2])
-                },
-            })
+            polygon = mutated
         end
-        updateZoneColors()
+        local bb = _boundingBox(polygon)
+        local homeXZ = assert(zoneAttributes.homeSystemPositions[i])
+        table.insert(_zones, {
+            index = i,
+            color = false,
+            polygon = polygon,
+            boundingBox = bb,
+            center = {
+                x = (bb.min.x + bb.max.x) / 2,
+                y = _table.y,
+                z = (bb.min.z + bb.max.z) / 2
+            },
+            homeSystemPosition = {
+                x = assert(homeXZ[1]),
+                y = assert(_table.y),
+                z = assert(homeXZ[2])
+            },
+        })
     end
-end
-
-function setPlayerCountWithExtraRing(playerCount)
-    setPlayerCount(playerCount, true)
+    updateZoneColors()
 end
 
 function getHomeSystemPositions(playerCount)
@@ -810,9 +817,28 @@ function onLoad(saveState)
             numCommandSheets = numCommandSheets + 1
         end
     end
-    setPlayerCount(numCommandSheets)
+    setPlayerCount({
+        playerCount = numCommandSheets,
+        extraRings = 0
+    })
+
+    -- Now that a "reasonable" setup is in place, attempt to restore correct one.
+    local json = saveState and string.len(saveState) and JSON.decode(saveState)
+    if json then
+        --print('Zone helper: restoring ' .. json.playerCount .. ' players with ' .. json.extraRings .. ' extra map rings')
+        setPlayerCount({
+            playerCount = json.playerCount,
+            extraRings = json.extraRings
+        })
+    end
 end
 
+function onSave()
+    return JSON.encode({
+        playerCount = getPlayerCount(),
+        extraRings = getExtraRings()
+    })
+end
 
 -------------------------------------------------------------------------------
 local _lockGlobalsMetaTable = {}

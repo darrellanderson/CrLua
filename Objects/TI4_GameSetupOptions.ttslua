@@ -4,6 +4,7 @@
 local _config = false
 local DEFAULT_CONFIG = {
     playerCount = 6,
+    extraRings = 0,
     useCodexACs = false
 }
 
@@ -46,31 +47,47 @@ function _createUI()
     local scale = self.getScale()
     local uiScale = (4 / scale.x) .. ' ' .. (4 / scale.z) .. ' ' .. (1 / scale.y)
 
-    local function uiPlayerCounts()
-        local current = _config.playerCount
+    local function text(class, text)
+        return {
+            tag = 'Text',
+            attributes = {
+                class = class
+            },
+            value = text
+        }
+    end
+
+    local function toggle(id, text, isOn)
+        return {
+            tag = 'Toggle',
+            attributes = {
+                id = id,
+                isOn = isOn or nil
+            },
+            value = text
+        }
+    end
+
+    local function toggleGroup(idPrefix, values)
+        local height = math.ceil(#values / 3) * 50
         local toggles = {}
-        for i = 3, 8 do
+        for _, value in ipairs(values) do
             table.insert(toggles, {
                 tag = 'ToggleButton',
                 attributes = {
-                    id = tostring(i),
-                    isOn = i == current and true or nil,
+                    id = idPrefix .. string.gsub(tostring(value), ' ', '_')
                 },
-                value = tostring(i)
+                value = value
             })
         end
         return {
             tag = 'ToggleGroup',
             attributes = {
-                preferredHeight = 100,
+                preferredHeight = height,
             },
             children = {
                 {
                     tag = 'GridLayout',
-                    attributes = {
-                        spacing = '10 10',
-                        cellSize = '86 40'
-                    },
                     children = toggles
                 }
             }
@@ -93,6 +110,13 @@ function _createUI()
                 attributes = {
                     spacing = 10,
                 }
+            },
+            {
+                tag = 'GridLayout',
+                attributes = {
+                    spacing = '10 10',
+                    cellSize = '86 40'
+                },
             },
             {
                 tag = 'ToggleGroup',
@@ -161,28 +185,15 @@ function _createUI()
                     padding = '10 10 10 10',
                 },
                 children = {
-                    {
-                        tag = 'Text',
-                        attributes = {
-                            class = 'title'
-                        },
-                        value = 'TI4 Game Setup Options'
-                    },
-                    {
-                        tag = 'Text',
-                        attributes = {
-                            class = 'heading'
-                        },
-                        value = 'Player Count'
-                    },
-                    uiPlayerCounts(),
-                    {
-                        tag = 'Toggle',
-                        attributes = {
-                            id = 'useCodexACs'
-                        },
-                        value = 'Use Codex Action Cards'
-                    },
+                    text('title', 'TI4 Game Setup Options'),
+
+                    text('heading', 'Player count'),
+                    toggleGroup('playerCount', { 3, 4, 5, 6, 7, 8 }),
+
+                    text('heading', 'Extra map rings'),
+                    toggleGroup('extraRings', { 0, 1, 2 }),
+
+                    toggle('useCodexACs', 'Use Codex Action Cards')
                 }
             },
             {
@@ -210,14 +221,20 @@ function _createUI()
 end
 
 function updateUiFromConfig()
-    self.UI.setAttribute('useCodexACs', 'isOn', _config.enabled)
+    self.UI.setAttribute('useCodexACs', 'isOn', _config.useCodexACs)
+    for i = 3, 8 do
+        self.UI.setAttribute('playerCount' .. i, 'isOn', _config.playerCount == i)
+    end
+    for i = 0, 2 do
+        self.UI.setAttribute('extraRings' .. i, 'isOn', _config.extraRings == i)
+    end
 end
 
 -------------------------------------------------------------------------------
 
 function onButtonClick(player, inputType, id)
     if id == 'setup' then
-        setupGame(_config.playerCount)
+        setupGame(_config.playerCount, _config.extraRings)
         setupCodexACs(_config.useCodexACs)
         packSelfIntoSetupBag()
     else
@@ -228,22 +245,39 @@ end
 function onToggleValueChanged(player, value, id)
     local valueAsBool = string.lower(value) == 'true' and true or false
     assert(type(valueAsBool) == 'boolean')
-    if id == '3' or id == '4' or id == '5' or id == '6' or id == '7' or id == '8' then
+
+    local playerCount = string.match(id, '^playerCount(.*)$')
+    local extraRings = string.match(id, '^extraRings(.*)$')
+
+    if playerCount then
         if valueAsBool then
-            _config.playerCount = tonumber(id)
+            _config.playerCount = tonumber(playerCount)
+        end
+    elseif extraRings then
+        if valueAsBool then
+            _config.extraRings = tonumber(extraRings)
         end
     elseif id == 'useCodexACs' then
         _config.useCodexACs = valueAsBool
     else
         error(TAG .. ': unknown toggle "' .. id .. '"')
     end
+
+    if _config.playerCount > 6 then
+        _config.extraRings = math.max(_config.extraRings, 1)
+    end
+    Wait.frames(updateUiFromConfig, 2)
 end
 
-function setupGame(playerCount)
-    assert(type(playerCount) == 'number')
-    if #_zoneHelper.zones() ~= playerCount then
+-------------------------------------------------------------------------------
+
+function setupGame(playerCount, extraRings)
+    assert(type(playerCount) == 'number' and type(extraRings) == 'number')
+    print('Setting up for ' .. playerCount .. ' players with ' .. extraRings .. ' extra map rings')
+    if _zoneHelper.getPlayerCount() ~= playerCount or _zoneHelper.getExtraRings() ~= extraRings then
         _setupHelper.setup({
-            playerCount = playerCount
+            playerCount = playerCount,
+            extraRings = extraRings
         })
     end
 end

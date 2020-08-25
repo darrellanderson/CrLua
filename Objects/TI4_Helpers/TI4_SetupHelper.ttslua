@@ -757,7 +757,7 @@ local _setupQueue = {}
 function setup(params)
     assert(type(params) == 'table')
     assert(type(params.playerCount) == 'number')
-    assert(not params.extraRings or type(params.extraRings) == number)
+    assert(not params.extraRings or type(params.extraRings) == 'number')
 
     table.insert(_setupQueue, params)
     startLuaCoroutine(self, 'setupCoroutine')
@@ -780,7 +780,10 @@ function setupCoroutine()
     SetupColor.packOld(setupBag)
     coroutine.yield(0)
 
-    _zoneHelper.setPlayerCount(playerCount, extraRings)
+    _zoneHelper.setPlayerCount({
+        playerCount = playerCount,
+        extraRings = extraRings
+    })
     SetupGeneric.resizeGridCircle(extraRings)
 
     SetupColor.transformHands()

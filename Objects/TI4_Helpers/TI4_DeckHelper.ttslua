@@ -636,6 +636,10 @@ function deal(params)
 
     params.deckAttributes = assert(DECKS[params.deck], 'bad deck name')
 
+    local deckWithoutS = string.match(params.deck, '^(.*)s$') or params.deck
+    deckWithoutS = string.lower(deckWithoutS)
+    printToAll('Dealing ' .. params.count .. ' ' .. deckWithoutS .. ' card' .. (params.count > 1 and 's' or '') .. ' to ' .. params.color)
+
     table.insert(_dealQueue, params)
     if not _dealCoroutineIsActive then
         startLuaCoroutine(self, 'dealCoroutine')

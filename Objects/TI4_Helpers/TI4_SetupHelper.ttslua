@@ -188,6 +188,7 @@ end
 -- @param offset table : {x,y,z}, all keys are optional.
 -- @return table : {x,y,z}.
 local function offsetPosition(position, offset)
+    assert(type(position) == 'table' and type(offset) == 'table')
     return {
         x = position.x + (offset.x or 0) * (position.z > 0 and 1 or -1),
         y = position.y + (offset.y or 0),
@@ -214,6 +215,14 @@ local function offsetRotation(position, offset)
         result.z = result.z + 180
     end
     return result
+end
+
+local function zoneRotation(zone, offset)
+    return {
+        x = zone.rotation.x,
+        y = zone.rotation.y + (offset.yRot or 0),
+        z = zone.rotation.z + (offset.flip and 180 or 0)
+    }
 end
 
 --- Get the agenda zone for the given player count.
@@ -360,7 +369,7 @@ function SetupGeneric.unpack(setupBag)
             spawnObjectJSON({
                 json              = json,
                 position          = offsetPosition(zone.center, offset),
-                rotation          = offsetRotation(zone.center, offset),
+                rotation          = zoneRotation(zone, offset),
                 callback_function = function(object) object.setLock(offset.lock or false) end,
                 sound             = false,
             })
@@ -371,7 +380,7 @@ function SetupGeneric.unpack(setupBag)
             spawnObjectJSON({
                 json              = json,
                 position          = offsetPosition(agendaPosPlayer, offset),
-                rotation          = offsetRotation(agendaPosPlayer, offset),
+                rotation          = zoneRotation(zone, offset),
                 callback_function = function(object) object.setLock(offset.lock or false) end,
                 sound             = false,
             })
@@ -451,16 +460,16 @@ function SetupColor.packColorBoxIntoSetupBag(setupBag, box)
 end
 
 --- Unpack per-color box from setup bag, place over player area.
-function SetupColor.unpackColorBoxFromSetupBag(setupBag, color, zoneCenter)
+function SetupColor.unpackColorBoxFromSetupBag(setupBag, color, zone)
     debugLog('SetupColor.unpackColorBoxFromSetupBag ' .. color)
-    assert(setupBag.tag == 'Bag' and type(color) == 'string' and type(zoneCenter) == 'table')
+    assert(setupBag.tag == 'Bag' and type(color) == 'string' and type(zone) == 'table')
 
     local offset = SetupColor.COLOR_BOX_OFFSET
     local guid = assert(getEntryGuid(setupBag, '^' .. color .. ' Box$'), ' missing box for ' .. color)
     local box = setupBag.takeObject({
         guid              = guid,
-        position          = offsetPosition(zoneCenter, offset),
-        rotation          = offsetRotation(zoneCenter, offset),
+        position          = offsetPosition(zone.center, offset),
+        rotation          = zoneRotation(zone, offset),
         callback_function = function(object) object.setLock(offset.lock or false) end,
         smooth            = false,
     })
@@ -497,8 +506,9 @@ function SetupColor.pack(color, colorBox)
 end
 
 --- Unpack per-color items from color box.
-function SetupColor.unpack(color, colorBox, zoneCenter, agendaZoneCenter)
-    assert(type(color) == 'string' and colorBox.tag == 'Bag' and type(zoneCenter) == 'table' and type(agendaZoneCenter) == 'table')
+function SetupColor.unpack(color, colorBox, zone, agendaZoneCenter)
+    assert(type(color) == 'string' and colorBox.tag == 'Bag' and type(zone) == 'table' and type(agendaZoneCenter) == 'table')
+    assert(zone.center)
     debugLog('SetupColor.unpack ' .. color)
 
     local nameToObject = {}
@@ -507,21 +517,21 @@ function SetupColor.unpack(color, colorBox, zoneCenter, agendaZoneCenter)
         local guid = assert(getEntryGuid(colorBox, namePattern), 'missing ' .. namePattern)
         local object = colorBox.takeObject({
             guid              = guid,
-            position          = offsetPosition(zoneCenter, offset),
-            rotation          = offsetRotation(zoneCenter, offset),
+            position          = offsetPosition(zone.center, offset),
+            rotation          = zoneRotation(zone, offset),
             callback_function = function(object) object.setLock(offset.lock or false) end,
             smooth            = false,
         })
         nameToObject[object.getName()] = object
     end
-    local agendaPosPlayer = agendaCenterPlayer(agendaZoneCenter, zoneCenter)
+    local agendaPosPlayer = agendaCenterPlayer(agendaZoneCenter, zone.center)
     for namePattern, offset in pairs(SetupColor.NAME_TO_PLAYER_AGENDA_ZONE_OFFSET) do
         namePattern = string.gsub(namePattern, '$COLOR', color)
         local guid = assert(getEntryGuid(colorBox, namePattern), 'missing ' .. namePattern)
         local object = colorBox.takeObject({
             guid              = guid,
             position          = offsetPosition(agendaPosPlayer, offset),
-            rotation          = offsetRotation(agendaPosPlayer, offset),
+            rotation          = zoneRotation(zone, offset),
             callback_function = function(object) object.setLock(offset.lock or false) end,
             smooth            = false,
         })
@@ -590,7 +600,7 @@ function SetupColor.packOld(setupBag)
     local colorToBox = {}
     for _, zone in ipairs(_zoneHelper.zonesAttributes()) do
         if zone.color then
-            colorToBox[zone.color] = SetupColor.unpackColorBoxFromSetupBag(setupBag, zone.color, zone.center)
+            colorToBox[zone.color] = SetupColor.unpackColorBoxFromSetupBag(setupBag, zone.color, zone)
             assert(colorToBox[zone.color], 'missing box for ' .. zone.color)
         end
         coroutine.yield(0)
@@ -652,8 +662,8 @@ function SetupColor.unpackNew(setupBag)
     for i, zone in ipairs(zonesAttributes) do
         local color = assert(SetupColor.DEFAULT_COLOR_LIST[i])
         colorToState[color] = {
-            box = SetupColor.unpackColorBoxFromSetupBag(setupBag, color, zone.center),
-            zoneCenter = zone.center,
+            box = SetupColor.unpackColorBoxFromSetupBag(setupBag, color, zone),
+            zone = zone,
             directionaliser = false,
             unitBags = false
         }
@@ -670,7 +680,7 @@ function SetupColor.unpackNew(setupBag)
 
     debugLog('unpackNew: unpacking per-color items from color boxes')
     for color, state in pairs(colorToState) do
-        local nameToObject = SetupColor.unpack(color, state.box, state.zoneCenter, agendaZoneCenter)
+        local nameToObject = SetupColor.unpack(color, state.box, state.zone, agendaZoneCenter)
         local name = 'Directionaliser (' .. color .. ')'
         state.directionaliser = nameToObject[name]
         assert(state.directionaliser, 'missing ' .. name)
@@ -880,12 +890,13 @@ function SetupFaction.packFactionBox(factionBox, factionBoxSrc)
 end
 
 --- Get faction box and where we found it.
-function SetupFaction.unpackFactionBox(faction, zoneCenter)
-    assert(type(faction) == 'table' and type(zoneCenter) == 'table')
+function SetupFaction.unpackFactionBox(faction, zone)
+    assert(type(faction) == 'table' and type(zone) == 'table')
+    assert(zone.center)
     debugLog('SetupFaction.unpackFactionBox: ' .. faction.name)
 
     local factionBoxNamePattern = '^' .. faction.tokenName:gsub('-', '%%-') .. ' Box$'
-    local unpackPosition = { x = zoneCenter.x, y = zoneCenter.y + 10, z = zoneCenter.z }
+    local unpackPosition = { x = zone.center.x, y = zone.center.y + 10, z = zone.center.z }
 
     -- First see if the box is already on the table, if so leave it where it is.
     local otherBoxes = {}
@@ -917,13 +928,13 @@ function SetupFaction.unpackFactionBox(faction, zoneCenter)
     end
 end
 
-function SetupFaction.unpack(faction, factionBox, zoneCenter)
-    assert(type(faction) == 'table' and factionBox.tag == 'Bag' and type(zoneCenter) == 'table')
+function SetupFaction.unpack(faction, factionBox, zone)
+    assert(type(faction) == 'table' and factionBox.tag == 'Bag' and type(zone) == 'table')
     debugLog('SetupFaction.unpack ' .. faction.name)
 
     local function nestedUnpack(bag, offset)
         bag.translate({ x = 0, y = 5, z = 0 })
-        local p = offsetPosition(zoneCenter, offset)
+        local p = offsetPosition(zone.center, offset)
         for _, entry in ipairs(bag.getObjects()) do
             debugLog('nestedUnpack ' .. bag.getName() .. ' -> ' .. entry.name)
             bag.takeObject({
@@ -953,8 +964,8 @@ function SetupFaction.unpack(faction, factionBox, zoneCenter)
         end
         local object = factionBox.takeObject({
             guid              = guid,
-            position          = offsetPosition(zoneCenter, offset),
-            rotation          = offsetRotation(zoneCenter, offset),
+            position          = offsetPosition(zone.center, offset),
+            rotation          = zoneRotation(zone, offset),
             callback_function = takeCallback,
             smooth            = false,
         })
@@ -1001,8 +1012,9 @@ function SetupFaction.unpackCommandTokens(color, commandTokensBag)
     end
 end
 
-function SetupFaction.unpackHomeSystemTile(faction, factionBox, homeSystemPosition, zoneCenter)
+function SetupFaction.unpackHomeSystemTile(faction, factionBox, homeSystemPosition, zone)
     assert(type(faction) == 'table' and factionBox.tag == 'Bag' and type(homeSystemPosition) == 'table')
+    assert(zone.center)
     debugLog('SetupColor.unpackHomeSystemTile ' .. faction.tokenName)
 
     local tileName = faction.tokenName:gsub('-', '%%-') .. ' Tile'
@@ -1033,9 +1045,9 @@ function SetupFaction.unpackHomeSystemTile(faction, factionBox, homeSystemPositi
         tile = factionBox.takeObject({
             guid              = guid,
             position          = {
-                x = zoneCenter.x + 10 * (zoneCenter.z < 1 and 1 or -1),
+                x = zone.center.x + 10 * (zone.center.z < 1 and 1 or -1),
                 y = homeSystemPosition.y,
-                z = zoneCenter.z + 8 * (zoneCenter.z < 1 and 1 or -1)
+                z = zone.center.z + 8 * (zone.center.z < 1 and 1 or -1)
             },
             rotation          = rotation,
             smooth            = true,
@@ -1047,8 +1059,8 @@ function SetupFaction.unpackHomeSystemTile(faction, factionBox, homeSystemPositi
 end
 
 --- Unpack any non-faction bags still in the faction box.
-function SetupFaction.unpackOther(faction, factionBox, zoneCenter)
-    assert(factionBox.tag == 'Bag' and type(zoneCenter) == 'table')
+function SetupFaction.unpackOther(faction, factionBox, zone)
+    assert(factionBox.tag == 'Bag' and type(zone) == 'table')
     debugLog('SetupFaction.unpackOther ' .. faction.name)
 
     local offset = {
@@ -1060,8 +1072,8 @@ function SetupFaction.unpackOther(faction, factionBox, zoneCenter)
         if not string.match(entry.name, '^' .. faction.tokenName:gsub('-', '%%-') .. ' .* Bag$') then
             local object = factionBox.takeObject({
                 guid              = entry.guid,
-                position          = offsetPosition(zoneCenter, offset),
-                rotation          = offsetRotation(zoneCenter, offset),
+                position          = offsetPosition(zone.center, offset),
+                rotation          = zoneRotation(zone, offset),
                 smooth            = false,
             })
             offset.x = offset.x + (SetupFaction.OTHER_OFFSET.dx or 0)
@@ -1147,8 +1159,8 @@ function SetupFaction.unpackUnits(color, faction, homeSystemTile)
     end
 end
 
-function SetupFaction.unpackStartingTech(color, faction, zoneCenter)
-    assert(type(color) == 'string' and type(faction) == 'table' and type(zoneCenter) == 'table')
+function SetupFaction.unpackStartingTech(color, faction, zone)
+    assert(type(color) == 'string' and type(faction) == 'table' and type(zone) == 'table')
     debugLog('SetupFaction.unpackStartingTech ' .. color)
 
     local function getTechDeck()
@@ -1171,16 +1183,16 @@ function SetupFaction.unpackStartingTech(color, faction, zoneCenter)
         local guid = assert(getEntryGuid(techDeck, name), 'missing starting technology ' .. name)
         techDeck.takeObject({
             guid              = guid,
-            position          = offsetPosition(zoneCenter, offset),
-            rotation          = offsetRotation(zoneCenter, offset),
+            position          = offsetPosition(zone.center, offset),
+            rotation          = zoneRotation(zone, offset),
             smooth            = true,
         })
         offset.z = offset.z + SetupFaction.STARTING_TECH_OFFSET.dz
     end
 end
 
-function SetupFaction.placeScoreCounters(ownerTokensBag, zoneCenter, zoneIndex, faction, color)
-    assert(ownerTokensBag.tag == 'Infinite' and type(zoneCenter) == 'table' and type(faction) == 'table' and type(color) == 'string')
+function SetupFaction.placeScoreCounters(ownerTokensBag, zone, zoneIndex, faction, color)
+    assert(ownerTokensBag.tag == 'Infinite' and type(zone) == 'table' and type(faction) == 'table' and type(color) == 'string')
     debugLog('SetupFaction.placeScoreCounters')
 
     local function getScoreboard()
@@ -1206,9 +1218,9 @@ function SetupFaction.placeScoreCounters(ownerTokensBag, zoneCenter, zoneIndex, 
         z = 0.03
     }
     local p = {
-        x = factionOrigin.x + zoneCenter.x * scale.x,
+        x = factionOrigin.x + zone.center.x * scale.x,
         y = ownerTokensBag.getPosition().y,
-        z = factionOrigin.z + zoneCenter.z * scale.z,
+        z = factionOrigin.z + zone.center.z * scale.z,
     }
 
     -- Instead of tokens, place a token bag!
@@ -1297,7 +1309,7 @@ function unpackFactionCoroutine()
         tokenObject.setLock(true)
     end
 
-    local factionBox, factionBoxSrc = SetupFaction.unpackFactionBox(faction, zoneAttributes.center)
+    local factionBox, factionBoxSrc = SetupFaction.unpackFactionBox(faction, zoneAttributes)
     if not factionBox then
         error('unpack faction: unable to find faction box for "' .. faction.name .. '"')
         return 1
@@ -1307,7 +1319,7 @@ function unpackFactionCoroutine()
     SetupFaction.renameFlagship(color, faction)
     coroutine.yield(0)
 
-    local nameToObject = SetupFaction.unpack(faction, factionBox, zoneAttributes.center)
+    local nameToObject = SetupFaction.unpack(faction, factionBox, zoneAttributes)
     local commandTokensBag = nameToObject[faction.tokenName .. ' Command Tokens Bag']
     local ownerTokensBag = nameToObject[faction.tokenName .. ' Owner Tokens Bag']
     nameToObject = nil
@@ -1316,19 +1328,19 @@ function unpackFactionCoroutine()
     SetupFaction.unpackCommandTokens(color, commandTokensBag)
     coroutine.yield(0)
 
-    local homeSystemTile, extraTile = SetupFaction.unpackHomeSystemTile(faction, factionBox, zoneAttributes.homeSystemPosition, zoneAttributes.center)
+    local homeSystemTile, extraTile = SetupFaction.unpackHomeSystemTile(faction, factionBox, zoneAttributes.homeSystemPosition, zoneAttributes)
     coroutine.yield(0)
 
-    SetupFaction.unpackOther(faction, factionBox, zoneAttributes.center)
+    SetupFaction.unpackOther(faction, factionBox, zoneAttributes)
     coroutine.yield(0)
 
     -- Give earlier unpack steps a moment to finish.
     yieldForSeconds(2.5)
 
-    SetupFaction.unpackStartingTech(color, faction, zoneAttributes.center)
+    SetupFaction.unpackStartingTech(color, faction, zoneAttributes)
     coroutine.yield(0)
 
-    SetupFaction.placeScoreCounters(ownerTokensBag, zoneAttributes.center, zoneAttributes.index, faction, color)
+    SetupFaction.placeScoreCounters(ownerTokensBag, zoneAttributes, zoneAttributes.index, faction, color)
     coroutine.yield(0)
 
     if factionBoxSrc then
@@ -1439,7 +1451,7 @@ function fixUnitScaleCoroutine()
         })
     end
 
-    print('Fix unit scale finished.  If directionalizer scale changed please redo setup to reposition units.')
+    print('Fix unit scale finished.  If directionaliser scale changed please redo setup to reposition units.')
 
     return 1
 end

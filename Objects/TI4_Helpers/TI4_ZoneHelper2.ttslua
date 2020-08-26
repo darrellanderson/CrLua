@@ -311,6 +311,11 @@ function setPlayerCount(params)
                 y = _table.y,
                 z = (bb.min.z + bb.max.z) / 2
             },
+            rotation = {
+                x = 0,
+                y = (bb.min.z + bb.max.z) / 2 > 0 and 0 or 180,
+                z = 0
+            },
             homeSystemPosition = {
                 x = assert(homeXZ[1]),
                 y = assert(_table.y),

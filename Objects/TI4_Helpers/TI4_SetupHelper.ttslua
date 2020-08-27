@@ -69,7 +69,7 @@ local SetupColor = {
             SCALE = { x = 20, y = 8, z = 4 }
         },
         INACTIVE = {
-            POSITION = { x = 148, y = 4, z = 80, dx = 3 },
+            POSITION = { x = 150, y = 4, z = 100, dx = 0, dz = -30 },
             SCALE = { x = 1, y = 4, z = 1 }
         }
     },
@@ -437,9 +437,9 @@ function SetupColor.transformHands()
             local nonPlayerIndex = (i - playerCount) - 1
             Player[color].setHandTransform({
                 position = {
-                    x = SetupColor.HAND.INACTIVE.POSITION.x + SetupColor.HAND.INACTIVE.POSITION.dx,
+                    x = SetupColor.HAND.INACTIVE.POSITION.x + nonPlayerIndex * (SetupColor.HAND.INACTIVE.POSITION.dx or 0),
                     y = SetupColor.HAND.INACTIVE.POSITION.y,
-                    z = SetupColor.HAND.INACTIVE.POSITION.z
+                    z = SetupColor.HAND.INACTIVE.POSITION.z + nonPlayerIndex * (SetupColor.HAND.INACTIVE.POSITION.dz or 0)
                 },
                 rotation = { 0, 0, 0 },
                 scale = SetupColor.HAND.INACTIVE.SCALE

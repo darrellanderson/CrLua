@@ -35,8 +35,6 @@ local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
-local _lowerNameToInfluence = false
-
 local ALLOCATE_COMMAND_TOKENS = {
     localPosition = { x = -0.1, y = 1, z = -5 },
     localDX = -0.4
@@ -78,9 +76,10 @@ local STRATEGY_CARD_RETURN_POSITION = {
     ['Logistics'] = { x = x0 + dx * 4, y = 0, z = z0 + dz, snap = false },
 }
 
-local _guidToParameters = {}
-local _allocatedTokenGuidToColor = {}
+local _lowerNameToInfluence = false
+local _guidToParameters = {}  -- strategy cards
 local _strategyCardSheetGuid = false
+local _allocatedTokenGuidToColor = {}  -- unassigned command tokens
 
 function getStrategyCardSheet()
     local result = _strategyCardSheetGuid and getObjectFromGUID(_strategyCardSheetGuid)
@@ -210,14 +209,14 @@ function getInitiativeOrder()
 end
 
 -- Expose in case external wants to control end of phase.
-function endStatusPhaseInInitiativeOrder()
+function endStatusPhaseInInitiativeOrder(playerColorOrder)
     for guid, parameters in pairs(_guidToParameters) do
         local strategyCard = getObjectFromGUID(guid)
         if strategyCard then
             _returnStrategyCard(strategyCard)
         end
     end
-    _doEndOfStatusPhase(Turns.order)
+    _doEndOfStatusPhase(playerColorOrder or Turns.order)
 end
 
 function recomputeInfluence(playerColor)
@@ -270,13 +269,13 @@ function recomputeInfluence(playerColor)
     end
 
     if voteCounter then
-        _countInfluence(voteCounter, lowerNameToCards, lowerNameToInZoneCards)
+        _countInfluence(playerColor, voteCounter, lowerNameToCards, lowerNameToInZoneCards)
     else
         _safeBroadcastToColor('No vote counter detected.', playerColor, {0.8,0.2,0.2})
     end
 end
 
-function dealAllActionCards()
+function dealAllActionCards(dealOrder)
     local lowerNameToCards = {}
     local isFranken = false
 
@@ -326,7 +325,7 @@ function dealAllActionCards()
         end
     end
 
-    for _, color in ipairs(Turns.order) do
+    for _, color in ipairs(dealOrder or Turns.order) do
         local faction = _factionHelper.fromColor(color)
         if not faction then
             _safeBroadcastToColor('No faction sheet detected for ' .. color .. '.', color, {0.8,0.2,0.2})
@@ -428,8 +427,8 @@ function _repairUnits(playerColor, units)
     _safeBroadcastToColor('Repaired Units.', playerColor, {1,1,1})
 end
 
-function _countInfluence(voteCounter, lowerNameToCards, lowerNameToInZoneCards)
-    assert(type(voteCounter) == 'userdata' and type(lowerNameToCards) == 'table' and type(lowerNameToInZoneCards) == 'table')
+function _countInfluence(playerColor, voteCounter, lowerNameToCards, lowerNameToInZoneCards)
+    assert(type(playerColor) == 'string' and type(voteCounter) == 'userdata' and type(lowerNameToCards) == 'table' and type(lowerNameToInZoneCards) == 'table')
 
     if not _lowerNameToInfluence then
         _lowerNameToInfluence = {}
@@ -653,7 +652,7 @@ local function _doEndOfStatusPhaseCoroutineBody(playerColor)
 
     -- Count ALL cards, may not be face up yet.
     if voteCounter then
-        _countInfluence(voteCounter, lowerNameToCards, lowerNameToInZoneCards)
+        _countInfluence(playerColor, voteCounter, lowerNameToCards, lowerNameToInZoneCards)
     else
         _safeBroadcastToColor('No vote counter detected.', playerColor, {0.8,0.2,0.2})
     end

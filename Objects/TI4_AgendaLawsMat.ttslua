@@ -1,0 +1,212 @@
+--- Snap (agenda) laws to grid.
+-- @author Darrell
+
+local CARD_SCALE_XZ = 2
+
+local SNAP_POINTS = {
+    PADDING = {  -- around edge of grid
+        x = 0.5,
+        z = 0.5
+    },
+    SPACING = {
+        x = 2.5 * CARD_SCALE_XZ,
+        z = 3.5 * CARD_SCALE_XZ
+    },
+    ROTATION = {
+        x = 0,
+        y = 180,
+        z = 180
+    },
+    BOX_SIZE = {
+        x = 0.5 * CARD_SCALE_XZ,
+        z = 1 * CARD_SCALE_XZ
+    },
+}
+
+-- Snap points are layed out in a 8x3 grid, [row][col] indexing.
+local _snapPointsGrid = false
+local _scriptingZone = false
+
+-------------------------------------------------------------------------------
+
+function isRelevantCard(enterObject)
+    assert(type(enterObject) == 'userdata')
+    return enterObject.tag == 'Card'
+end
+
+function onObjectEnterScriptingZone(zone, enterObject)
+    if zone == _scriptingZone and isRelevantCard(enterObject) then
+        enterObject.setScale({
+            x = CARD_SCALE_XZ,
+            y = 1,
+            z = CARD_SCALE_XZ,
+        })
+    end
+end
+
+function onObjectLeaveScriptingZone(zone, leaveObject)
+    if zone == _scriptingZone and isRelevantCard(leaveObject) then
+        leaveObject.setScale({
+            x = 1,
+            y = 1,
+            z = 1,
+        })
+    end
+end
+
+-------------------------------------------------------------------------------
+
+function createScriptingZone()
+    assert(not _scriptingZone)
+
+    local zoneName = self.getGUID() .. ' SCRIPTING ZONE'
+
+    local function getScriptingZone()
+        for _, object in ipairs(getAllObjects()) do
+            if object.tag == 'Scripting' and object.getName() == zoneName then
+                return object
+            end
+        end
+    end
+
+    _scriptingZone = getScriptingZone() or spawnObject({
+        type              = 'ScriptingTrigger',
+        position          = self.getPosition(),
+        rotation          = self.getRotation(),
+        sound             = false,
+        snap_to_grid      = false
+    })
+    _scriptingZone.setName(zoneName)
+end
+
+-- Attaching via joint prevents mat from being movable (???).
+-- Just reposition zone when mat moves.
+function resetScriptingZone()
+    _scriptingZone.setPosition({
+        x = self.getPosition().x,
+        y = self.getPosition().y + 2,
+        z = self.getPosition().z,
+    })
+    _scriptingZone.setRotation(self.getRotation())
+    _scriptingZone.setScale({
+        x = self.getScale().x * 1.75,
+        y = 4,
+        z = self.getScale().z * 1.75,
+    })
+end
+
+-------------------------------------------------------------------------------
+
+function onLoad(save_state)
+    resetSnapPoints()
+    drawSnapPoints()
+
+    createScriptingZone()
+    resetScriptingZone()
+
+    self.addContextMenuItem('Redraw boxes', drawSnapPoints, false)
+    self.addContextMenuItem('Reset card zone', resetScriptingZone, false)
+end
+
+function onDrop(playerColor)
+    resetScriptingZone()
+end
+
+function onPlayerTurnStart(player_color_start, player_color_previous)
+    -- in case all lines are erased, redraw on turn start
+    drawSnapPoints()
+end
+
+function resetSnapPoints()
+    local bounds = self.getBoundsNormalized()
+    local scale = self.getScale()
+
+    -- Create as many snap points as fit inside bounds.
+    local numCols = math.floor(bounds.size.x / SNAP_POINTS.SPACING.x)
+    local numRows = math.floor(bounds.size.z / SNAP_POINTS.SPACING.z)
+
+    -- Compute spacing in local space.
+    local size = {
+        x = bounds.size.x / scale.x,
+        z = bounds.size.z / scale.z
+    }
+    local spacing = {
+        x = SNAP_POINTS.SPACING.x / scale.x,
+        z = SNAP_POINTS.SPACING.z / scale.z,
+    }
+    local padding = {
+        x = (size.x - (spacing.x * numCols)) / 2,
+        z = (size.z - (spacing.z * numRows)) / 2,
+    }
+
+    local x0 = -(size.x / 2) + padding.x + (spacing.x / 2)
+    local z0 = -(size.z / 2) + padding.z + (spacing.z / 2)
+    local dx = spacing.x
+    local dz = spacing.z
+
+    local w = padding.x * 2 + numCols * spacing.x
+    local h = padding.z * 2 + numRows * spacing.z
+
+    --print('xxx ' .. w .. 'x' .. h .. ' vs scale ' .. size.x .. 'x' .. size.z)
+
+    _snapPointsGrid = {}
+    local allSnapPoints = {}
+    for row = 0, numRows - 1 do
+        local columnEntries = {}
+        for col = 0, numCols - 1 do
+            local snapPoint = {
+                position = {
+                    x = x0 + col * dx,
+                    y = bounds.size.y,
+                    z = z0 + row * dz
+                },
+                rotation = SNAP_POINTS.ROTATION,
+                rotation_snap = true
+            }
+            table.insert(columnEntries, snapPoint)
+            table.insert(allSnapPoints, snapPoint)
+        end
+        table.insert(_snapPointsGrid, columnEntries)
+    end
+    self.setSnapPoints(allSnapPoints)
+end
+
+function drawSnapPoints()
+    local thickness = 0.01
+    local color = { r = 0.3, g = 0.3, b = 0.3 }
+
+    local lines = {}
+    local dx = SNAP_POINTS.BOX_SIZE.x / self.getScale().x
+    local dz = SNAP_POINTS.BOX_SIZE.z / self.getScale().z
+
+    for rowIdx, row in ipairs(_snapPointsGrid) do
+        for colIdx, snapPoint in ipairs(row) do
+            local p = assert(snapPoint.position)
+            local y = p.y + 0.02
+            table.insert(lines, {
+                points = {
+                    { x = p.x - dx, y = y, z = p.z - dz },
+                    { x = p.x - dx, y = y, z = p.z + dz },
+                    { x = p.x + dx, y = y, z = p.z + dz },
+                    { x = p.x + dx, y = y, z = p.z - dz },
+                },
+                thickness = thickness,
+                color = color,
+                loop = true,
+                square = true
+            })
+        end
+    end
+    self.setVectorLines(lines)
+end
+
+-------------------------------------------------------------------------------
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

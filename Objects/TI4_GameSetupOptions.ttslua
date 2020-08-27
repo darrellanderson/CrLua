@@ -232,11 +232,15 @@ end
 
 -------------------------------------------------------------------------------
 
+local RIGHT_CLICK = '-2'
+
 function onButtonClick(player, inputType, id)
     if id == 'setup' then
         setupGame(_config.playerCount, _config.extraRings)
         setupCodexACs(_config.useCodexACs)
-        packSelfIntoSetupBag()
+        if inputType ~= RIGHT_CLICK then
+            packSelfIntoSetupBag()
+        end
     else
         error(TAG .. ': unknown button "' .. id .. '"')
     end

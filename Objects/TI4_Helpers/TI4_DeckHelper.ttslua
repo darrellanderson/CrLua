@@ -370,6 +370,13 @@ function getDeck(name)
     return deck and deck.getGUID()
 end
 
+--- Given a card name, which deck contains it?
+function getDeckName(cardName)
+    assert(type(cardName) == 'string')
+    local deckAttributes = _getDeckAttributes(cardName)
+    return deckAttributes and deckAttributes.deckName
+end
+
 -------------------------------------------------------------------------------
 
 --- Discard this card, optionally removing it from a contiainer.
@@ -707,10 +714,7 @@ end
 local function _isAgendaCard(object)
     assert(type(object) == 'userdata')
     assert(DECKS['Agenda'], 'No agenda deck??')
-    if object.tag == 'Card' then
-        local deckAttributes = _getDeckAttributes(object.getName())
-        return deckAttributes and deckAttributes.deckName == 'Agenda'
-    end
+    return getDeckName(object.getName()) == 'Agenda'
 end
 
 local function _putAgendaCard(cardObject, onTop)
@@ -738,7 +742,7 @@ local function _putAgendaCard(cardObject, onTop)
 end
 
 function onObjectLeaveContainer(container, leaveObject)
-    if _isAgendaCard(leaveObject) then
+    if leaveObject.tag == 'Card' and _isAgendaCard(leaveObject) then
         local function putTop(playerColor)
             printToAll('Put agenda top', playerColor)
             _putAgendaCard(leaveObject, true)
@@ -753,7 +757,7 @@ function onObjectLeaveContainer(container, leaveObject)
 end
 
 function onObjectEnterContainer(container, enterObject)
-    if _isAgendaCard(enterObject) then
+    if enterObject.tag == 'Card' and _isAgendaCard(enterObject) then
         enterObject.clearContextMenu()
     end
 end

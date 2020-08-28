@@ -48,7 +48,10 @@ local AUTOFILL_TYPE = {
 local PLASMA_SCORING_BUTTON = {
     ['Flagship'] = 'PS1',
     ['War Sun'] = 'PS2',
+    ['Cruiser'] = 'PS3',
     ['Dreadnought'] = 'PS4',
+    ['Destroyer'] = 'PS6',
+    ['Carrier'] = 'PS7',
     ['PDS'] = 'PS9',
     ['Space Dock'] = 'PS10'
 }
@@ -579,10 +582,14 @@ function autoFill(params)
     elseif autofillTypeAttributes == AUTOFILL_TYPE.SPACE_COMBAT then
         fillUnits = CrLua.TI4.Unit.filterToShips(selfUnitsInHex)
     elseif autofillTypeAttributes == AUTOFILL_TYPE.BOMBARDMENT then
+        fillUnits, psUnit = CrLua.TI4.Unit.filterToBombardment(selfUnitsInHex)
+
         if cardSet['Blitz'] then
-            fillUnits, psUnit = CrLua.TI4.Unit.filterToNonFighterShips(selfUnitsInHex)
-        else
-            fillUnits, psUnit = CrLua.TI4.Unit.filterToBombardment(selfUnitsInHex)
+            -- Use existing psUnit if there is one, all ships may bombard.
+            fillUnits = CrLua.TI4.Unit.filterToNonFighterShips(selfUnitsInHex)
+            if fillUnits and #fillUnits > 0 and not psUnit then
+                psUnit = fillUnits[1]
+            end
         end
         if planetaryShield then
             fillUnits = {}

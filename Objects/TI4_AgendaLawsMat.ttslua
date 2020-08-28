@@ -90,7 +90,7 @@ function resetScriptingZone()
     _scriptingZone.setRotation(self.getRotation())
     _scriptingZone.setScale({
         x = self.getScale().x * 1.75,
-        y = 4,
+        y = 4,  -- 4 is enough, could make larger to be safe
         z = self.getScale().z * 1.75,
     })
 end
@@ -109,7 +109,7 @@ function onLoad(save_state)
 end
 
 function onDrop(playerColor)
-    resetScriptingZone()
+    Wait.time(resetScriptingZone, 3)
 end
 
 function onPlayerTurnStart(player_color_start, player_color_previous)

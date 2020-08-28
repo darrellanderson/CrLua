@@ -761,6 +761,89 @@ function _fillMissingSystemData(guid, system)
     end
 end
 
+-------------------------------------------------------------------------------
+
+-- Heavily distilled hex math based on RedBlobGames excellent hex math.
+local _M = {
+    -- F matrix translates hex to position.
+    f0 = 3.0 / 2.0,
+    f1 = 0.0,
+    f2 = math.sqrt(3.0) / 2.0,
+    f3 = math.sqrt(3.0),
+    -- B matrix translates position to hex.
+    b0 = 2.0 / 3.0,
+    b1 = 0.0,
+    b2 = -1.0 / 3.0,
+    b3 = math.sqrt(3.0) / 3.0,
+    -- Angle to first corner (0 for flat top hex).
+    start_angle = 0.0
+}
+
+local _LAYOUT = {
+    size = { x = (Grid.sizeX or 7) / 2.0, z = (Grid.sizeY or 7) / 2.0 },
+    origin = { x = 0, z = 0 }
+}
+
+--- Get a hex id from a position.
+-- @param position table : {xyz} position.
+-- @return hex string.
+function hexFromPosition(position)
+    assert(type(position) == 'table')
+
+    -- Fractional hex position.
+    local p = {
+        x = (position.x - _LAYOUT.origin.x) / _LAYOUT.size.x,
+        z = (position.z - _LAYOUT.origin.z) / _LAYOUT.size.z
+    }
+    local q = _M.b0 * p.x + _M.b1 * p.z
+    local r = _M.b2 * p.x + _M.b3 * p.z
+    local s = -q - r
+
+    -- Round to grid aligned hex.
+    local qi = math.floor(0.5 + q)
+    local ri = math.floor(0.5 + r)
+    local si = math.floor(0.5 + s)
+    local q_diff = math.abs(qi - q)
+    local r_diff = math.abs(ri - r)
+    local s_diff = math.abs(si - s)
+    if q_diff > r_diff and q_diff > s_diff then
+        qi = -ri - si
+    else
+        if r_diff > s_diff then
+            ri = -qi - si
+        else
+            si = -qi - ri
+        end
+    end
+
+    return '<' .. qi .. ',' .. ri .. ',' .. si .. '>'
+end
+
+--- Bulk hexFromPosition.
+function hexesFromPositions(guidToPosition)
+    assert(type(guidToPosition) == 'table')
+    local result = {}
+    for guid, position in pairs(guidToPosition) do
+        result[guid] = hexFromPosition(position)
+    end
+    return result
+end
+
+--- Get a position from a hex.
+-- @param params hex : hex encoded as string.
+-- @return position table : {xyz}.
+function hexToPosition(hex)
+    assert(type(hex) == 'string')
+    local q, r, s = string.match(str, '<(%-?%d+),(%-?%d+),(%-?%d+)>')
+    hex = JSON.decode(hex)
+    assert(not (math.floor (0.5 + q + r + s) ~= 0), 'q + r + s must be 0')
+    local x = (_M.f0 * q + _M.f1 * r) * _LAYOUT.size.x
+    local z = (_M.f2 * q + _M.f3 * r) * _LAYOUT.size.z
+    return { x = x + _LAYOUT.origin.x, y = 0, z = z + _LAYOUT.origin.z }
+end
+
+-------------------------------------------------------------------------------
+
 function onLoad(saveState)
     self.setColorTint({ r = 0.25, g = 0.25, b = 0.25 })
     self.setScale({ x = 2, y = 0.01, z = 2 })

@@ -140,7 +140,17 @@ end
 function updateSpreadsheetScore()
     local sheetId = _sheetId(_data.sheetIdScore)
     local sheetName = _data.sheetNameScore
-    local cells = CrLua.TI4.PlayerScore.getCells(_data.stageOneObjectives, _data.stageTwoObjectives, _data.playerScores, _data.secretsOrder, _data.playerSecrets, _data.playerColorToStrategy, _data.StageOneMap, _data.StageTwoMap, _data.supportMap, _data.mecatolPoints, _data.otherPoints)
+
+    local cells = {}
+    CrLua.TI4.PlayerScore.setCellsFactions(cells)
+    CrLua.TI4.PlayerScore.setCellsPlayerNames(cells)
+    CrLua.TI4.PlayerScore.setCellsStrategyCards(cells, _data.playerColorToStrategy)
+    CrLua.TI4.PlayerScore.setCellsScores(cells, _data.playerScores)
+    CrLua.TI4.PlayerScore.setCellsPublicObjectivesAndRound(cells, _data.stageOneObjectives, _data.stageTwoObjectives, _data.StageOneMap, _data.StageTwoMap)
+    CrLua.TI4.PlayerScore.setCellsSecretObjectives(cells, _data.secretsOrder, _data.playerSecrets)
+    CrLua.TI4.PlayerScore.setCellsSupport(cells, _data.supportMap)
+    CrLua.TI4.PlayerScore.setCellsMecatol(cells, _data.mecatolPoints)
+    CrLua.TI4.PlayerScore.setCellsOther(cells, _data.otherPoints)
 
     if sheetId then
         CrLua.Log.d(TAG, 'updating score spreadsheet')

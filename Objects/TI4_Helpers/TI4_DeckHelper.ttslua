@@ -21,19 +21,14 @@ function getHelperClient(helperObjectName)
     end
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
-
--- Find decks based on placemats, that way can move mats and it just works.
-local PLACEMAT_GUID = {
-    SCORE = '7b15c0',
-    DECKS = '6dac8e',
-}
+local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 
 local DECKS = {
     ['Public Objectives I'] = {
         transform = {
-            parentGuid = PLACEMAT_GUID.SCORE,  -- {-91.22, 0.01, -0.86} @ {7.13, 1.00, 7.13}
+            parent = 'Public Objectives I Mat',
             deck = {
-                position = { x = 1.23, y = 0, z = -0.53 },
+                position = { x = 7.64, y = 0, z = 0.21 },
                 rotation = { x = 0, y = 0, z = 180 },
             }
         },
@@ -52,9 +47,9 @@ local DECKS = {
     },
     ['Public Objectives II'] = {
         transform = {
-            parentGuid = PLACEMAT_GUID.SCORE,
+            parent = 'Public Objectives II Mat',
             deck = {
-                position = { x = 1.23, y = 0, z = 0.53 },
+                position = { x = 7.54, y = 0, z = 0.34 },
                 rotation = { x = 0, y = 0, z = 180 },
             }
         },
@@ -73,9 +68,9 @@ local DECKS = {
     },
     ['Secret Objectives'] = {
         transform = {
-            parentGuid = PLACEMAT_GUID.DECKS,
+            parent = 'Cards Mat',
             deck = {
-                position = { x = 0.95, y = 0, z = -0.5 },  -- {-89.74, 0.02, 19.46}
+                position = { x = 2.81, y = 0, z = -1.86 },
                 rotation = { x = 0, y = 0, z = 180 },
             }
         },
@@ -105,13 +100,13 @@ local DECKS = {
     },
     ['Agenda'] = {
         transform = {
-            parentGuid = PLACEMAT_GUID.DECKS,
+            parent = 'Cards Mat',
             deck = {
-                position = { x = 0.01, y = 0, z = -0.5 },
+                position = { x = 0.00, y = 0, z = -1.86 },
                 rotation = { x = 0, y = 0, z = 180 },
             },
             discard = {
-                position = { x = 0.01, y = 0, z = 0.5 },
+                position = { x = 0.0, y = 0, z = 2.53 },
                 rotation = { x = 0, y = 0, z = 0 },
             }
         },
@@ -170,13 +165,13 @@ local DECKS = {
     },
     ['Actions'] = {
         transform = {
-            parentGuid = PLACEMAT_GUID.DECKS,  -- {-91.73, 0.01, 15.59} @ {3.97, 1.00, 3.97}
+            parent = 'Cards Mat',
             deck = {
-                position = { x = -0.97, y = 0, z = -0.5 },  -- {-93.41, 0.41, 19.38}
+                position = { x = -2.81, y = 0, z = -1.86 },
                 rotation = { x = 0, y = 0, z = 180 },
             },
             discard = {
-                position = { x = -0.97, y = 0, z = 0.5 },  -- {-89.74, 0.02, 19.46}
+                position = { x = -2.81, y = 0, z = 2.53 },
                 rotation = { x = 0, y = 0, z = 0 },
             }
         },
@@ -284,14 +279,40 @@ local DECKS = {
             'Ghost Squad',
         },
     },
+    ['Planets'] = {
+        transform = {
+            parent = 'Cards Mat',
+            deck = {
+                position = { x = 2.81, y = 0, z = 2.53 },
+                rotation = { x = 0, y = 0, z = 180 },
+            },
+        },
+        cardNames = {}
+    },
 }
 
+local _parentNameToGuid = {}
 local _lowerCardNameToDeckAttributes = false
 local _discardCardQueue = {}
 local _discardDeckQueue = {}
 local _waitForDestroy = {}
 local _dealQueue = {}
 local _dealCoroutineIsActive = false
+
+local function _getParent(parentName)
+    local guid = _parentNameToGuid[parentName]
+    local parent = guid and getObjectFromGUID(guid)
+    if parent then
+        return parent
+    end
+    for _, object in ipairs(getAllObjects()) do
+        if object.getName() == parentName then
+            _parentNameToGuid[parentName] = object.getGUID()
+            return object
+        end
+    end
+    error('Deck Helper: missing "' .. parentName .. '"')
+end
 
 local function _getDeckAttributes(cardName)
     assert(type(cardName) == 'string')
@@ -316,8 +337,7 @@ local function _getTransform(deckAttributes, deckOrDiscard)
         transform = deckAttributes.transform['deck']
     end
 
-    local parentGuid = deckAttributes.transform.parentGuid
-    local parent = parentGuid and assert(getObjectFromGUID(parentGuid))
+    local parent = _getParent(deckAttributes.transform.parent)
     local parentRot = parent and parent.getRotation()
 
     return {
@@ -440,8 +460,10 @@ function _processCardDiscardQueue()
 
     if cardObject then
         cardObject.setLock(false)
-        cardObject.setPosition(transform.position)
-        cardObject.setRotation(transform.rotation)
+        local collide = false
+        local fast = true
+        cardObject.setPositionSmooth(transform.position, collide, fast)
+        cardObject.setRotationSmooth(transform.rotation, collide, fast)
     elseif container then
         local isLocked = container.getLock()
         container.setLock(false)
@@ -681,12 +703,14 @@ function dealCoroutine()
 
             if discard then
                 local bounds = discard.getBoundsNormalized()
-                discard.setPosition({
+                local collide = false
+                local fast = true
+                discard.setPositionSmooth({
                     x = deckTransform.position.x,
                     y = deckTransform.position.y + bounds.size.y / 2,
                     z = deckTransform.position.z
-                })
-                discard.setRotation(deckTransform.rotation)
+                }, collide, fast)
+                discard.setRotationSmooth(deckTransform.rotation, collide, fast)
                 discard.setName(params.deckAttributes.deckName)
                 coroutine.yield(0)
 
@@ -783,6 +807,48 @@ end
 
 -------------------------------------------------------------------------------
 
+-- Helper to read deck positions based on deck locations (hard coded above).
+local function _reportDeckPositionsInParentSpace()
+    local parentNameSet = {}
+    for deckName, deckAttributes in pairs(DECKS) do
+        parentNameSet[deckAttributes.transform.parent] = true
+    end
+
+    local parentNameToObject = {}
+    local deckNameToObject = {}
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        if parentNameSet[name] then
+            parentNameToObject[name] = object
+        end
+        if DECKS[name] then
+            deckNameToObject[name] = object
+        end
+    end
+
+    for deckName, deckAttributes in pairs(DECKS) do
+        local deck = assert(deckNameToObject[deckName], 'missing ' .. deckName)
+        local parent = assert(parentNameToObject[deckAttributes.transform.parent], 'missing ' .. deckAttributes.transform.parent)
+        local p = parent.positionToLocal(deck.getPosition())
+        print(table.concat({
+            deckName,
+            math.floor(p.x * 1000) / 1000,
+            math.floor(p.y * 1000) / 1000,
+            math.floor(p.z * 1000) / 1000,
+        }, ' '))
+    end
+end
+
+function resetPlanetCardNames()
+    local deckAttributes = assert(DECKS['Planets'])
+    deckAttributes.cardNames = {}
+    for _, system in pairs(_systemHelper.systems()) do
+        for _, planet in ipairs(system.planets or {}) do
+            table.insert(deckAttributes.cardNames, planet.name)
+        end
+    end
+end
+
 function onLoad(saveState)
     self.setColorTint({ r = 0.25, g = 0.25, b = 0.25 })
     self.setScale({ x = 2, y = 0.01, z = 2 })
@@ -804,10 +870,13 @@ function onLoad(saveState)
     end
 
     -- Test methods.
+    self.addContextMenuItem('Get locations', _reportDeckPositionsInParentSpace, false)
     self.addContextMenuItem('Discard cards', testDiscardCards, false)
     self.addContextMenuItem('Discard deck', testDiscardDeck, false)
     self.addContextMenuItem('Deal 1', function(color) testDeal(color, 1) end, false)
     self.addContextMenuItem('Deal 3', function(color) testDeal(color, 3) end, false)
+
+    resetPlanetCardNames()
 end
 
 function testDiscardCards()

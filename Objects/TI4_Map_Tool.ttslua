@@ -40,6 +40,7 @@ function getHelperClient(helperObjectName)
 end
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
+local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 
 local INPUT_LABEL_MAP_STRING = "Enter map string or press 'save' to save the current map"
 local SLICE_DATALABEL_NAME = "slice_data_label"
@@ -567,20 +568,23 @@ end
 
 function returnCardsCoroutine()
     broadcastToAll('Returning planet cards')
-    local position = self.positionToWorld({ x = 0, y = 0, z = 0 })
-    position.y = position.y + 3
-    local rotation = self.getRotation()
 
     local planetNameToCardOrDeckAndEntryGuid = getPlanetNameToCardOrDeckAndEntryGuid()
     coroutine.yield(0)
 
+    local index = 1
     for system, object in pairs(getPlacedSystemToObject()) do
         if not system.home then
             for _, planet in ipairs(system.planets or {}) do
                 local cardOrDeckAndEntryGuid = planetNameToCardOrDeckAndEntryGuid[planet.name]
                 if cardOrDeckAndEntryGuid then
-                    placeCard(position, rotation, cardOrDeckAndEntryGuid.card, cardOrDeckAndEntryGuid.deck, cardOrDeckAndEntryGuid.entryGuid)
-                    position.y = position.y + 0.2
+                    _deckHelper.discardCard({
+                        guid = cardOrDeckAndEntryGuid.card.getGUID(),
+                        name = cardOrDeckAndEntryGuid.card.getName(),
+                        containerGuid = cardOrDeckAndEntryGuid.deck and cardOrDeckAndEntryGuid.deck.getGUID() or nil,
+                        index = index
+                    })
+                    index = index + 1
                 else
                     broadcastToAll('Missing card for "' .. planet.name .. '"', 'Red')
                 end

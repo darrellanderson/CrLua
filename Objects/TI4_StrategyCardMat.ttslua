@@ -51,14 +51,11 @@ local _buttonIsState2 = {}
 function onLoad(saveState)
     local bounds = self.getBoundsNormalized()
 
-    local scale = self.getScale()
-    local invScale = { x = 1 / scale.x, y = 1 / scale.y, z = 1 / scale.z }
-
-    local dx = -0.62
+    local dx = -5
     local y = bounds.size.y + 0.01
-    local z = -0.8
+    local z = -4.8
     local width = 2200
-    local height = 620
+    local height = 1200
     local fontSize = 200
 
     self.clearButtons()
@@ -69,7 +66,6 @@ function onLoad(saveState)
         label          = '',
         position       = { x = dx, y = y, z = z },
         rotation       = { x = 0, y = 0, z = 0 },
-        scale          = invScale,
         width          = width,
         height         = height,
         font_size      = fontSize,
@@ -81,7 +77,6 @@ function onLoad(saveState)
         label          = '',
         position       = { x = 0, y = y, z = z },
         rotation       = { x = 0, y = 0, z = 0 },
-        scale          = invScale,
         width          = width,
         height         = height,
         font_size      = fontSize,
@@ -93,7 +88,6 @@ function onLoad(saveState)
         label          = '',
         position       = { x = -dx, y = y, z = z },
         rotation       = { x = 0, y = 0, z = 0 },
-        scale          = invScale,
         width          = width,
         height         = height,
         font_size      = fontSize,

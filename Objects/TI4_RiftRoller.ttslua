@@ -52,18 +52,6 @@ local diceCount = 0
 
 -------------------------------------------------------------------------------
 
-function onObjectLeaveContainer(container, leaveObject)
-    if isGravRiftObject(leaveObject) then
-        leaveObject.addContextMenuItem('Roll Grav Rift', function(playerColor) rollRift(leaveObject, playerColor) end, true)
-    end
-end
-
-function onObjectEnterContainer(container, enterObject)
-    if isGravRiftObject(enterObject) then
-        enterObject.clearContextMenu()
-    end
-end
-
 function isGravRiftObject(object)
     if not _gravityRiftGuidSet then
         _gravityRiftGuidSet = {}
@@ -76,6 +64,53 @@ function isGravRiftObject(object)
         end
     end
     return _gravityRiftGuidSet[object.getGUID()]
+end
+
+function applyGravityRiftGoodness(object)
+    object.addContextMenuItem('Roll Grav Rift', function(playerColor) rollRift(object, playerColor) end, true)
+end
+
+function clearGravityRiftGoodness(object)
+    object.clearContextMenu()
+end
+
+-------------------------------------------------------------------------------
+
+function onLoad(saveState)
+    self.setColorTint({ r = 0.25, g = 0.25, b = 0.25 })
+    self.setScale({ x = 2, y = 0.01, z = 2 })
+    self.setName('TI4_RIFT_ROLLER')
+    self.setDescription('Adds a right-click "rift roll" to gravity rifts, PLEASE LEAVE ON TABLE! This object is only visible to the black (GM) player.')
+
+    -- Only the GM/black player can see this object.  Others can still interact!
+    local invisibleTo = {}
+    for _, color in ipairs(Player.getColors()) do
+        if color ~= 'Black' then
+            table.insert(invisibleTo, color)
+        end
+    end
+    self.setInvisibleTo(invisibleTo)
+
+    local function delayedAdd()
+        for _, object in ipairs(getAllObjects()) do
+            if isGravRiftObject(object) then
+                applyGravityRiftGoodness(object)
+            end
+        end
+    end
+    Wait.frames(delayedAdd, 11)
+end
+
+function onObjectLeaveContainer(container, leaveObject)
+    if isGravRiftObject(leaveObject) then
+        applyGravityRiftGoodness(leaveObject)
+    end
+end
+
+function onObjectEnterContainer(container, enterObject)
+    if isGravRiftObject(enterObject) then
+        clearGravityRiftGoodness(enterObject)
+    end
 end
 
 -------------------------------------------------------------------------------
@@ -280,20 +315,4 @@ end
 function wait(time)
     local start = os.time()
     repeat coroutine.yield(0) until os.time() > start + time
-end
-
-function onLoad(saveState)
-    self.setColorTint({ r = 0.25, g = 0.25, b = 0.25 })
-    self.setScale({ x = 2, y = 0.01, z = 2 })
-    self.setName('TI4_RIFT_ROLLER')
-    self.setDescription('Adds a right-click "rift roll" to gravity rifts, PLEASE LEAVE ON TABLE! This object is only visible to the black (GM) player.')
-
-    -- Only the GM/black player can see this object.  Others can still interact!
-    local invisibleTo = {}
-    for _, color in ipairs(Player.getColors()) do
-        if color ~= 'Black' then
-            table.insert(invisibleTo, color)
-        end
-    end
-    self.setInvisibleTo(invisibleTo)
 end

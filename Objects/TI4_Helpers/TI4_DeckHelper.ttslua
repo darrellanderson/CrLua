@@ -28,8 +28,13 @@ local DECKS = {
         transform = {
             parent = 'Public Objectives I Mat',
             deck = {
-                position = { x = 7.64, y = 0, z = 0.21 },
+                position = { x = 7.64, y = 0, z = 0.27 },
                 rotation = { x = 0, y = 0, z = 180 },
+            },
+            extraSnapPoints = {
+                p0 = { x = 3.62, y = 0, z = 0.27 },
+                d = { x = -2.81, y = 0, z = 0 },
+                count = 5
             }
         },
         cardNames = {
@@ -51,6 +56,11 @@ local DECKS = {
             deck = {
                 position = { x = 7.54, y = 0, z = 0.34 },
                 rotation = { x = 0, y = 0, z = 180 },
+            },
+            extraSnapPoints = {
+                p0 = { x = 3.69, y = 0, z = 0.34 },
+                d = { x = -2.83, y = 0, z = 0 },
+                count = 5
             }
         },
         cardNames = {
@@ -849,6 +859,54 @@ function resetPlanetCardNames()
     end
 end
 
+function resetSnapPoints()
+    local parentNameToSnapPoints = {}
+    for deckName, deckAttributes in pairs(DECKS) do
+        local snapPoints = parentNameToSnapPoints[deckAttributes.transform.parent]
+        if not snapPoints then
+            snapPoints = {}
+            parentNameToSnapPoints[deckAttributes.transform.parent] = snapPoints
+        end
+        if deckAttributes.transform.deck then
+            table.insert(snapPoints, {
+                position = deckAttributes.transform.deck.position,
+                rotation = deckAttributes.transform.deck.position.rotation,
+                rotation_snap = true
+            })
+        end
+        if deckAttributes.transform.discard then
+            table.insert(snapPoints, {
+                position = deckAttributes.transform.discard.position,
+                rotation = deckAttributes.transform.discard.position.rotation,
+                rotation_snap = true
+            })
+        end
+        if deckAttributes.transform.extraSnapPoints then
+            local p0 = deckAttributes.transform.extraSnapPoints.p0
+            local d = deckAttributes.transform.extraSnapPoints.d
+            for i = 0, deckAttributes.transform.extraSnapPoints.count - 1 do
+                table.insert(snapPoints, {
+                    position = {
+                        x = p0.x + d.x * i,
+                        y = p0.y + d.y * i,
+                        z = p0.z + d.z * i,
+                    },
+                    rotation = deckAttributes.transform.deck.position.rotation,
+                    rotation_snap = true
+                })
+            end
+        end
+    end
+
+    local parentNameToObject = {}
+    for _, object in ipairs(getAllObjects()) do
+        local snapPoints = parentNameToSnapPoints[object.getName()]
+        if snapPoints then
+            object.setSnapPoints(snapPoints)
+        end
+    end
+end
+
 function onLoad(saveState)
     self.setColorTint({ r = 0.25, g = 0.25, b = 0.25 })
     self.setScale({ x = 2, y = 0.01, z = 2 })
@@ -877,6 +935,7 @@ function onLoad(saveState)
     self.addContextMenuItem('Deal 3', function(color) testDeal(color, 3) end, false)
 
     resetPlanetCardNames()
+    resetSnapPoints()
 end
 
 function testDiscardCards()

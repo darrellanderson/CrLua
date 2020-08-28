@@ -44,7 +44,7 @@ local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 local INPUT_LABEL_MAP_STRING = "Enter map string or press 'save' to save the current map"
 local SLICE_DATALABEL_NAME = "slice_data_label"
 local MECATOL_TILE = 18
-local TILE_LIMIT = 61  -- full 4 ring map
+local TILE_LIMIT = 1000  -- full 4 ring map is 61, 8 is 217
 
 local CUSTODIANS_TOKEN_GUID = '70642f'
 
@@ -94,6 +94,7 @@ function setMapString(mapString)
         end
     end
 
+    broadcastToAll('Setting map string to ' .. mapString)
     _mapString = mapString
 end
 
@@ -304,16 +305,16 @@ function placeTilesCoroutine()
     coroutine.yield(0)
 
     local dy = 0.3
-    local positions = getSystemPositionsStartingAtOrigin(#buildList, dy)
+    local positionIterator = getSystemPositionsStartingAtOriginIterator(dy)
     local rotation = { x = 0, y = 180, z = 0 }
 
     for i, tile in ipairs(buildList) do
+        local position = positionIterator()
         if tile ~= 0 then
             local system = tileToSystem[tile]
             if system then
                 if not system.home then
                     local bag = systemGuidToBag[system.guid]
-                    local position = positions[i]
                     placeTile(system, bag, position, rotation)
                 end
             else
@@ -394,56 +395,62 @@ function onButtonSave(_, color)
 end
 
 function saveTilesCoroutine()
-    local guidToSystem = _systemHelper.systems()
-    local tileToPosition = {}
-    for guid, system in pairs(guidToSystem) do
-        local object = getObjectFromGUID(guid)
-        if object then
-            tileToPosition[system.tile] = object.getPosition()
-        end
+    -- Get tile numbers and positions, convert to hexes.
+    local systemToObject = getPlacedSystemToObject()
+    local guidToTile = {}
+    local guidToPosition = {}
+    for system, object in pairs(systemToObject) do
+        local guid = assert(system.guid)
+        guidToTile[guid] = assert(system.tile)
+        guidToPosition[guid] = object.getPosition()
     end
+    local guidToHex = _systemHelper.hexesFromPositions(guidToPosition)
+    coroutine.yield(0)
 
-    local tileRadius = getInscribedTileRadius()
-    local maxDistanceSq = tileRadius ^ 2
-    local function tileFromPosition(p1)
-        for tile, p2 in pairs(tileToPosition) do
-            local distanceSq = (p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2
-            if distanceSq < maxDistanceSq then
-                tileToPosition[tile] = nil  -- make future calls faster
-                return tile
-            end
-        end
-        return 0
+    -- Fill map from hex to map string index.
+    local indexToPosition = {}
+    local positionIterator = getSystemPositionsStartingAtOriginIterator()
+    for _ = 1, TILE_LIMIT do
+        table.insert(indexToPosition, assert(positionIterator()))
     end
+    local indexToHex = _systemHelper.hexesFromPositions(indexToPosition)
+    local hexToMapStringIndex = {}
+    for i, hex in ipairs(indexToHex) do
+        hexToMapStringIndex[hex] = i
+    end
+    coroutine.yield(0)
 
-    -- Get all tiles starting with center then in map string order.
-    local tileNumbers = {}
-    for i, position in ipairs(getSystemPositionsStartingAtOrigin(TILE_LIMIT)) do
-        table.insert(tileNumbers, tileFromPosition(position))
-        if i % 10 == 0 then
-            coroutine.yield(0)
+    -- Merge in a table (not a list, might have holes!)
+    local result = {}
+    local maxIndex = 0
+    for guid, hex in pairs(guidToHex) do
+        local index = assert(hexToMapStringIndex[hex], 'missing hex ' .. hex)
+        local tile = assert(guidToTile[guid], 'mssing tile ' .. guid)
+        if index and tile then
+            result[index] = tile
+            maxIndex = math.max(maxIndex, index)
         end
     end
+    coroutine.yield(0)
 
-    -- Prune trailing zeros.
-    for i = #tileNumbers, 1, -1 do
-        if tileNumbers[i] == 0 then
-            table.remove(tileNumbers, i)
-        else
-            break
+    -- Make it a list (fill in any holes with zeros).
+    for i = 1, maxIndex do
+        if not result[i] then
+            result[i] = 0
         end
     end
+    coroutine.yield(0)
 
     -- If the center tile is Mecatol remove it, otherwise do special encoding.
-    if #tileNumbers > 0 then
-        if tileNumbers[1] == MECATOL_TILE then
-            table.remove(tileNumbers, 1)
+    if #result > 0 then
+        if result[1] == MECATOL_TILE then
+            table.remove(result, 1)
         else
-            tileNumbers[1] = '{' .. tileNumbers[1] .. '}'
+            result[1] = '{' .. result[1] .. '}'
         end
     end
 
-    setMapString(table.concat(tileNumbers, ' '))
+    setMapString(table.concat(result, ' '))
     return 1
 end
 
@@ -499,6 +506,7 @@ function placeCardsCoroutine()
                     local position = object.positionToWorld(planet.position)
                     position.y = position.y + 3
                     local rotation = object.getRotation()
+                    rotation.z = 180
                     placeCard(position, rotation, cardOrDeckAndEntryGuid.card, cardOrDeckAndEntryGuid.deck, cardOrDeckAndEntryGuid.entryGuid)
                 else
                     broadcastToAll('Missing card for "' .. planet.name .. '"', 'Red')
@@ -835,6 +843,18 @@ function getTableY()
     return 1
 end
 
+function getPlacedSystemToObject()
+    local systemToObject = {}
+    local guidToSystem = _systemHelper.systems()
+    for _, object in ipairs(getAllObjects()) do
+        local system = guidToSystem[object.getGUID()]
+        if system then
+            systemToObject[system] = object
+        end
+    end
+    return systemToObject
+end
+
 function getOutscribedTileRadius()
     local x = Grid.sizeX or 7
     local y = Grid.sizeY or 7
@@ -849,26 +869,8 @@ function getInscribedTileRadius()
     return math.sqrt(c^2 - b^2)
 end
 
-function getPlacedSystemToObject()
-    local systemToObject = {}
-    local guidToSystem = _systemHelper.systems()
-    for _, object in ipairs(getAllObjects()) do
-        local system = guidToSystem[object.getGUID()]
-        if system then
-            systemToObject[system] = object
-        end
-    end
-    return systemToObject
-end
-
-function getSystemPositionsStartingAtOrigin(count, dy)
-    assert(type(count) == 'number' and count >= 0 and count <= TILE_LIMIT)
-    if count == 0 then return {} end
-
-    local result = { { x = 0, y = getTableY() + (dy or 0), z = 0 }}
-    local rotation = { x = 0, y = 0, z = 0 }
+function getSystemPositionsStartingAtOriginIterator(dy)
     local tileDiameter = getInscribedTileRadius() * 2
-
     local function move_in_dir(start, dir)
         return {
             x = start.x + math.sin(math.rad(dir)) * tileDiameter,
@@ -878,12 +880,16 @@ function getSystemPositionsStartingAtOrigin(count, dy)
     end
 
     local function spiral_hex_iterator(startpos, startrot)
-        local level = 1
+        local level = 0
         local dir = 120
         local steps = 0
         local north = startrot.y
         local nextpos = move_in_dir(startpos, north)
         return function()
+            if level == 0 then
+                level = 1
+                return startpos
+            end
             local thispos = nextpos
             nextpos = move_in_dir(nextpos, north + dir)
             steps = steps + 1
@@ -899,15 +905,9 @@ function getSystemPositionsStartingAtOrigin(count, dy)
         end
     end
 
-    -- Return points as a list rather than an iterator.  Iterator is elegant and
-    -- does not require everything be allocated like a list does, but a list
-    -- is as easy to work with and can also pass directly to setVectorLines.
-    local iter = spiral_hex_iterator(result[1], rotation)
-    for i = 2, count do
-        table.insert(result, iter())
-    end
-
-    return result
+    local origin = { x = 0, y = getTableY() + (dy or 0), z = 0 }
+    local rotation = { x = 0, y = 0, z = 0 }
+    return spiral_hex_iterator(origin, rotation)
 end
 
 -------------------------------------------------------------------------------

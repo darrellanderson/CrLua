@@ -59,11 +59,27 @@ local data = {
 -------------------------------------------------------------------------------
 
 --- Get bag for object.
-local function getNonCardDestination(objectName)
+local function getNonCardDestination(objectTag, objectName)
     assert(type(objectName) == 'string')
+
+    -- Faction owner tokens go into pick a faction to play bag.
+    local faction = objectTag == 'Card' and _factionHelper.fromTokenName(objectName)
+    if faction then
+        local bagGuid = data.pickFactionTokenBagGuid
+        bag = bagGuid and getObjectFromGUID(bagGuid)
+        if not bag then
+            for _, candidate in ipairs(getAllObjects()) do
+                if candidate.tag == 'Bag' and candidate.getName() == PICK_FACTION_BAG then
+                    data.pickFactionTokenBagGuid = candidate.getGUID()
+                    return candidate
+                end
+            end
+        end
+    end
 
     local bagGuid = data.objectNameToBagGuid[objectName]
     local bag = bagGuid and getObjectFromGUID(bagGuid)
+
 
     -- If we do not have a bag, look for one and remember it if found.  If more
     -- than one choose closest (reduces objects from flying over the table).
@@ -91,25 +107,6 @@ local function getNonCardDestination(objectName)
         end
         data.objectNameToBagGuid[objectName] = bag and bag.getGUID()
     end
-
-    -- If "FACTION Owner Token" and no bag, put in the "Pick a Faction to Play"
-    -- bag (scan again to make earlier, more common scan do less work).
-    local faction = (not bag) and _factionHelper.fromTokenName(objectName)
-    if not bag and faction then
-        local bagGuid = data.pickFactionTokenBagGuid
-        bag = bagGuid and getObjectFromGUID(bagGuid)
-        if not bag then
-            for _, candidate in ipairs(getAllObjects()) do
-                if candidate.getName() == PICK_FACTION_BAG then
-                    bag = candidate
-                    break
-                end
-            end
-        end
-        data.pickFactionTokenBagGuid = bag and bag.getGUID()
-    end
-
-    return bag
 end
 
 -------------------------------------------------------------------------------
@@ -138,7 +135,7 @@ function onObjectEnterContainer(container, enterObject)
         elseif enterObject.tag == 'Deck' and _deckHelper.discardDeck(discardParams) then
             -- deck helper is handling it.
         else
-            local bag = getNonCardDestination(enterObject.getName())
+            local bag = getNonCardDestination(enterObject.tag, enterObject.getName())
             if bag then
                 waitForDestroy(enterObject, bag)
             end

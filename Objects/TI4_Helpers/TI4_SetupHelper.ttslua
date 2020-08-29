@@ -1230,6 +1230,8 @@ function SetupFaction.placeScoreCounters(ownerTokensBag, zone, zoneIndex, factio
     })
     clone.setName(faction.tokenName)
     clone.setColorTint(color)
+    coroutine.yield(0)
+    coroutine.yield(0)
 
     -- Place token on score zero.
     local SPACING_X = 0.3

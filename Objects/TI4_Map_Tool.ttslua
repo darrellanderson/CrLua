@@ -331,8 +331,13 @@ function placeTile(system, bag, position, rotation)
     assert(type(system) == 'table' and (not bag or type(bag) == 'userdata'))
     assert(type(position) == 'table' and type(rotation) == 'table')
 
+    local function doLock(object)
+        object.setLock(true)
+        object.use_hands = false
+    end
+
     local function delayedLock(object)
-        Wait.time(function() object.setLock(true) end, 1)
+        Wait.time(function() doLock(object) end, 1)
     end
 
     if bag then
@@ -379,6 +384,7 @@ function clearTilesCoroutine()
             local hasPlanets = system.planets and #system.planets > 0
             local bag = hasPlanets and blueBag or redBag
             object.setLock(false)
+            object.use_hands = true
             bag.putObject(object)
             coroutine.yield(0)
         end
@@ -498,6 +504,12 @@ function placeCardsCoroutine()
     -- Find all card locations in a single pass, then place cards.
     local planetNameToCardOrDeckAndEntryGuid = getPlanetNameToCardOrDeckAndEntryGuid()
     coroutine.yield(0)
+
+    -- Make sure system tiles are locked, and no longer drawable into hands.
+    for system, object in pairs(getPlacedSystemToObject()) do
+        object.use_hands = false
+        object.setLock(true)
+    end
 
     for system, object in pairs(getPlacedSystemToObject()) do
         if not system.home then

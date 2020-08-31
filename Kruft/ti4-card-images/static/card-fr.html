@@ -33,11 +33,12 @@
                 <li id="subtitleBlock">
                     <label>Subtitle</label>
                     <select name="type" id="type" class="field-select">
-                        <option value="action phase|ff0000">Action Phase</option>
-                        <option value="status phase|ffffff">Status Phase</option>
-                        <option value="agenda phase|ffffff">Agenda Phase</option>
-                        <option value="directive|ffff00">Directive</option>
-                        <option value="law|ddad63">Law</option>
+                        <option value="PHASE D'ACTION|ff0000">PHASE D'ACTION</option>
+                        <option value="PHASE DE STATUT|ffffff">PHASE DE STATUT</option>
+                        <option value="PHASE DE PROJET|ffffff">PHASE DE PROJET</option>
+                        <option value="TOUTES PHASES|ffffff">TOUTES PHASES</option>
+                        <option value="DIRECTIVE|ffff00">DIRECTIVE</option>
+                        <option value="LOI|ddad63">LOI</option>
                     </select>
                 </li>
                 <li>
@@ -98,11 +99,11 @@
             var points = encodeURIComponent(document.getElementById("points").value)
 
             if (card == 'secret' || card == 'secret-c') {
-                footer = 'Victory Point|dea3a9'
+                footer = 'POINT DE VICTOIRE|dea3a9'
             } else if (card == 'stage1' || card == 'stage1-c') {
-                footer = 'Victory Point|dfbc96'
+                footer = 'POINT DE VICTOIRE|dfbc96'
             } else if (card == 'stage2' || card == 'stage2-c') {
-                footer = 'Victory Points|e3f5f9'
+                footer = 'POINTS DE VICTOIRE|e3f5f9'
             }
 
             var url = "/img"

@@ -10,6 +10,7 @@
 from PIL import Image
 from PIL import ImageFont
 from PIL import ImageDraw
+from PIL import ImageColor
 
 from google.appengine.api import memcache
 from google.appengine.api import urlfetch
@@ -17,6 +18,8 @@ from google.appengine.api import urlfetch
 import hashlib
 import io
 import logging
+import math
+import random
 import re
 import os
 import os.path
@@ -237,18 +240,36 @@ SECRET_BODY_Y = 395
 SECRET_BODY_TEXT_SIZE = 38
 SECRET_BODY_TEXT_H = 47
 
+SECRET_FOOTER_L = 250
+SECRET_FOOTER_R = 95
+SECRET_FOOTER_Y = 707
+SECRET_FOOTER_TEXT_SIZE = 30
+SECRET_FOOTER_TEXT_H = 47
+
 PUBLIC_TITLE_L = 250
 PUBLIC_TITLE_R = 100
 PUBLIC_TITLE_Y1 = 35
 PUBLIC_TITLE_Y2 = 15
-PUBLIC_TITLE_TEXT_SIZE = 44
-PUBLIC_TITLE_TEXT_H = 44
+PUBLIC_TITLE_TEXT_SIZE = 43
+PUBLIC_TITLE_TEXT_H = 43
+
+PUBLIC_TYPE_L = 250
+PUBLIC_TYPE_R = 100
+PUBLIC_TYPE_Y = 128
+PUBLIC_TYPE_TEXT_SIZE = 34
+PUBLIC_TYPE_TEXT_H = 34
 
 PUBLIC_BODY_L = 250
 PUBLIC_BODY_R = 50
 PUBLIC_BODY_Y = 395
 PUBLIC_BODY_TEXT_SIZE = 39
 PUBLIC_BODY_TEXT_H = 48
+
+PUBLIC_FOOTER_L = 250
+PUBLIC_FOOTER_R = 95
+PUBLIC_FOOTER_Y = 705
+PUBLIC_FOOTER_TEXT_SIZE = 32
+PUBLIC_FOOTER_TEXT_H = 47
 
 AGENDA_TITLE_L = 250
 AGENDA_TITLE_R = 100
@@ -282,17 +303,9 @@ BODY_SM_LINEH = 37
 BODY_LG_SIZE = 40
 BODY_LG_LINEH = 47
 
-def actionCard(title, body, flavor, isCodex):
-    img = getImage('ActionCardCodex.jpg' if isCodex else 'ActionCard.jpg')
+def actionCard(title, body, flavor, cardImage):
+    img = getImage(cardImage)
     draw = ImageDraw.Draw(img)
-
-    if isCodex == 2:
-        x = 443
-        y = 19
-        w = 18
-        h = 26
-        color = (6, 6, 6, 255)
-        draw.rectangle([(x, y), (x+w, y+h)], color)
 
     font = getFont('HandelGothicDBold.otf', ACTION_TITLE_TEXT_SIZE)
     color = (255, 232, 150, 255)
@@ -334,16 +347,10 @@ def actionCard(title, body, flavor, isCodex):
     y = top - ACTION_FLAVOR_LINE_DY
     draw.line([(107, y), (CARD_W - 69, y)], fill=(255, 255, 255, 255), width=3)
 
-    #img2 = getImage('Bribery.jpg')
-    #img.putalpha(1)
-    #img2.putalpha(1)
-    #img = Image.blend(img, img2, 0.4)
-    #img = img.convert('RGB')
-
     return imageToJPEG(img)
 
-def secretObjectiveCard(title, type, body):
-    img = getImage('SecretObjective.jpg')
+def secretObjectiveCard(title, type, body, footer, cardImage):
+    img = getImage(cardImage)
     draw = ImageDraw.Draw(img)
 
     font = getFont('HandelGothicDBold.otf', SECRET_TITLE_TEXT_SIZE)
@@ -365,8 +372,9 @@ def secretObjectiveCard(title, type, body):
     draw.rectangle([(x, y), (x+w, y+h)], color)
 
     font = getFont('HandelGothicDBold.otf', SECRET_TYPE_TEXT_SIZE)
-    color = (255, 255, 255, 255) if type.lower() == 'status phase' else (255, 0, 0, 255)
-    text = type
+    items = type.split('|')
+    text = items[0]
+    color = ImageColor.getrgb('#' + items[1])
     x = SECRET_TYPE_L
     y = SECRET_TYPE_Y
     maxX = CARD_W - SECRET_TYPE_R
@@ -382,11 +390,27 @@ def secretObjectiveCard(title, type, body):
     lineH = BODY_LG_LINEH
     y = wrapTextCenterHV(draw, font, text, x, y, maxX, color, lineH)
 
+    x = 125
+    y = 710
+    w = 250
+    h = 30
+    color = (12, 12, 14, 255)
+    draw.rectangle([(x, y), (x+w, y+h)], color)
+
+    font = getFont('HandelGothicDBold.otf', SECRET_FOOTER_TEXT_SIZE)
+    items = footer.split('|')
+    text = items[0]
+    color = ImageColor.getrgb('#' + items[1])
+    x = SECRET_FOOTER_L
+    y = SECRET_FOOTER_Y
+    maxX = CARD_W - SECRET_FOOTER_R
+    lineH = SECRET_FOOTER_TEXT_H
+    wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
+
     return imageToJPEG(img)
 
-def publicObjectiveCard(level, title, body):
-    imageName = 'Stage' + str(level) + '.jpg'
-    img = getImage(imageName)
+def publicObjectiveCard(level, title, type, body, footer, cardImage):
+    img = getImage(cardImage)
     draw = ImageDraw.Draw(img)
 
     font = getFont('HandelGothicDBold.otf', PUBLIC_TITLE_TEXT_SIZE)
@@ -400,6 +424,23 @@ def publicObjectiveCard(level, title, body):
     y = nudgeY(font, text, maxX, y1, y2)
     wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
 
+    x = 120
+    y = 130
+    w = 260
+    h = 35
+    color = (12, 12, 14, 255)
+    draw.rectangle([(x, y), (x+w, y+h)], color)
+
+    font = getFont('HandelGothicDBold.otf', PUBLIC_TYPE_TEXT_SIZE)
+    items = type.split('|')
+    text = items[0]
+    color = ImageColor.getrgb('#' + items[1])
+    x = PUBLIC_TYPE_L
+    y = PUBLIC_TYPE_Y
+    maxX = CARD_W - PUBLIC_TYPE_R
+    lineH = PUBLIC_TYPE_TEXT_H
+    wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
+
     font = getFont('MyriadProSemibold.otf', PUBLIC_BODY_TEXT_SIZE)
     color = (255, 255, 255, 255)
     text = body
@@ -409,10 +450,27 @@ def publicObjectiveCard(level, title, body):
     lineH = PUBLIC_BODY_TEXT_H
     y = wrapTextCenterHV(draw, font, text, x, y, maxX, color, lineH)
 
+    x = 110
+    y = 710
+    w = 280
+    h = 30
+    color = (12, 12, 14, 255)
+    draw.rectangle([(x, y), (x+w, y+h)], color)
+
+    font = getFont('HandelGothicDBold.otf', PUBLIC_FOOTER_TEXT_SIZE)
+    items = footer.split('|')
+    text = items[0]
+    color = ImageColor.getrgb('#' + items[1])
+    x = PUBLIC_FOOTER_L
+    y = PUBLIC_FOOTER_Y
+    maxX = CARD_W - PUBLIC_FOOTER_R
+    lineH = PUBLIC_FOOTER_TEXT_H
+    wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
+
     return imageToJPEG(img)
 
-def agendaCard(title, type, body):
-    img = getImage('Agenda.jpg')
+def agendaCard(title, type, body, cardImage):
+    img = getImage(cardImage)
     draw = ImageDraw.Draw(img)
 
     font = getFont('HandelGothicDBold.otf', AGENDA_TITLE_TEXT_SIZE)
@@ -434,8 +492,9 @@ def agendaCard(title, type, body):
     draw.rectangle([(x, y), (x+w, y+h)], color)
 
     font = getFont('MyriadProBold.ttf', AGENDA_TYPE_TEXT_SIZE)
-    color = (255, 255, 0, 255) if type.lower() == 'directive' else (221, 173, 99, 255)
-    text = type
+    items = type.split('|')
+    text = items[0]
+    color = ImageColor.getrgb('#' + items[1])
     x = AGENDA_TYPE_L
     y = AGENDA_TYPE_Y
     maxX = CARD_W - AGENDA_TYPE_R
@@ -525,8 +584,58 @@ def nobilityCard(color, title, type, body, footer, points):
 
     return imageToJPEG(img)
 
-
 # -----------------------------------------------------------------------------
+
+CARD_OPTIONS = {
+    'action' : {
+        'cardType' : 'action',
+        'cardImage' : 'ActionCard.jpg'
+    },
+    'action-c' : {
+        'cardType' : 'action',
+        'cardImage' : 'ActionCard_c.jpg'
+    },
+    'action_codex' : {
+        'cardType' : 'action',
+        'cardImage' : 'ActionCardCodex.jpg'
+    },
+    'secret' : {
+        'cardType' : 'secret',
+        'cardImage' : 'SecretObjective.jpg'
+    },
+    'secret-c' : {
+        'cardType' : 'secret',
+        'cardImage' : 'SecretObjective_c.jpg'
+    },
+    'stage1' : {
+        'cardType' : 'public1',
+        'cardImage' : 'Stage1.jpg'
+    },
+    'stage1-c' : {
+        'cardType' : 'public1',
+        'cardImage' : 'Stage1_c.jpg'
+    },
+    'stage2' : {
+        'cardType' : 'public2',
+        'cardImage' : 'Stage2.jpg'
+    },
+    'stage2-c' : {
+        'cardType' : 'public2',
+        'cardImage' : 'Stage2_c.jpg'
+    },
+    'agenda' : {
+        'cardType' : 'agenda',
+        'cardImage' : 'Agenda.jpg'
+    },
+    'agenda-c' : {
+        'cardType' : 'agenda',
+        'cardImage' : 'Agenda_c.jpg'
+    },
+    'nobility' : {
+        'cardType' : 'nobility',
+        'cardImage' : False
+    }
+}
 
 class CardHandler(webapp2.RequestHandler):
     def get(self):
@@ -553,22 +662,24 @@ class CardHandler(webapp2.RequestHandler):
         hash.update('version5')
         key = hash.hexdigest().lower()
 
+        cardOptions = CARD_OPTIONS[card]
+        cardType = cardOptions['cardType']
+        cardImage = cardOptions['cardImage']
+
         jpg = memcache.get(key=key)
         #jpg = None
         if jpg is None:
-            if card == 'action':
-                jpg = actionCard(title, body, flavor, False)
-            elif card == 'action_codex':
-                jpg = actionCard(title, body, flavor, True)
-            elif card == 'secret':
-                jpg = secretObjectiveCard(title, type, body)
-            elif card == 'stage1':
-                jpg = publicObjectiveCard(1, title, body)
-            elif card == 'stage2':
-                jpg = publicObjectiveCard(2, title, body)
-            elif card == 'agenda':
-                jpg = agendaCard(title, type, body)
-            elif card == 'nobility':
+            if cardType == 'action':
+                jpg = actionCard(title, body, flavor, cardImage)
+            elif cardType == 'secret':
+                jpg = secretObjectiveCard(title, type, body, footer, cardImage)
+            elif cardType == 'public1':
+                jpg = publicObjectiveCard(1, title, type, body, footer, cardImage)
+            elif cardType == 'public2':
+                jpg = publicObjectiveCard(2, title, type, body, footer, cardImage)
+            elif cardType == 'agenda':
+                jpg = agendaCard(title, type, body, cardImage)
+            elif cardType == 'nobility':
                 jpg = nobilityCard(color, title, type, body, footer, points)
             else:
                 self.response.status = 400 # bad request
@@ -586,7 +697,7 @@ class getActionHandler(webapp2.RequestHandler):
         body = self.request.get('body')
         flavor = self.request.get('flavor')
         source = self.request.get('source')
-        jpg = actionCard(title.upper(), body, flavor, True if source.lower() == 'codex' else 2)
+        jpg = actionCard(title.upper(), body, flavor, 'ActionCard_c.jpg')
         self.response.headers['Content-Type'] = 'image/jpeg'
         self.response.out.write(jpg)
 
@@ -658,14 +769,72 @@ class MutateSystemTile(webapp2.RequestHandler):
         self.response.headers['Content-Type'] = 'image/jpeg'
         self.response.out.write(jpg)
 
+class RadialDither(webapp2.RequestHandler):
+    def get(self):
+        center = ImageColor.getrgb('#' + self.request.get('center', 'ffffff'))
+        edge = ImageColor.getrgb('#' + self.request.get('edge', '000000'))
+        size = int(self.request.get('size', 128))
+        bits = int(self.request.get('bits', 5))
+        img = Image.new('RGB', (size, size))
+        pixels = img.load()
+        dr = edge[0] - center[0]
+        dg = edge[1] - center[1]
+        db = edge[2] - center[2]
+        quant = 2 ^ bits
+        for x in range(0, size):
+            for y in range(0, size):
+                dx = x - (size / 2)
+                dy = y - (size / 2)
+
+                # Actual U
+                u = math.sqrt((dx * dx) + (dy * dy)) / (size / 2)
+
+                # Quantized U
+                uq = math.floor(u * quant) / quant
+
+                # U2 is 0:1 how far along the quant.
+                u2 = (u - uq) * quant
+
+                # Replace U with either pre or post quant.
+                u = uq
+                if random.random() < u2:
+                    u = u + 1.0 / quant
+
+                # Noise step, keep or push to neighbor.
+                r = random.random()
+                if r < 0.1:
+                    u = u - 3.0 / quant
+                elif r < 0.2:
+                    u = u - 2.0 / quant
+                elif r < 0.3:
+                    u = u - 1.0 / quant
+                elif r > 0.9:
+                    u = u + 3.0 / quant
+                elif r > 0.8:
+                    u = u + 2.0 / quant
+                elif r > 0.7:
+                    u = u + 1.0 / quant
+                u = min(u, 1)
+                u = max(u, 0)
+
+                r = int(center[0] + (dr * u))
+                g = int(center[1] + (dg * u))
+                b = int(center[2] + (db * u))
+                pixels[x,y] = (r, g, b)
+        jpg = imageToJPEG(img)
+        self.response.headers['Content-Type'] = 'image/jpeg'
+        self.response.out.write(jpg)
+
+
 app = webapp2.WSGIApplication([
     ('/img', CardHandler),
-    ('/getaction', getActionHandler),
-    ('/testaction', TestActionHandler),
-    ('/testsecret', TestSecretHandler),
-    ('/testpublic', TestPublicHandler),
-    ('/testagenda', TestAgenda1Handler),
-    ('/testagenda2', TestAgenda2Handler),
-    ('/mutatesystem', MutateSystemTile),
+    #('/getaction', getActionHandler),
+    #('/testaction', TestActionHandler),
+    #('/testsecret', TestSecretHandler),
+    #('/testpublic', TestPublicHandler),
+    #('/testagenda', TestAgenda1Handler),
+    #('/testagenda2', TestAgenda2Handler),
+    #('/mutatesystem', MutateSystemTile),
+    #('/radialdither', RadialDither),
 
 ], debug=True)

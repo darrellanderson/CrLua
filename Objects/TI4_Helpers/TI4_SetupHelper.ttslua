@@ -846,13 +846,8 @@ function SetupFaction.getFactionAndTokenObject(zoneColor)
     assert(type(zoneColor) == 'string')
     debugLog('SetupFaction.getFactionTokenObject: ' .. zoneColor)
 
-    local inHandGuidSet = _zoneHelper.inHand()
-    local tokenNameToFaction = {}
-    for _, faction in pairs(_factionHelper.allFactions(true)) do
-        tokenNameToFaction[faction.tokenName] = faction
-    end
-
     -- Filter to only not-in-hand, yes-in-zone.
+    local inHandGuidSet = _zoneHelper.inHand()
     local function isCandidate(object)
         if inHandGuidSet[object.getGUID()] then
             return false
@@ -861,19 +856,10 @@ function SetupFaction.getFactionAndTokenObject(zoneColor)
     end
 
     for _, object in ipairs(getAllObjects()) do
-        if isCandidate(object) then
-            local name = object.getName()
-            local faction = tokenNameToFaction[name]
-            if faction then
-                debugLog('SetupFaction.getFactionTokenObject: found ' .. object.getName())
-                return faction, object
-            end
-            local tokenName = string.match(name, '^(.+) Owner Token$')
-            local faction = tokenName and tokenNameToFaction[tokenName]
-            if faction then
-                debugLog('SetupFaction.getFactionTokenObject: found ' .. object.getName())
-                return faction, object
-            end
+        local faction = _factionHelper.fromTokenName(object.getName())
+        if faction and isCandidate(object) then
+            debugLog('SetupFaction.getFactionTokenObject: found ' .. object.getName())
+            return faction, object
         end
     end
 end
@@ -1325,6 +1311,10 @@ function unpackFactionCoroutine()
     local commandTokensBag = nameToObject[faction.tokenName .. ' Command Tokens Bag']
     local ownerTokensBag = nameToObject[faction.tokenName .. ' Owner Tokens Bag']
     nameToObject = nil
+    coroutine.yield(0)
+
+    -- Make sure the faction helper knows about the faction before unpacking tokens.
+    _factionHelper.updateFactions()
     coroutine.yield(0)
 
     SetupFaction.unpackCommandTokens(color, commandTokensBag)

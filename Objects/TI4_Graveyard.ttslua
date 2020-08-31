@@ -24,7 +24,6 @@ function getHelperClient(helperObjectName)
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
 local _deckHelper = getHelperClient('TI4_DECK_HELPER')
-local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 
 -- Token bags use inconsistent name to bag, hard code for simplicity.
 local TOKEN_BAGS = {
@@ -62,24 +61,8 @@ local data = {
 local function getNonCardDestination(objectTag, objectName)
     assert(type(objectName) == 'string')
 
-    -- Faction owner tokens go into pick a faction to play bag.
-    local faction = objectTag == 'Card' and _factionHelper.fromTokenName(objectName)
-    if faction then
-        local bagGuid = data.pickFactionTokenBagGuid
-        bag = bagGuid and getObjectFromGUID(bagGuid)
-        if not bag then
-            for _, candidate in ipairs(getAllObjects()) do
-                if candidate.tag == 'Bag' and candidate.getName() == PICK_FACTION_BAG then
-                    data.pickFactionTokenBagGuid = candidate.getGUID()
-                    return candidate
-                end
-            end
-        end
-    end
-
     local bagGuid = data.objectNameToBagGuid[objectName]
     local bag = bagGuid and getObjectFromGUID(bagGuid)
-
 
     -- If we do not have a bag, look for one and remember it if found.  If more
     -- than one choose closest (reduces objects from flying over the table).
@@ -107,6 +90,8 @@ local function getNonCardDestination(objectTag, objectName)
         end
         data.objectNameToBagGuid[objectName] = bag and bag.getGUID()
     end
+
+    return bag
 end
 
 -------------------------------------------------------------------------------

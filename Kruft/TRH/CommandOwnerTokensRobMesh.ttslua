@@ -22,7 +22,7 @@ local IMAGE = {
     ['Arborec'] = 'Arborec',
     ['Barony of Letnev'] = 'Letnev',
     ['Clan of Saar'] = 'Saar',
-    ['Embers of Muaat'] = 'Muatt',
+    ['Embers of Muaat'] = 'Muaat',
     ['Emirates of Hacan'] = 'Hacan',
     ['Federation of Sol'] = 'Sol',
     ['Ghosts of Creuss'] = 'Creuss',
@@ -30,7 +30,7 @@ local IMAGE = {
     ['Mentak Coalition'] = 'Mentak',
     ['Naalu Collective'] = 'Naalu',
     ['Nekro Virus'] = 'Nekro',
-    ["Sardakk N'orr"] = 'Sadrakk',
+    ["Sardakk N'orr"] = 'Sardakk',
     ['Universities of Jol-Nar'] = 'JolNar',
     ['Winnu'] = 'Winnu',
     ['Xxcha Kingdom'] = 'Xxcha',
@@ -98,7 +98,7 @@ local function mutateJson(json, image, rule)
     return JSON.encode_pretty(json)
 end
 
-local function mutateObject(object, image, rule)
+local function mutateObject(object, image, rule, isFirst)
     assert(type(object) == 'userdata' and type(image) == 'string' and type(rule) == 'table')
     print('mutating ' .. object.getName())
 
@@ -140,7 +140,7 @@ local function mutateObject(object, image, rule)
     while object.spawning do
         coroutine.yield(0)
     end
-    local waitUntil = Time.time + 3
+    local waitUntil = Time.time + (isFirst and 3 or 0.2)
     while Time.time < waitUntil do
         coroutine.yield(0)
     end
@@ -188,7 +188,7 @@ function mutateCoroutine()
             coroutine.yield(0)
             coroutine.yield(0)
 
-            for _, tokenEntry in ipairs(commandTokens.getObjects()) do
+            for i, tokenEntry in ipairs(commandTokens.getObjects()) do
                 local token = commandTokens.takeObject({
                     guid = tokenEntry.guid,
                     position = { x = p.x, y = p.y + 15, z = p.z },
@@ -198,7 +198,7 @@ function mutateCoroutine()
                 coroutine.yield(0)
                 coroutine.yield(0)
 
-                token = mutateObject(token, image, COMMAND_TOKEN)
+                token = mutateObject(token, image, COMMAND_TOKEN, i == 1)
                 coroutine.yield(0)
                 coroutine.yield(0)
 
@@ -229,7 +229,7 @@ function mutateCoroutine()
             coroutine.yield(0)
             coroutine.yield(0)
 
-            token = mutateObject(token, image, OWNER_TOKEN)
+            token = mutateObject(token, image, OWNER_TOKEN, true)
             coroutine.yield(0)
             coroutine.yield(0)
 
@@ -253,8 +253,6 @@ function mutateCoroutine()
             factionsBox.putObject(box)
             coroutine.yield(0)
             coroutine.yield(0)
-
-            error('stop')
         end
     end
 

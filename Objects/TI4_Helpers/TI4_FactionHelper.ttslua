@@ -339,6 +339,7 @@ local _factionAttributes = {
 }
 
 local _colorToFaction = {}
+local _tokenNameToFaction = {}
 
 local _update = {
     time = false,
@@ -350,14 +351,14 @@ function allFactions(includeFactionsNotAtTable)
     if includeFactionsNotAtTable then
         return _factionAttributes
     else
-        _maybeUpdate()
+        _maybeUpdateFactions()
         return _colorToFaction
     end
 end
 
 function fromColor(color)
     assert(type(color) == 'string')
-    _maybeUpdate()
+    _maybeUpdateFactions()
     return _colorToFaction[color]
 end
 
@@ -366,131 +367,164 @@ function fromTokenName(tokenName)
     assert(type(tokenName) == 'string')
     tokenName = string.match(tokenName, '^(.*) .* Token$') or tokenName
     if string.len(tokenName) > 0 then
-        _maybeUpdate()
-        -- First check the official map which contains color attributes.
-        for _, faction in pairs(_colorToFaction) do
-            if faction.tokenName == tokenName then
-                return faction
-            end
+        _maybeUpdateFactions()
+        return _tokenNameToFaction[tokenName]
+    end
+end
+
+function _maybeUpdateFactions()
+    if not _update.time or (Time.time - _update.time) > _update.periodicUpdateSeconds then
+        updateFactions()
+    end
+end
+
+function updateFactions()
+    _update.time = Time.time
+
+    local factionLowerToFactionName = {}
+    for factionName, _ in pairs(_factionAttributes) do
+        factionLowerToFactionName[string.lower(factionName)] = factionName
+    end
+
+    -- Find command sheets (indexed by color), faction sheets (indexed by
+    -- faction name), and command token bags (indexed by "token faction" name,
+    -- which may differ slightly from the faction sheet faction name).
+    local colorToCommandSheet = {}
+    local factionSheetGuidToFactionSheet = {}
+    local factionSheetGuidToFactionName = {}
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        local guid = object.getGUID()
+
+        -- "Command Sheet (COLOR)"
+        local color = string.match(name, '^Command Sheet %((%a+)%)$')
+        if color then
+            colorToCommandSheet[color] = object
         end
 
-        -- Next search all.
-        for _, faction in pairs(_factionAttributes) do
-            if faction.tokenName == tokenName then
-                return faction
+        -- "FACTION Sheet" (only accept if FACTION in whitelist!)
+        -- Replace name with "expected" case, sometimes "of" vs "Of" depending on object.
+        local factionName = string.match(name, '^(.+) Sheet$')
+        factionName = factionName and factionLowerToFactionName[string.lower(factionName)]
+        if factionName then
+            factionSheetGuidToFactionSheet[guid] = object
+            factionSheetGuidToFactionName[guid] = factionName
+        end
+    end
+
+    -- Given a key/object-value table, return a map from command sheet color
+    -- to the key whose object is closest to the command sheet AND VICE VERSA.
+    -- For example, consider a table with an empty seat that has a command sheet
+    -- but no faction sheet.  In that case, that orphaned command sheet does
+    -- have a closest faction sheet, but that faction sheet is closer to another.
+    -- Likewise consider an extra faction sheet placed on the table for some
+    -- reason.  That faction sheet has a closest command sheet, but that
+    -- command sheet is closer to another.
+    local function distanceSq(p1, p2)
+        return (p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2
+    end
+    local function minKV(map, f)
+        local bestF = false
+        local bestK = false
+        for k, v in pairs(map) do
+            local thisF = f(v)
+            if not bestF or thisF < bestF then
+                bestF = thisF
+                bestK = k
             end
+        end
+        return bestK, map[bestK]
+    end
+    local function colorToClosestKey(keyToObjectTable)
+        local result = {}
+        -- Assign each object to its closest command sheet.
+        local colorToKeys = {}
+        for key, object in pairs(keyToObjectTable) do
+            local objectPosition = object.getPosition()
+            local function distance(commandSheet)
+                local commandSheetPosition = commandSheet.getPosition()
+                return distanceSq(objectPosition, commandSheetPosition)
+            end
+            local color, _ = minKV(colorToCommandSheet, distance)
+            if color then
+                local entry = colorToKeys[color]
+                if not entry then
+                    entry = {}
+                    colorToKeys[color] = entry
+                end
+                table.insert(entry, key)
+            end
+        end
+        -- For each color, get the closest candidate object.
+        for color, keys in pairs(colorToKeys) do
+            local colorPosition = colorToCommandSheet[color].getPosition()
+            local function distance(key)
+                local objectPosition = keyToObjectTable[key].getPosition()
+                return distanceSq(objectPosition, colorPosition)
+            end
+            local _, key = minKV(keys, distance)
+            result[color] = key
+        end
+        return result
+    end
+
+    -- Map command sheet color to nearest faction, tokenFaction, and seated player.
+    local colorToFactionSheetGuid = colorToClosestKey(factionSheetGuidToFactionSheet)
+
+    _colorToFaction = {}
+    _tokenNameToFaction = {}
+    for color, factionSheetGuid in pairs(colorToFactionSheetGuid) do
+        local factionName = factionSheetGuidToFactionName[factionSheetGuid]
+        local attributes = {
+            color = color,
+            commandSheetGuid = colorToCommandSheet[color].getGUID(),
+            factionSheetGuid = colorToFactionSheetGuid[color],
+        }
+        for k, v in pairs(_factionAttributes[factionName]) do
+            attributes[k] = v
+        end
+        _colorToFaction[color] = attributes
+        _tokenNameToFaction[attributes.tokenName] = attributes
+    end
+
+    -- Add any missing factions to token name map.
+    for factionName, attributes in pairs(_factionAttributes) do
+        if not _tokenNameToFaction[attributes.tokenName] then
+            _tokenNameToFaction[attributes.tokenName] = attributes
         end
     end
 end
 
-function _maybeUpdate()
-    if not _update.time or (Time.time - _update.time) > _update.periodicUpdateSeconds then
-        _update.time = Time.time
+-------------------------------------------------------------------------------
 
-        local factionLowerToFactionName = {}
-        for factionName, _ in pairs(_factionAttributes) do
-            factionLowerToFactionName[string.lower(factionName)] = factionName
-        end
-
-        -- Find command sheets (indexed by color), faction sheets (indexed by
-        -- faction name), and command token bags (indexed by "token faction" name,
-        -- which may differ slightly from the faction sheet faction name).
-        local colorToCommandSheet = {}
-        local factionSheetGuidToFactionSheet = {}
-        local factionSheetGuidToFactionName = {}
-        for _, object in ipairs(getAllObjects()) do
-            local name = object.getName()
-            local guid = object.getGUID()
-
-            -- "Command Sheet (COLOR)"
-            local color = string.match(name, '^Command Sheet %((%a+)%)$')
-            if color then
-                colorToCommandSheet[color] = object
-            end
-
-            -- "FACTION Sheet" (only accept if FACTION in whitelist!)
-            -- Replace name with "expected" case, sometimes "of" vs "Of" depending on object.
-            local factionName = string.match(name, '^(.+) Sheet$')
-            factionName = factionName and factionLowerToFactionName[string.lower(factionName)]
-            if factionName then
-                factionSheetGuidToFactionSheet[guid] = object
-                factionSheetGuidToFactionName[guid] = factionName
-            end
-        end
-
-        -- Given a key/object-value table, return a map from command sheet color
-        -- to the key whose object is closest to the command sheet AND VICE VERSA.
-        -- For example, consider a table with an empty seat that has a command sheet
-        -- but no faction sheet.  In that case, that orphaned command sheet does
-        -- have a closest faction sheet, but that faction sheet is closer to another.
-        -- Likewise consider an extra faction sheet placed on the table for some
-        -- reason.  That faction sheet has a closest command sheet, but that
-        -- command sheet is closer to another.
-        local function distanceSq(p1, p2)
-            return (p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2
-        end
-        local function minKV(map, f)
-            local bestF = false
-            local bestK = false
-            for k, v in pairs(map) do
-                local thisF = f(v)
-                if not bestF or thisF < bestF then
-                    bestF = thisF
-                    bestK = k
-                end
-            end
-            return bestK, map[bestK]
-        end
-        local function colorToClosestKey(keyToObjectTable)
-            local result = {}
-            -- Assign each object to its closest command sheet.
-            local colorToKeys = {}
-            for key, object in pairs(keyToObjectTable) do
-                local objectPosition = object.getPosition()
-                local function distance(commandSheet)
-                    local commandSheetPosition = commandSheet.getPosition()
-                    return distanceSq(objectPosition, commandSheetPosition)
-                end
-                local color, _ = minKV(colorToCommandSheet, distance)
-                if color then
-                    local entry = colorToKeys[color]
-                    if not entry then
-                        entry = {}
-                        colorToKeys[color] = entry
-                    end
-                    table.insert(entry, key)
-                end
-            end
-            -- For each color, get the closest candidate object.
-            for color, keys in pairs(colorToKeys) do
-                local colorPosition = colorToCommandSheet[color].getPosition()
-                local function distance(key)
-                    local objectPosition = keyToObjectTable[key].getPosition()
-                    return distanceSq(objectPosition, colorPosition)
-                end
-                local _, key = minKV(keys, distance)
-                result[color] = key
-            end
-            return result
-        end
-
-        -- Map command sheet color to nearest faction, tokenFaction, and seated player.
-        local colorToFactionSheetGuid = colorToClosestKey(factionSheetGuidToFactionSheet)
-
-        _colorToFaction = {}
-        for color, factionSheetGuid in pairs(colorToFactionSheetGuid) do
-            local factionName = factionSheetGuidToFactionName[factionSheetGuid]
-            local attributes = {
-                color = color,
-                commandSheetGuid = colorToCommandSheet[color].getGUID(),
-                factionSheetGuid = colorToFactionSheetGuid[color],
-            }
-            for k, v in pairs(_factionAttributes[factionName]) do
-                attributes[k] = v
-            end
-            _colorToFaction[color] = attributes
-        end
+local function _maybeTint(object)
+    if object.tag ~= 'Generic' then
+        return -- not a token
     end
+
+    local tokenName, tokenType = string.match(object.getName(), '^(.*) (%u%a+) Token$')
+    if tokenType ~= 'Command' and tokenType ~= 'Owner' then
+        return
+    end
+
+    local faction = fromTokenName(tokenName)
+    if not faction or not faction.color then
+        return
+    end
+
+    -- TODO XXX : WHAT IF MORE THAN ONE COLOR SHARE A FACTION??
+    object.setColorTint(faction.color)
+end
+
+function tintTokens()
+    _maybeUpdateFactions()
+    for _, object in ipairs(getAllObjects()) do
+        _maybeTint(object)
+    end
+end
+
+function onObjectLeaveContainer(container, leaveObject)
+    _maybeTint(leaveObject)
 end
 
 function onLoad(saveState)
@@ -512,4 +546,6 @@ function onLoad(saveState)
     for factionName, attributes in pairs(_factionAttributes) do
         attributes.name = factionName
     end
+
+    Wait.frames(tintTokens, 3)
 end

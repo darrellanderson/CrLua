@@ -74,6 +74,20 @@
                         <option value="2">2</option>
                     </select>
                 </li>
+
+                <li id="fontSizeBlock">
+                    <label>Font Size</label>
+                    <select name="fontsize" id="fontsize" class="field-select">
+                        <option value="0">Normal</option>
+                        <option value="-1">-1</option>
+                        <option value="-2">-2</option>
+                        <option value="-3">-3</option>
+                        <option value="-4">-4</option>
+                        <option value="-5">-5</option>
+                        <option value="-6">-6</option>
+                    </select>
+                </li>
+
                 <li>
                     <input type="submit" value="Update" />
                 </li>
@@ -96,6 +110,7 @@
             var color = encodeURIComponent(document.getElementById("color").value)
             var footer = encodeURIComponent(document.getElementById("footer").value)
             var points = encodeURIComponent(document.getElementById("points").value)
+            var fontsize = encodeURIComponent(document.getElementById("fontsize").value)
 
             if (card == 'secret' || card == 'secret-c') {
                 footer = 'Victory Point|dea3a9'
@@ -114,6 +129,7 @@
             url = url + "&color=" + color
             url = url + "&footer=" + footer
             url = url + "&points=" + points
+            url = url + "&fontsize=" + fontsize
 
             var img = document.getElementById("cardimage")
             img.src = url

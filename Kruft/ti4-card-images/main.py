@@ -288,7 +288,7 @@ AGENDA_BODY_UPPER_TEXT_SIZE = 24
 AGENDA_BODY_ELECT_L = 250
 AGENDA_BODY_ELECT_R = 90
 AGENDA_BODY_FORAGAINST_L = 60
-AGENDA_BODY_FORAGAINST_R = 75
+AGENDA_BODY_FORAGAINST_R = 90
 AGENDA_BODY_Y = 225
 AGENDA_BODY_TEXT_SIZE = 28
 AGENDA_BODY_TEXT_H = 35
@@ -303,7 +303,7 @@ BODY_SM_LINEH = 37
 BODY_LG_SIZE = 40
 BODY_LG_LINEH = 47
 
-def actionCard(title, body, flavor, cardImage):
+def actionCard(title, body, flavor, cardImage, fontsize):
     img = getImage(cardImage)
     draw = ImageDraw.Draw(img)
 
@@ -320,28 +320,28 @@ def actionCard(title, body, flavor, cardImage):
 
     body = body.replace('Action:', 'ACTION:')
     if 'ACTION:' in body:
-        font1 = getFont('MyriadProBoldItalic.ttf', ACTION_BODY_TEXT_SIZE)
+        font1 = getFont('MyriadProBoldItalic.ttf', ACTION_BODY_TEXT_SIZE + fontsize)
     else:
-        font1 = getFont('MyriadProBold.ttf', ACTION_BODY_TEXT_SIZE)
-    font2 = getFont('MyriadProSemibold.otf', ACTION_BODY_TEXT_SIZE)
-    font3 = getFont('HandelGothicDBold.otf', ACTION_BODY_UPPER_TEXT_SIZE)
+        font1 = getFont('MyriadProBold.ttf', ACTION_BODY_TEXT_SIZE + fontsize)
+    font2 = getFont('MyriadProSemibold.otf', ACTION_BODY_TEXT_SIZE + fontsize)
+    font3 = getFont('HandelGothicDBold.otf', ACTION_BODY_UPPER_TEXT_SIZE + fontsize)
 
     color = (255, 255, 255, 255)
     text = body
     x = ACTION_BODY_L
     y = ACTION_BODY_Y
     maxX = CARD_W - ACTION_BODY_R
-    lineH = ACTION_BODY_TEXT_H
+    lineH = ACTION_BODY_TEXT_H + fontsize
     for line in text.split('\n'):
         y = wrapTextBoldStart(draw, font1, font2, font3, line, x, y, maxX, color, lineH, 2)
 
-    font = getFont('MyriadWebProItalic.ttf', ACTION_FLAVOR_TEXT_SIZE)
+    font = getFont('MyriadWebProItalic.ttf', ACTION_FLAVOR_TEXT_SIZE + fontsize)
     color = (255, 255, 255, 255)
     text = flavor
     x = ACTION_FLAVOR_L
     y = ACTION_FLAVOR_Y
     maxX = CARD_W - ACTION_FLAVOR_R
-    lineH = ACTION_FLAVOR_TEXT_H
+    lineH = ACTION_FLAVOR_TEXT_H + fontsize
     top = wrapTextCenterAlignBottom(draw, font, text, x, y, maxX, color, lineH)
 
     y = top - ACTION_FLAVOR_LINE_DY
@@ -349,7 +349,7 @@ def actionCard(title, body, flavor, cardImage):
 
     return imageToJPEG(img)
 
-def secretObjectiveCard(title, type, body, footer, cardImage):
+def secretObjectiveCard(title, type, body, footer, cardImage, fontsize):
     img = getImage(cardImage)
     draw = ImageDraw.Draw(img)
 
@@ -381,13 +381,13 @@ def secretObjectiveCard(title, type, body, footer, cardImage):
     lineH = SECRET_TYPE_TEXT_H
     wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
 
-    font = getFont('MyriadProSemibold.otf', SECRET_BODY_TEXT_SIZE)
+    font = getFont('MyriadProSemibold.otf', SECRET_BODY_TEXT_SIZE + fontsize)
     color = (255, 255, 255, 255)
     text = body
     x = SECRET_BODY_L
     y = SECRET_BODY_Y
     maxX = CARD_W - SECRET_BODY_R
-    lineH = BODY_LG_LINEH
+    lineH = BODY_LG_LINEH + fontsize
     y = wrapTextCenterHV(draw, font, text, x, y, maxX, color, lineH)
 
     x = 125
@@ -409,7 +409,7 @@ def secretObjectiveCard(title, type, body, footer, cardImage):
 
     return imageToJPEG(img)
 
-def publicObjectiveCard(level, title, type, body, footer, cardImage):
+def publicObjectiveCard(level, title, type, body, footer, cardImage, fontsize):
     img = getImage(cardImage)
     draw = ImageDraw.Draw(img)
 
@@ -441,13 +441,13 @@ def publicObjectiveCard(level, title, type, body, footer, cardImage):
     lineH = PUBLIC_TYPE_TEXT_H
     wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
 
-    font = getFont('MyriadProSemibold.otf', PUBLIC_BODY_TEXT_SIZE)
+    font = getFont('MyriadProSemibold.otf', PUBLIC_BODY_TEXT_SIZE + fontsize)
     color = (255, 255, 255, 255)
     text = body
     x = PUBLIC_BODY_L
     y = PUBLIC_BODY_Y
     maxX = CARD_W - PUBLIC_BODY_R
-    lineH = PUBLIC_BODY_TEXT_H
+    lineH = PUBLIC_BODY_TEXT_H + fontsize
     y = wrapTextCenterHV(draw, font, text, x, y, maxX, color, lineH)
 
     x = 110
@@ -469,7 +469,7 @@ def publicObjectiveCard(level, title, type, body, footer, cardImage):
 
     return imageToJPEG(img)
 
-def agendaCard(title, type, body, cardImage):
+def agendaCard(title, type, body, cardImage, fontsize):
     img = getImage(cardImage)
     draw = ImageDraw.Draw(img)
 
@@ -503,13 +503,13 @@ def agendaCard(title, type, body, cardImage):
 
     #font1 = getFont('MyriadProBold.ttf', AGENDA_BODY_TEXT_SIZE)
     #font2 = getFont('MyriadProSemibold.otf', AGENDA_BODY_TEXT_SIZE)
-    font2 = getFont('MyriadProRegular.ttf', AGENDA_BODY_TEXT_SIZE)
+    font2 = getFont('MyriadProRegular.ttf', AGENDA_BODY_TEXT_SIZE + fontsize)
     color = (0, 0, 0, 255)
     text = body
     y = AGENDA_BODY_Y
-    lineH = AGENDA_BODY_TEXT_H
+    lineH = AGENDA_BODY_TEXT_H + fontsize
     if 'Elect ' in text:
-        font1 = getFont('MyriadProSemibold.otf', AGENDA_BODY_TEXT_SIZE)
+        font1 = getFont('MyriadProSemibold.otf', AGENDA_BODY_TEXT_SIZE + fontsize)
         x = AGENDA_BODY_ELECT_L
         maxX = CARD_W - AGENDA_BODY_ELECT_R
         for line in text.split('\n'):
@@ -518,8 +518,8 @@ def agendaCard(title, type, body, cardImage):
             else:
                 y = wrapTextCenter(draw, font2, line, x, y, maxX, color, lineH)
     else:
-        font1 = getFont('MyriadProSemiboldItalic.ttf', AGENDA_BODY_TEXT_SIZE)
-        font3 = getFont('HandelGothicDBold.otf', AGENDA_BODY_UPPER_TEXT_SIZE)
+        font1 = getFont('MyriadProSemiboldItalic.ttf', AGENDA_BODY_TEXT_SIZE + fontsize)
+        font3 = getFont('HandelGothicDBold.otf', AGENDA_BODY_UPPER_TEXT_SIZE + fontsize)
         x = AGENDA_BODY_FORAGAINST_L
         maxX = CARD_W - AGENDA_BODY_FORAGAINST_R
         for line in text.split('\n'):
@@ -530,7 +530,7 @@ def agendaCard(title, type, body, cardImage):
 
     return imageToJPEG(img)
 
-def nobilityCard(color, title, type, body, footer, points):
+def nobilityCard(color, title, type, body, footer, points, fontsize):
     filename = 'Nobility' + color + '.jpg'
     img = getImage(filename)
     draw = ImageDraw.Draw(img)
@@ -555,13 +555,13 @@ def nobilityCard(color, title, type, body, footer, points):
     lineH = TYPE_LINEH
     wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
 
-    font = getFont('MyriadProSemibold.otf', BODY_LG_SIZE)
+    font = getFont('MyriadProSemibold.otf', BODY_LG_SIZE + fontsize)
     color = (255, 255, 255, 255)
     text = body
     x = 250
     y = 375
     maxX = 450
-    lineH = BODY_LG_LINEH
+    lineH = BODY_LG_LINEH + fontsize
     y = wrapTextCenterHV(draw, font, text, x, y, maxX, color, lineH)
 
     font = getFont('MyriadProBold.ttf', 40)
@@ -647,6 +647,7 @@ class CardHandler(webapp2.RequestHandler):
         footer = self.request.get('footer', 'footer').upper()
         color = self.request.get('color', 'white').capitalize()
         points = self.request.get('points', '1').lower()
+        fontsize = self.request.get('fontsize', '0').lower()
 
         logging.info('Card "' + card + '" title="' + title + '" type="' + type + '" body="' + body + '" flavor="' + flavor + '"')
 
@@ -659,28 +660,30 @@ class CardHandler(webapp2.RequestHandler):
         hash.update(flavor.encode('utf-8'))
         hash.update(color.encode('utf-8'))
         hash.update(points.encode('utf-8'))
+        hash.update(fontsize.encode('utf-8'))
         hash.update('version5')
         key = hash.hexdigest().lower()
 
         cardOptions = CARD_OPTIONS[card]
         cardType = cardOptions['cardType']
         cardImage = cardOptions['cardImage']
+        fontsize = int(fontsize)
 
         jpg = memcache.get(key=key)
-        #jpg = None
+        jpg = None
         if jpg is None:
             if cardType == 'action':
-                jpg = actionCard(title, body, flavor, cardImage)
+                jpg = actionCard(title, body, flavor, cardImage, fontsize)
             elif cardType == 'secret':
-                jpg = secretObjectiveCard(title, type, body, footer, cardImage)
+                jpg = secretObjectiveCard(title, type, body, footer, cardImage, fontsize)
             elif cardType == 'public1':
-                jpg = publicObjectiveCard(1, title, type, body, footer, cardImage)
+                jpg = publicObjectiveCard(1, title, type, body, footer, cardImage, fontsize)
             elif cardType == 'public2':
-                jpg = publicObjectiveCard(2, title, type, body, footer, cardImage)
+                jpg = publicObjectiveCard(2, title, type, body, footer, cardImage, fontsize)
             elif cardType == 'agenda':
-                jpg = agendaCard(title, type, body, cardImage)
+                jpg = agendaCard(title, type, body, cardImage, fontsize)
             elif cardType == 'nobility':
-                jpg = nobilityCard(color, title, type, body, footer, points)
+                jpg = nobilityCard(color, title, type, body, footer, points, fontsize)
             else:
                 self.response.status = 400 # bad request
                 self.response.status_message = 'Bad card type'

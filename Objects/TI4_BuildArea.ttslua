@@ -113,7 +113,9 @@ local _data = {
     dragOffset = {
         x = 0,
         z = 0
-    }
+    },
+
+    philModeProductionValue = false
 }
 
 local _zoneHelper = false
@@ -132,6 +134,8 @@ function onLoad(saveState)
 
     _zoneHelper = CrLua.TTS.HelperClient.get('TI4_ZONE_HELPER')
     _systemHelper = CrLua.TTS.HelperClient.get('TI4_SYSTEM_HELPER')
+
+    self.addContextMenuItem("Toggle Phil Mode", togglePhilMode)
 
     Wait.frames(updateEverything, 2)
 end
@@ -179,9 +183,30 @@ end
 
 -------------------------------------------------------------------------------
 
+function togglePhilMode()
+    if _data.philModeProductionValue then
+        _data.philModeProductionValue = false
+    else
+        _data.philModeProductionValue = 4
+    end
+    drawBoundingBox()
+    updateProduceConsumeValues()
+end
+
+-------------------------------------------------------------------------------
+
 function onButtonClick(player, option, id)
     announce(_data.items, _data.resourcesAndCost)
     commit()
+end
+
+function onInputValueChanged(player, value, id)
+    if id == 'philModeProductionValue' then
+        _data.philModeProductionValue = tonumber(value)
+        drawBoundingBox()
+    else
+        error('unknown input ' .. id)
+    end
 end
 
 function onBeginDrag(player, option, id)
@@ -442,7 +467,7 @@ function drawBoundingBox()
     local bb = _data.boundingBox
     local d = _config.thickness / 2.0
     local y = bb.max.y - 0.01
-    self.setVectorLines({{
+    local lines = {{
         points = {
             { x = bb.min.x + d, y = y, z = bb.min.z + d },
             { x = bb.min.x + d, y = y, z = bb.max.z - d },
@@ -454,7 +479,100 @@ function drawBoundingBox()
         thickness = _config.thickness,
         loop = true,
         square = true,
-    }})
+    }}
+
+    if _data.philModeProductionValue and _data.philModeProductionValue > 0 then
+        local x0 = bb.min.x + self.getBoundsNormalized().size.x
+        local z0 = bb.min.z
+
+        -- Draw planet area separator.
+        table.insert(lines, {
+            points = {
+                { x = x0, y = y, z = bb.min.z },
+                { x = x0, y = y, z = bb.max.z },
+            },
+            color = _data.playerColor,
+            rotation = { x = 0, y = 0, z = 0 },
+            thickness = _config.thickness,
+            loop = false,
+            square = true,
+        })
+
+        -- Divide remaining area into N boxes.
+        local numCols = math.floor(math.sqrt(_data.philModeProductionValue))
+        local numRows = math.ceil(_data.philModeProductionValue / numCols)
+
+        local w = bb.max.x - x0
+        local h = bb.max.z - z0
+
+        local dx = w / math.max(numCols, 1)
+        for col = 1, numCols - 1 do
+            local x = x0 + col * dx
+            table.insert(lines, {
+                points = {
+                    { x = x, y = y, z = bb.min.z },
+                    { x = x, y = y, z = bb.max.z },
+                },
+                color = _data.playerColor,
+                rotation = { x = 0, y = 0, z = 0 },
+                thickness = _config.thickness,
+                loop = false,
+                square = true,
+            })
+        end
+
+        local dz = h / math.max(numRows, 1)
+        for row = 1, numRows - 1 do
+            local z = z0 + row * dz
+            table.insert(lines, {
+                points = {
+                    { x = x0, y = y, z = z },
+                    { x = bb.max.x, y = y, z = z },
+                },
+                color = _data.playerColor,
+                rotation = { x = 0, y = 0, z = 0 },
+                thickness = _config.thickness,
+                loop = false,
+                square = true,
+            })
+        end
+
+        local d = math.min(dx, dz) * 0.2
+        for col = 1, numCols - 1 do
+            local x = x0 + (col + 0.5) * dx
+            for row = 1, numRows - 1 do
+                local z = z0 + (row + 0.5) * dz
+                if row * numCols + col >= _data.philModeProductionValue then
+                    table.insert(lines, {
+                        points = {
+                            { x = x - d, y = y, z = z - d },
+                            { x = x + d, y = y, z = z + d},
+                        },
+                        color = _data.playerColor,
+                        rotation = { x = 0, y = 0, z = 0 },
+                        thickness = _config.thickness,
+                        loop = false,
+                        square = true,
+                    })
+                    table.insert(lines, {
+                        points = {
+                            { x = x + d, y = y, z = z - d },
+                            { x = x - d, y = y, z = z + d},
+                        },
+                        color = _data.playerColor,
+                        rotation = { x = 0, y = 0, z = 0 },
+                        thickness = _config.thickness,
+                        loop = false,
+                        square = true,
+                    })
+                end
+            end
+        end
+
+
+    end
+
+    self.setVectorLines(lines)
 end
 
 function drawUi(items, resourcesAndCost)
@@ -584,6 +702,21 @@ function drawUi(items, resourcesAndCost)
                                 { tag = 'Cell', children = {{
                                     tag = 'Text',
                                     value = r2c2
+                                }}},
+                                { tag = 'Cell', children = {{
+                                    tag = 'InputField',
+                                    attributes = {
+                                        active = _data.philModeProductionValue and true or false,
+                                        id = 'philModeProductionValue',
+                                        onValueChanged = 'onInputValueChanged',
+                                        characterValidation = 'Integer',
+                                        characterLimit = 2,
+                                        fontSize = fontSize * 0.9,
+                                        fontStyle = 'Bold',
+                                        horizontalOverflow = 'Overflow',
+                                        verticalOverflow = 'Overflow',
+                                        text = _data.philModeProductionValue or 4
+                                    },
                                 }}},
                             }
                         }

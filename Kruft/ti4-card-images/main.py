@@ -159,7 +159,19 @@ FONT_3_WORDS = {
     'ANTI-FIGHTER',
     'BARRAGE',
     'PLANETARY',
-    'SHIELD'
+    'SHIELD',
+    'PRODUCTION',
+
+    # French
+    unicode('DÉGÂTS', 'utf-8'),
+    unicode('ENCAISSÉS', 'utf-8'),
+    unicode('BARRAGE', 'utf-8'),
+    unicode('ANTI-CHASSEUR', 'utf-8'),
+    unicode('BOMBARDEMENT', 'utf-8'),
+    unicode('BOUCLIER', 'utf-8'),
+    unicode('PLANÉTAIRE', 'utf-8'),
+    unicode('CANON', 'utf-8'),
+    unicode('SPATIAL', 'utf-8'),
 }
 
 def wrapTextBoldStart(draw, font1, font2, font3, text, x, y, maxX, fill, lineH, dyfont3):
@@ -172,6 +184,10 @@ def wrapTextBoldStart(draw, font1, font2, font3, text, x, y, maxX, fill, lineH, 
     restoreFont = font1
     i = 0
     for word in words:
+        isAction = (i == 0 and word.lower() == 'action:') or (i == 1 and word == ':' and words[i-1].lower() == 'action')
+        isFor = word.lower() == 'for:' or (i > 0 and word == ':' and words[i-1].lower() == 'for')
+        isAgainst = word.lower() == 'against:' or (i > 0 and word == ':' and words[i-1].lower() == 'against')
+
         dy = 0
         if font == font3:
             font = restoreFont
@@ -187,10 +203,10 @@ def wrapTextBoldStart(draw, font1, font2, font3, text, x, y, maxX, fill, lineH, 
         x += w + spaceW
         if (word.endswith(':') or word.endswith('.')) and font == font1:
             font = font2
-            if (word.lower() != 'action:' or i > 0) and word.lower() != 'for:' and word.lower() != 'against:':
+            if (not isAction) and (not isFor) and (not isAgainst):
                 x = startX
                 y += lineH * PARAGRAPH_LINE_HEIGHT_SCALE
-            if word.lower() == 'for:' or word.lower() == 'against:':
+            if isFor or isAgainst:
                 indent = 20
         i = i + 1
     return y + (lineH * PARAGRAPH_LINE_HEIGHT_SCALE)
@@ -319,6 +335,7 @@ def actionCard(title, body, flavor, cardImage, fontsize):
     wrapText(draw, font, text, x, y, maxX, color, lineH)
 
     body = body.replace('Action:', 'ACTION:')
+    body = body.replace('Action :', 'ACTION :')
     if 'ACTION:' in body:
         font1 = getFont('MyriadProBoldItalic.ttf', ACTION_BODY_TEXT_SIZE + fontsize)
     else:
@@ -523,7 +540,9 @@ def agendaCard(title, type, body, cardImage, fontsize):
         x = AGENDA_BODY_FORAGAINST_L
         maxX = CARD_W - AGENDA_BODY_FORAGAINST_R
         for line in text.split('\n'):
-            if line.startswith('For:') or line.startswith('Against:'):
+            isFor = line.startswith('For:') or line.startswith('For :')
+            isAgainst = line.startswith('Against:') or line.startswith('Against :')
+            if isFor or isAgainst:
                 y = wrapTextBoldStart(draw, font1, font2, font3, line, x, y, maxX, color, lineH, 0)
             else:
                 y = wrapText(draw, font2, line, x, y, maxX, color, lineH)
@@ -670,7 +689,7 @@ class CardHandler(webapp2.RequestHandler):
         fontsize = int(fontsize)
 
         jpg = memcache.get(key=key)
-        jpg = None
+        #jpg = None
         if jpg is None:
             if cardType == 'action':
                 jpg = actionCard(title, body, flavor, cardImage, fontsize)

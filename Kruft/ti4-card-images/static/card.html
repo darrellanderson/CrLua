@@ -23,6 +23,7 @@
                     <option value="stage2-c">Stage 2 Public Objective (clean)</option>
                     <option value="agenda">Agenda</option>
                     <option value="agenda-c">Agenda (clean)</option>
+                    <option value="promissory-c">Promissory (clean)</option>
                     <option value="nobility">Nobility</option>
                     </select>
                 </li>
@@ -49,8 +50,8 @@
                     <textarea name="flavor" id="flavor" class="field-long field-textarea"></textarea>
                 </li>
 
-                <li id="nobilityColorBlock">
-                    <label>Nobility color</label>
+                <li id="colorBlock">
+                    <label>Color</label>
                     <select name="color" id="color" class="field-select">
                         <option value="white">White</option>
                         <option value="blue">Blue</option>
@@ -140,7 +141,7 @@
 
             document.getElementById("subtitleBlock").style.display = 'none';
             document.getElementById("actionFlavorBlock").style.display = 'none';
-            document.getElementById("nobilityColorBlock").style.display = 'none';
+            document.getElementById("colorBlock").style.display = 'none';
             document.getElementById("nobilityFooterBlock").style.display = 'none';
             document.getElementById("nobilityPointsBlock").style.display = 'none';
 
@@ -153,10 +154,13 @@
             if (card == 'agenda' || card == 'agenda-c' || card == 'stage1' || card == 'stage1-c' || card == 'stage2' || card == 'stage2-c') {
                 document.getElementById("subtitleBlock").style.display = 'block';
             }
+            if (card == 'promissory-c') {
+                document.getElementById("colorBlock").style.display = 'block';                
+            }
 
             if (card == 'nobility') {
                 document.getElementById("subtitleBlock").style.display = 'block';
-                document.getElementById("nobilityColorBlock").style.display = 'block';
+                document.getElementById("colorBlock").style.display = 'block';
                 document.getElementById("nobilityFooterBlock").style.display = 'block';
                 document.getElementById("nobilityPointsBlock").style.display = 'block';
             }

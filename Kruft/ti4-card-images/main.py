@@ -309,6 +309,20 @@ AGENDA_BODY_Y = 225
 AGENDA_BODY_TEXT_SIZE = 28
 AGENDA_BODY_TEXT_H = 35
 
+PROMISSORY_TITLE_L = 250
+PROMISSORY_TITLE_R = 100
+PROMISSORY_TITLE_Y1 = 55
+PROMISSORY_TITLE_Y2 = 35
+PROMISSORY_TITLE_TEXT_SIZE = 39
+PROMISSORY_TITLE_TEXT_H = 39
+
+PROMISSORY_BODY_L = 70
+PROMISSORY_BODY_R = 25
+PROMISSORY_BODY_Y = 206
+PROMISSORY_BODY_TEXT_SIZE = 31
+PROMISSORY_BODY_TEXT_H = 37
+PROMISSORY_BODY_UPPER_TEXT_SIZE = 24
+
 # REPLACE THESE WITH PER CARD CONSTANTS
 TITLE_SIZE = 44
 TITLE_LINEH = 44
@@ -404,7 +418,7 @@ def secretObjectiveCard(title, type, body, footer, cardImage, fontsize):
     x = SECRET_BODY_L
     y = SECRET_BODY_Y
     maxX = CARD_W - SECRET_BODY_R
-    lineH = BODY_LG_LINEH + fontsize
+    lineH = SECRET_BODY_TEXT_H + fontsize
     y = wrapTextCenterHV(draw, font, text, x, y, maxX, color, lineH)
 
     x = 125
@@ -549,6 +563,42 @@ def agendaCard(title, type, body, cardImage, fontsize):
 
     return imageToJPEG(img)
 
+def promissoryCard(color, title, body, fontsize):
+    filename = 'Promissory_' + color + '.jpg'
+    img = getImage(filename)
+    draw = ImageDraw.Draw(img)
+
+    font = getFont('HandelGothicDBold.otf', PROMISSORY_TITLE_TEXT_SIZE)
+    color = (0, 0, 0, 255)
+    text = title
+    x = PROMISSORY_TITLE_L
+    y1 = PROMISSORY_TITLE_Y1
+    y2 = PROMISSORY_TITLE_Y2
+    maxX = CARD_W - PROMISSORY_TITLE_R
+    lineH = PROMISSORY_TITLE_TEXT_H
+    y = nudgeY(font, text, maxX, y1, y2)
+    wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
+
+    body = body.replace('Action:', 'ACTION:')
+    body = body.replace('Action :', 'ACTION :')
+    if 'ACTION:' in body:
+        font1 = getFont('MyriadProBoldItalic.ttf', PROMISSORY_BODY_TEXT_SIZE + fontsize)
+    else:
+        font1 = getFont('MyriadProBold.ttf', PROMISSORY_BODY_TEXT_SIZE + fontsize)
+    font2 = getFont('MyriadProSemibold.otf', PROMISSORY_BODY_TEXT_SIZE + fontsize)
+    font3 = getFont('HandelGothicDBold.otf', PROMISSORY_BODY_UPPER_TEXT_SIZE + fontsize)
+
+    color = (0, 0, 0, 255)
+    text = body
+    x = PROMISSORY_BODY_L
+    y = PROMISSORY_BODY_Y
+    maxX = CARD_W - PROMISSORY_BODY_R
+    lineH = PROMISSORY_BODY_TEXT_H + fontsize
+    for line in text.split('\n'):
+        y = wrapTextBoldStart(draw, font1, font2, font3, line, x, y, maxX, color, lineH, 2)
+
+    return imageToJPEG(img)
+
 def nobilityCard(color, title, type, body, footer, points, fontsize):
     filename = 'Nobility' + color + '.jpg'
     img = getImage(filename)
@@ -650,6 +700,10 @@ CARD_OPTIONS = {
         'cardType' : 'agenda',
         'cardImage' : 'Agenda_c.jpg'
     },
+    'promissory-c' : {
+        'cardType' : 'promissory',
+        'cardImage' : False
+    },
     'nobility' : {
         'cardType' : 'nobility',
         'cardImage' : False
@@ -701,6 +755,8 @@ class CardHandler(webapp2.RequestHandler):
                 jpg = publicObjectiveCard(2, title, type, body, footer, cardImage, fontsize)
             elif cardType == 'agenda':
                 jpg = agendaCard(title, type, body, cardImage, fontsize)
+            elif cardType == 'promissory':
+                jpg = promissoryCard(color, title, body, fontsize)
             elif cardType == 'nobility':
                 jpg = nobilityCard(color, title, type, body, footer, points, fontsize)
             else:

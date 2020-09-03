@@ -1214,8 +1214,6 @@ function SetupFaction.placeScoreCounters(ownerTokensBag, zone, zoneIndex, factio
         position     = p,
         snap_to_grid = false,
     })
-    clone.setName(faction.tokenName)
-    clone.setColorTint(color)
     coroutine.yield(0)
     coroutine.yield(0)
 
@@ -1315,6 +1313,14 @@ function unpackFactionCoroutine()
 
     -- Make sure the faction helper knows about the faction before unpacking tokens.
     _factionHelper.updateFactions()
+    local quantity = commandTokensBag.getQuantity()
+    _factionHelper.tintTokens({ color = color })
+    while commandTokensBag.getQuantity() < quantity do
+        coroutine.yield(0)
+    end
+    while ownerTokensBag.getQuantity() < 1 do
+        coroutine.yield(0)
+    end
     coroutine.yield(0)
 
     SetupFaction.unpackCommandTokens(color, commandTokensBag)

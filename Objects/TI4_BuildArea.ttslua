@@ -120,6 +120,7 @@ local _data = {
 
 local _zoneHelper = false
 local _systemHelper = false
+local _deckHelper = false
 
 -------------------------------------------------------------------------------
 
@@ -134,6 +135,7 @@ function onLoad(saveState)
 
     _zoneHelper = CrLua.TTS.HelperClient.get('TI4_ZONE_HELPER')
     _systemHelper = CrLua.TTS.HelperClient.get('TI4_SYSTEM_HELPER')
+    _deckHelper = CrLua.TTS.HelperClient.get('TI4_DECK_HELPER')
 
     self.addContextMenuItem("Toggle Phil Mode", togglePhilMode)
 
@@ -334,6 +336,9 @@ function getProduceConsumeItems()
             return false
         end
         if objectEffects.requireFaceUp and object.is_face_down then
+            return false
+        end
+        if object.tag == 'Card' and _deckHelper.isDiscard(object.getGUID()) then
             return false
         end
         if objectEffects.anywhereInPlayerZone then

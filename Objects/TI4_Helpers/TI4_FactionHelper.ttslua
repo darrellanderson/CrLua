@@ -497,34 +497,87 @@ end
 
 -------------------------------------------------------------------------------
 
-local function _maybeTint(object)
-    if object.tag ~= 'Generic' then
-        return -- not a token
-    end
+local DEFAULT_TINT = {
+    White = '8C8C8C',
+    Blue = '0C98D7',
+    Purple = '7500B7',
+    Yellow = 'A5A300',
+    Red = 'CB0000',
+    Green = '007406',
+    Orange = 'F3631C',
+    Brown = '703A16',
+    Pink = 'F46FCD',
+    --Grey = '7F7F7F',
+    --Black = '050505',
+}
 
-    local tokenName, tokenType = string.match(object.getName(), '^(.*) (%u%a+) Token$')
-    if tokenType ~= 'Command' and tokenType ~= 'Owner' then
-        return
-    end
-
-    local faction = fromTokenName(tokenName)
-    if not faction or not faction.color then
-        return
-    end
-
-    -- TODO XXX : WHAT IF MORE THAN ONE COLOR SHARE A FACTION??
-    object.setColorTint(faction.color)
-end
-
-function tintTokens()
+function tintTokens(params)
     _maybeUpdateFactions()
-    for _, object in ipairs(getAllObjects()) do
-        _maybeTint(object)
-    end
-end
 
-function onObjectLeaveContainer(container, leaveObject)
-    _maybeTint(leaveObject)
+    -- No color means do all colors.
+    if not params then
+        for color, _ in pairs(_colorToFaction) do
+            tintTokens({ color = color })
+        end
+        return
+    end
+    assert(type(params.color) == 'string')
+    assert(not params.tint or type(params.tint) == 'string')
+
+    local tintColor = assert(params.tint or DEFAULT_TINT[params.color], 'no tint color for "' .. params.color .. '"')
+    assert(string.match(tintColor, '^%x%x%x%x%x%x$'), 'bad tint color "' .. tintColor .. '"')
+    tintColor = Color.fromHex('#' .. tintColor .. 'ff')  -- RGBA
+
+    local faction = _colorToFaction[params.color]
+    if not faction then
+        return
+    end
+
+    local tintSet = {
+        [faction.tokenName .. ' Command Token'] = true,
+        [faction.tokenName .. ' Owner Token'] = true,
+        [faction.tokenName .. ' Command Tokens Bag'] = true,
+        [faction.tokenName .. ' Owner Tokens Bag'] = true,
+    }
+
+    local function tintCommandTokensBag(bag)
+        local p = bag.getPosition()
+        local function takeCallback(object)
+            object.setColorTint(tintColor)
+            bag.putObject(object)
+        end
+        for i, entry in ipairs(bag.getObjects()) do
+            bag.takeObject({
+                guid = entry.guid,
+                position = { x = p.x, y = p.y + 5 + i, z = p.z },
+                callback_function = takeCallback
+            })
+        end
+    end
+
+    local function tintOwnerTokensBag(bag)
+        local p = bag.getPosition()
+        local function takeCallback(object)
+            object.setColorTint(tintColor)
+            bag.reset()
+            bag.putObject(object)
+        end
+        bag.takeObject({
+            position = { x = p.x, y = p.y + 5, z = p.z },
+            callback_function = takeCallback
+        })
+    end
+
+    for _, object in ipairs(getAllObjects()) do
+        if tintSet[object.getName()] then
+            object.setColorTint(tintColor)
+            if object.tag == 'Bag' then
+                tintCommandTokensBag(object)
+            elseif object.tag == 'Infinite' then
+                tintOwnerTokensBag(object)
+            end
+        end
+    end
 end
 
 function onLoad(saveState)
@@ -546,6 +599,4 @@ function onLoad(saveState)
     for factionName, attributes in pairs(_factionAttributes) do
         attributes.name = factionName
     end
-
-    Wait.frames(tintTokens, 3)
 end

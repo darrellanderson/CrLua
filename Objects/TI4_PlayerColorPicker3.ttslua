@@ -459,6 +459,11 @@ function swapCoroutine()
             CrLua.Log.d(TAG, 'only changing tint')
             local unitObjects = Pack.getUnitBagsAndUnits(swapPlan.anonNameToItems)
             tintUnits(unitObjects, swapPlan.nextColor, swapPlan.nextTint)
+            _factionHelper.updateFactions()
+            _factionHelper.tintTokens({
+                color = swapPlan.nextColor,
+                tint = swapPlan.nextTint
+            })
             CrLua.Log.i(TAG, 'FINISHED')
             return 1
         end
@@ -589,6 +594,15 @@ function swapCoroutine()
     putBags(bagNameToBag)
     coroutine.yield(0)
     coroutine.yield(0)
+
+    -- Reset token tints.
+    for _, swapPlan in ipairs(swapPlans) do
+        _factionHelper.updateFactions()
+        _factionHelper.tintTokens({
+            color = swapPlan.nextColor,
+            tint = swapPlan.nextTint
+        })
+    end
 
     CrLua.Log.i(TAG, 'FINISHED')
     return 1

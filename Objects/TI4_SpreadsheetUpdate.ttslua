@@ -152,6 +152,8 @@ function updateSpreadsheetScore()
     CrLua.TI4.PlayerScore.setCellsMecatol(cells, _data.mecatolPoints)
     CrLua.TI4.PlayerScore.setCellsOther(cells, _data.otherPoints)
 
+    --for k, v in pairs(cells) do print('(' .. k .. ') = "' .. v .. '"') end
+
     if sheetId then
         CrLua.Log.d(TAG, 'updating score spreadsheet')
         CrLua.TTS.Spreadsheet.update('score', sheetId, sheetName, cells)

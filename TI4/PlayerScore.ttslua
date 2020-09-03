@@ -377,7 +377,9 @@ function CrLua.TI4.PlayerScore.setCellsPublicObjectivesAndRound(cells, PHASE1obj
             for _, color in ipairs(completed) do
                 local col = PublicCompletionCells[color]
                 local value = CrLua.TI4.PlayerScore.colorAbbreviation[color]
-                cells[ col .. row ] = value
+                if col and row and value then
+                    cells[ col .. row ] = value
+                end
             end
         end
     end
@@ -398,7 +400,9 @@ function CrLua.TI4.PlayerScore.setCellsPublicObjectivesAndRound(cells, PHASE1obj
             for _, color in ipairs(completed) do
                 local col = PublicCompletionCells[color]
                 local value = CrLua.TI4.PlayerScore.colorAbbreviation[color]
-                cells[ col .. row ] = value
+                if col and row and value then
+                    cells[ col .. row ] = value
+                end
             end
         end
     end
@@ -565,7 +569,6 @@ function CrLua.TI4.PlayerScore.updateSecrets(secretsOrder, playerSecrets, nameTo
     local newOrder = {}
     for name, ownerTokens in pairs(nameToOwnerTokens) do
         if CrLua.TI4.PlayerScore.SECRET[name] then
-
             -- Tolerate accidentally putting multiple tokens from the same player.
             local ownerSet = {}
             for _, ownerToken in ipairs(ownerTokens) do

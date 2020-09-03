@@ -55,8 +55,40 @@ local SetupGeneric = {
     NAME_TO_AGENDA_ZONE_OFFSET = {
         ['^For:$'] = { x = 4.25, lock = true },
         ['^Against:$'] = { x = -4.25, lock = true },
-        ['^Votes$'] = { x = -9.25 },
+        ['^Votes$'] = { x = -8.25 },
         ['^Speaker Token %- Agenda$'] = { x = 0 },
+    },
+    NAME_TO_TABLE_POSITIONS = {
+        ['^TI4 Graveyard'] = {
+            { x = -23.50, y = -0.19, z = -9, lock = true, dx = -1.5, dz = -7.5 },
+            { x = -23.50, y = -0.19, z = 9, lock = true, dx = -1.5, dz = 7.5 },
+            { x = 23.50, y = -0.19, z = -9, lock = true, dx = 1.5, dz = -7.5 },
+            { x = 23.50, y = -0.19, z = 9, lock = true, dx = 1.5, dz = 7.5 }
+        },
+        ['^Commodities/Tradegoods x3 Bag$'] = {
+            { x = -22.00, y = -0.19, z = 3, lock = true, dx = -5 },
+            { x = 22.00, y = -0.19, z = 3, lock = true, dx = 5 },
+        },
+        ['^Commodities/Tradegoods x1 Bag$'] = {
+            { x = -25.00, y = -0.19, z = 3, lock = true, dx = -5 },
+            { x = 25.00, y = -0.19, z = 3, lock = true, dx = 5 },
+        },
+        ['^x3 Fighters Tokens Bag$'] = {
+            { x = -22.00, y = -0.19, z = 0, lock = true, dx = -5 },
+            { x = 22.00, y = -0.19, z = 0, lock = true, dx = 5 },
+        },
+        ['^x1 Fighters Tokens Bag$'] = {
+            { x = -25.00, y = -0.19, z = 0, lock = true, dx = -5 },
+            { x = 25.00, y = -0.19, z = 0, lock = true, dx = 5 },
+        },
+        ['^x3 Infantry Token Bag$'] = {
+            { x = -22.00, y = -0.19, z = -3, lock = true, dx = -5 },
+            { x = 22.00, y = -0.19, z = -3, lock = true, dx = 5 },
+        },
+        ['^x1 Infantry Token Bag$'] = {
+            { x = -25.00, y = -0.19, z = -3, lock = true, dx = -5 },
+            { x = 25.00, y = -0.19, z = -3, lock = true, dx = 5 },
+        },
     }
 }
 
@@ -226,10 +258,10 @@ local function zoneRotation(zone, offset)
 end
 
 --- Get the agenda zone for the given player count.
-local function agendaCenter(playerCount)
-    assert(type(playerCount) == 'number')
+local function agendaCenter(extraRings)
+    assert(type(extraRings) == 'number')
     return {
-        x = playerCount <= 6 and -42.75 or -44.75,
+        x = -46,
         y = 0,
         z = 0
     }
@@ -340,8 +372,8 @@ function SetupGeneric.pack(setupBag)
 end
 
 --- Unpack non-color objects from the setup bag.
-function SetupGeneric.unpack(setupBag)
-    assert(setupBag.tag == 'Bag')
+function SetupGeneric.unpack(setupBag, extraRings)
+    assert(setupBag.tag == 'Bag' and type(extraRings) == 'number')
     debugLog('SetupGeneric.unpack')
 
     -- Get per-object json.  Leave the "master" copies of the objects in the
@@ -360,7 +392,7 @@ function SetupGeneric.unpack(setupBag)
     end
 
     local zonesAttributes = _zoneHelper.zonesAttributes()
-    local agendaZoneCenter = agendaCenter(#zonesAttributes)
+    local agendaZoneCenter = agendaCenter(extraRings)
 
     -- Per player objects.
     for _, zone in ipairs(zonesAttributes) do
@@ -397,6 +429,24 @@ function SetupGeneric.unpack(setupBag)
             callback_function = function(object) object.setLock(offset.lock or false) end,
             sound             = false,
         })
+    end
+
+    -- Table objects.
+    for namePattern, offsets in pairs(SetupGeneric.NAME_TO_TABLE_POSITIONS) do
+        for _, offset in ipairs(offsets) do
+            local json = assert(nameToJson[namePattern], 'no json for ' .. namePattern)
+            spawnObjectJSON({
+                json              = json,
+                position          = {
+                    x = offset.x + (offset.dx or 0) * extraRings,
+                    y = offset.y,
+                    z = offset.z + (offset.dz or 0) * extraRings
+                },
+                rotation          = { x = 0, y = 0, z = 0 },
+                callback_function = function(object) object.setLock(offset.lock or false) end,
+                sound             = false,
+            })
+        end
     end
 end
 
@@ -643,19 +693,16 @@ function SetupColor.packOld(setupBag)
     debugLog('packOld: finished')
 end
 
---- Color and generic unpacking, for an N-player table.  THIS IS INTENDED FOR
+--- Color unpacking, for an N-player table.  THIS IS INTENDED FOR
 -- RESETTING A STARTER TABLE TO A DIFFERENT PLAYER COUNT.  DOES NOT DO FACTIONS!
 -- Gets zone count from zone helper.  Make sure to set zone count before this!
-function SetupColor.unpackNew(setupBag)
-    assert(setupBag.tag == 'Bag')
+function SetupColor.unpackNew(setupBag, extraRings)
+    assert(setupBag.tag == 'Bag' and type(extraRings) == 'number')
     debugLog('unpackNew')
-
-    SetupGeneric.unpack(setupBag)
-    coroutine.yield(0)
 
     -- Zone helper gets current zones but they do not have colors yet.
     local zonesAttributes = _zoneHelper.zonesAttributes()
-    local agendaZoneCenter = agendaCenter(#zonesAttributes)
+    local agendaZoneCenter = agendaCenter(extraRings)
     local colorToState = {}
 
     debugLog('unpackNew: unpacking color boxes')
@@ -799,7 +846,10 @@ function setupCoroutine()
     SetupColor.transformHands()
     coroutine.yield(0)
 
-    SetupColor.unpackNew(setupBag)
+    SetupGeneric.unpack(setupBag, extraRings)
+    coroutine.yield(0)
+
+    SetupColor.unpackNew(setupBag, extraRings)
     coroutine.yield(0)
 
     _zoneHelper.updateZoneColors()

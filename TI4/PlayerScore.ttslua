@@ -208,11 +208,8 @@ end
 function CrLua.TI4.PlayerScore.score(scoreboard, ownerToken)
     assert(type(scoreboard) == 'userdata' and type(ownerToken) == 'userdata')
 
-    -- Owner tokens are not centered at their position!  Use the bounds center.
-    local center = ownerToken.getBounds().center
-
     -- Scoreboard local space x.
-    local p = scoreboard.positionToLocal(center)
+    local p = scoreboard.positionToLocal(ownerToken.getPosition())
     local u = -(p.x - 3.25) / 6.5
     return u * (scoreboard.is_face_down and 15 or 11)
 end
@@ -226,7 +223,7 @@ function CrLua.TI4.PlayerScore.colorToScore(nameToScoreObjects, nameToOwnerToken
     -- The scoreboard bounding box is larger than the image.  Prune out extras.
     if #ownerTokens > 0 then
         for i = #ownerTokens, 1, -1 do
-            local center = ownerTokens[i].getBounds().center
+            local center = ownerTokens[i].getPosition()
             local p = scoreboard.positionToLocal(center)
             if math.abs(p.z) > 0.5 then
                 table.remove(ownerTokens, i)
@@ -675,7 +672,7 @@ function CrLua.TI4.PlayerScore.getMecatolPoints(currentMecatolPoints, nameToOwne
         if not _custodians then
             return true
         end
-        local p1 = ownerToken.getBounds().center
+        local p1 = ownerToken.getPosition()
         local p2 = _custodians.getPosition()
         local d = math.sqrt((p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2)
         return d < 1.5

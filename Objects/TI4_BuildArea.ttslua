@@ -329,10 +329,14 @@ function getProduceConsumeItems()
     local playerColor = _data.playerColor
 
     -- Get objects to consider.
+    local inHandGuidSet = _zoneHelper.inHand()
     local objects = CrLua.Table.join(_data.inside, {})
     local function useOutsizeBuildAreaObject(object)
         local objectEffects = OBJECT_EFFECTS[object.getName()]
         if not objectEffects then
+            return false
+        end
+        if inHandGuidSet[object.getGUID()] then
             return false
         end
         if objectEffects.requireFaceUp and object.is_face_down then

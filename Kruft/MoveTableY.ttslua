@@ -1,0 +1,22 @@
+--- Move everything up.
+
+function onLoad(save_state)
+    print('xxx onLoad')
+    self.addContextMenuItem('Move Table', doMoveTable)
+end
+
+function doMoveTable()
+    local objects = {}
+    for _, object in ipairs(getAllObjects()) do
+        table.insert(objects, object)
+    end
+    table.sort(objects, function(a, b) return a.getPosition().y < b.getPosition().y end)
+
+    for _, object in ipairs(objects) do
+        --print('xxx ' .. object.getPosition().y .. ' ' .. object.getName())
+        local isLocked = object.getLock()
+        object.setLock(false)
+        object.translate({ x = 0, y = 1, z = 0 })
+        object.setLock(isLocked)
+    end
+end

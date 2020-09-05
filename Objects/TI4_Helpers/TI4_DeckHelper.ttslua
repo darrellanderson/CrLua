@@ -338,7 +338,7 @@ local function _getDeckAttributes(cardName)
 end
 
 local function _getTransform(deckAttributes, deckOrDiscard)
-    assert(type(deckAttributes) == 'table' and not deckOrDiscard or type(deckOrDiscard) == 'string')
+    assert(type(deckAttributes) == 'table' and type(deckOrDiscard) == 'string')
 
     -- Get the requested transform.  If the request is for 'discard' and the
     -- deck does not have a discard, use the main deck instead.
@@ -346,10 +346,8 @@ local function _getTransform(deckAttributes, deckOrDiscard)
     if not transform and deckOrDiscard == 'discard' then
         transform = deckAttributes.transform['deck']
     end
-
     local parent = _getParent(deckAttributes.transform.parent)
     local parentRot = parent and parent.getRotation()
-
     return {
         position = parent and parent.positionToWorld(transform.position) or {
             x = transform.position.x,  -- make a copy, caller may mutate!
@@ -612,12 +610,14 @@ function isDiscard(cardGuid)
     assert(type(cardGuid) == 'string')
     local cardObject = assert(getObjectFromGUID(cardGuid))
     assert(cardObject.tag == 'Card')
-    local deckAttributes = assert(_getDeckAttributes(cardObject.getName()))
-    local discardTransform = assert(_getTransform(deckAttributes, 'discard'))
-    local p1 = cardObject.getPosition()
-    local p2 = discardTransform.position
-    local d = math.sqrt((p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2)
-    return d < 1
+    local deckAttributes = _getDeckAttributes(cardObject.getName())
+    local discardTransform = deckAttributes and _getTransform(deckAttributes, 'discard')
+    if discardTransform then
+        local p1 = cardObject.getPosition()
+        local p2 = discardTransform.position
+        local d = math.sqrt((p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2)
+        return d < 1
+    end
 end
 
 --- Make sure dropped card it not going to wrong deck/discard.
@@ -625,10 +625,12 @@ function _verifyCardDrop(cardObject)
     assert(type(cardObject) == 'userdata' and cardObject.tag == 'Card')
 
     local function insideDeckTransform(deckTransform)
-        local p1 = cardObject.getPosition()
-        local p2 = deckTransform.position
-        local d = math.sqrt((p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2)
-        return d < 1 and deckTransform.rotation
+        if deckTransform then
+            local p1 = cardObject.getPosition()
+            local p2 = deckTransform.position
+            local d = math.sqrt((p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2)
+            return d < 1 and deckTransform.rotation
+        end
     end
 
     local function insideDeckOrDiscard(deckAttributes)
@@ -745,10 +747,10 @@ end
 -------------------------------------------------------------------------------
 -- Add top/bottom context menu on Agenda cards to discard to top/bottom.
 
-local function _isAgendaCard(object)
-    assert(type(object) == 'userdata')
+function isAgendaCard(cardName)
+    assert(type(cardName) == 'string')
     assert(DECKS['Agenda'], 'No agenda deck??')
-    return getDeckName(object.getName()) == 'Agenda'
+    return getDeckName(cardName) == 'Agenda'
 end
 
 local function _putAgendaCard(cardObject, onTop)
@@ -776,7 +778,7 @@ local function _putAgendaCard(cardObject, onTop)
 end
 
 function onObjectLeaveContainer(container, leaveObject)
-    if leaveObject.tag == 'Card' and _isAgendaCard(leaveObject) then
+    if leaveObject.tag == 'Card' and isAgendaCard(leaveObject.getName()) then
         local function putTop(playerColor)
             printToAll('Put agenda top', playerColor)
             _putAgendaCard(leaveObject, true)
@@ -791,7 +793,7 @@ function onObjectLeaveContainer(container, leaveObject)
 end
 
 function onObjectEnterContainer(container, enterObject)
-    if enterObject.tag == 'Card' and _isAgendaCard(enterObject) then
+    if enterObject.tag == 'Card' and isAgendaCard(enterObject.getName()) then
         enterObject.clearContextMenu()
     end
 end

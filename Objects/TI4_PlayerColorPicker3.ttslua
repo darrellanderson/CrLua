@@ -1034,36 +1034,38 @@ function Pack.renameFlagship(anonNameToItems)
 
     local items = anonNameToItems[ANONYMOUS_FLAGSHIP_NAME] or {}
     for _, item in ipairs(items) do
-        assert(item.live and item.name.insidePrevBag)
-        local object = getObjectFromGUID(item.guid)
-        assert(object)
-        object.setName(item.name.insidePrevBag)
-        if object.tag == 'Bag' then
-            -- Remove flagships from the flagship bag.
-            local entryObjects = {}
-            local pos = object.getPosition()
-            for i, entry in ipairs(object.getObjects()) do
-                local entryObject = object.takeObject({
-                    guid = entry.guid,
-                    position = { x = pos.x, y = pos.y + 5 + i, z = pos.z },
-                    smooth = false,
-                })
-                coroutine.yield(0)
-                entryObject.setLock(true)
-                entryObject.setName(item.name.insidePrevBag)
-                table.insert(entryObjects, entryObject)
-            end
+        if item.name.insidePrevBag then
+            assert(item.live)
+            local object = getObjectFromGUID(item.guid)
+            assert(object)
+            object.setName(item.name.insidePrevBag)
+            if object.tag == 'Bag' then
+                -- Remove flagships from the flagship bag.
+                local entryObjects = {}
+                local pos = object.getPosition()
+                for i, entry in ipairs(object.getObjects()) do
+                    local entryObject = object.takeObject({
+                        guid = entry.guid,
+                        position = { x = pos.x, y = pos.y + 5 + i, z = pos.z },
+                        smooth = false,
+                    })
+                    coroutine.yield(0)
+                    entryObject.setLock(true)
+                    entryObject.setName(item.name.insidePrevBag)
+                    table.insert(entryObjects, entryObject)
+                end
 
-            -- Wait after take for TTS to finish the takes.
-            waitForSpawnComplete(entryObjects)
+                -- Wait after take for TTS to finish the takes.
+                waitForSpawnComplete(entryObjects)
 
-            -- Put back into unit bag.
-            for _, entryObject in ipairs(entryObjects) do
-                entryObject.setLock(false)
-                object.putObject(entryObject)
+                -- Put back into unit bag.
+                for _, entryObject in ipairs(entryObjects) do
+                    entryObject.setLock(false)
+                    object.putObject(entryObject)
+                end
             end
+            coroutine.yield(0)
         end
-        coroutine.yield(0)
     end
 end
 
@@ -1569,6 +1571,9 @@ function Unpack.renameFlagship(anonNameToItems, unitObjects)
     local items = anonNameToItems[ANONYMOUS_FLAGSHIP_NAME] or {}
     assert(items and #items > 0)
     local firstItem = items[1]
+    if not firstItem.name.insideNextBag then
+        return  -- Franken games have anonymous flagships
+    end
     local fromName = assert(firstItem.name.insideNextBag)
     local toName = assert(firstItem.name.next)
 

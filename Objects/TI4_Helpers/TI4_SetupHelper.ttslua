@@ -53,10 +53,10 @@ local SetupGeneric = {
         ['^Any Afters%?$'] = { x = -0.6, z = 3 },
     },
     NAME_TO_AGENDA_ZONE_OFFSET = {
-        ['^For:$'] = { x = 4.25, lock = true },
-        ['^Against:$'] = { x = -4.25, lock = true },
-        ['^Votes$'] = { x = -8.25 },
-        ['^Speaker Token %- Agenda$'] = { x = 0 },
+        ['^For:$'] = { x = 4.25, y = 0.3, lock = true },
+        ['^Against:$'] = { x = -4.25, y = 0.3, lock = true },
+        ['^Votes$'] = { x = -9 },
+        ['^Speaker Token %- Agenda$'] = { x = 0, y = 0.3, },
     },
     NAME_TO_TABLE_POSITIONS = {
         ['^TI4 Graveyard'] = {
@@ -237,7 +237,7 @@ local function offsetRotation(position, offset)
     local result = { x = 0, y = 0, z = 0 }
 
     local z = offsetPosition(position, offset).z
-    if z == 0 then
+    if math.abs(z) < 0.1 then
         result.y = 270
     else
         result.y = z > 0 and 0 or 180
@@ -259,12 +259,18 @@ end
 
 --- Get the agenda zone for the given player count.
 local function agendaCenter(extraRings)
+    local function getAgendaPhaseMat()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == 'Agenda Phase Mat' then
+                return object
+            end
+        end
+        error('missing Agenda Phase Mat')
+    end
+    local agendaPhaseMat = getAgendaPhaseMat()
+
     assert(type(extraRings) == 'number')
-    return {
-        x = -46,
-        y = 0,
-        z = 0
-    }
+    return agendaPhaseMat.getPosition()
 end
 
 --- Get the per-player player agenda zone for the player/player count.
@@ -432,6 +438,7 @@ function SetupGeneric.unpack(setupBag, extraRings)
     end
 
     -- Table objects.
+    local tableY = _zoneHelper.getTableY()
     for namePattern, offsets in pairs(SetupGeneric.NAME_TO_TABLE_POSITIONS) do
         for _, offset in ipairs(offsets) do
             local json = assert(nameToJson[namePattern], 'no json for ' .. namePattern)
@@ -439,7 +446,7 @@ function SetupGeneric.unpack(setupBag, extraRings)
                 json              = json,
                 position          = {
                     x = offset.x + (offset.dx or 0) * extraRings,
-                    y = offset.y,
+                    y = offset.y + tableY,
                     z = offset.z + (offset.dz or 0) * extraRings
                 },
                 rotation          = { x = 0, y = 0, z = 0 },

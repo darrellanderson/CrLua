@@ -250,7 +250,7 @@ local DEFAULT_ZONES = {
 }
 
 local DEFAULT_TABLE_XZ = {{-128, -128}, {-128, 128}, {128, 128}, {128, -128}}
-local DEFAULT_TABLE_Y = 0
+local DEFAULT_TABLE_Y = 1
 
 -- Current zones.
 local _zones = {}
@@ -267,6 +267,10 @@ end
 
 function getExtraRings()
     return _extraRings
+end
+
+function getTableY()
+    return _table.y or DEFAULT_TABLE_Y
 end
 
 -------------------------------------------------------------------------------

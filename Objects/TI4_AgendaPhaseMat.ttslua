@@ -1,0 +1,36 @@
+function onLoad(save_state)
+    local y = self.getBoundsNormalized().size.y / 2
+    self.createButton({
+        click_function = 'resetAgendaTokens',
+        function_owner = self,
+        label          = 'Reset\nWhen/After',
+        position       = { x = 0, y = y, z = 0 },
+        rotation       = { x = 0, y = 90, z = 0 },
+        scale          = self.getScale(),
+        width          = 1100,
+        height         = 600,
+        font_size      = 180,
+    })
+
+    self.setSnapPoints({
+        {
+            position      = { x = 0, y = 0, z = 0 },
+            rotation      = { x = 0, y = 90, z = 0 },
+            rotation_snap = true
+        }
+    })
+end
+
+function resetAgendaTokens()
+    local resetNameSet = {
+        ['Any Whens?'] = true,
+        ['Any Afters?'] = true
+    }
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Tile' and resetNameSet[object.getName()] then
+            if object.is_face_down then
+                object.flip()
+            end
+        end
+    end
+end

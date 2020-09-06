@@ -30,9 +30,7 @@
 local TAG = 'AutoFillMultiRoller'
 
 local data = {
-    visualizeHexes = false,
     colorToMultiRoller = false,
-    lastActivatedPosition = false,
     perPlanetButtons = {}  -- map from function name to button index
 }
 
@@ -97,28 +95,8 @@ function onLoad(save_state)
     Wait.frames(updateUi, 2)
 end
 
-function onPlayerTurnStart(playerColorStart, playerColorPrevious)
-    CrLua.Log.d(TAG, 'onPlayerTurnStart: clearing last activated position')
-    data.lastActivatedPosition = false
-    updateUi()
-end
-
-function onObjectDrop(playerColor, droppedObject)
-    local isPlayerCurrentTurn = playerColor == Turns.turn_color
-    if not isPlayerCurrentTurn then
-        return
-    end
-    local isCommandToken = string.find(droppedObject.getName(), ' Command Token')
-    if not isCommandToken then
-        return
-    end
-    local system = _systemHelper.systemFromPosition(droppedObject.getPosition())
-    if not system then
-        return  -- ignore tokens not dropped on a system
-    end
-
-    CrLua.Log.d(TAG, 'onObjectDrop: activated by ' .. playerColor)
-    data.lastActivatedPosition = droppedObject.getPosition()
+function onSystemActivation(system)
+    CrLua.Log.d(TAG, 'onSystemActivation')
     updateUi()
 end
 
@@ -181,7 +159,7 @@ end
 -------------------------------------------------------------------------------
 
 function updateUi()
-    local system = data.lastActivatedPosition and _systemHelper.systemFromPosition(data.lastActivatedPosition)
+    local system = _systemHelper.getActivatedSystem()
     local planets = system and system.planets or {}
 
     local result = {}
@@ -336,15 +314,6 @@ function getHexes(position)
     -- Remove any duplicates.
     adjacentHexes = CrLua.List.unique(adjacentHexes)
 
-    if data.visualizeHexes then
-        local lines = {}
-        table.insert(lines, CrLua.TI4.Hex.vectorLine(hex, { color = {1,0,0} }))
-        for _, adjacentHex in ipairs(adjacentHexes) do
-            table.insert(lines, CrLua.TI4.Hex.vectorLine(adjacentHex, { color = {0,1,0} }))
-        end
-        Global.setVectorLines(lines)
-    end
-
     return hex, adjacentHexes
 end
 
@@ -472,7 +441,9 @@ function autoFill(params)
         return
     end
 
-    if not data.lastActivatedPosition then
+    local system = _systemHelper.getActivatedSystem()
+    local systemObject = system and getObjectFromGUID(system.guid)
+    if not systemObject then
         printToAll(TAG .. ': no activated system', {1,0,0})
         return
     end
@@ -484,11 +455,10 @@ function autoFill(params)
     end
 
     -- Get units in hex and adjacent (including wormholes) systems.
-    local hex, adjacent = getHexes(data.lastActivatedPosition)
+    local hex, adjacent = getHexes(systemObject.getPosition())
     local unitsInHex, unitsInAdjacent = getUnits(hex, adjacent)
 
     -- Inject units on supplemental tile, using a fake object for position.
-    local system = _systemHelper.systemFromPosition(data.lastActivatedPosition)
     local arenaUnits = getArenaUnits(system.guid)
     if arenaUnits then
         unitsInHex = CrLua.List.join(unitsInHex, arenaUnits)

@@ -24,6 +24,8 @@ function getHelperClient(helperObjectName)
     end
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
+local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
+local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 -- Systems table, from guid to systems.
 --
@@ -44,6 +46,7 @@ end
 -- - tech: string {red|green|yellow|blue}.
 -- - position: table with {xz}: override, local space.
 -- - radius: number: override, local space.
+-- - legendary: boolean.
 --
 -- Also computed:
 -- - system.guid: tile GUID.
@@ -579,6 +582,10 @@ function _systemIsValid(system)
             if trait and trait ~= 'cultural' and trait ~= 'industrial' and trait ~= 'hazardous' then
                 return false, 'planet.trait must be {cultural|industrial|hazardous}'
             end
+            local legendary = planet.legendary
+            if legendary and (type(legendary) ~= 'boolean') then
+                return false, 'planet.legendary must be {true|false}'
+            end
         end
     end
 
@@ -844,6 +851,16 @@ end
 
 -------------------------------------------------------------------------------
 
+local _activatedSystem = false
+
+--- Get the currently activated system.
+-- Objects may declare an 'onSystemActivation(system)' called on activation.
+function getActivatedSystem()
+    return _activatedSystem
+end
+
+-------------------------------------------------------------------------------
+
 function onLoad(saveState)
     self.setColorTint({ r = 0.25, g = 0.25, b = 0.25 })
     self.setScale({ x = 2, y = 0.01, z = 2 })
@@ -858,4 +875,41 @@ function onLoad(saveState)
         end
     end
     self.setInvisibleTo(invisibleTo)
+end
+
+function onPlayerTurnEnd(player_color_end, player_color_next)
+    _activatedSystem = false
+end
+
+function onObjectDrop(playerColor, object)
+    local function systemActivation()
+        if playerColor ~= Turns.turn_color then
+            return false
+        end
+        if not string.match(object.getName(), 'Command Token$') then
+            return false
+        end
+        local position = object.getPosition()
+        if not _zoneHelper.inTableZone(position) then
+            return false
+        end
+        return systemFromPosition(position)
+    end
+
+    local system = systemActivation()
+    if system then
+        _activatedSystem = system
+        local faction = _factionHelper.fromColor(playerColor)
+        local factionName = faction and faction.name or playerColor
+        broadcastToAll(factionName .. ' activated ' .. system.string, playerColor)
+        local systemObject = getObjectFromGUID(system.guid)
+        systemObject.highlightOn(playerColor, 30)
+
+        -- Tell any interested parties.
+        for _, object in ipairs(getAllObjects()) do
+            if object.getVar('onSystemActivation') then
+                object.call('onSystemActivation', system)
+            end
+        end
+    end
 end

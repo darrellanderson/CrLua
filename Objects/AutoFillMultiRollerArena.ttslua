@@ -1,26 +1,10 @@
 local TAG = 'AutoFillMultiRollerArena'
 
-function getHelperClient(helperObjectName)
-    local function getHelperObject()
-        for _, object in ipairs(getAllObjects()) do
-            if object.getName() == helperObjectName then return object end
-        end
-        error('missing object "' .. helperObjectName .. '"')
-    end
-    local helperObject = false
-    local function getCallWrapper(functionName)
-        helperObject = helperObject or getHelperObject()
-        if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
-        return function(parameters) return helperObject.call(functionName, parameters) end
-    end
-    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
-end
-local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
-
-_activatedSystemGuid = false
+local _systemHelper = false
+local _activeSystemGuid = false
 
 function onLoad(saveState)
-    CrLua.Log.d(TAG, 'onLoad ' .. tostring(_activatedSystemGuid))
+    _systemHelper = CrLua.TTS.HelperClient.get('TI4_SYSTEM_HELPER')
     Wait.frames(applyUi, 2)
 end
 
@@ -28,23 +12,13 @@ function onPlayerConnect(player_id)
     Wait.frames(applyUi, 2)
 end
 
-function onObjectDrop(playerColor, droppedObject)
-    CrLua.Log.d(TAG, 'onObjectDrop ' ..droppedObject.getName())
-    local isPlayerCurrentTurn = playerColor == Turns.turn_color
-    if not isPlayerCurrentTurn then
-        return
-    end
-    local isCommandToken = string.find(droppedObject.getName(), ' Command Token')
-    if not isCommandToken then
-        return
-    end
-    local system = _systemHelper.systemFromPosition(droppedObject.getPosition())
-    if not system then
-        return  -- ignore tokens not dropped on a system
-    end
+function onSystemActivation(system)
+    CrLua.Log.d(TAG, 'onSystemActivation: ' .. system.string)
 
-    CrLua.Log.d(TAG, 'onObjectDrop: activated by ' .. playerColor)
-    _activatedSystemGuid = system.guid
+    if _activeSystemGuid == system.guid then
+        return
+    end
+    _activeSystemGuid = system.guid
 
     -- Replace our diffuse image with the one from the activated tile.
     local systemObject = getObjectFromGUID(system.guid)
@@ -56,13 +30,6 @@ function onObjectDrop(playerColor, droppedObject)
     ignoreDeletedItem(self.getGUID())
     self.setCustomObject(custom)
     local newSelf = self.reload()
-
-    local function injectActivatedSystemGuid()
-        CrLua.Log.d(TAG, 'applying activated system guid')
-        newSelf.setVar('_activatedSystemGuid', _activatedSystemGuid)
-    end
-    Wait.frames(injectActivatedSystemGuid, 1)
-    Wait.frames(injectActivatedSystemGuid, 3)  -- again just a little later
 end
 
 local _deletedItemsGuid = false
@@ -110,7 +77,8 @@ local SMOOTH_POSITION_FAST = false
 function warpIn()
     CrLua.Log.d(TAG, 'warpIn')
 
-    local systemObject = _activatedSystemGuid and getObjectFromGUID(_activatedSystemGuid)
+    local system = _systemHelper.getActivatedSystem()
+    local systemObject = system and getObjectFromGUID(system.guid)
     if not systemObject then
         error(TAG .. ': no activated system')
     end
@@ -151,7 +119,8 @@ end
 function warpOut()
     CrLua.Log.d(TAG, 'warpOut')
 
-    local systemObject = _activatedSystemGuid and getObjectFromGUID(_activatedSystemGuid)
+    local system = _systemHelper.getActivatedSystem()
+    local systemObject = system and getObjectFromGUID(system.guid)
     if not systemObject then
         error(TAG .. ': no activated system')
     end
@@ -260,9 +229,10 @@ end
 #include <~/CrLua/Table>
 #include <~/CrLua/Util>
 
-#include <~/CrLua/TI4/Faction>
 #include <~/CrLua/TI4/Hex>
 #include <~/CrLua/TI4/Unit>
+
+#include <~/CrLua/TTS/HelperClient>
 
 --CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
 

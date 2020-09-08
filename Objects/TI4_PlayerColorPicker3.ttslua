@@ -82,12 +82,12 @@ local SWAP = {
 }
 
 local DEFAULT_TINT = {
-    White = '8C8C8C',
-    Blue = '0C98D7',
-    Purple = '7500B7',
-    Yellow = 'A5A300',
+    White = '8B8B8B',
+    Blue = '07B2FF',
+    Purple = '7400B7',
+    Yellow = 'D6B700',
     Red = 'CB0000',
-    Green = '007406',
+    Green = '007306',
     Orange = 'F3631C',
     Brown = '703A16',
     Pink = 'F46FCD',
@@ -96,12 +96,12 @@ local DEFAULT_TINT = {
 }
 
 local TINTS = {
-    White = { '000000', '333333', '666666', '8C8C8C', 'CCCCCC', 'FFFFFF' },
-    Blue = { '0000FF', '4169E1', '0C98D7', '00BFFF', '87CEFA', 'B0E0E6' },
-    Purple = { '800080', '4B0082', '7500B7', '8A2BE2', '9932CC', '9370DB' },
-    Yellow = { 'A5A300', 'CCCC00', 'FFFF00', 'FFFF66', 'F0E68C', 'EEE8AA' },
+    White = { '000000', '333333', '666666', '8B8B8B', 'CCCCCC', 'FFFFFF' },
+    Blue = { '0000FF', '4169E1', '07B2FF', '00BFFF', '87CEFA', 'B0E0E6' },
+    Purple = { '800080', '4B0082', '7400B7', '8A2BE2', '9932CC', '9370DB' },
+    Yellow = { 'D6B700', 'CCCC00', 'FFFF00', 'FFFF66', 'F0E68C', 'EEE8AA' },
     Red = { '8B0000', 'B22222', 'CB0000', 'FF0000', 'DC143C', 'CD5C5C' },
-    Green = { '006400', '007406', '808000', '6B8E23', '9ACD32', '7CFC00' },
+    Green = { '006400', '007306', '808000', '6B8E23', '9ACD32', '7CFC00' },
     Orange = { 'FF4500', 'F3631C', 'FF8C00', 'FFA500', 'FF7F50', 'FF6347' },
     Brown = { '664A3D', '703A16', '8B4513', 'A0522D', 'CD853F', 'D2B48C' },
     Pink = { 'C71585', 'FF1493', 'F46FCD', 'FF69B4', 'DB7093', 'FFB6C1' },
@@ -135,6 +135,8 @@ local _prevTint = false
 local _nextColor = false
 local _nextTint = false
 
+local _waitingForDele = {}
+
 -------------------------------------------------------------------------------
 
 function onLoad(saveState)
@@ -144,12 +146,27 @@ function onLoad(saveState)
     Wait.frames(resetUi, 2)
 end
 
-function onPlayerChangeColor(player_color)
+function onPlayerChangeColor(playerColor)
     Wait.frames(resetUi, 2)
 end
 
-function filterObjectEnter(enterObject)
-    return string.match(enterObject.getName(), ' Player Pieces$') and true or false
+function onObjectDestroy(dyingObject)
+    _waitingForDele[dyingObject.getGUID()] = nil
+end
+
+function _registerPut(object)
+    _waitingForDele[object.getGUID()] = true
+end
+
+function _waitForPuts()
+    local function hasOutstandingPuts()
+        for _, _ in pairs(_waitingForDele) do
+            return true
+        end
+    end
+    while hasOutstandingPuts() do
+        coroutine.yield(0)
+    end
 end
 
 -------------------------------------------------------------------------------
@@ -501,15 +518,15 @@ function swapCoroutine()
         coroutine.yield(0)
         coroutine.yield(0)
 
-        Pack.singletons(swapPlan.anonNameToItems, packBag)
-        coroutine.yield(0)
-        coroutine.yield(0)
-
         Pack.decks(swapPlan.anonNameToItems, swapPlan.prevColor, packBag)
         coroutine.yield(0)
         coroutine.yield(0)
 
         Pack.units(swapPlan.anonNameToItems, packBag)
+        coroutine.yield(0)
+        coroutine.yield(0)
+
+        Pack.singletons(swapPlan.anonNameToItems, packBag)
         coroutine.yield(0)
         coroutine.yield(0)
     end
@@ -668,12 +685,14 @@ function putBags(bagNameToBag)
     for bagName, bag in pairs(bagNameToBag) do
         bag.setLock(false)
         if string.match(bagName, ' Box$') then
+            _registerPut(bag)
             bagContainer.putObject(bag)
         else
             assert(bag.getQuantity() == 0)
             destroyObject(bag)
         end
     end
+    _waitForPuts()
 end
 
 -------------------------------------------------------------------------------
@@ -738,10 +757,12 @@ function tintUnits(unitBagsAndUnits, playerColor, tintColorHex)
             -- Put back into unit bag.
             for _, entryObject in ipairs(entryObjects) do
                 entryObject.setLock(false)
+                _registerPut(entryObject)
                 object.putObject(entryObject)
             end
         end
     end
+    _waitForPuts()
 end
 
 -------------------------------------------------------------------------------
@@ -1061,12 +1082,14 @@ function Pack.renameFlagship(anonNameToItems)
                 -- Put back into unit bag.
                 for _, entryObject in ipairs(entryObjects) do
                     entryObject.setLock(false)
+                    _registerPut(entryObject)
                     object.putObject(entryObject)
                 end
             end
             coroutine.yield(0)
         end
     end
+    _waitForPuts()
 end
 
 function Pack.singletons(anonNameToItems, packBag)
@@ -1081,7 +1104,9 @@ function Pack.singletons(anonNameToItems, packBag)
             assert(object)
             if i == 1 then
                 object.setLock(false)
+                _registerPut(object)
                 packBag.putObject(object)
+                _waitForPuts()
             else
                 destroyObject(object)
             end
@@ -1170,11 +1195,13 @@ function Pack.decks(anonNameToItems, deckColor, packBag)
         for i, cardObject in ipairs(cardObjects or {}) do
             cardObject.setLock(false)
             deckObject.setLock(false)
+            _registerPut(cardObject)
             deckObject = deckObject.putObject(cardObject)
             deckObject.setLock(true)
             coroutine.yield(0)  -- give deck time to spawn
             coroutine.yield(0)
         end
+        _waitForPuts()
 
         local deckName = SwapPlan._applyColorToAnonymousName(anonDeckName, deckColor)
         deckObject.setName(deckName)
@@ -1184,8 +1211,10 @@ function Pack.decks(anonNameToItems, deckColor, packBag)
         end
 
         deckObject.setLock(false)
+        _registerPut(deckObject)
         packBag.putObject(deckObject)
         coroutine.yield(0)
+        _waitForPuts()
     end
 end
 
@@ -1215,7 +1244,7 @@ function Pack.units(anonNameToItems, packBag)
                 local object = getObjectFromGUID(item.guid)
                 assert(object)
                 object.setLock(false)
-                object.jointTo()
+                _registerPut(object)
                 unitBag.putObject(object)
             end
         end
@@ -1223,12 +1252,17 @@ function Pack.units(anonNameToItems, packBag)
     end
     coroutine.yield(0)
     coroutine.yield(0)
+    _waitForPuts()
 
     for _, unitBag in pairs(anonNameToUnitBag) do
         unitBag.setLock(false)
-        packBag.putObject(unitBag)
+        unitBag.jointTo()  -- break all joints
         coroutine.yield(0)
+        packBag.putObject(unitBag)
     end
+    coroutine.yield(0)
+    coroutine.yield(0)
+    _waitForPuts()
 end
 
 function Pack.handCards(playerColor, handBag)
@@ -1240,9 +1274,11 @@ function Pack.handCards(playerColor, handBag)
     for i = 1, player.getHandCount() do
         for _, object in ipairs(player.getHandObjects(i)) do
             object.setLock(false)
+            _registerPut(object)
             handBag.putObject(object)
         end
     end
+    _waitForPuts()
 end
 
 function Pack.moveHand(playerColor)
@@ -1602,11 +1638,13 @@ function Unpack.renameFlagship(anonNameToItems, unitObjects)
                 -- Put back into unit bag.
                 for _, entryObject in ipairs(entryObjects) do
                     entryObject.setLock(false)
+                    _registerPut(entryObject)
                     object.putObject(entryObject)
                 end
             end
         end
     end
+    _waitForPuts()
 end
 
 -------------------------------------------------------------------------------

@@ -652,6 +652,8 @@ function autoFill(params)
     end
     printToAll(message, params.clickerColor)
 
+    local doClick = not params.altClick
+
     injectValues{
         multiRoller = assert(multiRoller),
         unitCount = assert(unitCount),
@@ -659,8 +661,11 @@ function autoFill(params)
         suggestPdsUnitName = psUnit and psUnit.unitName,
         clickerColor = assert(params.clickerColor),
         clickButtonLabel = autofillTypeAttributes.clickButtonLabel,
-        doClick = params.altClick
+        doClick = doClick
     }
+    if not doClick then
+        printToAll('AutoFill: left click to fill and roll.', params.clickerColor)
+    end
 end
 
 -------------------------------------------------------------------------------

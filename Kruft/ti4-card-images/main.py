@@ -17,12 +17,14 @@ from google.appengine.api import urlfetch
 
 import hashlib
 import io
+import json
 import logging
 import math
 import random
 import re
 import os
 import os.path
+import urllib
 import webapp2
 
 PARAGRAPH_LINE_HEIGHT_SCALE = 1.4
@@ -43,7 +45,7 @@ def getFont(name, size):
 
 def imageToJPEG(image):
     # BytesIO is bugged, write to a file.
-    file = '/tmp/card.jpg'
+    file = '/tmp/img' + str(random.random()) + '.jpg'
     f = open(file, 'wb')
     image.save(f, format='JPEG')
     f.close()
@@ -57,16 +59,38 @@ def nudgeY(font, text, maxX, y1, y2):
     (w, h) = font.getsize(text)
     return y1 if w <= maxX else y2
 
+def getImageFromUrl(url):
+    logging.info('getImageFromUrl: ' + url)
+    hash = hashlib.sha1()
+    hash.update(url.lower())
+    key = hash.hexdigest().lower()
+    result = urlfetch.fetch(url)
+    file = '/tmp/image_' + key + '.jpg'
+    f = open(file, 'wb')
+    f.write(result.content)
+    f.close()
+    img = Image.open(file)
+    os.remove(file)
+    return img
+
 # -----------------------------------------------------------------------------
 
+_visualizeMargins = False
+
 def wrapText(draw, font, text, x, y, maxX, fill, lineH):
+    if _visualizeMargins:
+        w = maxX
+        h = 30
+        color = (128, 128, 128, 64)
+        draw.rectangle([(x, y), (x+w, y+h)], color)
+
     words = filter(None, text.split(' '))
     text = ''
     lineWidth = 0
     (spaceW, h) = font.getsize(' ')
     for word in words:
         (w, h) = font.getsize(word)
-        if lineWidth + w > maxX:
+        if lineWidth > 0 and lineWidth + w > maxX:
             draw.text((x, y), text, font=font, fill=fill)
             text = ''
             lineWidth = 0
@@ -77,13 +101,19 @@ def wrapText(draw, font, text, x, y, maxX, fill, lineH):
     return y + (lineH * PARAGRAPH_LINE_HEIGHT_SCALE)
 
 def wrapTextCenter(draw, font, text, x, y, maxX, fill, lineH):
+    if _visualizeMargins:
+        w = maxX / 2
+        h = 30
+        color = (128, 128, 128, 64)
+        draw.rectangle([(x - w, y), (x + w, y+h)], color)
+
     words = filter(None, text.split(' '))
     text = ''
     lineWidth = 0
     (spaceW, h) = font.getsize(' ')
     for word in words:
         (w, h) = font.getsize(word)
-        if lineWidth + w > maxX:
+        if lineWidth > 0 and lineWidth + w > maxX:
             x2 = x - (lineWidth / 2)
             draw.text((x2, y), text, font=font, fill=fill)
             text = ''
@@ -96,6 +126,12 @@ def wrapTextCenter(draw, font, text, x, y, maxX, fill, lineH):
     return y + (lineH * PARAGRAPH_LINE_HEIGHT_SCALE)
 
 def wrapTextCenterHV(draw, font, text, x, y, maxX, fill, lineH):
+    if _visualizeMargins:
+        w = maxX / 2
+        h = 30
+        color = (128, 128, 128, 64)
+        draw.rectangle([(x - w, y), (x + w, y+h)], color)
+
     text = text.replace('\n', ' \n ')
     lines = []
     (spaceW, h) = font.getsize(' ')
@@ -104,7 +140,7 @@ def wrapTextCenterHV(draw, font, text, x, y, maxX, fill, lineH):
     lineWidth = 0
     for word in words:
         (w, h) = font.getsize(word)
-        if word == '\n' or lineWidth + w > maxX:
+        if word == '\n' or (lineWidth > 0 and lineWidth + w > maxX):
             lines.append(text)
             text = ''
             lineWidth = 0
@@ -123,6 +159,12 @@ def wrapTextCenterHV(draw, font, text, x, y, maxX, fill, lineH):
     return y + (lineH * PARAGRAPH_LINE_HEIGHT_SCALE)
 
 def wrapTextCenterAlignBottom(draw, font, text, x, y, maxX, fill, lineH):
+    if _visualizeMargins:
+        w = maxX / 2
+        h = 30
+        color = (128, 128, 128, 64)
+        draw.rectangle([(x - w, y), (x + w, y+h)], color)
+
     text = text.replace('\n', ' \n ')
     lines = []
     (spaceW, h) = font.getsize(' ')
@@ -131,7 +173,7 @@ def wrapTextCenterAlignBottom(draw, font, text, x, y, maxX, fill, lineH):
     lineWidth = 0
     for word in words:
         (w, h) = font.getsize(word)
-        if word == '\n' or lineWidth + w > maxX:
+        if word == '\n' or (lineWidth > 0 and lineWidth + w > maxX):
             lines.append(text)
             text = ''
             lineWidth = 0
@@ -175,6 +217,12 @@ FONT_3_WORDS = {
 }
 
 def wrapTextBoldStart(draw, font1, font2, font3, text, x, y, maxX, fill, lineH, dyfont3):
+    if _visualizeMargins:
+        w = maxX - x
+        h = 30
+        color = (128, 128, 128, 64)
+        draw.rectangle([(x, y), (x+w, y+h)], color)
+
     font = font1
     (spaceW, h) = font.getsize(' ')
     words = filter(None, text.split(' '))
@@ -192,6 +240,11 @@ def wrapTextBoldStart(draw, font1, font2, font3, text, x, y, maxX, fill, lineH, 
         if font == font3:
             font = restoreFont
         if word in FONT_3_WORDS or re.sub(r'[^\w\s]', '', word) in FONT_3_WORDS:
+            restoreFont = font
+            font = font3
+            dy = dyfont3
+        if word.startswith('^'):
+            word = word[1:]
             restoreFont = font
             font = font3
             dy = dyfont3
@@ -217,7 +270,7 @@ CARD_W = 500
 CARD_H = 750
 
 ACTION_TITLE_L = 85
-ACTION_TITLE_R = 100
+ACTION_TITLE_R = 105
 ACTION_TITLE_Y1 = 96
 ACTION_TITLE_Y2 = 76
 ACTION_TITLE_TEXT_SIZE = 39
@@ -276,7 +329,7 @@ PUBLIC_TYPE_TEXT_SIZE = 34
 PUBLIC_TYPE_TEXT_H = 34
 
 PUBLIC_BODY_L = 250
-PUBLIC_BODY_R = 50
+PUBLIC_BODY_R = 80
 PUBLIC_BODY_Y = 395
 PUBLIC_BODY_TEXT_SIZE = 39
 PUBLIC_BODY_TEXT_H = 48
@@ -288,7 +341,7 @@ PUBLIC_FOOTER_TEXT_SIZE = 32
 PUBLIC_FOOTER_TEXT_H = 47
 
 AGENDA_TITLE_L = 250
-AGENDA_TITLE_R = 100
+AGENDA_TITLE_R = 65
 AGENDA_TITLE_Y1 = 55
 AGENDA_TITLE_Y2 = 35
 AGENDA_TITLE_TEXT_SIZE = 44
@@ -302,22 +355,22 @@ AGENDA_TYPE_TEXT_H = 31
 AGENDA_BODY_UPPER_TEXT_SIZE = 24
 
 AGENDA_BODY_ELECT_L = 250
-AGENDA_BODY_ELECT_R = 90
+AGENDA_BODY_ELECT_R = 105
 AGENDA_BODY_FORAGAINST_L = 60
-AGENDA_BODY_FORAGAINST_R = 90
+AGENDA_BODY_FORAGAINST_R = 105
 AGENDA_BODY_Y = 225
 AGENDA_BODY_TEXT_SIZE = 28
 AGENDA_BODY_TEXT_H = 35
 
 PROMISSORY_TITLE_L = 250
-PROMISSORY_TITLE_R = 100
+PROMISSORY_TITLE_R = 130 # 100
 PROMISSORY_TITLE_Y1 = 55
 PROMISSORY_TITLE_Y2 = 35
 PROMISSORY_TITLE_TEXT_SIZE = 39
 PROMISSORY_TITLE_TEXT_H = 39
 
 PROMISSORY_BODY_L = 70
-PROMISSORY_BODY_R = 25
+PROMISSORY_BODY_R = 65 # 25
 PROMISSORY_BODY_Y = 206
 PROMISSORY_BODY_TEXT_SIZE = 31
 PROMISSORY_BODY_TEXT_H = 37
@@ -333,18 +386,18 @@ BODY_SM_LINEH = 37
 BODY_LG_SIZE = 40
 BODY_LG_LINEH = 47
 
-def actionCard(title, body, flavor, cardImage, fontsize):
+def actionCard(title, body, flavor, cardImage, titlesize, fontsize):
     img = getImage(cardImage)
     draw = ImageDraw.Draw(img)
 
-    font = getFont('HandelGothicDBold.otf', ACTION_TITLE_TEXT_SIZE)
+    font = getFont('HandelGothicDBold.otf', ACTION_TITLE_TEXT_SIZE + titlesize)
     color = (255, 232, 150, 255)
     text = title
     x = ACTION_TITLE_L
     y1 = ACTION_TITLE_Y1
     y2 = ACTION_TITLE_Y2
     maxX = CARD_W - ACTION_TITLE_R
-    lineH = ACTION_TITLE_TEXT_H
+    lineH = ACTION_TITLE_TEXT_H + titlesize
     y = nudgeY(font, text, maxX, y1, y2)
     wrapText(draw, font, text, x, y, maxX, color, lineH)
 
@@ -380,18 +433,18 @@ def actionCard(title, body, flavor, cardImage, fontsize):
 
     return imageToJPEG(img)
 
-def secretObjectiveCard(title, type, body, footer, cardImage, fontsize):
+def secretObjectiveCard(title, type, body, footer, cardImage, titlesize, fontsize):
     img = getImage(cardImage)
     draw = ImageDraw.Draw(img)
 
-    font = getFont('HandelGothicDBold.otf', SECRET_TITLE_TEXT_SIZE)
+    font = getFont('HandelGothicDBold.otf', SECRET_TITLE_TEXT_SIZE + titlesize)
     color = (254, 196, 173, 255)
     text = title
     x = SECRET_TITLE_L
     y1 = SECRET_TITLE_Y1
     y2 = SECRET_TITLE_Y2
     maxX = CARD_W - SECRET_TITLE_R
-    lineH = SECRET_TITLE_TEXT_H
+    lineH = SECRET_TITLE_TEXT_H + titlesize
     y = nudgeY(font, text, maxX, y1, y2)
     wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
 
@@ -440,18 +493,18 @@ def secretObjectiveCard(title, type, body, footer, cardImage, fontsize):
 
     return imageToJPEG(img)
 
-def publicObjectiveCard(level, title, type, body, footer, cardImage, fontsize):
+def publicObjectiveCard(level, title, type, body, footer, cardImage, titlesize, fontsize):
     img = getImage(cardImage)
     draw = ImageDraw.Draw(img)
 
-    font = getFont('HandelGothicDBold.otf', PUBLIC_TITLE_TEXT_SIZE)
+    font = getFont('HandelGothicDBold.otf', PUBLIC_TITLE_TEXT_SIZE + titlesize)
     color = (249, 249, 169, 255) if level == 1 else (173, 239, 254, 255)
     text = title
     x = PUBLIC_TITLE_L
     y1 = PUBLIC_TITLE_Y1
     y2 = PUBLIC_TITLE_Y2
     maxX = CARD_W - PUBLIC_TITLE_R
-    lineH = PUBLIC_TITLE_TEXT_H
+    lineH = PUBLIC_TITLE_TEXT_H + titlesize
     y = nudgeY(font, text, maxX, y1, y2)
     wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
 
@@ -500,18 +553,18 @@ def publicObjectiveCard(level, title, type, body, footer, cardImage, fontsize):
 
     return imageToJPEG(img)
 
-def agendaCard(title, type, body, cardImage, fontsize):
+def agendaCard(title, type, body, cardImage, titlesize, fontsize):
     img = getImage(cardImage)
     draw = ImageDraw.Draw(img)
 
-    font = getFont('HandelGothicDBold.otf', AGENDA_TITLE_TEXT_SIZE)
+    font = getFont('HandelGothicDBold.otf', AGENDA_TITLE_TEXT_SIZE + titlesize)
     color = (149, 202, 255, 255)
     text = title
     x = AGENDA_TITLE_L
     y1 = AGENDA_TITLE_Y1
     y2 = AGENDA_TITLE_Y2
     maxX = CARD_W - AGENDA_TITLE_R
-    lineH = AGENDA_TITLE_TEXT_H
+    lineH = AGENDA_TITLE_TEXT_H + titlesize
     y = nudgeY(font, text, maxX, y1, y2)
     wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
 
@@ -519,7 +572,7 @@ def agendaCard(title, type, body, cardImage, fontsize):
     y = 160
     w = 100
     h = 30
-    color = (12, 12, 14, 255)
+    color = (24, 26, 25, 255)
     draw.rectangle([(x, y), (x+w, y+h)], color)
 
     font = getFont('MyriadProBold.ttf', AGENDA_TYPE_TEXT_SIZE)
@@ -535,10 +588,21 @@ def agendaCard(title, type, body, cardImage, fontsize):
     #font1 = getFont('MyriadProBold.ttf', AGENDA_BODY_TEXT_SIZE)
     #font2 = getFont('MyriadProSemibold.otf', AGENDA_BODY_TEXT_SIZE)
     font2 = getFont('MyriadProRegular.ttf', AGENDA_BODY_TEXT_SIZE + fontsize)
+    font3 = getFont('HandelGothicDBold.otf', AGENDA_BODY_UPPER_TEXT_SIZE + fontsize)
     color = (0, 0, 0, 255)
     text = body
     y = AGENDA_BODY_Y
     lineH = AGENDA_BODY_TEXT_H + fontsize
+
+    if '(When' in text:
+        i = text.find('(When')
+        j = text.find(')', i + 1)
+        whenText = text[i+1:j]
+        if text[j+1] == '\n':
+            j += 1
+        text = text[:i] + text[j+1:]
+        y = wrapTextCenter(draw, font2, whenText, x, y, maxX, color, lineH)
+
     if 'Elect ' in text:
         font1 = getFont('MyriadProSemibold.otf', AGENDA_BODY_TEXT_SIZE + fontsize)
         x = AGENDA_BODY_ELECT_L
@@ -550,32 +614,31 @@ def agendaCard(title, type, body, cardImage, fontsize):
                 y = wrapTextCenter(draw, font2, line, x, y, maxX, color, lineH)
     else:
         font1 = getFont('MyriadProSemiboldItalic.ttf', AGENDA_BODY_TEXT_SIZE + fontsize)
-        font3 = getFont('HandelGothicDBold.otf', AGENDA_BODY_UPPER_TEXT_SIZE + fontsize)
         x = AGENDA_BODY_FORAGAINST_L
         maxX = CARD_W - AGENDA_BODY_FORAGAINST_R
         for line in text.split('\n'):
             isFor = line.startswith('For:') or line.startswith('For :')
             isAgainst = line.startswith('Against:') or line.startswith('Against :')
             if isFor or isAgainst:
-                y = wrapTextBoldStart(draw, font1, font2, font3, line, x, y, maxX, color, lineH, 0)
+                y = wrapTextBoldStart(draw, font1, font2, font3, line, x, y, maxX, color, lineH, 1)
             else:
                 y = wrapText(draw, font2, line, x, y, maxX, color, lineH)
 
     return imageToJPEG(img)
 
-def promissoryCard(color, title, body, fontsize):
+def promissoryCard(color, title, body, titlesize, fontsize):
     filename = 'Promissory_' + color + '.jpg'
     img = getImage(filename)
     draw = ImageDraw.Draw(img)
 
-    font = getFont('HandelGothicDBold.otf', PROMISSORY_TITLE_TEXT_SIZE)
+    font = getFont('HandelGothicDBold.otf', PROMISSORY_TITLE_TEXT_SIZE + titlesize)
     color = (0, 0, 0, 255)
     text = title
     x = PROMISSORY_TITLE_L
     y1 = PROMISSORY_TITLE_Y1
     y2 = PROMISSORY_TITLE_Y2
     maxX = CARD_W - PROMISSORY_TITLE_R
-    lineH = PROMISSORY_TITLE_TEXT_H
+    lineH = PROMISSORY_TITLE_TEXT_H + titlesize
     y = nudgeY(font, text, maxX, y1, y2)
     wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
 
@@ -599,25 +662,26 @@ def promissoryCard(color, title, body, fontsize):
 
     return imageToJPEG(img)
 
-def nobilityCard(color, title, type, body, footer, points, fontsize):
+def nobilityCard(color, title, type, body, footer, points, titlesize, fontsize):
     filename = 'Nobility' + color + '.jpg'
     img = getImage(filename)
     draw = ImageDraw.Draw(img)
 
-    font = getFont('HandelGothicDBold.otf', TITLE_SIZE)
+    font = getFont('HandelGothicDBold.otf', TITLE_SIZE + titlesize)
     color = (255, 255, 255, 255)
     text = title
     x = 250
     y1 = 35
     y2 = 15
     maxX = 400
-    lineH = TITLE_LINEH
+    lineH = TITLE_LINEH + titlesize
     y = nudgeY(font, text, maxX, y1, y2)
     wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
 
     font = getFont('MyriadProBold.ttf', TYPE_SIZE)
-    color = (255, 255, 255, 255) if type.lower() == 'status phase' else (255, 0, 0, 255)
-    text = type
+    items = type.split('|')
+    text = items[0]
+    color = ImageColor.getrgb('#' + items[1])
     x = 250
     y = 135
     maxX = 400
@@ -658,47 +722,58 @@ def nobilityCard(color, title, type, body, footer, points, fontsize):
 CARD_OPTIONS = {
     'action' : {
         'cardType' : 'action',
-        'cardImage' : 'ActionCard.jpg'
+        'cardImage' : 'ActionCard.jpg',
+        'back' : 'Action_Back.jpg',
     },
     'action-c' : {
         'cardType' : 'action',
-        'cardImage' : 'ActionCard_c.jpg'
+        'cardImage' : 'ActionCard_c.jpg',
+        'back' : 'Action_Back.jpg',
     },
     'action_codex' : {
         'cardType' : 'action',
-        'cardImage' : 'ActionCardCodex.jpg'
+        'cardImage' : 'ActionCardCodex.jpg',
+        'back' : 'Action_Back.jpg',
     },
     'secret' : {
         'cardType' : 'secret',
-        'cardImage' : 'SecretObjective.jpg'
+        'cardImage' : 'SecretObjective.jpg',
+        'back' : 'SecretObjective_Back.jpg',
     },
     'secret-c' : {
         'cardType' : 'secret',
-        'cardImage' : 'SecretObjective_c.jpg'
+        'cardImage' : 'SecretObjective_c.jpg',
+        'back' : 'SecretObjective_Back.jpg',
     },
     'stage1' : {
         'cardType' : 'public1',
-        'cardImage' : 'Stage1.jpg'
+        'cardImage' : 'Stage1.jpg',
+        'back' : 'Stage1_Back.jpg',
     },
     'stage1-c' : {
         'cardType' : 'public1',
-        'cardImage' : 'Stage1_c.jpg'
+        'cardImage' : 'Stage1_c.jpg',
+        'back' : 'Stage1_Back.jpg',
     },
     'stage2' : {
         'cardType' : 'public2',
-        'cardImage' : 'Stage2.jpg'
+        'cardImage' : 'Stage2.jpg',
+        'back' : 'Stage2_Back.jpg',
     },
     'stage2-c' : {
         'cardType' : 'public2',
-        'cardImage' : 'Stage2_c.jpg'
+        'cardImage' : 'Stage2_c.jpg',
+        'back' : 'Stage2_Back.jpg',
     },
     'agenda' : {
         'cardType' : 'agenda',
-        'cardImage' : 'Agenda.jpg'
+        'cardImage' : 'Agenda.jpg',
+        'back' : 'Agenda_Back.jpg',
     },
     'agenda-c' : {
         'cardType' : 'agenda',
-        'cardImage' : 'Agenda_c.jpg'
+        'cardImage' : 'Agenda_c.jpg',
+        'back' : 'Agenda_Back.jpg',
     },
     'promissory-c' : {
         'cardType' : 'promissory',
@@ -720,6 +795,7 @@ class CardHandler(webapp2.RequestHandler):
         footer = self.request.get('footer', 'footer').upper()
         color = self.request.get('color', 'white').capitalize()
         points = self.request.get('points', '1').lower()
+        titlesize = self.request.get('titlesize', '0').lower()
         fontsize = self.request.get('fontsize', '0').lower()
 
         logging.info('Card "' + card + '" title="' + title + '" type="' + type + '" body="' + body + '" flavor="' + flavor + '"')
@@ -733,32 +809,34 @@ class CardHandler(webapp2.RequestHandler):
         hash.update(flavor.encode('utf-8'))
         hash.update(color.encode('utf-8'))
         hash.update(points.encode('utf-8'))
+        hash.update(titlesize.encode('utf-8'))
         hash.update(fontsize.encode('utf-8'))
-        hash.update('version5')
+        hash.update('version6')
         key = hash.hexdigest().lower()
 
         cardOptions = CARD_OPTIONS[card]
         cardType = cardOptions['cardType']
         cardImage = cardOptions['cardImage']
+        titlesize = int(titlesize)
         fontsize = int(fontsize)
 
         jpg = memcache.get(key=key)
         #jpg = None
         if jpg is None:
             if cardType == 'action':
-                jpg = actionCard(title, body, flavor, cardImage, fontsize)
+                jpg = actionCard(title, body, flavor, cardImage, titlesize, fontsize)
             elif cardType == 'secret':
-                jpg = secretObjectiveCard(title, type, body, footer, cardImage, fontsize)
+                jpg = secretObjectiveCard(title, type, body, footer, cardImage, titlesize, fontsize)
             elif cardType == 'public1':
-                jpg = publicObjectiveCard(1, title, type, body, footer, cardImage, fontsize)
+                jpg = publicObjectiveCard(1, title, type, body, footer, cardImage, titlesize, fontsize)
             elif cardType == 'public2':
-                jpg = publicObjectiveCard(2, title, type, body, footer, cardImage, fontsize)
+                jpg = publicObjectiveCard(2, title, type, body, footer, cardImage, titlesize, fontsize)
             elif cardType == 'agenda':
-                jpg = agendaCard(title, type, body, cardImage, fontsize)
+                jpg = agendaCard(title, type, body, cardImage, titlesize, fontsize)
             elif cardType == 'promissory':
-                jpg = promissoryCard(color, title, body, fontsize)
+                jpg = promissoryCard(color, title, body, titlesize, fontsize)
             elif cardType == 'nobility':
-                jpg = nobilityCard(color, title, type, body, footer, points, fontsize)
+                jpg = nobilityCard(color, title, type, body, footer, points, titlesize, fontsize)
             else:
                 self.response.status = 400 # bad request
                 self.response.status_message = 'Bad card type'
@@ -769,15 +847,70 @@ class CardHandler(webapp2.RequestHandler):
         self.response.headers['Content-Type'] = 'image/jpeg'
         self.response.out.write(jpg)
 
+class BackHandler(webapp2.RequestHandler):
+    def get(self):
+        card = self.request.get('card', 'action').lower()
+        cardOptions = CARD_OPTIONS[card]
+        backImage = cardOptions['back']
+        key = backImage
+        jpg = memcache.get(key=key)
+        #jpg = None
+        if jpg is None:
+            img = getImage(backImage)
+            jpg = imageToJPEG(img)
+            memcache.add(key, jpg, 3600)
+        self.response.headers['Content-Type'] = 'image/jpeg'
+        self.response.out.write(jpg)
+
 class getActionHandler(webapp2.RequestHandler):
     def get(self):
-        title = self.request.get('title')
+        title = self.request.get('title').upper()
         body = self.request.get('body')
         flavor = self.request.get('flavor')
         source = self.request.get('source')
-        jpg = actionCard(title.upper(), body, flavor, 'ActionCard_c.jpg')
+        cardImage = 'ActionCardCodex.jpg' if source == 'codex' else 'ActionCard_c.jpg'
+        titlesize = 0
+        fontsize = 0
+        jpg = actionCard(title, body, flavor, cardImage, titlesize, fontsize)
+
         self.response.headers['Content-Type'] = 'image/jpeg'
         self.response.out.write(jpg)
+
+class getAgendaHandler(webapp2.RequestHandler):
+    def get(self):
+        title = self.request.get('title').upper()
+        type = self.request.get('type').upper()
+        elect = self.request.get('elect')
+        forText = self.request.get('for')
+        againstText = self.request.get('against')
+        source = self.request.get('source')
+        cardImage = 'Agenda_c.jpg'
+        titlesize = 0
+        fontsize = 0
+
+        if type == 'DIRECTIVE':
+            type = 'DIRECTIVE|ffff00'
+        elif type == 'LAW':
+            type = 'LAW|ddad63'
+
+        body = ''
+        if len(elect) > 1:
+            body += 'Elect '
+            body += elect + '\n'
+            if len(againstText) > 1:
+                body += 'For: ' + forText + '\nAgainst: ' + againstText
+            else:
+                body += forText
+        else:
+            if len(againstText) > 1:
+                body += 'For: ' + forText + '\nAgainst: ' + againstText
+            else:
+                body += forText
+
+        jpg = agendaCard(title, type, body, cardImage, titlesize, fontsize)
+        self.response.headers['Content-Type'] = 'image/jpeg'
+        self.response.out.write(jpg)
+
 
 class TestActionHandler(webapp2.RequestHandler):
     def get(self):
@@ -827,15 +960,7 @@ class TestAgenda2Handler(webapp2.RequestHandler):
 # Given a 3200x3200 system tile image, generate a 2048x1024 one.
 class MutateSystemTile(webapp2.RequestHandler):
     def get(self):
-        imageUrl = self.request.get('image')
-        unique = self.request.get('unique')
-        result = urlfetch.fetch(imageUrl)
-        file = '/tmp/system ' + unique + '.jpg'
-        f = open(file, 'wb')
-        f.write(result.content)
-        f.close()
-        original = Image.open(file)
-        os.remove(file)
+        original = getImageFromUrl(self.request.get('image'))
         front = original.crop((1390, 1630, 3170, 3170))
         front = front.resize((1014 - 9, 947 - 76))
         back = original.crop((1382, 30, 3170, 1570))
@@ -843,6 +968,60 @@ class MutateSystemTile(webapp2.RequestHandler):
         img = Image.new('RGB', (2048, 1024), 'black')
         img.paste(front, (9, 76, 1014, 947))
         img.paste(back, (1033, 76, 2038, 947))
+        jpg = imageToJPEG(img)
+        self.response.headers['Content-Type'] = 'image/jpeg'
+        self.response.out.write(jpg)
+
+# Convert command and owner tokens to the new 512x512 shared image.
+class MutateFactionTokens(webapp2.RequestHandler):
+    def get(self):
+        command = getImageFromUrl(self.request.get('command'))
+        owner = getImageFromUrl(self.request.get('owner'))
+        img = Image.new('RGB', (512, 512), 'black')
+        #command = getImage('commandToken.png')
+        #owner = getImage('ownerToken.png')
+        #img = getImage('playertokens_uv.png')
+
+        commandTop = command.crop((450, 0, 900, 450))
+        commandTop = commandTop.rotate(270)
+        x = 141
+        y = 311
+        dx = 175
+        dy = 175
+        commandTop = commandTop.resize((dx * 2, dy * 2))
+        mask = Image.new('RGBA', (dx * 2, dy * 2))
+        draw = ImageDraw.Draw(mask)
+        draw.polygon([(0, 350), (195, 50), (370, 350)], (255, 255, 255, 255))
+        img.paste(commandTop, (x-dx, y-dy, x+dx, y+dy), mask)
+
+        commandBottom = command.crop((450, 450, 900, 900))
+        commandBottom = commandBottom.rotate(90)
+        x = 336
+        y = 351
+        dx = 150
+        dy = 150
+        commandBottom = commandBottom.resize((dx * 2, dy * 2))
+        mask = Image.new('RGBA', (dx * 2, dy * 2))
+        draw = ImageDraw.Draw(mask)
+        draw.polygon([(10, 0), (165, 280), (320, 0)], (255, 255, 255, 255))
+        img.paste(commandBottom, (x-dx, y-dy, x+dx, y+dy), mask)
+
+        owner = owner.rotate(270)
+        owner = owner.crop((0, 190, 340, 400))
+        x = 256
+        y = 96
+        dx = 124
+        dy = 77
+        owner = owner.resize((dx * 2, dy * 2))
+        img.paste(owner, (x-dx, y-dy, x+dx, y+dy))
+
+        border = getImage('playertokens_border.png')
+        img.paste(border, (0, 0, 512, 512), border)
+
+        #img = Image.blend(img, getImage('playertokens_uv.png'), 0.2)
+
+        img = img.convert('RGB')
+
         jpg = imageToJPEG(img)
         self.response.headers['Content-Type'] = 'image/jpeg'
         self.response.out.write(jpg)
@@ -903,16 +1082,87 @@ class RadialDither(webapp2.RequestHandler):
         self.response.headers['Content-Type'] = 'image/jpeg'
         self.response.out.write(jpg)
 
+class FourK(webapp2.RequestHandler):
+    def get(self):
+        img = getImageFromUrl(self.request.get('img'))
+        img = img.convert('RGB')
+        w, h = img.size
+        w0, h0 = w, h
+        if w > 4096:
+            h = int(h * 4096 / w)
+            w = 4096
+        if h > 4096:
+            w = int(w * 4096 / h)
+            h = 4096
+        logging.info('4k resizing from ' + str(w0) + 'x' + str(h0) + ' -> ' + str(w) + 'x' + str(h))
+        img = img.resize((w, h))
+        jpg = imageToJPEG(img)
+        self.response.headers['Content-Type'] = 'image/jpeg'
+        self.response.out.write(jpg)
+
+class CardSheet(webapp2.RequestHandler):
+    def post(self):
+        cardw = int(self.request.get('cardw', 500))
+        cardh = int(self.request.get('cardh', 750))
+        cols = int(self.request.get('cols', 0))
+        file = self.request.get('file', False)
+        back = self.request.get('back', False)
+        body = urllib.unquote(self.request.body)
+        while body.endswith('='):
+            body = body[:-1]
+        logging.info('body: ' + body)
+        #if len(body) == 0:
+        #    body = '[{ "name": "A", "img": "url" }]'
+        items = json.loads(body)
+        logging.info('body: ' + body + ' #=' + str(len(items)))
+        if cols == 0:
+            cols = int(math.floor(4096 / cardw))
+        rows = int(math.ceil(float(len(items)) / cols))
+        rows = max(rows, 2) # must have at least 2 rows
+        logging.info('cardSheet: ' + str(cols) + 'x' + str(rows))
+        img = Image.new('RGB', (cardw * cols, cardh * rows))
+        back = Image.open(back)
+        for col in range(cols):
+            for row in range(rows):
+                x = cardw * col
+                y = cardh * row
+                i = (row * cols) + col
+                card = False
+                if i < len(items):
+                    item = items[i]
+                    logging.info(str(i) + ' "' + item['name'] + '" ' + item['img'])
+                    card = getImageFromUrl(item['img'])
+                else:
+                    card = back
+                card = card.resize((cardw, cardh))
+                img.paste(card, (x, y, x+cardw, y+cardh))
+        f = open(file, 'wb')
+        img.save(f, format='JPEG')
+        f.close()
+
+class Proxy(webapp2.RequestHandler):
+    def get(self):
+        file = self.request.get('file', '/tmp/t.jpg')
+        img = Image.open(file)
+        jpg = imageToJPEG(img)
+        self.response.headers['Content-Type'] = 'image/jpeg'
+        self.response.out.write(jpg)
 
 app = webapp2.WSGIApplication([
     ('/img', CardHandler),
-    #('/getaction', getActionHandler),
+    ('/back', BackHandler),
+    ('/getaction', getActionHandler),
+    ('/getagenda', getAgendaHandler),
     #('/testaction', TestActionHandler),
     #('/testsecret', TestSecretHandler),
     #('/testpublic', TestPublicHandler),
     #('/testagenda', TestAgenda1Handler),
     #('/testagenda2', TestAgenda2Handler),
     #('/mutatesystem', MutateSystemTile),
+    #('/mutatefaction', MutateFactionTokens),
     #('/radialdither', RadialDither),
+    #('/4k', FourK),
+    ('/cardsheet', CardSheet),
+    ('/proxy', Proxy),
 
 ], debug=True)

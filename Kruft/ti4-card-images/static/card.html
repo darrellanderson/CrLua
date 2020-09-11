@@ -76,6 +76,27 @@
                     </select>
                 </li>
 
+                <li id="titleSizeBlock">
+                    <label>Title Size</label>
+                    <select name="titlesize" id="titlesize" class="field-select">
+                        <option value="0">Normal</option>
+                        <option value="-1">-1</option>
+                        <option value="-2">-2</option>
+                        <option value="-3">-3</option>
+                        <option value="-4">-4</option>
+                        <option value="-5">-5</option>
+                        <option value="-6">-6</option>
+                        <option value="-7">-7</option>
+                        <option value="-8">-8</option>
+                        <option value="-9">-9</option>
+                        <option value="-10">-10</option>
+                        <option value="-11">-11</option>
+                        <option value="-12">-12</option>
+                        <option value="-13">-13</option>
+                        <option value="-14">-14</option>
+                        <option value="-15">-15</option>
+                    </select>
+                </li>
                 <li id="fontSizeBlock">
                     <label>Font Size</label>
                     <select name="fontsize" id="fontsize" class="field-select">
@@ -86,6 +107,15 @@
                         <option value="-4">-4</option>
                         <option value="-5">-5</option>
                         <option value="-6">-6</option>
+                        <option value="-7">-7</option>
+                        <option value="-8">-8</option>
+                        <option value="-9">-9</option>
+                        <option value="-10">-10</option>
+                        <option value="-11">-11</option>
+                        <option value="-12">-12</option>
+                        <option value="-13">-13</option>
+                        <option value="-14">-14</option>
+                        <option value="-15">-15</option>
                     </select>
                 </li>
 
@@ -97,6 +127,9 @@
         </div>
         <div class="card" id="cardcontainer">
             <img id="cardimage" />
+        </div>
+        <div class="card" id="backcontainer">
+            <img id="backimage" />
         </div>
     </div>
 
@@ -111,6 +144,7 @@
             var color = encodeURIComponent(document.getElementById("color").value)
             var footer = encodeURIComponent(document.getElementById("footer").value)
             var points = encodeURIComponent(document.getElementById("points").value)
+            var titlesize = encodeURIComponent(document.getElementById("titlesize").value)
             var fontsize = encodeURIComponent(document.getElementById("fontsize").value)
 
             if (card == 'secret' || card == 'secret-c') {
@@ -130,9 +164,15 @@
             url = url + "&color=" + color
             url = url + "&footer=" + footer
             url = url + "&points=" + points
+            url = url + "&titlesize=" + titlesize
             url = url + "&fontsize=" + fontsize
 
             var img = document.getElementById("cardimage")
+            img.src = url
+
+            var url = "/back"
+            url = url + "?card=" + card
+            var img = document.getElementById("backimage")
             img.src = url
         }
 
@@ -155,7 +195,7 @@
                 document.getElementById("subtitleBlock").style.display = 'block';
             }
             if (card == 'promissory-c') {
-                document.getElementById("colorBlock").style.display = 'block';                
+                document.getElementById("colorBlock").style.display = 'block';
             }
 
             if (card == 'nobility') {

@@ -80,6 +80,7 @@ local _lowerNameToInfluence = false
 local _guidToParameters = {}  -- strategy cards
 local _strategyCardSheetGuid = false
 local _allocatedTokenGuidToColor = {}  -- unassigned command tokens
+local _putTokenGuidSet = {}
 
 function getStrategyCardSheet()
     local result = _strategyCardSheetGuid and getObjectFromGUID(_strategyCardSheetGuid)
@@ -482,6 +483,7 @@ function _returnCommandTokens(playerColor, commandTokens, commandTokensBag)
     local guidToZone = _zoneHelper.zonesFromPositions(guidToPosition)
     for guid, commandToken in pairs(guidToCommandToken) do
         if not guidToZone[guid] then
+            _putTokenGuidSet[guid] = true
             commandTokensBag.putObject(commandToken)
         end
     end
@@ -639,7 +641,7 @@ local function _doEndOfStatusPhaseCoroutineBody(playerColor)
     coroutine.yield(0)
 
     if not faction then
-        _safeBroadcastToColor('No faction sheet detected.', playerColor, {0.8,0.2,0.2})
+        _safeBroadcastToColor('No faction sheet detected for ' .. playerColor .. '.', playerColor, {0.8,0.2,0.2})
     end
 
     -- Franken do not benefit from faction attributes and may have different flagships.
@@ -654,22 +656,29 @@ local function _doEndOfStatusPhaseCoroutineBody(playerColor)
     if voteCounter then
         _countInfluence(playerColor, voteCounter, lowerNameToCards, lowerNameToInZoneCards)
     else
-        _safeBroadcastToColor('No vote counter detected.', playerColor, {0.8,0.2,0.2})
+        _safeBroadcastToColor('No vote counter detected for ' .. playerColor .. '.', playerColor, {0.8,0.2,0.2})
     end
 
     local numCommandTokens = _getAllocateCommandTokensCount(playerColor, faction, lowerNameToInZoneCards)
     if commandTokensBag then
-        -- Allocate new tokens before returning old.  There's a race where new
-        -- tokens get destroyed/replaced if competing with an active put.
-        _allocateCommandTokens(playerColor, commandSheet, commandTokensBag, numCommandTokens)
-        coroutine.yield(0)
+        _returnCommandTokens(playerColor, commandTokens, commandTokensBag)
+
+        -- Wait for puts to complete (objects destroyed), otherwise TTS may
+        -- pull out put-not-quite-finished tokens and things break.
+        local function putPending()
+            for _, _ in pairs(_putTokenGuidSet) do
+                return true
+            end
+        end
+        while putPending() do
+            coroutine.yield(0)
+        end
         coroutine.yield(0)
         coroutine.yield(0)
 
-        _returnCommandTokens(playerColor, commandTokens, commandTokensBag)
-        coroutine.yield(0)
+        _allocateCommandTokens(playerColor, commandSheet, commandTokensBag, numCommandTokens)
     else
-        _safeBroadcastToColor('No token bag detected.', playerColor, {0.8,0.2,0.2})
+        _safeBroadcastToColor('No token bag detected for ' .. playerColor .. '.', playerColor, {0.8,0.2,0.2})
     end
 end
 
@@ -788,6 +797,7 @@ function onObjectPickUp(playerColor, pickedUpObject)
 end
 
 function onObjectDestroy(dyingObject)
+    _putTokenGuidSet[dyingObject.getGUID()] = nil
     _clearUnallocatedCommandToken(dyingObject)
 end
 

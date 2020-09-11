@@ -1271,6 +1271,8 @@ function SetupFaction.placeScoreCounters(ownerTokensBag, zone, zoneIndex, factio
         position     = p,
         snap_to_grid = false,
     })
+    clone.setLock(false)
+    Wait.time(function() clone.setLock(true) end, 2)
     coroutine.yield(0)
     coroutine.yield(0)
 
@@ -1288,6 +1290,28 @@ function SetupFaction.placeScoreCounters(ownerTokensBag, zone, zoneIndex, factio
         position = p,
         rotation = { x = 0, y = scoreboard.getRotation().y + 90, z = 0 }
     })
+
+    -- Place token above the secrets mat.
+    local function getSecretsMat()
+        local findName = 'Secrets Mat'
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == findName then
+                return object
+            end
+        end
+        error('unpack faction place score counters: missing ' .. findName)
+    end
+    local secretsMat = getSecretsMat()
+    local p = secretsMat.call('suggestedOwnerTokenLocation', color)
+    if p then
+        local token = ownerTokensBag.takeObject({
+            position = { x = p.x, y = p.y + 1, z = p.z },
+            rotation = { x = 0, y = secretsMat.getRotation().y + 90, z = 0 }
+        })
+        local scale = token.getScale()
+        local m = 2.25
+        token.setScale({ x = scale.x * m, y = scale.y * m, z = scale.z * m })
+    end
 end
 
 local _unpackFactionQueue = {}

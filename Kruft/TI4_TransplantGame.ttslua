@@ -1,0 +1,42 @@
+--- Save/restore game state to move game between tables.
+-- Cards, units.
+-- Command tokens, owner tokens.
+
+-- Ignore map, faction setup -- do those manually.
+
+local _state = false
+
+function onLoad(saveState)
+    _state = saveState and string.len(saveState) < 0 and JSON.decode(saveState)
+
+    self.addContextMenuItem('Save', doSave)
+    self.addContextMenuItem('Restore', doSave)
+end
+
+function onSave()
+    return _state and JSON.encode(_state) or ''
+end
+
+function doSave()
+    local cards = {}
+    local decks = {}
+    local units = {}
+
+    for _, object in ipairs(getAllObjects()) do
+
+        if object.tag == 'Card' then
+            table.insert(cards, {
+                name = object.getName(),
+                position = object.getPosition(),
+                rotation = object.getRotation()
+            })
+        elseif object.tag == 'Deck' then
+            table.insert(decks, {
+
+            })
+
+    end
+end
+
+function doRestore()
+end

@@ -16,30 +16,38 @@ end
 local _strategyCardHelper = getHelperClient('TI4_STRATEGY_CARD_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
+local x = -3.85
+local z = 2
+local width = 1100
+local height = 400
+local fontSize = 150
+
 function onLoad(save_state)
     local y = self.getBoundsNormalized().size.y / 2 + 0.01
     self.createButton({
         click_function = 'resetAgendaTokens',
         function_owner = self,
         label          = 'Reset\nWhen/After',
-        position       = { x = 0, y = y, z = 0 },
+        position       = { x = x, y = y, z = -z },
         rotation       = { x = 0, y = 90, z = 0 },
         scale          = self.getScale(),
-        width          = 1100,
-        height         = 600,
-        font_size      = 180,
+        width          = width,
+        height         = height,
+        font_size      = fontSize,
+        tooltip        = 'Reset When/After Tokens',
     })
 
     self.createButton({
         click_function = 'resetVotes',
         function_owner = self,
-        label          = 'Update Available Votes',
-        position       = { x = -3.9, y = y, z = 0 },
+        label          = 'Update\nAvail Votes',
+        position       = { x = x, y = y, z = z },
         rotation       = { x = 0, y = 90, z = 0 },
         scale          = self.getScale(),
-        width          = 2200,
-        height         = 300,
-        font_size      = 180,
+        width          = width,
+        height         = height,
+        font_size      = fontSize,
+        tooltip        = 'Recompute available votes from non-exhausted planet cards',
     })
 
     self.setSnapPoints({

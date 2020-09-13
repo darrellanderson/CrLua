@@ -8,7 +8,17 @@ local DEFAULT_CONFIG = {
     useCodexACs = false
 }
 
-local codexACList = {'Hack Election', 'Harness Energy', 'Blitz', 'Fighter Conscription', 'Forward Supply Base', 'Rally', 'War Machine (1)', 'War Machine (2)', 'War Machine (3)', 'War Machine (4)', 'Master Plan', 'Insider Information', 'Plagiarize', 'Scramble Frequency', 'Solar Flare', 'Reflective Shielding', 'Impersonation', 'Sanction', 'Counterstroke', 'Ghost Squad',}
+local CODEX_AC_LIST = {'Hack Election', 'Harness Energy', 'Blitz', 'Fighter Conscription', 'Forward Supply Base', 'Rally', 'War Machine (1)', 'War Machine (2)', 'War Machine (3)', 'War Machine (4)', 'Master Plan', 'Insider Information', 'Plagiarize', 'Scramble Frequency', 'Solar Flare', 'Reflective Shielding', 'Impersonation', 'Sanction', 'Counterstroke', 'Ghost Squad',}
+
+local CONTRIBUTIONS = [[
+This mod is made of contributions from many people.
+-
+Special thanks to Raptor1210 for creating and maintaining it.
+-
+Thanks to 3tamatulg, Alister, Billy, Blarknob, Brandondash, Cruix, Cyrusa, Darrell, Darth Batman, Doot, Garnet Bear, Hooliganj, Jatta Pake, Jefferson, Lily, Mage, Mantis, Max Philippa, Milty, Nicest_guy_22, Positive, Loving Teammate, Psicoma, Raptor1210, Rodney, SCPT Hunter, SCPT Matt, Snorecerer, Tactic Blue, ThatRobHuman, Toppopia, Wekker, x3n d0g, and the entire TI4 community for their contributions.
+-
+A massive shout out to Fantasy Flight Games for creating an awesome game. If you have the opportunity please support them. The board game industry wouldn't be the same without them and if you enjoy their work please, please support them and your local game stores.
+]]
 
 function getHelperClient(helperObjectName)
     local function getHelperObject()
@@ -172,7 +182,7 @@ function _createUI()
     local top = {
         tag = 'Panel',
         attributes = {
-            position = '0 0 2',  -- 0.05
+            position = '0 0 2',
             rotation = '0 180 0',
             width = 300,
             height = 500,
@@ -216,8 +226,31 @@ function _createUI()
             }
         }
     }
+    local bottom = {
+        tag = 'Panel',
+        attributes = {
+            position = '0 0 -22',
+            rotation = '0 0 0',
+            width = 300,
+            height = 500,
+            padding = '20 20 20 20',
+            scale = uiScale,
+            color = '#000000e0'
+        },
+        children = {
+            {
+                tag = 'Text',
+                attributes = {
+                    fontSize = 14,
+                    color = 'White',
+                    alignment = 'MiddleCenter',
+                },
+                value = CONTRIBUTIONS
+            }
+        }
+    }
 
-    self.UI.setXmlTable({ defaults, top })
+    self.UI.setXmlTable({ defaults, top, bottom })
 end
 
 function updateUiFromConfig()
@@ -312,7 +345,7 @@ function setupCodexACs(codexACsVal)
     else
         print('Removing Codex action cards from deck.')
         local codexACSet = {}
-        for _, codexAC in ipairs(codexACList) do
+        for _, codexAC in ipairs(CODEX_AC_LIST) do
             codexACSet[codexAC] = true
         end
         for i, entry in ipairs(actionDeck.getObjects()) do

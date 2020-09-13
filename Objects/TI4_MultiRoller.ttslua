@@ -752,8 +752,8 @@ unitParams["TEC Flagship"] = {type="Flagship"}
 unitParams["For'xdar"] = {type="Flagship",hitCMBT=7,rollsCMBT=2}
 unitParams["Mho Rhodyn"] = {type="Flagship",hitCMBT=7,rollsCMBT=2}
 unitParams["Locus"] = {type="Flagship",hitCMBT=9,rollsCMBT=2}
-unitParams["Gheld'Atar"] = {type="Flagship",hitCMBT=7,rollsCMBT=2,hitBOMB=5,rollsBOMB=4}
-unitParams["Eru'Ishon"] = {type="Flagship",hitCMBT=7,rollsCMBT=1}
+unitParams["Gheld'atar"] = {type="Flagship",hitCMBT=7,rollsCMBT=2,hitBOMB=5,rollsBOMB=4}
+unitParams["Eru'ishon"] = {type="Flagship",hitCMBT=7,rollsCMBT=1}
 unitParams["Regulus"] = {type="Flagship",hitCMBT=5,rollsCMBT=1}
 unitParams["Noctul H'rgan"] = {type="Flagship",hitCMBT=7,rollsCMBT=2}
 unitParams["Robotic Reprocessing Center"] = {type="Flagship",hitCMBT=7,rollsCMBT=2}
@@ -928,8 +928,8 @@ unitType["TEC Flagship"] = "Flagship" -- Franken
 unitType["For'xdar"] = "Flagship" -- Franken
 unitType["Mho Rhodyn"] = "Flagship" -- Franken
 unitType["Locus"] = "Flagship" -- Franken
-unitType["Gheld'Atar"] = "Flagship" -- Franken
-unitType["Eru'Ishon"] = "Flagship" -- Franken
+unitType["Gheld'atar"] = "Flagship" -- Franken
+unitType["Eru'ishon"] = "Flagship" -- Franken
 unitType["Regulus"] = "Flagship" -- Franken
 unitType["Noctul H'rgan"] = "Flagship" -- Franken
 unitType["Robotic Reprocessing Center"] = "Flagship" -- Franken
@@ -1118,10 +1118,10 @@ function baseUnits(factionName)
             unitName["Flagship"] = "Locus"
             unitName["PDS"] = "Perdition Array I"
         elseif factionName == "The Gheldor Authority" then
-            unitName["Flagship"] = "Gheld'Atar"
+            unitName["Flagship"] = "Gheld'atar"
             unitName["Space Dock"] = "Planetary Fortress I"
         elseif factionName == "The Zeth Contingency" then
-            unitName["Flagship"] = "Eru'Ishon"
+            unitName["Flagship"] = "Eru'ishon"
         elseif factionName == "The Lazax" then
             unitName["Flagship"] = "Regulus"
             unitName["Fighter"] = "Heavy Bomber I"

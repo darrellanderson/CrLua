@@ -53,8 +53,8 @@ local SetupGeneric = {
         ['^Any Afters%?$'] = { x = -0.6, z = 3 },
     },
     NAME_TO_AGENDA_ZONE_OFFSET = {
-        ['^For:$'] = { x = 4.25, y = 0.3, lock = true },
-        ['^Against:$'] = { x = -4.25, y = 0.3, lock = true },
+        ['^For:$'] = { x = -4.25, y = 0.3, lock = true },
+        ['^Against:$'] = { x = 4.25, y = 0.3, lock = true },
         ['^Votes$'] = { x = 9 },
         ['^Speaker Token %- Agenda$'] = { x = 0, y = 0.3, },
     },
@@ -943,13 +943,16 @@ function SetupFaction.unpackFactionBox(faction, zone)
 
     -- First see if the box is already on the table, if so leave it where it is.
     local otherBoxes = {}
-    local otherBoxNamePattern = 'Factions$'
+    local otherBoxNameSet = {
+        ['Factions'] = true,
+        ['Blue Space Faction Pack'] = true,
+    }
     for _, object in ipairs(getAllObjects()) do
         if object.tag == 'Bag' then
             local name = object.getName()
             if string.match(name, factionBoxNamePattern) then
                 return object, false
-            elseif string.match(name, otherBoxNamePattern) then
+            elseif otherBoxNameSet[name] then
                 table.insert(otherBoxes, object)  -- remember for later, if needed
             end
         end
@@ -1002,7 +1005,10 @@ function SetupFaction.unpack(faction, factionBox, zone)
                 nameToObject[object.getName()] = nil
                 nestedUnpack(object, offset)
             else
-                object.setLock(offset.lock or false)
+                -- Do not lock too soon, infinite bag may still be getting set up.
+                if offset.lock then
+                    Wait.time(function() object.setLock(true) end, 3)
+                end
             end
         end
         local object = factionBox.takeObject({
@@ -1272,7 +1278,7 @@ function SetupFaction.placeScoreCounters(ownerTokensBag, zone, zoneIndex, factio
         snap_to_grid = false,
     })
     clone.setLock(false)
-    Wait.time(function() clone.setLock(true) end, 2)
+    Wait.time(function() clone.setLock(true) end, 3)
     coroutine.yield(0)
     coroutine.yield(0)
 
@@ -1352,7 +1358,21 @@ function unpackFactionCoroutine()
     hideSetupButton()
     coroutine.yield(0)
 
-    -- Delete the unpack button object.
+    -- Move the token out of the way in case faction sheet, etc moves on top.
+    if tokenObject then
+        tokenObject.translate({ x = 0, y = 5, z = 0 })
+        coroutine.yield(0)
+        tokenObject.setLock(true)
+    end
+
+    local factionBox, factionBoxSrc = SetupFaction.unpackFactionBox(faction, zoneAttributes)
+    if not factionBox then
+        error('unpack faction: unable to find faction box for "' .. faction.name .. '"')
+        return 1
+    end
+    coroutine.yield(0)
+
+    -- Delete the unpack button object AFTER we've found the box to unpack.
     if params.unpackButtonGuid then
         local deletedItems = false
         for _, object in ipairs(getAllObjects()) do
@@ -1368,20 +1388,6 @@ function unpackFactionCoroutine()
         destroyObject(unpackButton)
         coroutine.yield(0)
     end
-
-    -- Move the token out of the way in case faction sheet, etc moves on top.
-    if tokenObject then
-        tokenObject.translate({ x = 0, y = 5, z = 0 })
-        coroutine.yield(0)
-        tokenObject.setLock(true)
-    end
-
-    local factionBox, factionBoxSrc = SetupFaction.unpackFactionBox(faction, zoneAttributes)
-    if not factionBox then
-        error('unpack faction: unable to find faction box for "' .. faction.name .. '"')
-        return 1
-    end
-    coroutine.yield(0)
 
     SetupFaction.renameFlagship(color, faction)
     coroutine.yield(0)

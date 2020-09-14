@@ -1,7 +1,9 @@
 local TAG = 'AutoFillMultiRollerArena'
 
 local _systemHelper = false
-local _activeSystemGuid = false
+
+-- This needs to be global for poking a new value in when updating the object.
+_activeSystemGuid = false
 
 function onLoad(saveState)
     _systemHelper = CrLua.TTS.HelperClient.get('TI4_SYSTEM_HELPER')
@@ -12,13 +14,24 @@ function onPlayerConnect(player_id)
     Wait.frames(applyUi, 2)
 end
 
+function onPlayerTurnEnd(player_color_end, player_color_next)
+    CrLua.Log.d(TAG, 'onPlayerTurnEnd')
+
+    -- If there are still units here warp them out before udpating.
+    if _activeSystemGuid then
+        warpOut()
+    end
+
+    _activeSystemGuid = false
+end
+
 function onSystemActivation(system)
     CrLua.Log.d(TAG, 'onSystemActivation: ' .. system.string)
 
     if _activeSystemGuid == system.guid then
         return
     end
-    _activeSystemGuid = system.guid
+    _activeSystemGuid = assert(system.guid)
 
     -- Replace our diffuse image with the one from the activated tile.
     local systemObject = getObjectFromGUID(system.guid)
@@ -30,6 +43,9 @@ function onSystemActivation(system)
     ignoreDeletedItem(self.getGUID())
     self.setCustomObject(custom)
     local newSelf = self.reload()
+
+    -- Tell our new self about the currently active system.  Yuck.
+    Wait.frames(function() newSelf.setVar('_activeSystemGuid', _activeSystemGuid) end, 2)
 end
 
 local _deletedItemsGuid = false
@@ -75,12 +91,12 @@ end
 local SMOOTH_POSITION_FAST = false
 
 function warpIn()
-    CrLua.Log.d(TAG, 'warpIn')
+    CrLua.Log.d(TAG, 'warpIn '.. (_activeSystemGuid or '-'))
 
-    local system = _systemHelper.getActivatedSystem()
-    local systemObject = system and getObjectFromGUID(system.guid)
+    local systemObject = _activeSystemGuid and getObjectFromGUID(_activeSystemGuid)
     if not systemObject then
-        error(TAG .. ': no activated system')
+        broadcastToAll(TAG .. ': no activated system', 'Red')
+        return
     end
 
     local tokenToPos = {}
@@ -119,10 +135,10 @@ end
 function warpOut()
     CrLua.Log.d(TAG, 'warpOut')
 
-    local system = _systemHelper.getActivatedSystem()
-    local systemObject = system and getObjectFromGUID(system.guid)
+    local systemObject = _activeSystemGuid and getObjectFromGUID(_activeSystemGuid)
     if not systemObject then
-        error(TAG .. ': no activated system')
+        broadcastToAll(TAG .. ': no activated system', 'Red')
+        return
     end
 
     local tokenToPos = {}

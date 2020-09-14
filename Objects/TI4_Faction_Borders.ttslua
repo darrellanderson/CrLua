@@ -99,10 +99,20 @@ function onPlayerTurnStart(playerColorStart, playerColorPrevious)
         if (not _lastUpdateBetweenTurnsTime) or (Time.time - _lastUpdateBetweenTurnsTime > 1) then
             _lastUpdateBetweenTurnsTime = Time.time
             _config.enabled = true
-            updateCache()
-            drawPolygons()
+            updateCacheDrawAndPolygons()
         end
     end
+end
+
+function updateCacheDrawAndPolygons()
+    startLuaCoroutine(self, 'updateCacheDrawAndPolygonsCoroutine')
+end
+
+function updateCacheDrawAndPolygonsCoroutine()
+    updateCache()
+    coroutine.yield(0)
+    drawPolygons()
+    return 1
 end
 
 -------------------------------------------------------------------------------
@@ -423,13 +433,11 @@ function onButtonClick(player, wha, id)
         removePolygons()
     elseif id == 'update' then
         _config.enabled = true
-        updateCache()
-        drawPolygons()
+        updateCacheDrawAndPolygons()
     elseif id == 'reset' then
         _config = CrLua.Table.copy(DEFAULT_CONFIG)
         updateUiFromConfig()
-        updateCache()
-        drawPolygons()
+        updateCacheDrawAndPolygons()
     else
         error(TAG .. ': unknown button "' .. id .. '"')
     end
@@ -593,8 +601,10 @@ function updateCache()
             table.insert(colors, color)
         end
     end
+    coroutine.yield(0)
 
     local hexToOwners = getSystemOwners()
+    coroutine.yield(0)
 
     _cache.originalPolygons.planets = {}
     for hex, owners in pairs(hexToOwners) do
@@ -607,14 +617,17 @@ function updateCache()
             })
         end
     end
+    coroutine.yield(0)
 
     _cache.originalPolygons.ground = {}
     _cache.originalPolygons.space = {}
     for _, color in ipairs(colors) do
         local ownFullySet, ownPartialSet, ownSpaceSet = getOwned(hexToOwners, color)
+        coroutine.yield(0)
 
         -- Control ground, with partial hexes.
         local polygons = getControlPolygons(ownFullySet, ownPartialSet)
+        coroutine.yield(0)
         for _, polygon in ipairs(polygons) do
             table.insert(_cache.originalPolygons.ground, {
                 color = assert(color),
@@ -624,6 +637,7 @@ function updateCache()
 
         -- Control space.
         local polygons = getControlPolygons(ownSpaceSet, false)
+        coroutine.yield(0)
         for _, polygon in ipairs(polygons) do
             table.insert(_cache.originalPolygons.space, {
                 color = assert(color),

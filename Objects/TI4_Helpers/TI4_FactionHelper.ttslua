@@ -35,6 +35,7 @@ local _factionAttributes = {
 
     ['The Arborec'] = {
         tokenName = 'Arborec',
+        frankenName = '...',
         startingUnits = { Infantry = 4, Fighter = 2, Cruiser = 1, Carrier = 1, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Magen Defense Grid' },
         flagship = 'Duha Menaimon',
@@ -214,7 +215,7 @@ local _factionAttributes = {
         tokenName = 'Gheldor Authority',
         startingUnits = { Infantry = 4, Fighter = 2, Destroyer = 1, Carrier = 2, Space_Dock = 1 },
         startingTech = { 'Magen Defense Grid' },
-        flagship = "Gheld'Atar",
+        flagship = "Gheld'atar",
         flagshipDescription = 'Units you control that are on planets adjacent to this system cannot lose PLANETARY SHIELD.',
     },
 
@@ -323,7 +324,7 @@ local _factionAttributes = {
         tokenName = 'Zeth Contingency',
         startingUnits = { Infantry = 3, Fighter = 2, Destroyer = 2, Carrier = 1, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Antimass Deflectors', 'Neural Motivator', 'Sarween Tools', 'Plasma Scoring' },
-        flagship = "Eru'Ishon",
+        flagship = "Eru'ishon",
         flagshipDescription = 'When this unit makes a combat roll, it rolls a number of dice equal to the greatest number of technologies you control in any color.',
         startMessage = 'Pick 2 technologies and return the other 2 to your deck.'
     },
@@ -491,6 +492,14 @@ function updateFactions()
     for factionName, attributes in pairs(_factionAttributes) do
         if not _tokenNameToFaction[attributes.tokenName] then
             _tokenNameToFaction[attributes.tokenName] = attributes
+        end
+    end
+
+    -- Also add using the Franken name (if different from token name).
+    -- The Franken name is the shorthand faction name for Franken tokens.
+    for factionName, attributes in pairs(_factionAttributes) do
+        if attributes.frankenName and not _tokenNameToFaction[attributes.frankenName] then
+            _tokenNameToFaction[attributes.frankenName] = _tokenNameToFaction[attributes.tokenName]
         end
     end
 end

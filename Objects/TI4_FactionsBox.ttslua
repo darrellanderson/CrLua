@@ -49,7 +49,7 @@ function unpackFactionTokensLuaCoroutine()
     for _, entry in ipairs(self.getObjects()) do
         local tokenName = string.match(entry.name, '^(.*) Box$')
         if tokenName then
-            wantTokenNameSet[tokenName] = true
+            wantTokenNameSet[tokenName .. ' Faction Token'] = true
         end
     end
 
@@ -108,7 +108,7 @@ function packFactionTokensLuaCoroutine()
     for _, entry in ipairs(self.getObjects()) do
         local tokenName = string.match(entry.name, '^(.*) Box$')
         if tokenName then
-            wantTokenNameSet[tokenName] = true
+            wantTokenNameSet[tokenName .. ' Faction Token'] = true
         end
     end
 

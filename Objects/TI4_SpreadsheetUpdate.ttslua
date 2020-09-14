@@ -311,9 +311,15 @@ end
 
 function onButtonClick(player, value, id)
     if id == 'updateTech' then
+        if not _data.sheetIdTech or string.len(_data.sheetIdTech) == 0 then
+            printToColor('Spreadsheet Update: Enter the tech sheet id or URL on the back side of this object', player.color, 'Red')
+        end
         updateTechState()
         updateSpreadsheetTech()
     elseif id == 'updateScore' then
+        if not _data.sheetIdScore or string.len(_data.sheetIdScore) == 0 then
+            printToColor('Spreadsheet Update: Enter the score sheet id or URL on the back side of this object', player.color, 'Red')
+        end
         updateScoreState()
         updateSpreadsheetScore()
     else

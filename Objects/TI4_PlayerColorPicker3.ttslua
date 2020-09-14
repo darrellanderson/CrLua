@@ -296,9 +296,8 @@ end
 
 function swapColorsUi()
     local prevColorSet = {}
-    CrLua.TI4.Zone.update()
-    for _, zone in ipairs(CrLua.TI4.Zone.all()) do
-        prevColorSet[zone.color] = true
+    for _, zoneColor in ipairs(_zoneHelper.zones()) do
+        prevColorSet[zoneColor] = true
     end
 
     local nextColorSet = {}
@@ -454,11 +453,10 @@ function swapCoroutine()
     -- Gather swap plans, source ("prev") is always an in-use color.  "Next"
     -- may be inside this container in which case the single plan is enough.
     -- This step does not modify anything, and errors out if anything missing.
-    CrLua.TI4.Zone.update()
-    assert(CrLua.TI4.Zone.fromColor(_prevColor))
+    assert(_zoneHelper.zoneAttributes(_prevColor))
     local swapPlans = { SwapPlan.get(_prevColor, _nextColor, _nextTint) }
     -- If "next" is also in-use, then create a second swap plan for it.
-    if _nextColor ~= _prevColor and CrLua.TI4.Zone.fromColor(_nextColor) then
+    if _nextColor ~= _prevColor and _zoneHelper.zoneAttributes(_nextColor) then
         table.insert(swapPlans, SwapPlan.get(_nextColor, _prevColor, _prevTint))
     end
 
@@ -627,6 +625,22 @@ end
 
 -------------------------------------------------------------------------------
 
+local function waitForSpawnComplete(tableWithObjectValues)
+    assert(type(tableWithObjectValues) == 'table')
+    for _, object in pairs(tableWithObjectValues) do
+        while object.spawning do
+            coroutine.yield(0)
+        end
+    end
+
+    -- Even though spawning is done, give TTS a moment to finish.
+    -- A single yield does not seem to be enough time.  Two is good,
+    -- but be paranoid and give it three.
+    coroutine.yield(0)
+    coroutine.yield(0)
+    coroutine.yield(0)
+end
+
 function getBagContainer()
     for _, object in ipairs(getAllObjects()) do
         if object.tag == 'Bag' and object.getName() == COLOR_BOX_CONTAINER then
@@ -676,6 +690,9 @@ function getBags(bagNameSet)
         bag.setLock(true)
         bagNameToBag[bagName] = bag
     end
+
+    waitForSpawnComplete(bagNameToBag)
+
     return bagNameToBag
 end
 
@@ -708,22 +725,6 @@ function getContainerEntryGuid(container, name)
             return entry.guid
         end
     end
-end
-
-local function waitForSpawnComplete(tableWithObjectValues)
-    assert(type(tableWithObjectValues) == 'table')
-    for _, object in pairs(tableWithObjectValues) do
-        while object.spawning do
-            coroutine.yield(0)
-        end
-    end
-
-    -- Even though spawning is done, give TTS a moment to finish.
-    -- A single yield does not seem to be enough time.  Two is good,
-    -- but be paranoid and give it three.
-    coroutine.yield(0)
-    coroutine.yield(0)
-    coroutine.yield(0)
 end
 
 --- Change tint color
@@ -1722,16 +1723,14 @@ end
 #include <~/CrLua/List>
 #include <~/CrLua/LockTable>
 #include <~/CrLua/Log>
-#include <~/CrLua/Polygon>
 #include <~/CrLua/Table>
 #include <~/CrLua/Util>
 
 #include <~/CrLua/TI4/Unit>
-#include <~/CrLua/TI4/Zone>
 
 #include <~/CrLua/TTS/HelperClient>
 
-CrLua.assertRequired({ 'Color', 'Log', 'TI4.Unit', 'TI4.Zone', 'TTS.HelperClient' })
+CrLua.assertRequired({ 'Color', 'Log', 'TI4.Unit', 'TTS.HelperClient' })
 CrLua.lock()
 
 SWAP = CrLua.LockTable.readOnlyRequireKey('SWAP', SWAP)

@@ -128,14 +128,22 @@ function register(parameters)
     local BUTTON_HEIGHT = 200
     local BUTTON_FONT_SIZE = 100
 
+    local position = { x = -0.2, y = -0.13, z = -1.25 }
+    local rotation = { x = 0, y = 0, z = 180 }
+    if parameters.flip then
+        -- "Extra Strat Cards" are flipped.
+        position.y = 0.13
+        rotation.z = 0
+    end
+
     self.setVar('play_' .. parameters.guid, function(_, playerColor) _onClickPlay(strategyCard, parameters, playerColor) end)
     strategyCard.clearButtons()
     strategyCard.createButton({
         click_function = 'play_' .. parameters.guid,
         function_owner = self,
         label = 'Play',
-        position = { -0.2, -0.13, -1.25 },
-        rotation = { 0, 0, 180 },
+        position = position,
+        rotation = rotation,
         width = BUTTON_WIDTH,
         height = BUTTON_HEIGHT,
         font_size = BUTTON_FONT_SIZE,
@@ -380,6 +388,11 @@ function _returnStrategyCard(strategyCard)
     local dx = strategyCard.getPosition().x - position.x
     local dz = strategyCard.getPosition().z - position.z
     local d = math.sqrt(dx ^ 2 + dz ^ 2)
+
+    local parameters = _guidToParameters[strategyCard.getGUID()]
+    if parameters.flip then
+        rotation.z = (rotation.z + 180) % 360
+    end
 
     if d > 1 then
         local collide = false

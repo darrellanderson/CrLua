@@ -116,7 +116,7 @@ function doResetCoroutine()
         end
         assert(card and card.tag == 'Card')
 
-        card.setName(name)
+        card.setName(name .. ' Faction Token')
         card.setDescription(desc)
 
         coroutine.yield(0)

@@ -101,6 +101,7 @@ local function spawnDeck(deckName, cards, cardSheetUrl, backUrl)
         params            = params,
         snap_to_grid      = false,
     })
+    deck.use_grid = false
     deck.setCustomObject(params)
     deck.setName(deckName)
     coroutine.yield(0)
@@ -114,6 +115,7 @@ local function spawnDeck(deckName, cards, cardSheetUrl, backUrl)
             position = { x = p.x, y = p.y + 2 + i * 0.2, z = p.z },
             smooth = false
         })
+        card.use_grid = false
         card.setName(cards[i].name)
         if cards[i].description then
             card.setDescription(cards[i].description)

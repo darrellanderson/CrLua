@@ -176,6 +176,18 @@ end
 
 -------------------------------------------------------------------------------
 
+function uniqueList(order)
+    local result = {}
+    local seenSet = {}
+    for _, color in ipairs(order) do
+        if not seenSet[color] then
+            seenSet[color] = true
+            table.insert(result, color)
+        end
+    end
+    return result
+end
+
 function getInitiativeOrder()
     local guidToInitiative = {}
     local guidToPosition = {}
@@ -212,7 +224,7 @@ function getInitiativeOrder()
     table.sort(turnOrder, function(a, b) return colorToInitiative[a] < colorToInitiative[b] end)
 
     return {
-        order = turnOrder,
+        order = uniqueList(turnOrder),
         strategyCardGuidToPlayerColor = strategyCardGuidToPlayerColor
     }
 end
@@ -225,7 +237,11 @@ function endStatusPhaseInInitiativeOrder(playerColorOrder)
             _returnStrategyCard(strategyCard)
         end
     end
-    _doEndOfStatusPhase(playerColorOrder or Turns.order)
+
+    -- Be paranoid and make sure colors only appear once!
+    local order = uniqueList(playerColorOrder or Turns.order)
+
+    _doEndOfStatusPhase(order)
 end
 
 function recomputeInfluence(playerColor)
@@ -334,7 +350,10 @@ function dealAllActionCards(dealOrder)
         end
     end
 
-    for _, color in ipairs(dealOrder or Turns.order) do
+    -- Be paranoid about repeats in the list.
+    local order = uniqueList(dealOrder or Turns.order)
+
+    for _, color in ipairs(order) do
         local faction = _factionHelper.fromColor(color)
         if not faction then
             _safeBroadcastToColor('No faction sheet detected for ' .. color .. '.', color, {0.8,0.2,0.2})

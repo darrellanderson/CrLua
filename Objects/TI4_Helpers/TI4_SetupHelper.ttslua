@@ -1312,11 +1312,13 @@ function SetupFaction.placeScoreCounters(ownerTokensBag, zone, zoneIndex, factio
     if p then
         local token = ownerTokensBag.takeObject({
             position = { x = p.x, y = p.y + 1, z = p.z },
-            rotation = { x = 0, y = secretsMat.getRotation().y + 90, z = 0 }
+            rotation = { x = 0, y = secretsMat.getRotation().y + 90, z = 0 },
+            smooth = false
         })
         local scale = token.getScale()
         local m = 2.25
         token.setScale({ x = scale.x * m, y = scale.y * m, z = scale.z * m })
+        Wait.time(function() token.setLock(true) end, 3)
     end
 end
 
@@ -1370,6 +1372,9 @@ function unpackFactionCoroutine()
         error('unpack faction: unable to find faction box for "' .. faction.name .. '"')
         return 1
     end
+    while factionBox.spawning do
+        coroutine.yield(0)
+    end
     coroutine.yield(0)
 
     -- Delete the unpack button object AFTER we've found the box to unpack.
@@ -1396,6 +1401,9 @@ function unpackFactionCoroutine()
     local commandTokensBag = nameToObject[faction.tokenName .. ' Command Tokens Bag']
     local ownerTokensBag = nameToObject[faction.tokenName .. ' Owner Tokens Bag']
     nameToObject = nil
+    while commandTokensBag.spawning or ownerTokensBag.spawning do
+        coroutine.yield(0)
+    end
     coroutine.yield(0)
 
     -- Make sure the faction helper knows about the faction before unpacking tokens.

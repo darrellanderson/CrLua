@@ -425,7 +425,15 @@ end
 
 -------------------------------------------------------------------------------
 
+local _autoFillQueue = {}
+
 function autoFill(params)
+    table.insert(_autoFillQueue, params)
+    startLuaCoroutine(self, 'autoFillCoroutine')
+end
+
+function autoFillCoroutine()
+    local params = assert(table.remove(_autoFillQueue))
     assert(type(params.clickerColor) == 'string', 'clickerColor')
     assert(type(params.altClick) == 'boolean', 'altClick')
     assert(AUTOFILL_TYPE[params.autoFillType], 'autoFillType')
@@ -434,35 +442,38 @@ function autoFill(params)
     local autofillTypeAttributes = assert(AUTOFILL_TYPE[params.autoFillType])
 
     updateColorToMultiRoller()
+    coroutine.yield(0)
 
     local multiRoller = data.colorToMultiRoller[params.clickerColor]
     if not multiRoller then
         printToAll(TAG .. ': no MultiRoller for ' .. params.clickerColor, {1,0,0})
-        return
+        return 1
     end
 
     local system = _systemHelper.getActivatedSystem()
     local systemObject = system and getObjectFromGUID(system.guid)
     if not systemObject then
         printToAll(TAG .. ': no activated system', {1,0,0})
-        return
+        return 1
     end
 
     local activatingColor = Turns.turn_color
     if not activatingColor then
         printToAll(TAG .. ': no activating player', {1,0,0})
-        return
+        return 1
     end
 
     -- Get units in hex and adjacent (including wormholes) systems.
     local hex, adjacent = getHexes(systemObject.getPosition())
     local unitsInHex, unitsInAdjacent = getUnits(hex, adjacent)
+    coroutine.yield(0)
 
     -- Inject units on supplemental tile, using a fake object for position.
     local arenaUnits = getArenaUnits(system.guid)
     if arenaUnits then
         unitsInHex = CrLua.List.join(unitsInHex, arenaUnits)
     end
+    coroutine.yield(0)
 
     -- If per-planet, restrict to units in hex to those on the given planet.
     local planet = false
@@ -489,6 +500,7 @@ function autoFill(params)
             unitsInAdjacent = {}
         end
     end
+    coroutine.yield(0)
 
     -- Deduce enemy color as the only non-self in the system.
     local enemyColors = CrLua.TI4.Unit.getEnemyColors(params.clickerColor, activatingColor, unitsInHex)
@@ -507,6 +519,7 @@ function autoFill(params)
     -- Get cards.
     local cards = getCards(params.clickerColor, enemyColor)
     local cardSet = CrLua.List.toSet(cards)
+    coroutine.yield(0)
 
     -- Is bombardment allowed?
     local planetaryShield = false
@@ -666,6 +679,8 @@ function autoFill(params)
     if not doClick then
         printToAll('AutoFill: left click to fill and roll.', params.clickerColor)
     end
+
+    return 1
 end
 
 -------------------------------------------------------------------------------

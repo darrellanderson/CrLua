@@ -35,8 +35,9 @@ function getHelperClient(helperObjectName)
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
 
-local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
+local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
+local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 local PRINT_DEBUG_LOG_MESSAGES = false
 
@@ -60,34 +61,34 @@ local SetupGeneric = {
     },
     NAME_TO_TABLE_POSITIONS = {
         ['^TI4 Graveyard'] = {
-            { x = -23.50, y = -0.19, z = -9, lock = true, dx = -1.5, dz = -7.5 },
-            { x = -23.50, y = -0.19, z = 9, lock = true, dx = -1.5, dz = 7.5 },
-            { x = 23.50, y = -0.19, z = -9, lock = true, dx = 1.5, dz = -7.5 },
-            { x = 23.50, y = -0.19, z = 9, lock = true, dx = 1.5, dz = 7.5 }
+            { x = -26.50, y = -0.19, z = -9, lock = true, dx = -1.5, dz = -7.5 },
+            { x = -26.50, y = -0.19, z = 9, lock = true, dx = -1.5, dz = 7.5 },
+            { x = 26.50, y = -0.19, z = -9, lock = true, dx = 1.5, dz = -7.5 },
+            { x = 26.50, y = -0.19, z = 9, lock = true, dx = 1.5, dz = 7.5 }
         },
         ['^Commodities/Tradegoods x3 Bag$'] = {
-            { x = -22.00, y = -0.19, z = 3, lock = true, dx = -5 },
-            { x = 22.00, y = -0.19, z = 3, lock = true, dx = 5 },
-        },
-        ['^Commodities/Tradegoods x1 Bag$'] = {
             { x = -25.00, y = -0.19, z = 3, lock = true, dx = -5 },
             { x = 25.00, y = -0.19, z = 3, lock = true, dx = 5 },
         },
-        ['^x3 Fighters Tokens Bag$'] = {
-            { x = -22.00, y = -0.19, z = 0, lock = true, dx = -5 },
-            { x = 22.00, y = -0.19, z = 0, lock = true, dx = 5 },
+        ['^Commodities/Tradegoods x1 Bag$'] = {
+            { x = -28.00, y = -0.19, z = 3, lock = true, dx = -5 },
+            { x = 28.00, y = -0.19, z = 3, lock = true, dx = 5 },
         },
-        ['^x1 Fighters Tokens Bag$'] = {
+        ['^x3 Fighters Tokens Bag$'] = {
             { x = -25.00, y = -0.19, z = 0, lock = true, dx = -5 },
             { x = 25.00, y = -0.19, z = 0, lock = true, dx = 5 },
         },
-        ['^x3 Infantry Token Bag$'] = {
-            { x = -22.00, y = -0.19, z = -3, lock = true, dx = -5 },
-            { x = 22.00, y = -0.19, z = -3, lock = true, dx = 5 },
+        ['^x1 Fighters Tokens Bag$'] = {
+            { x = -28.00, y = -0.19, z = 0, lock = true, dx = -5 },
+            { x = 28.00, y = -0.19, z = 0, lock = true, dx = 5 },
         },
-        ['^x1 Infantry Token Bag$'] = {
+        ['^x3 Infantry Token Bag$'] = {
             { x = -25.00, y = -0.19, z = -3, lock = true, dx = -5 },
             { x = 25.00, y = -0.19, z = -3, lock = true, dx = 5 },
+        },
+        ['^x1 Infantry Token Bag$'] = {
+            { x = -28.00, y = -0.19, z = -3, lock = true, dx = -5 },
+            { x = 28.00, y = -0.19, z = -3, lock = true, dx = 5 },
         },
     }
 }
@@ -1091,16 +1092,29 @@ function SetupFaction.unpackHomeSystemTile(faction, factionBox, homeSystemPositi
         extraTile = tile
         tileName = 'Ghosts of Creuss Tile'
         local guid = assert(getEntryGuid(factionBox, tileName), 'missing ' .. tileName)
+
+        -- Compute position on grid.  First get a "good" postition then snap.
+        local position = {
+            x = zone.center.x + 3 * (zone.center.z < 1 and 1 or -1),
+            y = homeSystemPosition.y,
+            z = zone.center.z + 8 * (zone.center.z < 1 and 1 or -1)
+        }
+        local hex = _systemHelper.hexFromPosition(position)
+        position = _systemHelper.hexToPosition(hex)
+        position.y = homeSystemPosition.y
+
+        -- This tile may be different, give it some extra time to settle.
+        -- MUST lock it as a signal that it is safe to place starting units.
+        local function delayedLock(object)
+            Wait.time(function() object.setLock(true) end, 3)
+        end
+
         tile = factionBox.takeObject({
             guid              = guid,
-            position          = {
-                x = zone.center.x + 10 * (zone.center.z < 1 and 1 or -1),
-                y = homeSystemPosition.y,
-                z = zone.center.z + 8 * (zone.center.z < 1 and 1 or -1)
-            },
+            position          = position,
             rotation          = rotation,
             smooth            = true,
-            callback_function = function(object) object.setLock(true) end,
+            callback_function = delayedLock
         })
     end
 

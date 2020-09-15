@@ -1093,12 +1093,17 @@ function SetupFaction.unpackHomeSystemTile(faction, factionBox, homeSystemPositi
         tileName = 'Ghosts of Creuss Tile'
         local guid = assert(getEntryGuid(factionBox, tileName), 'missing ' .. tileName)
 
-        -- Compute position on grid.  First get a "good" postition then snap.
+        -- Get custom off-map position, apply extra rings.
         local position = {
-            x = zone.center.x + 3 * (zone.center.z < 1 and 1 or -1),
+            x = assert(zone.ghostHomePosition.x),
             y = homeSystemPosition.y,
-            z = zone.center.z + 8 * (zone.center.z < 1 and 1 or -1)
+            z = assert(zone.ghostHomePosition.z)
         }
+
+        -- Apply extra rings.
+        position.z = position.z + _zoneHelper.getExtraRings() * 6 * (position.z > 0 and 1 or -1)
+
+        -- Position should already be grid aligned, but make sure.
         local hex = _systemHelper.hexFromPosition(position)
         position = _systemHelper.hexToPosition(hex)
         position.y = homeSystemPosition.y

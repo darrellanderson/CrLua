@@ -298,7 +298,6 @@ local DEFAULT_ZONES = {
     },
 }
 
-local DEFAULT_TABLE_XZ = {{-128, -128}, {-128, 128}, {128, 128}, {128, -128}}
 local DEFAULT_TABLE_Y = 1
 
 -- Current zones.
@@ -332,8 +331,6 @@ function setPlayerCount(params)
     --print('Setting up for ' .. params.playerCount .. ' players with ' .. params.extraRings .. ' extra map rings')
 
     _table = {
-        polygon = DEFAULT_TABLE_XZ,
-        boundingBox = _boundingBox(DEFAULT_TABLE_XZ),
         y = DEFAULT_TABLE_Y,
     }
 
@@ -508,14 +505,6 @@ function inHand()
     return result
 end
 
---- Is position on the main table?
--- @param position table : {xyz} position.
--- @return boolean : true if on main table.
-function inTableZone(position)
-    assert(type(position) == 'table' and type(position.x) == 'number')
-    return _boundingBoxContains(_table.boundingBox, position) and _polygonContains(_table.polygon, position)
-end
-
 -------------------------------------------------------------------------------
 
 --- Get setVectorLines compatible lines from zone borders.
@@ -564,15 +553,6 @@ function getBordersVectorLines(parameters)
         if not colorSet or colorSet[zone.color] then
             local polygon = assert(zone.polygon)
             polygon = _inset(polygon, inset)
-            if parameters.clipToTable then
-                local bb = _table.boundingBox
-                for i, xz in ipairs(polygon) do
-                    xz[1] = math.max(xz[1], bb.min.x)
-                    xz[1] = math.min(xz[1], bb.max.x)
-                    xz[2] = math.max(xz[2], bb.min.z)
-                    xz[2] = math.min(xz[2], bb.max.z)
-                end
-            end
             table.insert(lines, {
                 points = polygonToPointsXYZ(polygon),
                 thickness = thickness,

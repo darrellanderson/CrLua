@@ -818,7 +818,7 @@ end
 function commit()
     CrLua.Log.d(TAG, 'commit')
     for object, _ in pairs(_data.inside) do
-        if object.tag == 'Card' and not object.is_face_down then
+        if (object.tag == 'Card' or object.tag == 'Deck') and not object.is_face_down then
             object.flip()
         end
     end

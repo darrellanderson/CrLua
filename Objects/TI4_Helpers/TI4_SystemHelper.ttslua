@@ -841,8 +841,7 @@ end
 -- @return position table : {xyz}.
 function hexToPosition(hex)
     assert(type(hex) == 'string')
-    local q, r, s = string.match(str, '<(%-?%d+),(%-?%d+),(%-?%d+)>')
-    hex = JSON.decode(hex)
+    local q, r, s = string.match(hex, '<(%-?%d+),(%-?%d+),(%-?%d+)>')
     assert(not (math.floor (0.5 + q + r + s) ~= 0), 'q + r + s must be 0')
     local x = (_M.f0 * q + _M.f1 * r) * _LAYOUT.size.x
     local z = (_M.f2 * q + _M.f3 * r) * _LAYOUT.size.z

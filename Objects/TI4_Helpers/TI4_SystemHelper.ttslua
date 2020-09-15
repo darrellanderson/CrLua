@@ -881,34 +881,31 @@ function onPlayerTurnEnd(player_color_end, player_color_next)
 end
 
 function onObjectDrop(playerColor, object)
-    local function systemActivation()
-        if playerColor ~= Turns.turn_color then
-            return false
-        end
-        if not string.match(object.getName(), 'Command Token$') then
-            return false
-        end
-        local position = object.getPosition()
-        if not _zoneHelper.inTableZone(position) then
-            return false
-        end
-        return systemFromPosition(position)
+    if playerColor ~= Turns.turn_color then
+        return
     end
 
-    local system = systemActivation()
-    if system then
-        _activatedSystem = system
-        local faction = _factionHelper.fromColor(playerColor)
-        local factionName = faction and faction.name or playerColor
-        broadcastToAll(factionName .. ' activated ' .. system.string, playerColor)
-        local systemObject = getObjectFromGUID(system.guid)
-        systemObject.highlightOn(playerColor, 30)
+    local faction = _factionHelper.fromColor(playerColor)
+    local commandTokenName = faction and faction.tokenName .. ' Command Token'
+    if object.getName() ~= commandTokenName then
+        return
+    end
 
-        -- Tell any interested parties.
-        for _, object in ipairs(getAllObjects()) do
-            if object.getVar('onSystemActivation') then
-                object.call('onSystemActivation', system)
-            end
+    local system = systemFromPosition(object.getPosition())
+    if not system then
+        return
+    end
+
+    _activatedSystem = system
+    local factionName = faction and faction.name or playerColor
+    broadcastToAll(factionName .. ' activated ' .. system.string, playerColor)
+    local systemObject = getObjectFromGUID(system.guid)
+    systemObject.highlightOn(playerColor, 30)
+
+    -- Tell any interested parties.
+    for _, object in ipairs(getAllObjects()) do
+        if object.getVar('onSystemActivation') then
+            object.call('onSystemActivation', system)
         end
     end
 end

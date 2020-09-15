@@ -275,10 +275,11 @@ end
 
 function getLocalBoundingBox()
     local bounds = self.getBoundsNormalized()
+    local scale = self.getScale()
     local min = {
-        x = -bounds.size.x / 2.0,
+        x = -bounds.size.x / 2.0 / scale.x,
         y = -bounds.size.y / 2.0,
-        z = -bounds.size.z / 2.0
+        z = -bounds.size.z / 2.0 / scale.z
     }
     local max = {
         x = min.x + _data.width,
@@ -597,14 +598,25 @@ function drawUi(items, resourcesAndCost)
 
     -- Text panel size.
     local bounds = self.getBoundsNormalized()
+    local boundsWidth = bounds.size.x
+    local boundsHeight = bounds.size.z
+    local boundsDepth = bounds.size.y  -- do not scale?
     local panelWidth = bounds.size.x - _config.thickness
     local panelHeight = bounds.size.z - _config.thickness
+
+    -- Apply inverse scale.
+    local scale = self.getScale()
+    boundsWidth = boundsWidth / scale.x
+    boundsHeight = boundsHeight / scale.z
+    panelWidth = panelWidth / scale.x
+    panelHeight = panelHeight / scale.z
+    bounds = nil
 
     -- Draggable corner.
     local cornerWidth = 0.75
     local cornerHeight = cornerWidth
-    local cornerX = _data.width - (bounds.size.x / 2.0) - (cornerWidth / 2.0)
-    local cornerY = _data.height - (bounds.size.z / 2.0) - (cornerHeight / 2.0)
+    local cornerX = _data.width - (boundsWidth / 2.0) - (cornerWidth / 2.0)
+    local cornerY = _data.height - (boundsHeight / 2.0) - (cornerHeight / 2.0)
 
     -- UI uses x100 units.
     panelWidth = panelWidth * 100
@@ -613,8 +625,8 @@ function drawUi(items, resourcesAndCost)
     cornerHeight = cornerHeight * 100
     cornerX = cornerX * 100
     cornerY = cornerY * 100
-    local panelPosition = '0 0 ' .. trimFloat(bounds.size.y * 50.0 + 2)
-    local cornerPosition = trimFloat(cornerX) .. ' ' .. trimFloat(cornerY) .. ' ' .. trimFloat(-bounds.size.y * 50.0 + 1)
+    local panelPosition = '0 0 ' .. trimFloat(boundsDepth * 50.0 + 2)
+    local cornerPosition = trimFloat(cornerX) .. ' ' .. trimFloat(cornerY) .. ' ' .. trimFloat(-boundsDepth * 50.0 + 1)
 
     local r1c1 = 'Build Cost: ' .. (resourcesAndCost and resourcesAndCost.cost or '-')
     if resourcesAndCost and items and items.sarween then
@@ -634,6 +646,7 @@ function drawUi(items, resourcesAndCost)
     local w1 = w * 0.45
     local w2 = w - (2 * w1)
     local fontSize = 40
+
 
     local columnWidths = trimFloat(w1) .. ' ' .. trimFloat(w1) .. ' ' .. trimFloat(w2)
 

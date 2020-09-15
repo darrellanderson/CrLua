@@ -500,8 +500,23 @@ function _countInfluence(playerColor, voteCounter, lowerNameToCards, lowerNameTo
     voteCounter.setValue(influence)
 end
 
-function _returnCommandTokens(playerColor, commandTokens, commandTokensBag)
+function _returnCommandTokens(playerColor, commandTokens, commandTokensBag, zoneExceptions)
     assert(type(playerColor) == 'string' and type(commandTokens) == 'table' and type(commandTokensBag) == 'userdata')
+
+    local function insideException(p)
+        local function _insideBounds(bounds, p)
+            if p.x < bounds.center.x - bounds.size.x / 2 then return false end
+            if p.x > bounds.center.x + bounds.size.x / 2 then return false end
+            if p.z < bounds.center.z - bounds.size.z / 2 then return false end
+            if p.z > bounds.center.z + bounds.size.z / 2 then return false end
+            return true
+        end
+        for _, zoneException in ipairs(zoneExceptions) do
+            if _insideBounds(zoneException.getBounds(), p) then
+                return true
+            end
+        end
+    end
 
     -- Only return command tokens not in a player zone.  Allow them to live
     -- in other player zones, just not on the map.
@@ -514,7 +529,7 @@ function _returnCommandTokens(playerColor, commandTokens, commandTokensBag)
     end
     local guidToZone = _zoneHelper.zonesFromPositions(guidToPosition)
     for guid, commandToken in pairs(guidToCommandToken) do
-        if not guidToZone[guid] then
+        if not guidToZone[guid] or insideException(commandToken.getPosition()) then
             _putTokenGuidSet[guid] = true
             commandTokensBag.putObject(commandToken)
         end
@@ -610,6 +625,11 @@ local function _doEndOfStatusPhaseCoroutineBody(playerColor)
     local commandSheetName = 'Command Sheet (' .. playerColor .. ')'
     local voteCounterName = playerColor .. ' Player Votes'
 
+    local zoneExceptionNameSet = {
+        ['Ghosts of Creuss Tile'] = true,
+    }
+    local zoneExceptions = {}
+
     local commandTokens = {}
     local commandTokensBag = false
     local commandSheet = false
@@ -634,6 +654,8 @@ local function _doEndOfStatusPhaseCoroutineBody(playerColor)
                 voteCounter = object
             elseif string.match(name, unitNamePattern) or name == flagshipName then
                 table.insert(units, object)
+            elseif zoneExceptionNameSet[name] then
+                table.insert(zoneExceptions, object)
             elseif object.tag == 'Card' or name == 'Scheming' or name == 'Versatile' then
                 local lowerName = string.lower(name)
                 local cards = lowerNameToCards[lowerName]
@@ -693,7 +715,7 @@ local function _doEndOfStatusPhaseCoroutineBody(playerColor)
 
     local numCommandTokens = _getAllocateCommandTokensCount(playerColor, faction, lowerNameToInZoneCards)
     if commandTokensBag then
-        _returnCommandTokens(playerColor, commandTokens, commandTokensBag)
+        _returnCommandTokens(playerColor, commandTokens, commandTokensBag, zoneExceptions)
 
         -- Wait for puts to complete (objects destroyed), otherwise TTS may
         -- pull out put-not-quite-finished tokens and things break.

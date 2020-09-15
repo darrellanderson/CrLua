@@ -56,7 +56,7 @@ local SetupGeneric = {
         ['^For:$'] = { x = -4.25, y = 0.3, lock = true },
         ['^Against:$'] = { x = 4.25, y = 0.3, lock = true },
         ['^Votes$'] = { x = 9 },
-        ['^Speaker Token %- Agenda$'] = { x = 0, y = 0.3, },
+        ['^Speaker Token %- Agenda$'] = { x = 0, y = 0.3, yRot = 180 },
     },
     NAME_TO_TABLE_POSITIONS = {
         ['^TI4 Graveyard'] = {
@@ -1351,7 +1351,7 @@ function unpackFactionCoroutine()
         faction, tokenObject = SetupFaction.getFactionAndTokenObject(color)
     end
     if not faction then
-        error('unpack faction: no faction token for ' .. color)
+        printToAll('Unpack Faction: no faction token for ' .. color .. '.  Please pick one from the green "Pick a Faction to Play" bag and place it in the ' .. color .. ' play area.', 'Red')
         return 1
     end
     coroutine.yield(0)

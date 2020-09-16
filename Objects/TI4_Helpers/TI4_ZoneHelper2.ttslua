@@ -805,11 +805,11 @@ function clearBordersVectorLines()
 end
 
 --- Draw borders using self local space.  This leaves any global lines in place.
-function drawBordersVectorLines()
+function drawBordersVectorLines(highlightCurrentPlayer)
     local lines = getBordersVectorLines({})
 
     -- If it is a player's turn, inset a line in their zone.
-    if Turns.enable and Turns.turn_color then
+    if highlightCurrentPlayer and Turns.enable and Turns.turn_color then
         local lines2 = getBordersVectorLines({
             inset = DEFAULT_VECTOR_LINE_THICKNESS * 3,
             thickness = DEFAULT_VECTOR_LINE_THICKNESS * 2,
@@ -829,6 +829,10 @@ function drawBordersVectorLines()
         end
     end
     viewObject.setVectorLines(lines)
+end
+
+function onPlayerTurnStart(player_color_start, player_color_previous)
+    Wait.frames(function() drawBordersVectorLines(true) end, 4)
 end
 
 -------------------------------------------------------------------------------

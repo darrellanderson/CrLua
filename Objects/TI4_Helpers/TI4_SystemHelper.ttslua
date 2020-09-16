@@ -885,9 +885,16 @@ function onObjectDrop(playerColor, object)
         return
     end
 
-    local faction = _factionHelper.fromColor(playerColor)
-    local commandTokenName = faction and faction.tokenName .. ' Command Token'
-    if object.getName() ~= commandTokenName then
+    local tokenName = string.match(object.getName(), '^(.*) Command Token')
+    if not tokenName then
+        return
+    end
+
+    -- In addition to "FACTION Command Token" accept "COLOR Command Token".
+    local faction = _factionHelper.fromTokenName(tokenName)
+    local matchesFaction = faction and faction.color == playerColor
+    local matchesColor = tokenName == playerColor
+    if (not matchesFaction) and (not matchesColor) then
         return
     end
 
@@ -897,7 +904,7 @@ function onObjectDrop(playerColor, object)
     end
 
     _activatedSystem = system
-    local factionName = faction and faction.name or playerColor
+    local factionName = (faction and faction.name) or playerColor
     broadcastToAll(factionName .. ' activated ' .. system.string, playerColor)
     local systemObject = getObjectFromGUID(system.guid)
     systemObject.highlightOn(playerColor, 30)

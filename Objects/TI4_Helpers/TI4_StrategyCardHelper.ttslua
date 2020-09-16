@@ -657,8 +657,14 @@ local function _doEndOfStatusPhaseCoroutineBody(playerColor)
 
     local faction = _factionHelper.fromColor(playerColor)
     local tokenName = faction and faction.tokenName
-    local commandTokenName = tokenName and (tokenName .. ' Command Token')
-    local commandTokenBagName = tokenName and (tokenName .. ' Command Tokens Bag')
+    local commandTokenNameSet = {
+        [(tokenName or playerColor) .. ' Command Token'] = true,
+        [playerColor .. ' Command Token'] = true
+    }
+    local commandTokenBagNameSet = {
+        [(tokenName or playerColor) .. ' Command Tokens Bag'] = true,
+        [playerColor .. ' Command Tokens Bag'] = true
+    }
     local unitNamePattern = '^' .. playerColor .. ' '
     local flagshipName = faction and faction.flagship
     local commandSheetName = 'Command Sheet (' .. playerColor .. ')'
@@ -683,9 +689,9 @@ local function _doEndOfStatusPhaseCoroutineBody(playerColor)
     for _, object in ipairs(getAllObjects()) do
         if not inHandGuidSet[object.getGUID()] then
             local name = object.getName()
-            if name == commandTokenName then
+            if commandTokenNameSet[name] then
                 table.insert(commandTokens, object)
-            elseif object.tag == 'Bag' and name == commandTokenBagName then
+            elseif object.tag == 'Bag' and commandTokenBagNameSet[name] then
                 commandTokensBag = object
             elseif name == commandSheetName then
                 commandSheet = object

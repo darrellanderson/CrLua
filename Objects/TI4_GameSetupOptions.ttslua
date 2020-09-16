@@ -22,6 +22,7 @@ local CONTRIBUTORS = {
     'Darth Batman',
     'Doot',
     'Garnet Bear',
+    'Goatboy',
     'Hooliganj',
     'Jatta Pake',
     'Jefferson',
@@ -303,10 +304,11 @@ end
 local RIGHT_CLICK = '-2'
 
 function onButtonClick(player, inputType, id)
+    local isRightClick = inputType == RIGHT_CLICK and true or false
     if id == 'setup' then
-        setupGame(_config.playerCount, _config.extraRings)
+        setupGame(_config.playerCount, _config.extraRings, isRightClick)
         setupCodexACs(_config.useCodexACs)
-        if inputType ~= RIGHT_CLICK then
+        if not isRightClick then
             packSelfIntoSetupBag()
         end
     else
@@ -343,15 +345,14 @@ end
 
 -------------------------------------------------------------------------------
 
-function setupGame(playerCount, extraRings)
-    assert(type(playerCount) == 'number' and type(extraRings) == 'number')
+function setupGame(playerCount, extraRings, isRightClick)
+    assert(type(playerCount) == 'number' and type(extraRings) == 'number' and type(isRightClick) == 'boolean')
     print('Setting up for ' .. playerCount .. ' players with ' .. extraRings .. ' extra map rings')
-    if _zoneHelper.getPlayerCount() ~= playerCount or _zoneHelper.getExtraRings() ~= extraRings then
-        _setupHelper.setup({
-            playerCount = playerCount,
-            extraRings = extraRings
-        })
-    end
+    _setupHelper.setup({
+        playerCount = playerCount,
+        extraRings = extraRings,
+        isRightClick = isRightClick
+    })
 end
 
 function setupCodexACs(codexACsVal)

@@ -176,14 +176,18 @@ end
 local function createHiddenBags()
     for _, transform in pairs(getHiddenZoneTransforms()) do
         local p = transform.position
-        for i = 1, 2 do
+        local deltas = {
+            { x = 4, y = 0, z = 0 },
+            { x = 8, y = 4, z = 0 },
+        }
+        for _, delta in ipairs(deltas) do
             local bag = spawnObject({
                 type = 'Bag',
-                position = { p.x + 2 + (i * 3), p.y, p.z },
+                position = { p.x + delta.x, p.y + delta.y, p.z + delta.z },
                 sound = false,
-                snap_to_grid = false,
+                snap_to_grid = true,
             })
-            bag.use_grid = false
+            bag.use_grid = true
             bag.use_snap_points = false
             bag.sticky = false
             coroutine.yield(0)
@@ -200,6 +204,8 @@ local function unpackToTable()
             rotation = transform.rotation,
             guid = guid,
         })
+        coroutine.yield(0)
+        coroutine.yield(0)
         coroutine.yield(0)
     end
 end
@@ -235,9 +241,9 @@ local function createBags()
             type              = 'Bag',
             position          = p,
             sound             = false,
-            snap_to_grid      = false,
+            snap_to_grid      = true,
         })
-        bag.use_grid = false
+        bag.use_grid = true
         bag.use_snap_points = false
         bag.setColorTint(zoneAttributes.color or 'White')
         table.insert(result, bag)

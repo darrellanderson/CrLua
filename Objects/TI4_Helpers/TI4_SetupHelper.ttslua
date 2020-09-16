@@ -35,6 +35,7 @@ function getHelperClient(helperObjectName)
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
 
+local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
@@ -162,6 +163,8 @@ local SetupFaction = {
         x = -2, z = 2, dx = -2
     },
 }
+
+local SetupCards = {}
 
 local _putPendingGuidSet = {}
 
@@ -815,6 +818,48 @@ end
 
 -------------------------------------------------------------------------------
 
+function SetupCards.dealObjectives()
+    debugLog('SetupCards.dealObjectives')
+
+    local stage1Mat = false
+    local stage2Mat = false
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        if name == 'Public Objectives I Mat' then
+            stage1Mat = object
+        elseif name == 'Public Objectives II Mat' then
+            stage2Mat = object
+        end
+    end
+
+    local stage1Guid = _deckHelper.getDeck('Public Objectives I')
+    local stage1Deck = stage1Guid and getObjectFromGUID(stage1Guid)
+
+    local stage2Guid = _deckHelper.getDeck('Public Objectives II')
+    local stage2Deck = stage2Guid and getObjectFromGUID(stage2Guid)
+
+    local function deal(deck, mat)
+        assert(deck.tag == 'Deck')
+        local p1 = deck.getPosition()
+        for _, snapPoint in ipairs(mat.getSnapPoints()) do
+            local p2 = mat.positionToWorld(snapPoint.position)
+            p2.y = p2.y + 3
+            local dSq = (p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2
+            if dSq > 1 then
+                deck.takeObject({
+                    position          = p2,
+                    smooth            = true
+                })
+            end
+        end
+    end
+
+    deal(stage1Deck, stage1Mat)
+    deal(stage2Deck, stage2Mat)
+end
+
+-------------------------------------------------------------------------------
+
 local _setupQueue = {}
 
 --- This is the primary entry point for using the helper object.  Packs up the
@@ -833,44 +878,53 @@ end
 function setupCoroutine()
     debugLog('setupCoroutine')
 
-    _zoneHelper.clearBordersVectorLines()
-
     local params = assert(table.remove(_setupQueue))
     local playerCount = assert(params.playerCount)
     local extraRings = params.extraRings or 0
+    local isRightClick = params.isRightClick
 
-    local setupBag = assert(SetupGeneric.getSetupBag())
-    coroutine.yield(0)
+    _zoneHelper.clearBordersVectorLines()
 
-    SetupColor.packOld(setupBag)
-    coroutine.yield(0)
+    -- If player or extra ring count changes reconfigure table.
+    if _zoneHelper.getPlayerCount() ~= playerCount or _zoneHelper.getExtraRings() ~= extraRings then
+        local setupBag = assert(SetupGeneric.getSetupBag())
+        coroutine.yield(0)
 
-    _zoneHelper.setPlayerCount({
-        playerCount = playerCount,
-        extraRings = extraRings
-    })
-    SetupGeneric.resizeGridCircle(extraRings)
+        SetupColor.packOld(setupBag)
+        coroutine.yield(0)
 
-    SetupColor.transformHands()
-    coroutine.yield(0)
+        _zoneHelper.setPlayerCount({
+            playerCount = playerCount,
+            extraRings = extraRings
+        })
+        SetupGeneric.resizeGridCircle(extraRings)
 
-    SetupGeneric.unpack(setupBag, extraRings)
-    coroutine.yield(0)
+        SetupColor.transformHands()
+        coroutine.yield(0)
 
-    SetupColor.unpackNew(setupBag, extraRings)
-    coroutine.yield(0)
+        SetupGeneric.unpack(setupBag, extraRings)
+        coroutine.yield(0)
 
-    _zoneHelper.updateZoneColors()
-    coroutine.yield(0)
+        SetupColor.unpackNew(setupBag, extraRings)
+        coroutine.yield(0)
+
+        _zoneHelper.updateZoneColors()
+        coroutine.yield(0)
+
+        -- Tell any other listeners about the change.
+        for _, object in ipairs(getAllObjects()) do
+            if object.getVar('onSetupHelperPlayerCountChanged') then
+                object.call('onSetupHelperPlayerCountChanged')
+            end
+        end
+        coroutine.yield(0)
+    end
 
     _zoneHelper.drawBordersVectorLines()
     coroutine.yield(0)
 
-    -- Tell any other listeners about the change.
-    for _, object in ipairs(getAllObjects()) do
-        if object.getVar('onSetupHelperPlayerCountChanged') then
-            object.call('onSetupHelperPlayerCountChanged')
-        end
+    if not isRightClick then
+        SetupCards.dealObjectives()
     end
     coroutine.yield(0)
 

@@ -35,7 +35,7 @@ local _factionAttributes = {
 
     ['The Arborec'] = {
         tokenName = 'Arborec',
-        frankenName = '...',
+        home = 5,
         startingUnits = { Infantry = 4, Fighter = 2, Cruiser = 1, Carrier = 1, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Magen Defense Grid' },
         flagship = 'Duha Menaimon',
@@ -44,6 +44,7 @@ local _factionAttributes = {
 
     ['The Barony Of Letnev'] = {
         tokenName = 'Barony of Letnev',
+        home = 10,
         startingUnits = { Infantry = 3, Fighter = 1, Destroyer = 1, Carrier = 1, Dreadnought = 1, Space_Dock = 1 },
         startingTech = { 'Antimass Deflectors', 'Plasma Scoring' },
         flagship = 'Arc Secundus',
@@ -52,6 +53,7 @@ local _factionAttributes = {
 
     ['The Clan Of Saar'] = {
         tokenName = 'Clan of Saar',
+        home = 11,
         startingUnits = { Infantry = 4, Fighter = 2, Cruiser = 1, Carrier = 2, Space_Dock = 1 },
         startingTech = { 'Antimass Deflectors' },
         flagship = 'Son of Ragh',
@@ -60,6 +62,7 @@ local _factionAttributes = {
 
     ['The Embers Of Muaat'] = {
         tokenName = 'Embers of Muaat',
+        home = 4,
         startingUnits = { Infantry = 4, Fighter = 2, War_Sun = 1, Space_Dock = 1 },
         startingTech = { 'Plasma Scoring' },
         flagship = 'The Inferno',
@@ -68,6 +71,7 @@ local _factionAttributes = {
 
     ['The Emirates Of Hacan'] = {
         tokenName = 'Emirates of Hacan',
+        home = 16,
         startingUnits = { Infantry = 4, Fighter = 2, Cruiser = 1, Carrier = 2, Space_Dock = 1 },
         startingTech = { 'Antimass Deflectors', 'Sarween Tools' },
         flagship = 'Wrath of Kenara',
@@ -76,6 +80,7 @@ local _factionAttributes = {
 
     ['The Federation Of Sol'] = {
         tokenName = 'Federation of Sol',
+        home = 1,
         startingUnits = { Infantry = 5, Fighter = 3, Destroyer = 1, Carrier = 2, Space_Dock = 1 },
         startingTech = { 'Antimass Deflectors', 'Neural Motivator' },
         flagship = 'Genesis',
@@ -85,6 +90,7 @@ local _factionAttributes = {
 
     ['The Ghosts Of Creuss'] = {
         tokenName = 'Ghosts of Creuss',
+        home = 17,
         startingUnits = { Infantry = 4, Fighter = 2, Destroyer = 2, Carrier = 1, Space_Dock = 1 },
         startingTech = { 'Gravity Drive' },
         flagship = 'Hil Colish',
@@ -93,6 +99,7 @@ local _factionAttributes = {
 
     ['The L1Z1X Mindnet'] = {
         tokenName = 'L1Z1X Mindnet',
+        home = 6,
         startingUnits = { Infantry = 5, Fighter = 3, Carrier = 1, Dreadnought = 1, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Neural Motivator', 'Plasma Scoring' },
         flagship = '[0.0.1]',
@@ -101,6 +108,7 @@ local _factionAttributes = {
 
     ['The Mentak Coalition'] = {
         tokenName = 'Mentak Coalition',
+        home = 2,
         startingUnits = { Infantry = 4 ,Fighter = 3, Cruiser = 2, Carrier = 1, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Sarween Tools', 'Plasma Scoring' },
         flagship = 'Fourth Moon',
@@ -109,6 +117,7 @@ local _factionAttributes = {
 
     ['The Naalu Collective'] = {
         tokenName = 'Naalu Collective',
+        home = 9,
         startingUnits = { Infantry = 4, Fighter = 3, Destroyer = 1, Cruiser = 1, Carrier = 1, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Neural Motivator', 'Sarween Tools' },
         flagship = 'Matriarch',
@@ -117,6 +126,7 @@ local _factionAttributes = {
 
     ['The Nekro Virus'] = {
         tokenName = 'Nekro Virus',
+        home = 8,
         startingUnits = { Infantry = 2, Fighter = 2, Cruiser = 1, Carrier = 1, Dreadnought = 1, Space_Dock = 1 },
         startingTech = { 'Dacxive Animators', 'Valefar Assimilator X', 'Valefar Assimilator Y' },
         flagship = 'The Alastor',
@@ -125,6 +135,7 @@ local _factionAttributes = {
 
     ["The Sardakk N'orr"] = {
         tokenName = "Sardakk N'orr",
+        home = 13,
         startingUnits = { Infantry = 5, Cruiser = 1, Carrier = 2, Space_Dock = 1, PDS = 1 },
         startingTech = {},
         flagship = "C'morran N'orr",
@@ -133,6 +144,7 @@ local _factionAttributes = {
 
     ['The Universities of Jol-Nar'] = {
         tokenName = 'Universities of Jol-Nar',
+        home = 12,
         startingUnits = { Infantry = 2, Fighter = 1, Carrier = 2, Dreadnought = 1, Space_Dock = 1, PDS = 2 },
         startingTech = { 'Antimass Deflectors', 'Neural Motivator', 'Sarween Tools', 'Plasma Scoring' },
         flagship = 'J.N.S. Hylarim',
@@ -141,6 +153,7 @@ local _factionAttributes = {
 
     ['The Winnu'] = {
         tokenName = 'Winnu',
+        home = 7,
         startingUnits = { Infantry = 2, Fighter = 2, Cruiser = 1, Carrier = 1, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Antimass Deflectors', 'Neural Motivator', 'Sarween Tools', 'Plasma Scoring' },
         flagship = 'Salai Sai Corian',
@@ -150,6 +163,7 @@ local _factionAttributes = {
 
     ['The Xxcha Kingdom'] = {
         tokenName = 'Xxcha Kingdom',
+        home = 14,
         startingUnits = { Infantry = 4, Fighter = 3, Cruiser = 2, Carrier = 1, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Graviton Laser System' },
         flagship = 'Loncara Ssodu',
@@ -158,6 +172,7 @@ local _factionAttributes = {
 
     ['The Yin Brotherhood'] = {
         tokenName = 'Yin Brotherhood',
+        home = 3,
         startingUnits = { Infantry = 4, Fighter = 4, Destroyer = 1, Carrier = 2, Space_Dock = 1 },
         startingTech = { 'Sarween Tools' },
         flagship = 'Van Hauge',
@@ -166,6 +181,7 @@ local _factionAttributes = {
 
     ['The Yssaril Tribes'] = {
         tokenName = 'Yssaril Tribes',
+        home = 15,
         startingUnits = { Infantry = 5, Fighter = 2, Cruiser = 1, Carrier = 2, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Neural Motivator' },
         flagship = "Y'sia Y'ssrila",
@@ -177,6 +193,7 @@ local _factionAttributes = {
     ['The Advent'] = {
         source = 'Blue Space',
         tokenName = 'Advent',
+        home = 3006,
         startingUnits = { Infantry = 2, Fighter = 6, Destroyer = 1, Carrier = 2, Space_Dock = 1 },
         startingTech = { 'Neural Motivator', 'Sarween Tools' },
         flagship = 'Advent Flagship',
@@ -186,6 +203,7 @@ local _factionAttributes = {
     ['The Drahn Consortium'] = {
         source = 'Blue Space',
         tokenName = 'Drahn Consortium',
+        home = 3001,
         startingUnits = { Infantry = 4, Fighter = 3, Destroyer = 1, Carrier = 2, Space_Dock = 1 },
         startingTech = { 'Neural Motivator', 'Plasma Scoring' },
         flagship = 'Nightingale II',
@@ -195,6 +213,7 @@ local _factionAttributes = {
     ['The Free Systems Alliance'] = {
         source = 'Blue Space',
         tokenName = 'Free Systems Alliance',
+        home = 3007,
         startingUnits = { Infantry = 4, Fighter = 2, Cruiser = 2, Carrier = 1, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Neural Motivator' },
         flagship = 'Vox',
@@ -204,6 +223,7 @@ local _factionAttributes = {
     ['The Fremen'] = {
         source = 'Blue Space',
         tokenName = 'Fremen',
+        home = 3002,
         startingUnits = { Infantry = 7, Fighter = 2, Cruiser = 2, Carrier = 1, Space_Dock = 1 },
         startingTech = { 'Antimass Deflectors' },
         flagship = 'Shai-Hulud',
@@ -213,6 +233,7 @@ local _factionAttributes = {
     ['The Gheldor Authority'] = {
         source = 'Blue Space',
         tokenName = 'Gheldor Authority',
+        home = 3014,
         startingUnits = { Infantry = 4, Fighter = 2, Destroyer = 1, Carrier = 2, Space_Dock = 1 },
         startingTech = { 'Magen Defense Grid' },
         flagship = "Gheld'atar",
@@ -222,6 +243,7 @@ local _factionAttributes = {
     ['The HCEN Defense System'] = {
         source = 'Blue Space',
         tokenName = 'HCEN Defense System',
+        home = 3013,
         startingUnits = { Infantry = 3, Cruiser = 1, Carrier = 1, PDS = 2, Space_Dock = 1 },
         startingTech = { 'Graviton Laser System' },
         flagship = 'Locus',
@@ -231,6 +253,7 @@ local _factionAttributes = {
     ['The Khet Drakkol Union'] = {
         source = 'Blue Space',
         tokenName = 'Khet Drakkol Union',
+        home = 3003,
         startingUnits = { Infantry = 4, Fighter = 3, Destroyer = 1, Dreadnought = 2, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Sarween Tools' },
         flagship = 'Khage',
@@ -240,6 +263,7 @@ local _factionAttributes = {
     ['The Kortali Horde'] = {
         source = 'Blue Space',
         tokenName = 'Kortali Horde',
+        home = 3011,
         startingUnits = { Infantry = 5, Fighter = 3, Cruiser = 1, Carrier = 2, Space_Dock = 1 },
         startingTech = { 'Dacxive Animators' },
         flagship = "For'xdar",
@@ -249,6 +273,7 @@ local _factionAttributes = {
     ['The Lazax'] = {
         source = 'Blue Space',
         tokenName = 'Lazax',
+        home = 3016,
         startingUnits = { Infantry = 3, Fighter = 2, Cruiser = 1, Carrier = 1, Dreadnought = 1, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Antimass Deflectors', 'Neural Motivator', 'Sarween Tools', 'Plasma Scoring' },
         flagship = 'Regulus',
@@ -259,6 +284,7 @@ local _factionAttributes = {
     ['The Mahact Sorcerer Kings'] = {
         source = 'Blue Space',
         tokenName = 'Mahact Sorcerer Kings',
+        home = 3017,
         startingUnits = { Infantry = 4, Fighter = 2, Cruiser = 1, Carrier = 2, Space_Dock = 1, PDS = 2 },
         startingTech = { },
         flagship = "Noctul H'rgan",
@@ -268,6 +294,7 @@ local _factionAttributes = {
     ['The Mandalorian Clans'] = {
         source = 'Blue Space',
         tokenName = 'Mandalorian Clans',
+        home = 3005,
         startingUnits = { Infantry = 5, Fighter = 2, Cruiser = 2, Carrier = 1, Space_Dock = 1 },
         startingTech = { 'Neural Motivator', 'Antimass Deflectors' },
         flagship = "Kyr'tsad",
@@ -277,6 +304,7 @@ local _factionAttributes = {
     ["The Navigators' Guild"] = {
         source = 'Blue Space',
         tokenName = "Navigators' Guild",
+        home = 3008,
         startingUnits = { Infantry = 4, Fighter = 1, Cruiser = 1, Carrier = 2, Space_Dock = 1 },
         startingTech = { 'Antimass Deflectors', 'Sarween Tools' },
         flagship = 'Chogra Tuhn',
@@ -286,6 +314,7 @@ local _factionAttributes = {
     ['The Rhodyn Migrant Fleet'] = {
         source = 'Blue Space',
         tokenName = 'Rhodyn Migrant Fleet',
+        home = 3012,
         startingUnits = { Infantry = 4, Fighter = 2, Destroyer = 1, Space_Dock = 1, Flagship = 1 },
         startingTech = { 'Gravity Drive' },
         flagship = 'Mho Rhodyn',
@@ -295,6 +324,7 @@ local _factionAttributes = {
     ['The Trader Emergency Coalition'] = {
         source = 'Blue Space',
         tokenName = 'Trader Emergency Coalition',
+        home = 3010,
         startingUnits = { Infantry = 2, Fighter = 2, Cruiser = 1, Destroyer = 1, Carrier = 1, Space_Dock = 2 },
         startingTech = { 'Sarween Tools', 'Plasma Scoring' },
         flagship = 'Trader Flagship',
@@ -304,6 +334,7 @@ local _factionAttributes = {
     ['The Vasari Empire'] = {
         source = 'Blue Space',
         tokenName = 'Vasari Empire',
+        home = 3009,
         startingUnits = { Infantry = 3, Fighter = 2, Destroyer = 1, Carrier = 1, Dreadnought = 1, Space_Dock = 1 },
         startingTech = { 'Antimass Deflectors', 'Plasma Scoring' },
         flagship = 'Vasari Flagship',
@@ -313,6 +344,7 @@ local _factionAttributes = {
     ['The Veldyr Sovereignty'] = {
         source = 'Blue Space',
         tokenName = 'Veldyr Sovereignty',
+        home = 3004,
         startingUnits = { Infantry = 3, Fighter = 2, Destroyer = 1 ,Dreadnought = 1, Carrier = 1, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Plasma Scoring' },
         flagship = 'Richtyrian',
@@ -322,6 +354,7 @@ local _factionAttributes = {
     ['The Zeth Contingency'] = {
         source = 'Blue Space',
         tokenName = 'Zeth Contingency',
+        home = 3015,
         startingUnits = { Infantry = 3, Fighter = 2, Destroyer = 2, Carrier = 1, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Antimass Deflectors', 'Neural Motivator', 'Sarween Tools', 'Plasma Scoring' },
         flagship = "Eru'ishon",
@@ -332,6 +365,7 @@ local _factionAttributes = {
     ['The Savages of Cymiae'] = {
         source = 'Other Homebrew',
         tokenName = 'Savages of Cymiae',
+        home = 3018,
         startingUnits = { Infantry = 2, Fighter = 2, Cruiser = 1, Carrier = 1, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Plasma Scoring', 'Magen Defense Grid' },
         flagship = 'Robotic Reprocessing Center',

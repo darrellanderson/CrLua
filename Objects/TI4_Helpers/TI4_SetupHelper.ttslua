@@ -807,8 +807,8 @@ function SetupColor.unpackNew(setupBag, extraRings)
             unitBag.jointTo(state.directionaliser, {
                 type = 'Fixed',
                 collision = false,
-                break_force = 10000,
-                break_torque = 10000
+                break_force = 1000000,  -- max is 1000000
+                break_torque = 1000000
             })
         end
     end

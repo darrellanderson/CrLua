@@ -1533,7 +1533,7 @@ function unpackFactionCoroutine()
         _safeBroadcastToColor(faction.tokenName .. ': ' .. faction.startMessage, color, color)
     end
 
-    debugLog('unpack faction finished')
+    print('Unpack faction "' .. faction.name .. '" finished')
     return 1
 end
 

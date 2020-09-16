@@ -87,7 +87,6 @@ local OBJECT_EFFECTS = {
         requireFaceUp = true,
         warmachine = true,
     },
-
 }
 
 -------------------------------------------------------------------------------
@@ -118,9 +117,12 @@ local _data = {
     philModeProductionValue = false
 }
 
-local _zoneHelper = false
-local _systemHelper = false
 local _deckHelper = false
+local _factionHelper = false
+local _systemHelper = false
+local _zoneHelper = false
+
+local _graveyardGuid = false
 
 -------------------------------------------------------------------------------
 
@@ -133,10 +135,14 @@ function onLoad(saveState)
     _data.height = math.max(_data.height, _config.minHeight)
     _data.playerColor = saveState and saveState.playerColor or _data.playerColor
 
-    _zoneHelper = CrLua.TTS.HelperClient.get('TI4_ZONE_HELPER')
-    _systemHelper = CrLua.TTS.HelperClient.get('TI4_SYSTEM_HELPER')
     _deckHelper = CrLua.TTS.HelperClient.get('TI4_DECK_HELPER')
+    _factionHelper = CrLua.TTS.HelperClient.get('TI4_FACTION_HELPER')
+    _systemHelper = CrLua.TTS.HelperClient.get('TI4_SYSTEM_HELPER')
+    _zoneHelper = CrLua.TTS.HelperClient.get('TI4_ZONE_HELPER')
 
+    self.addContextMenuItem("Warp to active", warpToActiveSystem, false)
+    self.addContextMenuItem("Warp to home", warpToHomeSystem, false)
+    self.addContextMenuItem("Trash trade goods", trashTradeGoods, false)
     self.addContextMenuItem("Toggle Phil Mode", togglePhilMode)
 
     Wait.frames(updateEverything, 2)
@@ -154,6 +160,7 @@ function onObjectDrop(playerColor, droppedObject)
     assert(type(playerColor) == 'string' and type(droppedObject) == 'userdata')
     if droppedObject == self then
         CrLua.Log.d(TAG, 'onObjectDrop: self')
+        _graveyardGuid = false
         updateEverything()
     elseif isInsideBuildArea(droppedObject) then
         _data.inside[droppedObject] = true
@@ -184,6 +191,95 @@ function onObjectDestroy(dyingObject)
 end
 
 -------------------------------------------------------------------------------
+
+local function _warpToSystem(system)
+    assert(type(system) == 'table')
+    print(TAG .. ': warping to ' .. system.string)
+
+    local systemObject = getObjectFromGUID(system.guid)
+    if not systemObject then
+        error('missing system guid ' .. system.guid)
+    end
+
+    local units = {}
+    for object, _ in pairs(_data.inside) do
+        if CrLua.TI4.Unit.fromObject(object) then
+            table.insert(units, object)
+        end
+    end
+
+    local p0 = systemObject.getPosition()
+    for i, unit in ipairs(units) do
+        local phi = math.rad(i * (360 / #units))
+        local r = 2
+        local collide = false
+        local fast = true
+        unit.setPositionSmooth({
+            x = p0.x + r * math.cos(phi),
+            y = p0.y + 3,
+            z = p0.z + r * math.sin(phi)
+        }, collide, fast)
+    end
+end
+
+function warpToActiveSystem()
+    local system = _systemHelper.getActivatedSystem()
+    if system then
+        _warpToSystem(system)
+    else
+        print(TAG .. ': no active system.')
+    end
+end
+
+function warpToHomeSystem()
+    local zoneColor = _zoneHelper.zoneFromPosition(self.getPosition())
+    local faction = zoneColor and _factionHelper.fromColor(zoneColor)
+    local tile = faction and faction.home
+    local system = _systemHelper.systemFromTile(tile)
+    if system then
+        _warpToSystem(system)
+    else
+        print(TAG .. ': no home system.')
+    end
+end
+
+function trashTradeGoods()
+    local function getGraveyard()
+        local graveyard = _graveyardGuid and getObjectFromGUID(_graveyardGuid)
+        if graveyard then
+            return graveyard
+        end
+        local bestGraveyard = false
+        local bestDistanceSq = false
+        local p1 = self.getPosition()
+        for _, object in ipairs(getAllObjects()) do
+            if object.tag == 'Bag' and string.match(object.getName(), '^TI4 Graveyard') then
+                local p2 = object.getPosition()
+                local dSq = (p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2
+                if not bestDistanceSq or dSq < bestDistanceSq then
+                    bestGraveyard = object
+                    bestDistanceSq = dSq
+                end
+            end
+        end
+        _graveyardGuid = bestGraveyard and bestGraveyard.getGUID()
+        return bestGraveyard
+    end
+
+    local tradeGoods = {}
+    for object, _ in pairs(_data.inside) do
+        if string.match(object.getName(), 'Commodities/Tradegoods x[13]') then
+            table.insert(tradeGoods, object)
+        end
+    end
+
+    local graveyard = getGraveyard()
+    if graveyard then
+        for _, tradeGood in ipairs(tradeGoods) do
+            graveyard.putObject(tradeGood)
+        end
+    end
+end
 
 function togglePhilMode()
     if _data.philModeProductionValue then

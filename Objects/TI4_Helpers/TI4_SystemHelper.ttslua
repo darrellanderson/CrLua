@@ -848,6 +848,23 @@ function hexToPosition(hex)
     return { x = x + _LAYOUT.origin.x, y = 0, z = z + _LAYOUT.origin.z }
 end
 
+function hexNeighbors(hex)
+    assert(type(hex) == 'string')
+    local q, r, s = string.match(hex, '<(%-?%d+),(%-?%d+),(%-?%d+)>')
+    local function makeHex(q, r, s)
+        return '<' .. q .. ',' .. r .. ',' .. s .. '>'
+    end
+    return {
+        makeHex(q + 1, r + 0, s - 1),
+        makeHex(q + 1, r - 1, s + 0),
+        makeHex(q + 0, r - 1, s + 1),
+        makeHex(q - 1, r + 0, s + 1),
+        makeHex(q - 1, r + 1, s + 0),
+        makeHex(q + 0, r + 1, s - 1)
+    }
+end
+
+
 -------------------------------------------------------------------------------
 
 local _activatedSystem = false

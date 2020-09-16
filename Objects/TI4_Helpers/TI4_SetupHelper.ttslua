@@ -1078,13 +1078,17 @@ function SetupFaction.unpackHomeSystemTile(faction, factionBox, homeSystemPositi
         z = 0
     }
 
+    local function delayedLock(object)
+        Wait.time(function() object.setLock(true) end, 1)
+    end
+
     local guid = assert(getEntryGuid(factionBox, tileName), 'missing ' .. tileName)
     local tile = factionBox.takeObject({
         guid              = guid,
         position          = homeSystemPosition,
         rotation          = rotation,
         smooth            = true,
-        callback_function = function(object) object.setLock(true) end,
+        callback_function = delayedLock,
     })
 
     local extraTile = false
@@ -1107,12 +1111,6 @@ function SetupFaction.unpackHomeSystemTile(faction, factionBox, homeSystemPositi
         local hex = _systemHelper.hexFromPosition(position)
         position = _systemHelper.hexToPosition(hex)
         position.y = homeSystemPosition.y
-
-        -- This tile may be different, give it some extra time to settle.
-        -- MUST lock it as a signal that it is safe to place starting units.
-        local function delayedLock(object)
-            Wait.time(function() object.setLock(true) end, 3)
-        end
 
         tile = factionBox.takeObject({
             guid              = guid,
@@ -1468,7 +1466,11 @@ function unpackFactionCoroutine()
     end
 
     -- Wait for home system to land before unpacking units.
-    while not homeSystemTile.getLock() do coroutine.yield(0) end
+    -- Could wait for lock, but try to avoid non-time barriers.
+    local waitUntil = Time.time + 3
+    while Time.time < waitUntil do
+        coroutine.yield(0)
+    end
 
     SetupFaction.unpackUnits(color, faction, homeSystemTile)
     coroutine.yield(0)

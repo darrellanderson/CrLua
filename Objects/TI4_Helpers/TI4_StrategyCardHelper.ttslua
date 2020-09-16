@@ -231,6 +231,7 @@ end
 
 -- Expose in case external wants to control end of phase.
 function endStatusPhaseInInitiativeOrder(playerColorOrder)
+    -- Return strategy cards.
     for guid, parameters in pairs(_guidToParameters) do
         local strategyCard = getObjectFromGUID(guid)
         if strategyCard then
@@ -611,6 +612,44 @@ function _getDealActionCardsCount(playerColor, faction, lowerNameToInZoneCards)
     return result
 end
 
+--- Move the speaker agenda token to match the speaker token.
+function _moveSpeakerAgendaToken()
+    local speakerTokenName = 'Speaker Token'
+    local speakerTokenAgendaName = 'Speaker Token - Agenda'
+
+    local speakerToken = false
+    local speakerTokenAgenda = false
+    local colorToVoteCounter = {}
+
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        if name == speakerTokenName then
+            speakerToken = object
+        elseif name == speakerTokenAgendaName then
+            speakerTokenAgenda = object
+        end
+        local color = string.match(name, '(.*) Player Votes')
+        if color then
+            colorToVoteCounter[color] = object
+        end
+    end
+
+    if speakerToken and speakerTokenAgenda then
+        local zoneColor = _zoneHelper.zoneFromPosition(speakerToken.getPosition())
+        local voteCounter = zoneColor and colorToVoteCounter[zoneColor]
+        if voteCounter then
+            local pos = voteCounter.getPosition()
+            pos.z = pos.z + 4 * (pos.z > 0 and 1 or -1)
+            local rot = voteCounter.getRotation()
+            rot.y = (rot.y + 180) % 360
+            local collide = false
+            local fast = true
+            speakerTokenAgenda.setPositionSmooth(pos, collide, fast)
+            speakerTokenAgenda.setRotationSmooth(rot, collide, fast)
+        end
+    end
+end
+
 -------------------------------------------------------------------------------
 
 local function _doEndOfStatusPhaseCoroutineBody(playerColor)
@@ -756,6 +795,9 @@ function _doEndOfStatusPhaseCoroutine()
         _doEndOfStatusPhaseCoroutineBody(playerColor)
         coroutine.yield(0)
     end
+
+    _moveSpeakerAgendaToken()
+    coroutine.yield(0)
 
     return 1 -- REQUIRED to exit coroutine
 end

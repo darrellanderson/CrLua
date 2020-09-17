@@ -164,6 +164,7 @@ local SetupFaction = {
     },
 }
 
+local SetupFranken = {}
 local SetupCards = {}
 
 local _putPendingGuidSet = {}
@@ -1300,19 +1301,23 @@ function SetupFaction.unpackStartingTech(color, faction, zone)
         z = SetupFaction.STARTING_TECH_OFFSET.z
     }
     for i, name in ipairs(faction.startingTech) do
-        local guid = assert(getEntryGuid(techDeck, name), 'missing starting technology ' .. name)
-        techDeck.takeObject({
-            guid              = guid,
-            position          = offsetPosition(zone.center, offset),
-            rotation          = zoneRotation(zone, offset),
-            smooth            = true,
-        })
+        local guid = getEntryGuid(techDeck, name)
+        if guid then
+            techDeck.takeObject({
+                guid              = guid,
+                position          = offsetPosition(zone.center, offset),
+                rotation          = zoneRotation(zone, offset),
+                smooth            = true,
+            })
+        else
+            printToColor('unpackStartingTech: missing starting technology ' .. name, color, 'Red')
+        end
         offset.z = offset.z + SetupFaction.STARTING_TECH_OFFSET.dz
     end
 end
 
-function SetupFaction.placeScoreCounters(ownerTokensBag, zone, zoneIndex, faction, color)
-    assert(ownerTokensBag.tag == 'Infinite' and type(zone) == 'table' and type(faction) == 'table' and type(color) == 'string')
+function SetupFaction.placeScoreCounters(ownerTokensBag, zone, zoneIndex, color)
+    assert(ownerTokensBag.tag == 'Infinite' and type(zone) == 'table' and type(color) == 'string')
     debugLog('SetupFaction.placeScoreCounters')
 
     local function getScoreboard()
@@ -1504,7 +1509,7 @@ function unpackFactionCoroutine()
     SetupFaction.unpackStartingTech(color, faction, zoneAttributes)
     coroutine.yield(0)
 
-    SetupFaction.placeScoreCounters(ownerTokensBag, zoneAttributes, zoneAttributes.index, faction, color)
+    SetupFaction.placeScoreCounters(ownerTokensBag, zoneAttributes, zoneAttributes.index, color)
     coroutine.yield(0)
 
     if factionBoxSrc then
@@ -1534,6 +1539,193 @@ function unpackFactionCoroutine()
     end
 
     print('Unpack faction "' .. faction.name .. '" finished')
+    return 1
+end
+
+-------------------------------------------------------------------------------
+
+function SetupFranken.renameFlagship(color)
+    local flagshipNameToFaction = {}
+    for _, faction in pairs(_factionHelper.allFactions(true)) do
+        flagshipNameToFaction[faction.flagship] = faction
+    end
+
+    local faction = false
+    for _, object in ipairs(getAllObjects()) do
+        local candidate = flagshipNameToFaction[object.getName()]
+        if candidate and _zoneHelper.zoneFromPosition(object.getPosition()) == color then
+            if faction then
+                error('SetupFranken.renameFlagship: multiple flagships for ' .. color)
+            end
+            faction = candidate
+        end
+    end
+    if not faction then
+        printToColor('SetupFranken.renameFlagship: missing flagship for ' .. color, color, 'Red')
+        return
+    end
+
+    printToColor('SetupFranken.renameFlagship: ' .. faction.tokenName .. ' flagship "' .. faction.flagship .. '"', color, color)
+    SetupFaction.renameFlagship(color, faction)
+end
+
+function SetupFranken.unpackStartingTech(color)
+    local faction = false
+    local zoneAttributes = _zoneHelper.zoneAttributes(color)
+
+    for _, object in ipairs(getAllObjects()) do
+        local tokenName = string.match(object.getName(), '^(.*) Starting Tech')
+        if tokenName and _zoneHelper.zoneFromPosition(object.getPosition()) == color then
+            if faction then
+                error('SetupFranken.unpackStartingTech: multiple starting tech tokens for ' .. color)
+            end
+            faction = _factionHelper.fromTokenName(tokenName)
+        end
+    end
+    if not faction then
+        printToColor('SetupFranken.unpackStartingTech: missing starting tech for ' .. color, color, 'Red')
+        return
+    end
+
+    printToColor('SetupFranken.unpackStartingTech: ' .. faction.tokenName .. ' starting tech', color, color)
+    SetupFaction.unpackStartingTech(color, faction, zoneAttributes)
+end
+
+function SetupFranken.unpackStartingUnits(color)
+    local faction = false
+    local homeSystemTile = false
+
+    local guidToSystem = _systemHelper.systems()
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        local tokenName1 = string.match(name, '^(.*) Fleet$')
+        local tokenName2 = string.match(name, '^(.*) Starting Units$')
+        local tokenName = tokenName1 or tokenName2
+        if tokenName and _zoneHelper.zoneFromPosition(object.getPosition()) == color then
+            if faction then
+                error('SetupFranken.unpackStartingUnits: multiple starting unit tokens for ' .. color)
+            end
+            faction = _factionHelper.fromTokenName(tokenName)
+        end
+
+        local system = guidToSystem[object.getGUID()]
+        if system and system.home and _zoneHelper.zoneFromPosition(object.getPosition()) == color then
+            if homeSystemTile then
+                error('SetupFranken.unpackStartingUnits: multiple home system tiles for ' .. color)
+            end
+            homeSystemTile = object
+        end
+    end
+    if not faction then
+        printToColor('SetupFranken.unpackStartingUnits: missing starting for ' .. color .. ', skipping starting units', color, 'Red')
+        return
+    end
+
+    -- If no HS in player zone look in the default on-map location.
+    if not homeSystemTile then
+        local zoneAttributes = _zoneHelper.zoneAttributes(color)
+        local pos = zoneAttributes and zoneAttributes.homeSystemPosition
+        local system = pos and _systemHelper.systemFromPosition(pos)
+        homeSystemTile = system and getObjectFromGUID(system.guid)
+    end
+    if not homeSystemTile then
+        -- Make this one non-fatal, HS may be ... somewhere else.
+        printToColor('SetupFranken.unpackStartingUnits: missing home system tile for ' .. color .. ', skipping starting units', color, 'Red')
+        return
+    end
+
+    printToColor('SetupFranken.unpackStartingUnits: ' .. faction.tokenName .. ' starting units', color, color)
+    SetupFaction.unpackUnits(color, faction, homeSystemTile)
+end
+
+local _unpackFrankenQueue = {}
+
+--- Entry point for faction unpack.
+-- Params:
+-- - params.unpackButtonGuid (optional) if set, delete this object after unpack.
+-- - params.factionTokenName (optional) if set, unpack this faction (otherwise look for a token in zone).
+-- - params.color (required) unpack into this zone.
+function unpackFranken(params)
+    assert(type(params) == 'table')
+    assert(not params.unpackButtonGuid or type(params.unpackButtonGuid) == 'string')
+    assert(type(params.color) == 'string')
+    table.insert(_unpackFrankenQueue, params)
+    startLuaCoroutine(self, 'unpackFrankenCoroutine')
+end
+
+function unpackFrankenCoroutine()
+    local params = table.remove(_unpackFrankenQueue)
+    local color = params.color
+    local zoneAttributes = _zoneHelper.zoneAttributes(color)
+
+    local commandTokensBag = false
+    local ownerTokensBag = false
+    for _, object in ipairs(getAllObjects()) do
+        if string.match(object.getName(), 'Command Tokens Bag$') and _zoneHelper.zoneFromPosition(object.getPosition()) == color then
+            if commandTokensBag then
+                error('Unpack: multiple command tokens bags for ' .. color)
+            end
+            commandTokensBag = object
+        end
+        if string.match(object.getName(), 'Owner Tokens Bag$') and _zoneHelper.zoneFromPosition(object.getPosition()) == color then
+            if ownerTokensBag then
+                error('Unpack: multiple owner tokens bags for ' .. color)
+            end
+            ownerTokensBag = object
+        end
+    end
+    coroutine.yield(0)
+    if (not commandTokensBag) or (not ownerTokensBag) then
+        printToColor('UnpackFranken: unpack the faction sheet, command and owner tokens bags first.', color, 'Red')
+        return 1
+    end
+
+    if params.unpackButtonGuid then
+        local deletedItems = false
+        for _, object in ipairs(getAllObjects()) do
+            if object.tag == 'Bag' and object.getName() == 'TI4 Deleted Items' then
+                deletedItems = object
+                break
+            end
+        end
+        if deletedItems then
+            deletedItems.call('ignoreGuid', params.unpackButtonGuid)
+        end
+        local unpackButton = assert(getObjectFromGUID(params.unpackButtonGuid))
+        destroyObject(unpackButton)
+        coroutine.yield(0)
+    end
+
+    SetupFranken.renameFlagship(color)
+    coroutine.yield(0)
+
+    -- Make sure the faction helper knows about the faction before unpacking tokens.
+    _factionHelper.updateFactions()
+    local quantity = commandTokensBag.getQuantity()
+    _factionHelper.tintTokens({ color = color })
+    while commandTokensBag.getQuantity() < quantity do
+        coroutine.yield(0)
+    end
+    while ownerTokensBag.getQuantity() < 1 do
+        coroutine.yield(0)
+    end
+    coroutine.yield(0)
+
+    if commandTokensBag.getQuantity() == 16 then
+        SetupFaction.unpackCommandTokens(color, commandTokensBag)
+        coroutine.yield(0)
+    end
+
+    SetupFranken.unpackStartingTech(color)
+    coroutine.yield(0)
+
+    SetupFaction.placeScoreCounters(ownerTokensBag, zoneAttributes, zoneAttributes.index, color)
+    coroutine.yield(0)
+
+    SetupFranken.unpackStartingUnits(color)
+    coroutine.yield(0)
+
+    print('Unpack Franken for ' .. color .. ' finished')
     return 1
 end
 

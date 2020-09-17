@@ -154,7 +154,7 @@ function anyPeerIsActive(peers)
     local activeNotSeated = false
     for _, peer in ipairs(peers) do
         if not peer.is_face_down then
-            local peerColor = objectNameToColor(peer.getName())
+            local peerColor = parseColor(peer.getName())
             if seatedSet[peerColor] then
                 activeSeated = activeSeated or peerColor
             else
@@ -172,7 +172,7 @@ function setActivePeersWithIncludeSelf(peers)
         seatedSet[color] = true
     end
     for _, peer in ipairs(peers) do
-        local peerColor = objectNameToColor(peer.getName())
+        local peerColor = parseColor(peer.getName())
         if peer.is_face_down and seatedSet[peerColor] then
             peer.flip()
         end

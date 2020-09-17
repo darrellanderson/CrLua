@@ -1,9 +1,6 @@
 --- Active/passed token.
 -- @author Darrell
 --
--- Place one token near each player, each token assigns itself to the closest
--- seated player.
---
 -- When flipped to "passed" the token will automatically skip that player's
 -- turn, broadcasting to all players that player has passed.
 --
@@ -25,13 +22,25 @@ function onLoad()
     -- Guid may change if there's a conflict.  Wait a moment before using.
     local function delayedCreateTimer()
         _timerId = 'Active/Passed:' .. self.getGUID()
+
+        local function colorIndex()
+            local color = myColor()
+            for i, candidate in ipairs(Player.getColors()) do
+                if color == candidate then
+                    return i
+                end
+            end
+            return 0
+        end
+        math.randomseed(colorIndex())
+
         -- No need to remove the timer if this is destroyed, TTS ignores it.
         Timer.destroy(_timerId)
         Timer.create({
             identifier = _timerId,
             function_owner = self,
             function_name = 'timerCallback',
-            delay = 1.5,  -- seconds
+            delay = 1.5 + (math.random() * 0.5),  -- seconds
             repetitions = 0  -- repeat until explictly Timer.destroy'ed
         })
     end
@@ -68,33 +77,14 @@ end
 
 -------------------------------------------------------------------------------
 
---- Get the color from an Active/Passed token object name.
--- @param name string : game Object name.
--- @return color string : color, or nil if not valid.
-function objectNameToColor(name)
-    -- All possible player colors (including "spectators").
-    local validColorNames = {
-        White = true, Brown = true, Red = true, Orange = true, Yellow = true,
-        Green = true, Teal = true, Blue = true, Purple = true, Pink = true,
-        Grey = true, Black = true
-    }
+function parseColor(name)
     local color = string.match(name, '^Active/Passed %((%a+)%)$')
-    -- Accept "Red", "red", "RED", and I suppose even "rED".
     color = color and (string.upper(string.sub(color, 1, 1)) .. string.lower(string.sub(color, 2)))
-    return validColorNames[color] and color
-end
-
---- Get an Active/Passed token object name for the given color.
-function colorToObjectName(color)
-    return string.format('Active/Passed (%s)', color or 'unassigned')
-end
-
-function defaultObjectName()
-    return colorToObjectName()
+    return color
 end
 
 function myColor()
-    return objectNameToColor(self.getName())
+    return parseColor(self.getName())
 end
 
 -------------------------------------------------------------------------------
@@ -103,7 +93,7 @@ end
 -- @param name string : peer game Object name.
 -- @return boolean true if peer.
 function isPeerName(name)
-    local color = objectNameToColor(name)
+    local color = parseColor(name)
     if color then
         CrLua.Log.d(TAG, 'isPeer found ' .. color)
     end
@@ -130,7 +120,7 @@ function sanityCheckPeersWithIncludeSelf(peers)
     local result = true
     local colorCount = {}
     for _, peer in ipairs(peers) do
-        local color = objectNameToColor(peer.getName())
+        local color = parseColor(peer.getName())
         if color then
             colorCount[color] = (colorCount[color] or 0) + 1
         end
@@ -138,18 +128,7 @@ function sanityCheckPeersWithIncludeSelf(peers)
     for color, count in pairs(colorCount) do
         if count > 1 then
             result = false
-            local player = Player[color]
-            local name = (player and player.steam_name) or color
-            printToAll('Warning: player ' .. name .. ' has multiple active/passed tokens', color)
-        end
-    end
-    local seated = getSeatedPlayers()
-    for _, color in ipairs(seated) do
-        if not colorCount[color] then
-            result = false
-            local player = Player[color]
-            local name = (player and player.steam_name) or color
-            printToAll('Warning: player ' .. name .. ' does not have an active/passed token', color)
+            printToAll('Warning: ' .. color .. ' has multiple active/passed tokens', color)
         end
     end
     return result
@@ -167,12 +146,16 @@ end
 -- @param peers list of active/passed token objects.
 -- @return color, color pair: any seated player active?  any missing players active?
 function anyPeerIsActive(peers)
+    local seatedSet = {}
+    for _, color in ipairs(getSeatedPlayers()) do
+        seatedSet[color] = true
+    end
     local activeSeated = false
     local activeNotSeated = false
     for _, peer in ipairs(peers) do
         if not peer.is_face_down then
             local peerColor = objectNameToColor(peer.getName())
-            if CrLua.TTS.Player.isSeated(peerColor) then
+            if seatedSet[peerColor] then
                 activeSeated = activeSeated or peerColor
             else
                 activeNotSeated = activeNotSeated or peerColor
@@ -183,21 +166,14 @@ function anyPeerIsActive(peers)
     return activeSeated, activeNotSeated
 end
 
-function anyPeerIsColor(color)
-    local peers = getPeers(false)
-    for _, peer in ipairs(peers) do
-        local peerColor = objectNameToColor(peer.getName())
-        if peerColor == color then
-            return true
-        end
-    end
-    return false
-end
-
 function setActivePeersWithIncludeSelf(peers)
+    local seatedSet = {}
+    for _, color in ipairs(getSeatedPlayers()) do
+        seatedSet[color] = true
+    end
     for _, peer in ipairs(peers) do
         local peerColor = objectNameToColor(peer.getName())
-        if peer.is_face_down and CrLua.TTS.Player.isSeated(peerColor) then
+        if peer.is_face_down and seatedSet[peerColor] then
             peer.flip()
         end
     end
@@ -212,26 +188,6 @@ function isMyTurn()
 end
 
 -------------------------------------------------------------------------------
-
---- Assign this to the closest seated player.
--- Also tints the side of the token for a visual confirmation.
-function resetTokenForNewOwner()
-    local oldColor = myColor()
-    local newColor = playerColorAtPosition(self.getPosition())
-
-    -- If another token is already assigned to that color, do not claim it.
-    if anyPeerIsColor(newColor) then
-        newColor = nil
-    end
-
-    -- Tint this object to indicate color.
-    CrLua.Log.d(TAG, 'resetTokenForNewOwner ' .. (oldColor or '<nil>') .. ' -> ' .. (newColor or '<nil>'))
-    self.setColorTint(newColor or 'Grey')
-
-    -- Also rename self.
-    local name = colorToObjectName(newColor)
-    self.setName(name)
-end
 
 --- Pass turn if this token is set to "passed".  If all tokens are set to
 -- "passed" then disable turns altogether, requiring turns be re-enabled
@@ -288,24 +244,11 @@ end
 
 -------------------------------------------------------------------------------
 
---- Get player for the given table position.
--- @param position table : {x,y,z} table.
--- @return color string : player at postition, or nil if none.
-function playerColorAtPosition(position)
-    local playerColor = CrLua.TTS.Player.closest(position)
-    CrLua.Log.d(TAG, 'playerColorAtPosition -> ' .. (playerColor or '<nil>'))
-    return playerColor
-end
-
--------------------------------------------------------------------------------
-
 #include <~/CrLua/CrLua>
 #include <~/CrLua/LockGlobals>
 
 #include <~/CrLua/LockTable>
 #include <~/CrLua/Log>
-#include <~/CrLua/Util>
-#include <~/CrLua/TTS/Player>
 
-CrLua.assertRequired({'Log', 'TTS.Player'}) -- do this BEFORE lock
+CrLua.assertRequired({'Log'}) -- do this BEFORE lock
 CrLua.lock()

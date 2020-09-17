@@ -28,6 +28,8 @@ function onLoad(save_state)
 
     -- Guid may change if there's a conflict.  Wait a moment before using.
     local function delayedCreateTimer()
+        math.randomseed(tonumber(self.getGUID(), 16))
+
         _timerId = 'HereAFK:' .. self.getGUID()
         Timer.destroy(_timerId)
         -- No need to remove the timer if this is destroyed, TTS ignores it.
@@ -35,7 +37,7 @@ function onLoad(save_state)
             identifier = _timerId,
             function_owner = self,
             function_name = 'timerCallback',
-            delay = 3,  -- seconds
+            delay = 2.5 + math.random(),  -- seconds
             repetitions = 0  -- repeat until explictly Timer.destroy'ed
         })
     end

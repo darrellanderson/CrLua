@@ -433,16 +433,6 @@ function planets()
     return result
 end
 
---- Get non-planet items that affect resources and/or influence.
--- @return table: map from LOWERCASE object name to {name,resources,influence} table.
-function nonPlanetResourceInfluenceCards()
-    local result = {}
-    for _, item in ipairs(_nonPlanetResourceInfluenceCards) do
-        result[string.lower(item.name)] = item
-    end
-    return result
-end
-
 --- Get system at position.
 -- @postition table: {xyz} position.
 -- @return system table.
@@ -508,6 +498,47 @@ function planetFromPosition(params)
         end
     end
     return best
+end
+
+--- Get map from wormhole type to object guids.
+function wormholes()
+    local result = {
+        ['alpha'] = {},
+        ['beta'] = {},
+        ['delta'] = {},
+    }
+
+    -- Systems.
+    for guid, system in pairs(_systems) do
+        for _, wormhole in ipairs(system.wormholes or {}) do
+            table.insert(result[wormhole], guid)
+        end
+    end
+
+    -- Wormhole objects.
+    local objectNameToWormhole = {
+        ['Alpha Wormhole Token'] = 'alpha',
+        ['Beta Wormhole Token'] = 'beta',
+        ['Hil Colish'] = 'delta',
+    }
+    for _, object in ipairs(getAllObjects()) do
+        local wormhole = objectNameToWormhole[object.getName()]
+        if wormhole then
+            table.insert(result[wormhole], object.getGuid())
+        end
+    end
+
+    return result
+end
+
+--- Get non-planet items that affect resources and/or influence.
+-- @return table: map from LOWERCASE object name to {name,resources,influence} table.
+function nonPlanetResourceInfluenceCards()
+    local result = {}
+    for _, item in ipairs(_nonPlanetResourceInfluenceCards) do
+        result[string.lower(item.name)] = item
+    end
+    return result
 end
 
 --- Let homebrew add custom systems via runtime injection.
@@ -863,7 +894,6 @@ function hexNeighbors(hex)
         makeHex(q + 0, r + 1, s - 1)
     }
 end
-
 
 -------------------------------------------------------------------------------
 

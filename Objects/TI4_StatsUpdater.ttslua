@@ -481,7 +481,7 @@ end
 
 function startPeriodicUpdates()
     if not _waitId then
-        printToAll('Showing TI4 stats in notes (lower right).  Stats are score, resources/influence, and tactics/fleet/stategy command token counts.  To disable, either right-click the table and select "Hide TI4 Stats" to hide for all, or individual players may disable them via Menu -> Configuration -> Interface -> Notes.')
+        printToAll('Showing TI4 stats in notes (lower right).  Stats are score, resources/influence (ready and total), commodities/trade goods, and tactics/fleet/stategy command token counts.  To disable, either right-click the table and select "Hide TI4 Stats" to hide for all, or individual players may disable them via Menu -> Configuration -> Interface -> Notes.')
         _logNext = true
     end
     if _waitId then

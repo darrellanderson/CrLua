@@ -100,12 +100,13 @@ local SetupColor = {
     HAND = {
         ACTIVE = {
             OFFSET = { x = 0, y = 4, z = 21, dzMiddle = 5, yRot = 180 },
-            SCALE = { x = 20, y = 8, z = 4 }
+            SCALE = { x = 22, y = 8, z = 4 }
         },
         INACTIVE = {
             POSITION = { x = 150, y = 4, z = 100, dx = 0, dz = -30 },
             SCALE = { x = 1, y = 4, z = 1 }
-        }
+        },
+        USE_WALL = false
     },
 
     -- The box with per-color items, hover above the player area.
@@ -168,6 +169,7 @@ local SetupFranken = {}
 local SetupCards = {}
 
 local _putPendingGuidSet = {}
+local _deletedItemsBagGuid = false
 
 local function putPending(object)
     assert(type(object) == 'userdata')
@@ -185,6 +187,24 @@ function onObjectDestroy(dyingObject)
 end
 
 -------------------------------------------------------------------------------
+
+function _safeDestroyObject(object)
+    assert(type(object) == 'userdata')
+    local deletedItems = _deletedItemsBagGuid and getObjectFromGUID(_deletedItemsBagGuid)
+    if not deletedItems then
+        for _, object in ipairs(getAllObjects()) do
+            if object.tag == 'Bag' and object.getName() == 'TI4 Deleted Items' then
+                _deletedItemsBagGuid = object.getGUID()
+                deletedItems = object
+                break
+            end
+        end
+    end
+    if deletedItems then
+        deletedItems.call('ignoreGuid', object.getGUID())
+    end
+    destroyObject(object)
+end
 
 --- Normal broadcastToColor throws an error if the color is not seated.
 function _safeBroadcastToColor(message, playerColor, messageColor)
@@ -353,12 +373,8 @@ function SetupGeneric.pack(setupBag)
         nameToObjects[namePattern] = {}
     end
 
-    local deletedItems = false
     for _, object in ipairs(getAllObjects()) do
         local name = object.getName()
-        if name == 'TI4 Deleted Items' then
-            deletedItems = object
-        end
         for namePattern, objects in pairs(nameToObjects) do
             if string.match(name, namePattern) then
                 table.insert(objects, object)
@@ -373,10 +389,7 @@ function SetupGeneric.pack(setupBag)
                 object.setLock(false)
                 setupBag.putObject(object)
             else
-                if deletedItems then
-                    deletedItems.call('ignoreGuid', object.getGUID())
-                end
-                destroyObject(object)
+                _safeDestroyObject(object)
             end
         end
     end
@@ -471,10 +484,23 @@ function SetupColor.transformHands()
     local zonesAttributes = _zoneHelper.zonesAttributes()
     local playerCount = #zonesAttributes
 
+    local invisibleHandWallName = 'Invisible Wall'
+
+    if SetupColor.HAND.USE_WALL then
+        for _, object in ipairs(getAllObjects()) do
+            if object.tag == 'Block' and object.getName() == invisibleHandWallName then
+                _safeDestroyObject(object)
+            end
+        end
+        coroutine.yield(0)
+        coroutine.yield(0)
+    end
+
     for i, color in ipairs(SetupColor.DEFAULT_COLOR_LIST) do
         if i <= playerCount then
             local zoneCenter = zonesAttributes[i].center
             local position = offsetPosition(zoneCenter, SetupColor.HAND.ACTIVE.OFFSET)
+            local rotation = offsetRotation(zoneCenter, SetupColor.HAND.ACTIVE.OFFSET)
 
             -- If this zone is between two like-center-z zones, move hand to
             -- avoid cards flying between left/right neighbors from hitting
@@ -492,9 +518,38 @@ function SetupColor.transformHands()
 
             Player[color].setHandTransform({
                 position = position,
-                rotation = offsetRotation(zoneCenter, SetupColor.HAND.ACTIVE.OFFSET),
+                rotation = rotation,
                 scale    = SetupColor.HAND.ACTIVE.SCALE
             })
+
+            if SetupColor.HAND.USE_WALL then
+                -- Place an invisible wall in front of hand.  There's a TTS bug
+                -- where draw from deck sometimes (rarely) instead draws from
+                -- another player's hand.  No idea why, but as a precaution in case
+                -- there's a raycast, put this wall in the way.
+                local wall = spawnObject({
+                    type              = 'BlockSquare',
+                    position          = {
+                        x = position.x,
+                        y = position.y,
+                        z = position.z + ((SetupColor.HAND.ACTIVE.SCALE.z / 2) + 1) * (position.z < 1 and 1 or -1)
+                    },
+                    rotation          = rotation,
+                    scale             = {
+                        x = SetupColor.HAND.ACTIVE.SCALE.x * 1.5,
+                        y = SetupColor.HAND.ACTIVE.SCALE.y * 1.4,
+                        z = 0.1
+                    },
+                    callback_function = function(object) object.setLock(true) end,
+                    sound             = false,
+                    params            = nil,
+                    snap_to_grid      = false,
+                })
+                wall.setName(invisibleHandWallName)
+                wall.setDescription('')
+                wall.setColorTint({ r = 1, g = 0, b = 0, a = 0.5 })
+                wall.tooltip = false
+            end
         else
             local nonPlayerIndex = (i - playerCount) - 1
             Player[color].setHandTransform({
@@ -1455,18 +1510,8 @@ function unpackFactionCoroutine()
 
     -- Delete the unpack button object AFTER we've found the box to unpack.
     if params.unpackButtonGuid then
-        local deletedItems = false
-        for _, object in ipairs(getAllObjects()) do
-            if object.tag == 'Bag' and object.getName() == 'TI4 Deleted Items' then
-                deletedItems = object
-                break
-            end
-        end
-        if deletedItems then
-            deletedItems.call('ignoreGuid', params.unpackButtonGuid)
-        end
         local unpackButton = assert(getObjectFromGUID(params.unpackButtonGuid))
-        destroyObject(unpackButton)
+        _safeDestroyObject(unpackButton)
         coroutine.yield(0)
     end
 
@@ -1681,18 +1726,8 @@ function unpackFrankenCoroutine()
     end
 
     if params.unpackButtonGuid then
-        local deletedItems = false
-        for _, object in ipairs(getAllObjects()) do
-            if object.tag == 'Bag' and object.getName() == 'TI4 Deleted Items' then
-                deletedItems = object
-                break
-            end
-        end
-        if deletedItems then
-            deletedItems.call('ignoreGuid', params.unpackButtonGuid)
-        end
         local unpackButton = assert(getObjectFromGUID(params.unpackButtonGuid))
-        destroyObject(unpackButton)
+        _safeDestroyObject(unpackButton)
         coroutine.yield(0)
     end
 

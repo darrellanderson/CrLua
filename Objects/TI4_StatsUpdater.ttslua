@@ -15,7 +15,23 @@ local HEX_COLOR = {
     White = 'e0e0e0',
     Blue = '2255ee',
     Purple = '9b59b6',
-    Yellow = 'dddd00'
+    Yellow = 'dddd00',
+    Brown = '703A16',
+}
+
+-- For the log chat pad left with spaces so things line up.  Using strlen
+-- is okay, but can do better.  Just specify manually here.
+local PREFIX = {
+    LABEL = '            ',
+    Red = '      ',
+    Green = '  ',
+    Orange = '',
+    Pink = '    ',
+    White = '  ',
+    Blue = '    ',
+    Purple = ' ',
+    Yellow = ' ',
+    Brown = '  ',
 }
 
 local PERIODIC_SECONDS = 5
@@ -374,7 +390,7 @@ function updateNotesCoroutine()
     -- Assemble the collections of strings for each row.
     local rows = {
         {
-            '[' .. HEX_COLOR.LABEL .. ']',
+            PREFIX.LABEL .. '[' .. HEX_COLOR.LABEL .. ']',
             'VP',
             'R',
             'I',
@@ -400,7 +416,7 @@ function updateNotesCoroutine()
         local numTactics, numFleet, numStrategy = countCommandTokens(color, commandTokenPositions)
 
         table.insert(rows, {
-            '[' .. HEX_COLOR[color] .. ']' .. color,
+            PREFIX[color] .. '[' .. HEX_COLOR[color] .. ']' .. color,
             string.format('%d', score),
             string.format('%d/%d', resourcesUp, resources),
             string.format('%d/%d', influenceUp, influence),
@@ -433,32 +449,21 @@ function updateNotesCoroutine()
         return result
     end
 
-    local function leftPad(str, size)
-        local d = math.max(size - string.len(str), 0)
-        local result = str
-        local padChar = '  '
-        for _ = 1, d do
-            result = padChar .. result
-        end
-        return result
-    end
-
     local gap = '    '
     for i, row in ipairs(rows) do
         for j, col in ipairs(row) do
             if j > 1 then
                 row[j] = pad(row[j], colWidth[j])
-            else
-                row[j] = leftPad(row[j], colWidth[j])
             end
         end
         rows[i] = table.concat(row, gap) .. ' '
     end
 
     -- Optionally print to console, do this before prepending empty lines!
+    -- Prepend a throwaway line in case timestamp prefix or something.
     if _logNext then
         _logNext = false
-        local logMessage = table.concat(rows, '\n')
+        local logMessage = 'TI Stats:\n' .. table.concat(rows, '\n')
         printToAll(logMessage)
     end
 

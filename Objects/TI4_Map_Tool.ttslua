@@ -715,7 +715,7 @@ function count_slices(count)
         end
         table.sort(candidates, function(a, b) return a.dSq < b.dSq end)
         local d = candidates[2].dSq - candidates[1].dSq
-        return d > 0.1 and candidates[1].index or false
+        return d > 1 and candidates[1].index or false
     end
 
     for system, object in pairs(getPlacedSystemToObject()) do

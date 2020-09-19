@@ -78,8 +78,8 @@ local SYSTEM_BAG_GUIDS = {
 
 local _mapString = false
 
--- Remember where tiles came from to put them back.
-local _tileGuidToBagBuid = {}
+-- Remember which tiles got cloned for repeated map string entries.
+local _tileClonesGuidSet = {}
 
 -------------------------------------------------------------------------------
 
@@ -309,12 +309,17 @@ function placeTilesCoroutine()
     local positionIterator = getSystemPositionsStartingAtOriginIterator(dy)
     local rotation = { x = 0, y = 180, z = 0 }
 
+    local placedTileSet = {}
+
     for i, tile in ipairs(buildList) do
         local position = positionIterator()
         if tile ~= 0 then
             local system = tileToSystem[tile]
-            if system then
-                if not system.home then
+            if system and not system.home then
+                if placedTileSet[tile] then
+                    _cloneSystem(system, position, rotation)
+                else
+                    placedTileSet[tile] = true
                     local bag = systemGuidToBag[system.guid]
                     placeTile(system, bag, position, rotation)
                 end
@@ -331,17 +336,17 @@ function placeTile(system, bag, position, rotation)
     assert(type(system) == 'table' and (not bag or type(bag) == 'userdata'))
     assert(type(position) == 'table' and type(rotation) == 'table')
 
-    local function doLock(object)
-        object.setLock(true)
-        object.use_hands = false
-    end
-
     local function delayedLock(object)
+        local function doLock(object)
+            object.setLock(true)
+            object.use_hands = false
+        end
         Wait.time(function() doLock(object) end, 1)
     end
 
+    local object = false
     if bag then
-        local object = bag.takeObject({
+        object = bag.takeObject({
             position          = position,
             rotation          = rotation,
             callback_function = delayedLock,
@@ -351,7 +356,7 @@ function placeTile(system, bag, position, rotation)
         assert(object)
     else
         -- Look on table for object.
-        local object = getObjectFromGUID(system.guid)
+        object = getObjectFromGUID(system.guid)
         object.setLock(false)
         if object then
             local collide = false
@@ -363,6 +368,46 @@ function placeTile(system, bag, position, rotation)
             broadcastToAll('cannot find system tile for ' .. system.string, 'Red')
         end
     end
+end
+
+function _cloneSystem(system, position, rotation)
+    local primary = assert(getObjectFromGUID(system.guid))
+
+    -- Clone the system tile object.
+    local clone = primary.clone({
+        position = {
+            x = position.x,
+            y = position.y + 3,
+            z = position.z
+        },
+        snap_to_grid = true,
+    })
+    local collide = false
+    local fast = true
+    clone.setPositionSmooth(position, collide, fast)
+    clone.setRotationSmooth(rotation, collide, fast)
+
+    -- Wait for TTS to assign a new guid.
+    while clone.getGUID() == system.guid do
+        coroutine.yield(0)
+    end
+
+    _tileClonesGuidSet[clone.getGUID()] = true
+
+    -- Add to system helper.
+    local clonedSystem = {}
+    for k, v in pairs(system) do
+        if k == 'guid' then
+            clonedSystem.guid = clone.getGUID()
+        elseif k == 'tile' then
+            clonedSystem.tile = -1
+        else
+            clonedSystem[k] = v
+        end
+    end
+    _systemHelper.injectHomebrewSystems({
+        [clonedSystem.guid] = clonedSystem
+    })
 end
 
 function onButtonClearTiles(_, color)
@@ -380,14 +425,19 @@ function clearTilesCoroutine()
         broadcastToAll('Cannot find blue planet tiles bag')
     end
     for system, object in pairs(getPlacedSystemToObject()) do
-        if not system.home then
+        local guid = object.getGUID()
+        if _tileClonesGuidSet[guid] then
+            _tileClonesGuidSet[guid] = nil
+            _systemHelper.removeHomebrewSystems({ guid })
+            _safeDestroyObject(object)
+        elseif not system.home then
             local hasPlanets = system.planets and #system.planets > 0
             local bag = hasPlanets and blueBag or redBag
             object.setLock(false)
             object.use_hands = true
             bag.putObject(object)
-            coroutine.yield(0)
         end
+        coroutine.yield(0)
     end
     return 1
 end
@@ -474,28 +524,40 @@ local function getPlanetNameToCardOrDeckAndEntryGuid()
     for _, planet in pairs(_systemHelper.planets()) do
         planetNameSet[planet.name] = true
     end
+
     local planetNameToCardOrDeckAndEntryGuid = {}
+    local extras = {}
+
+    local function addResult(name, value)
+        if planetNameToCardOrDeckAndEntryGuid[name] then
+            -- Already have this planet.
+            table.insert(extras, value)
+        else
+            planetNameToCardOrDeckAndEntryGuid[name] = value
+        end
+    end
+
     for _, object in ipairs(getAllObjects()) do
         local name = object.getName()
         if object.tag == 'Card' and planetNameSet[name] then
-            planetNameToCardOrDeckAndEntryGuid[name] = {
+            addResult(name, {
                 card = object,
                 deck = false,
                 entryGuid = false
-            }
+            })
         elseif object.tag == 'Deck' then
             for _, entry in ipairs(object.getObjects()) do
                 if planetNameSet[entry.name] then
-                    planetNameToCardOrDeckAndEntryGuid[entry.name] = {
+                    addResult(entry.name, {
                         card = false,
                         deck = object,
                         entryGuid = entry.guid
-                    }
+                    })
                 end
             end
         end
     end
-    return planetNameToCardOrDeckAndEntryGuid
+    return planetNameToCardOrDeckAndEntryGuid, extras
 end
 
 function placeCardsCoroutine()
@@ -511,21 +573,56 @@ function placeCardsCoroutine()
         object.setLock(true)
     end
 
+    -- Build a map from planet name to positionS plural, in case repeated.
+    local planetToTransforms = {}
     for system, object in pairs(getPlacedSystemToObject()) do
         if not system.home then
             for _, planet in ipairs(system.planets or {}) do
-                local cardOrDeckAndEntryGuid = planetNameToCardOrDeckAndEntryGuid[planet.name]
-                if cardOrDeckAndEntryGuid then
-                    local position = object.positionToWorld(planet.position)
-                    position.y = position.y + 3
-                    local rotation = object.getRotation()
-                    rotation.z = 180
-                    placeCard(position, rotation, cardOrDeckAndEntryGuid.card, cardOrDeckAndEntryGuid.deck, cardOrDeckAndEntryGuid.entryGuid)
+                local entry = planetToTransforms[planet.name]
+                if not entry then
+                    entry = {}
+                    planetToTransforms[planet.name] = entry
+                end
+                local pos = object.positionToWorld(planet.position)
+                local rot = object.getRotation()
+                table.insert(entry, {
+                    position = { x = pos.x, y = pos.y + 3, z = pos.z },
+                    rotation = { x = rot.x, y = rot.y, z = 180 }
+                })
+            end
+        end
+    end
+
+    -- Place cards.
+    for planetName, transforms in pairs(planetToTransforms) do
+        local cardOrDeckAndEntryGuid = planetNameToCardOrDeckAndEntryGuid[planetName]
+        if cardOrDeckAndEntryGuid then
+            local card = cardOrDeckAndEntryGuid.card
+            local deck = cardOrDeckAndEntryGuid.deck
+            local entryGuid = cardOrDeckAndEntryGuid.entryGuid
+            for i, transform in ipairs(transforms) do
+                local pos = transform.position
+                local rot = transform.rotation
+                if i == 1 then
+                    -- The first time placing a planet get it from the source.
+                    card = placeCard(pos, rot, card, deck, entryGuid)
+                    deck = false
+                    entryGuid = false
                 else
-                    broadcastToAll('Missing card for "' .. planet.name .. '"', 'Red')
+                    -- Make clones for extra copies.
+                    assert(card and card.tag == 'Card')
+                    local clone = card.clone({
+                        position     = pos,
+                        snap_to_grid = false,
+                    })
+                    local collide = false
+                    local fast = true
+                    clone.setRotationSmooth(rot, collide, fast)
                 end
                 coroutine.yield(0)
             end
+        else
+            broadcastToAll('Missing card for "' .. planet.name .. '"', 'Red')
         end
     end
 
@@ -539,7 +636,7 @@ function placeCardsCoroutine()
             local fast = true
             custodiansToken.setPositionSmooth(p, collide, fast)
         end
-        Wait.time(delayedLiftCustodians, 5)
+        Wait.time(delayedLiftCustodians, 3)
     end
 
     return 1
@@ -563,7 +660,7 @@ function placeCard(position, rotation, card, deck, entryGuid)
         card.setPositionSmooth(position, collide, fast)
         card.setRotationSmooth(rotation, collide, fast)
     elseif deck and entryGuid then
-        deck.takeObject({
+        card = deck.takeObject({
             guid     = entryGuid,
             position = position,
             rotation = rotation,
@@ -572,6 +669,7 @@ function placeCard(position, rotation, card, deck, entryGuid)
     else
         error('no card')
     end
+    return card
 end
 
 function onButtonReturnCards(_, color)
@@ -581,28 +679,48 @@ end
 function returnCardsCoroutine()
     broadcastToAll('Returning planet cards')
 
-    local planetNameToCardOrDeckAndEntryGuid = getPlanetNameToCardOrDeckAndEntryGuid()
+    local planetNameToCardOrDeckAndEntryGuid, extras = getPlanetNameToCardOrDeckAndEntryGuid()
     coroutine.yield(0)
 
-    local index = 1
+    -- Destroy any extras.
+    for _, extra in ipairs(extras) do
+        if extra.card then
+            _safeDestroyObject(extra.card)
+        else
+            extra.deck.takeObject({
+                guid = extra.entryGuid,
+                callback_function = _safeDestroyObject
+            })
+        end
+        coroutine.yield(0)
+    end
+
+    -- Get the SET of planet names, ignore duplicates (handled by extras above).
+    local planetNameSet = {}
     for system, object in pairs(getPlacedSystemToObject()) do
         if not system.home then
             for _, planet in ipairs(system.planets or {}) do
-                local cardOrDeckAndEntryGuid = planetNameToCardOrDeckAndEntryGuid[planet.name]
-                if cardOrDeckAndEntryGuid then
-                    _deckHelper.discardCard({
-                        guid = cardOrDeckAndEntryGuid.card.getGUID(),
-                        name = cardOrDeckAndEntryGuid.card.getName(),
-                        containerGuid = cardOrDeckAndEntryGuid.deck and cardOrDeckAndEntryGuid.deck.getGUID() or nil,
-                        index = index
-                    })
-                    index = index + 1
-                else
-                    broadcastToAll('Missing card for "' .. planet.name .. '"', 'Red')
-                end
-                coroutine.yield(0)
+                planetNameSet[planet.name] = true
             end
         end
+    end
+    coroutine.yield(0)
+
+    local index = 1
+    for planetName, _ in pairs(planetNameSet) do
+        local cardOrDeckAndEntryGuid = planetNameToCardOrDeckAndEntryGuid[planetName]
+        if cardOrDeckAndEntryGuid then
+            _deckHelper.discardCard({
+                guid = cardOrDeckAndEntryGuid.card and cardOrDeckAndEntryGuid.card.getGUID() or cardOrDeckAndEntryGuid.entryGuid,
+                name = planetName,
+                containerGuid = cardOrDeckAndEntryGuid.deck and cardOrDeckAndEntryGuid.deck.getGUID() or nil,
+                index = index
+            })
+            index = index + 1
+        else
+            broadcastToAll('Missing card for "' .. planet.name .. '"', 'Red')
+        end
+        coroutine.yield(0)
     end
     return 1
 end
@@ -824,6 +942,25 @@ end
 -------------------------------------------------------------------------------
 -- Helpers
 -------------------------------------------------------------------------------
+
+local _deletedItemsBagGuid = false
+function _safeDestroyObject(object)
+    assert(type(object) == 'userdata')
+    local deletedItems = _deletedItemsBagGuid and getObjectFromGUID(_deletedItemsBagGuid)
+    if not deletedItems then
+        for _, object in ipairs(getAllObjects()) do
+            if object.tag == 'Bag' and object.getName() == 'TI4 Deleted Items' then
+                _deletedItemsBagGuid = object.getGUID()
+                deletedItems = object
+                break
+            end
+        end
+    end
+    if deletedItems then
+        deletedItems.call('ignoreGuid', object.getGUID())
+    end
+    destroyObject(object)
+end
 
 function parseMapString(input)
     assert(type(input) == 'string')

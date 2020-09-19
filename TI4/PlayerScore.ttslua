@@ -211,7 +211,12 @@ function CrLua.TI4.PlayerScore.score(scoreboard, ownerToken)
     -- Scoreboard local space x.
     local p = scoreboard.positionToLocal(ownerToken.getPosition())
     local u = -(p.x - 3.25) / 6.5
-    return u * (scoreboard.is_face_down and 15 or 11)
+    local limit = 11
+    if scoreboard.is_face_down then
+        u = 1 - u
+        limit = 15
+    end
+    return math.floor(u * limit)
 end
 
 function CrLua.TI4.PlayerScore.colorToScore(nameToScoreObjects, nameToOwnerTokens)
@@ -244,7 +249,7 @@ function CrLua.TI4.PlayerScore.colorToScore(nameToScoreObjects, nameToOwnerToken
         local color = ownerTokenNameToColor[ownerToken.getName()]
         assert(color)
         local score = CrLua.TI4.PlayerScore.score(scoreboard, ownerToken)
-        colorToScore[color] = math.floor(math.max(colorToScore[color] or 0, score))
+        colorToScore[color] = math.max(colorToScore[color] or 0, score)
     end
     return colorToScore
 end

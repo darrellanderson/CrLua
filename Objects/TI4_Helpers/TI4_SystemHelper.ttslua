@@ -508,23 +508,30 @@ function wormholes()
         ['delta'] = {},
     }
 
-    -- Systems.
-    for guid, system in pairs(_systems) do
-        for _, wormhole in ipairs(system.wormholes or {}) do
-            table.insert(result[wormhole], guid)
-        end
-    end
-
-    -- Wormhole objects.
-    local objectNameToWormhole = {
-        ['Alpha Wormhole Token'] = 'alpha',
-        ['Beta Wormhole Token'] = 'beta',
-        ['Hil Colish'] = 'delta',
+    -- Non-system wormhole objects.
+    local objectNameToNonSystemWormholes = {
+        ['Alpha Wormhole Token'] = { 'alpha' },
+        ['Beta Wormhole Token'] = { 'beta' },
+        ['Hil Colish'] = { 'delta' },
     }
+
     for _, object in ipairs(getAllObjects()) do
-        local wormhole = objectNameToWormhole[object.getName()]
-        if wormhole then
-            table.insert(result[wormhole], object.getGuid())
+        if object.tag ~= 'Bag' then
+            local guid = object.getGUID()
+            local name = object.getName()
+
+            local system = _systems[guid]
+            local nonSystemWormholes = objectNameToNonSystemWormholes[name]
+
+            if system then
+                for _, wormhole in ipairs(system.wormholes or {}) do
+                    table.insert(result[wormhole], guid)
+                end
+            elseif nonSystemWormholes then
+                for _, wormhole in ipairs(nonSystemWormholes) do
+                    table.insert(result[wormhole], guid)
+                end
+            end
         end
     end
 
@@ -544,12 +551,40 @@ end
 --- Let homebrew add custom systems via runtime injection.
 -- @param systems: table mapping from guid to system table.
 function injectHomebrewSystems(systems)
+    assert(type(systems) == 'table')
+
+    -- Unclear if the systems are shared with the caller, make a copy to be
+    -- sure any later mutations to the caller's version does not change this.
+    local function copyTable(t)
+        if t and type(t) == 'table' then
+            local copy = {}
+            for k, v in pairs(t) do
+                copy[k] = type(v) == 'table' and copyTable(v) or v
+            end
+            t = copy
+        end
+        return t
+    end
+    systems = copyTable(systems)
+
     for guid, system in pairs(systems) do
         local success, errorMessage = _systemIsValid(system)
         if not success then
             error('injectSystems: ' .. guid .. ' ' .. errorMessage)
         end
+        system._homebrew = true
         _systems[guid] = system
+    end
+end
+
+--- Remove systems by guid.
+-- @param guid table : list of guids
+function removeHomebrewSystems(guids)
+    assert(type(guids) == 'table')
+    for _, guid in ipairs(guids) do
+        local system = _systems[guid]
+        assert(system._homebrew)  -- prevent removing non-homebrew entries
+        _systems[guid] = nil
     end
 end
 
@@ -957,9 +992,15 @@ function onObjectDrop(playerColor, object)
     systemObject.highlightOn(playerColor, 30)
 
     -- Tell any interested parties.
+    local reportTo = {}
     for _, object in ipairs(getAllObjects()) do
         if object.getVar('onSystemActivation') then
-            object.call('onSystemActivation', system)
+            table.insert(reportTo, object)
         end
+    end
+    for i, object in ipairs(reportTo) do
+        -- Wrap each in a separate 'Wait' instance so if one fails the rest go ahead.
+        -- Since that is happening, also spread out over N frames.
+        Wait.frames(function() object.call('onSystemActivation', system) end, i)
     end
 end

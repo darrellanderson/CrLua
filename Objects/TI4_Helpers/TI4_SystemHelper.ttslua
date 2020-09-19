@@ -572,6 +572,7 @@ function injectHomebrewSystems(systems)
         if not success then
             error('injectSystems: ' .. guid .. ' ' .. errorMessage)
         end
+        system.guid = nil  -- force rebuild of any auto-generated fields
         system._homebrew = true
         _systems[guid] = system
     end

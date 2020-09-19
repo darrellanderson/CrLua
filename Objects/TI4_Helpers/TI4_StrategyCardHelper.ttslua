@@ -418,6 +418,7 @@ function _returnStrategyCard(strategyCard)
         local collide = false
         local fast = true
         local abovePos = { x = position.x, y = position.y + 1, z = position.z}
+        strategyCard.setLock(false)  -- paranoia
         strategyCard.setPositionSmooth(abovePos, collide, fast)
         strategyCard.setRotationSmooth(rotation, collide, fast)
         if playerColor then
@@ -531,6 +532,7 @@ function _returnCommandTokens(playerColor, commandTokens, commandTokensBag, zone
     local guidToZone = _zoneHelper.zonesFromPositions(guidToPosition)
     for guid, commandToken in pairs(guidToCommandToken) do
         if not guidToZone[guid] or insideException(commandToken.getPosition()) then
+            commandToken.setLock(false)  -- paranoia
             _putTokenGuidSet[guid] = true
             commandTokensBag.putObject(commandToken)
         end
@@ -644,6 +646,7 @@ function _moveSpeakerAgendaToken()
             rot.y = (rot.y + 180) % 360
             local collide = false
             local fast = true
+            speakerTokenAgenda.setLock(false)  -- paranoia
             speakerTokenAgenda.setPositionSmooth(pos, collide, fast)
             speakerTokenAgenda.setRotationSmooth(rot, collide, fast)
         end

@@ -730,7 +730,7 @@ function dealCoroutine()
 
                 -- Give set position smooth time to work.
                 local waitUntil = Time.time + 1
-                while Time.time < waitUntil or (not discard.resting) do
+                while Time.time < waitUntil or discard.isSmoothMoving() do
                     coroutine.yield(0)
                 end
 

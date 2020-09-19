@@ -98,7 +98,7 @@ function getTokens(tokenType)
     assert(type(tokenType) == 'string')
 
     local tokens = {}
-    local tokenPattern = '^(.*) ' .. tokenType .. ' Token'
+    local tokenPattern = '^(.*) ' .. tokenType .. ' Token$'
     for _, object in ipairs(getAllObjects()) do
         if string.match(object.getName(), tokenPattern) then
             table.insert(tokens, object)

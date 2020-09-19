@@ -340,26 +340,24 @@ end
 local function _getTransform(deckAttributes, deckOrDiscard)
     assert(type(deckAttributes) == 'table' and type(deckOrDiscard) == 'string')
 
-    -- Get the requested transform.  If the request is for 'discard' and the
-    -- deck does not have a discard, use the main deck instead.
+    -- Get the requested transform.
     local transform = deckAttributes.transform[deckOrDiscard]
-    if not transform and deckOrDiscard == 'discard' then
-        transform = deckAttributes.transform['deck']
-    end
-    local parent = _getParent(deckAttributes.transform.parent)
-    local parentRot = parent and parent.getRotation()
-    return {
-        position = parent and parent.positionToWorld(transform.position) or {
-            x = transform.position.x,  -- make a copy, caller may mutate!
-            y = transform.position.y,
-            z = transform.position.z
-        },
-        rotation = {
-            x = transform.rotation.x + (parentRot and parentRot.x) or 0,
-            y = transform.rotation.y + (parentRot and parentRot.y) or 0,
-            z = transform.rotation.z + (parentRot and parentRot.z) or 0,
+    if transform then
+        local parent = _getParent(deckAttributes.transform.parent)
+        local parentRot = parent and parent.getRotation()
+        return {
+            position = parent and parent.positionToWorld(transform.position) or {
+                x = transform.position.x,  -- make a copy, caller may mutate!
+                y = transform.position.y,
+                z = transform.position.z
+            },
+            rotation = {
+                x = transform.rotation.x + (parentRot and parentRot.x) or 0,
+                y = transform.rotation.y + (parentRot and parentRot.y) or 0,
+                z = transform.rotation.z + (parentRot and parentRot.z) or 0,
+            }
         }
-    }
+    end
 end
 
 local function _getDeck(deckTransform)
@@ -390,11 +388,8 @@ end
 function getDeck(name)
     assert(type(name) == 'string')
     local deckAttributes = DECKS[name]
-    if not deckAttributes then
-        error('no such deck "' .. name .. '"')
-    end
-    local deckTransform = _getTransform(deckAttributes, 'deck')
-    local deck = _getDeck(deckTransform)
+    local deckTransform = deckAttributes and _getTransform(deckAttributes, 'deck')
+    local deck = deckTransform and _getDeck(deckTransform)
     return deck and deck.getGUID()
 end
 
@@ -437,7 +432,11 @@ function _processCardDiscardQueue()
     end
 
     local deckAttributes = assert(params.deckAttributes)
-    local transform = assert(_getTransform(deckAttributes, 'discard'))
+    local transform = _getTransform(deckAttributes, 'discard')
+    if not transform then
+        transform = _getTransform(deckAttributes, 'deck')
+    end
+
     transform.position.y = transform.position.y + 3 + (params.index or 0) / 10
 
     local container = false
@@ -494,6 +493,9 @@ function _processCardDiscardQueue()
         local function delayedShuffle()
             deckAttributes._waitShuffleId = nil
             local transform = _getTransform(deckAttributes, 'discard')
+            if not transform then
+                transform = _getTransform(deckAttributes, 'deck')
+            end
             local deck = _getDeck(transform)
             if deck and deck.tag == 'Deck' then
                 deck.shuffle()
@@ -711,7 +713,7 @@ function dealCoroutine()
         -- If not able to deal all cards shuffle discard.
         if params.count > 0 then
             local discardTransform = _getTransform(params.deckAttributes, 'discard')
-            local discard = _getDeck(discardTransform)
+            local discard = discardTransform and _getDeck(discardTransform)
 
             if discard then
                 local bounds = discard.getBoundsNormalized()
@@ -725,6 +727,12 @@ function dealCoroutine()
                 discard.setRotationSmooth(deckTransform.rotation, collide, fast)
                 discard.setName(params.deckAttributes.deckName)
                 coroutine.yield(0)
+
+                -- Give set position smooth time to work.
+                local waitUntil = Time.time + 1
+                while Time.time < waitUntil or (not discard.resting) do
+                    coroutine.yield(0)
+                end
 
                 if discard.tag == 'Deck' then
                     discard.shuffle()
@@ -798,8 +806,6 @@ function onObjectEnterContainer(container, enterObject)
     end
 end
 
--------------------------------------------------------------------------------
-
 function onObjectDestroy(dyingObject)
     local guid = dyingObject.getGUID()
     if _waitForDestroy[guid] then
@@ -808,8 +814,6 @@ function onObjectDestroy(dyingObject)
         callback()
     end
 end
-
--------------------------------------------------------------------------------
 
 function onObjectDrop(playerColor, droppedObject)
     if droppedObject.tag == 'Card' then

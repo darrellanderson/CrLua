@@ -968,13 +968,8 @@ function hexNeighbors(hex)
     }
 end
 
-function hexAdjacentsIncludeWormholes(hex)
+function hexAdjacentWormholes(hex)
     assert(type(hex) == 'string')
-
-    local adjacentSet = {}
-    for _, neighborHex in ipairs(hexNeighbors(hex)) do
-        adjacentSet[neighborHex] = true
-    end
 
     local wormholes = wormholes()
     local wormholesInThisHexSet = {}
@@ -991,6 +986,7 @@ function hexAdjacentsIncludeWormholes(hex)
         end
     end
 
+    local adjacentSet = {}
     for wormhole, _ in pairs(wormholesInThisHexSet) do
         for _, connected in ipairs(wormholes[wormhole].connected) do
             for wormholeHex, _ in pairs(wormholeToHexSet[connected]) do

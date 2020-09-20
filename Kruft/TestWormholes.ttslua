@@ -24,14 +24,17 @@ function testWormholes()
     print('testWormholes')
 
     local guidToSystem = _systemHelper.systems()
-    local wormholeToGuids = _systemHelper.wormholes()
+    local wormholes = _systemHelper.wormholes()
 
-    for wormhole, guids in pairs(wormholeToGuids) do
+    for wormhole, state in pairs(wormholes) do
         print('WORMHOLE ' .. wormhole .. ':')
-        for i, guid in ipairs(guids) do
+        for i, guid in ipairs(state.guids) do
             local system = guidToSystem[guid]
             local object = getObjectFromGUID(guid)
             print(i .. ':' .. guid .. ' ' .. (system and system.string or object.getName()))
+        end
+        for i, connected in ipairs(state.connected) do
+            print(i .. ':' .. connected)
         end
     end
 
@@ -45,5 +48,19 @@ function testWormholes()
     print('hex[]: ' .. guidToHex['abcd'])
 
     local hexes = _systemHelper.hexNeighbors(hex)
-    print('hexes: ' .. table.concat(hexes, ' '))
+    print('hexNeighbors: ' .. table.concat(hexes, ' '))
+
+    local hexes = _systemHelper.hexAdjacentWormholes(hex)
+    print('hexAdjacentWormholes: ' .. table.concat(hexes, ' '))
 end
+
+-------------------------------------------------------------------------------
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

@@ -24,6 +24,7 @@ function getHelperClient(helperObjectName)
     end
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
+local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
@@ -503,10 +504,32 @@ end
 --- Get map from wormhole type to object guids.
 function wormholes()
     local result = {
-        ['alpha'] = {},
-        ['beta'] = {},
-        ['delta'] = {},
+        ['alpha'] = {
+            guids = {},
+            connected = { 'alpha' }
+        },
+        ['beta'] = {
+            guids = {},
+            connected = { 'beta' }
+        },
+        ['delta'] = {
+            guids = {},
+            connected = { 'delta' }
+        },
     }
+
+    local function addGuid(wormhole, guid)
+        table.insert(result[wormhole].guids, guid)
+    end
+
+    local function addConnection(src, dst)
+        for _, existing in ipairs(result[src].connected) do
+            if existing == dst then
+                return
+            end
+        end
+        table.insert(result[src].connected, dst)
+    end
 
     -- Non-system wormhole objects.
     local objectNameToNonSystemWormholes = {
@@ -524,13 +547,19 @@ function wormholes()
             local nonSystemWormholes = objectNameToNonSystemWormholes[name]
 
             if system then
+                _fillMissingSystemData(guid, system)
                 for _, wormhole in ipairs(system.wormholes or {}) do
-                    table.insert(result[wormhole], guid)
+                    addGuid(wormhole, guid)
                 end
             elseif nonSystemWormholes then
                 for _, wormhole in ipairs(nonSystemWormholes) do
-                    table.insert(result[wormhole], guid)
+                    addGuid(wormhole, guid)
                 end
+            end
+
+            if name == 'Wormhole Reconstruction' and (not object.is_face_down) and (not _deckHelper.isDiscard(guid)) then
+                addConnection('alpha', 'beta')
+                addConnection('beta', 'alpha')
             end
         end
     end
@@ -833,6 +862,14 @@ function _fillMissingSystemData(guid, system)
             planet.position, planet.radius = _planetPosition(system, zoneBorders, i)
         end
     end
+
+    -- If a system has face-up/face-down wormholes, reset wormholes based on state.
+    if system.faceUpWormholes or system.faceDownWormholes then
+        local systemObject = getObjectFromGUID(guid)
+        if systemObject then
+            system.wormholes = system.is_face_down and system.faceDownWormholes or system.faceUpWormholes
+        end
+    end
 end
 
 -------------------------------------------------------------------------------
@@ -931,6 +968,46 @@ function hexNeighbors(hex)
     }
 end
 
+function hexAdjacentsIncludeWormholes(hex)
+    assert(type(hex) == 'string')
+
+    local adjacentSet = {}
+    for _, neighborHex in ipairs(hexNeighbors(hex)) do
+        adjacentSet[neighborHex] = true
+    end
+
+    local wormholes = wormholes()
+    local wormholesInThisHexSet = {}
+    local wormholeToHexSet = {}
+    for wormhole, state in pairs(wormholes) do
+        wormholeToHexSet[wormhole] = {}
+        for _, guid in ipairs(state.guids) do
+            local object = getObjectFromGUID(guid)
+            local wormholeHex = hexFromPosition(object.getPosition())
+            if hex == wormholeHex then
+                wormholesInThisHexSet[wormhole] = true
+            end
+            wormholeToHexSet[wormhole][wormholeHex] = true
+        end
+    end
+
+    for wormhole, _ in pairs(wormholesInThisHexSet) do
+        for _, connected in ipairs(wormholes[wormhole].connected) do
+            for wormholeHex, _ in pairs(wormholeToHexSet[connected]) do
+                adjacentSet[wormholeHex] = true
+            end
+        end
+    end
+
+    local result = {}
+    for adjacentHex, _ in pairs(adjacentSet) do
+        if adjacentHex ~= hex then
+            table.insert(result, adjacentHex)
+        end
+    end
+    return result
+end
+
 -------------------------------------------------------------------------------
 
 local _activatedSystem = false
@@ -1005,3 +1082,14 @@ function onObjectDrop(playerColor, object)
         Wait.frames(function() object.call('onSystemActivation', system) end, i)
     end
 end
+
+-------------------------------------------------------------------------------
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

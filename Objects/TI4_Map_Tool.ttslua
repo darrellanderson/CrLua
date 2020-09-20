@@ -80,6 +80,7 @@ local _mapString = false
 
 -- Remember which tiles got cloned for repeated map string entries.
 local _tileClonesGuidSet = {}
+local _hasCloneMenuGuidSet = {}
 
 -------------------------------------------------------------------------------
 
@@ -108,7 +109,32 @@ end
 
 function onLoad()
     createInputs()
+    self.addContextMenuItem('Add Clone To Tiles', addCloneMenuOptionToSystemTiles)
 end
+
+function onObjectDestroy(dyingObject)
+    _hasCloneMenuGuidSet[dyingObject.getGUID()] = nil
+end
+
+function addCloneMenuOptionToSystemTiles()
+    local guidToSystem = _systemHelper.systems()
+    for _, object in ipairs(getAllObjects()) do
+        local guid = object.getGUID()
+        local system = guidToSystem[guid]
+        if system and not _hasCloneMenuGuidSet[guid] then
+            local function cloneSystemTile()
+                local position = object.getPosition()
+                position.y = position.y + 5
+                local rotation = object.getRotation()
+                _cloneSystem(system, position, rotation, false)
+            end
+            object.addContextMenuItem('Clone System Tile', cloneSystemTile)
+            _hasCloneMenuGuidSet[guid] = true
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
 
 function createInputs()
     local buttonY = 0.2
@@ -317,7 +343,7 @@ function placeTilesCoroutine()
             local system = tileToSystem[tile]
             if system and not system.home then
                 if placedTileSet[tile] then
-                    _cloneSystem(system, position, rotation)
+                    _cloneSystem(system, position, rotation, true)
                 else
                     placedTileSet[tile] = true
                     local bag = systemGuidToBag[system.guid]
@@ -332,17 +358,17 @@ function placeTilesCoroutine()
     return 1
 end
 
+local function delayedLock(object)
+    local function doLock(object)
+        object.setLock(true)
+        object.use_hands = false
+    end
+    Wait.time(function() doLock(object) end, 3)
+end
+
 function placeTile(system, bag, position, rotation)
     assert(type(system) == 'table' and (not bag or type(bag) == 'userdata'))
     assert(type(position) == 'table' and type(rotation) == 'table')
-
-    local function delayedLock(object)
-        local function doLock(object)
-            object.setLock(true)
-            object.use_hands = false
-        end
-        Wait.time(function() doLock(object) end, 1)
-    end
 
     local object = false
     if bag then
@@ -370,7 +396,8 @@ function placeTile(system, bag, position, rotation)
     end
 end
 
-function _cloneSystem(system, position, rotation)
+function _cloneSystem(system, position, rotation, lock)
+    assert(type(system) == 'table' and type(position) == 'table' and type(rotation) == 'table' and type(lock) == 'boolean')
     local primary = assert(getObjectFromGUID(system.guid))
 
     -- Clone the system tile object.
@@ -382,32 +409,37 @@ function _cloneSystem(system, position, rotation)
         },
         snap_to_grid = true,
     })
+    clone.setLock(false)
     local collide = false
     local fast = true
     clone.setPositionSmooth(position, collide, fast)
     clone.setRotationSmooth(rotation, collide, fast)
-
-    -- Wait for TTS to assign a new guid.
-    while clone.getGUID() == system.guid do
-        coroutine.yield(0)
+    if lock then
+        delayedLock(clone)
     end
 
-    _tileClonesGuidSet[clone.getGUID()] = true
+    local function cloneReady()
+        return clone.getGUID() ~= system.guid
+    end
 
-    -- Add to system helper.
-    local clonedSystem = {}
-    for k, v in pairs(system) do
-        if k == 'guid' then
-            clonedSystem.guid = clone.getGUID()
-        elseif k == 'tile' then
-            clonedSystem.tile = -1
-        else
-            clonedSystem[k] = v
+    local function injectClone()
+        _tileClonesGuidSet[clone.getGUID()] = true
+
+        -- Add to system helper.  Keep the same tile number for map string generation.
+        local clonedSystem = {}
+        for k, v in pairs(system) do
+            if k == 'guid' then
+                clonedSystem.guid = clone.getGUID()
+            else
+                clonedSystem[k] = v
+            end
         end
+        _systemHelper.injectHomebrewSystems({
+            [clonedSystem.guid] = clonedSystem
+        })
     end
-    _systemHelper.injectHomebrewSystems({
-        [clonedSystem.guid] = clonedSystem
-    })
+
+    Wait.condition(injectClone, cloneReady)
 end
 
 function onButtonClearTiles(_, color)

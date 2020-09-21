@@ -918,6 +918,12 @@ function SwapPlan._getItems(prevColor, nextColor)
 
         -- Live objects.
         local nameTable = prevNameToNameTable[name]
+
+        -- Watch out for Franken tokens with flagship names.
+        if nameTable and nameTable.anon == ANONYMOUS_FLAGSHIP_NAME and object.tag == 'Tile' then
+            nameTable = false
+        end
+        
         if nameTable then
             local items = getItems(nameTable.anon)
             local item = SwapPlan._objectToItem(object, nameTable)
@@ -1592,7 +1598,7 @@ function Unpack.units(anonNameToItems, unpackBag)
             local unitBag = anonNameToUnitBag[anonName]
             if item.live and item.live.tag ~= 'Bag' then
                 local object = Unpack._unpackItem(item, unitBag)
-                assert(object)
+                assert(object, 'MISSING ' .. (item.name.insideNextBag or item.name.next) .. ' FROM ' .. unitBag.getName())
                 table.insert(unitObjects, object)
             end
         end

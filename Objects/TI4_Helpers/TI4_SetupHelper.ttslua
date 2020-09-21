@@ -217,6 +217,17 @@ function _safeBroadcastToColor(message, playerColor, messageColor)
     broadcastToAll(message, messageColor)
 end
 
+--- Normal broadcastToColor throws an error if the color is not seated.
+function _safePrintToColor(message, playerColor, messageColor)
+    for _, player in ipairs(Player.getPlayers()) do
+        if player.color == playerColor then
+            printToColor(message, playerColor, messageColor)
+            return
+        end
+    end
+    printToAll(message, messageColor)
+end
+
 --- Toggle'able debug messages.
 -- @param message string
 local function debugLog(message)
@@ -1365,7 +1376,7 @@ function SetupFaction.unpackStartingTech(color, faction, zone)
                 smooth            = true,
             })
         else
-            printToColor('unpackStartingTech: missing starting technology ' .. name, color, 'Red')
+            _safePrintToColor('unpackStartingTech: missing starting technology ' .. name, color, 'Red')
         end
         offset.z = offset.z + SetupFaction.STARTING_TECH_OFFSET.dz
     end
@@ -1606,11 +1617,11 @@ function SetupFranken.renameFlagship(color)
         end
     end
     if not faction then
-        printToColor('SetupFranken.renameFlagship: missing flagship for ' .. color, color, 'Red')
+        _safePrintToColor('SetupFranken.renameFlagship: missing flagship for ' .. color, color, 'Red')
         return
     end
 
-    printToColor('SetupFranken.renameFlagship: ' .. faction.tokenName .. ' flagship "' .. faction.flagship .. '"', color, color)
+    _safePrintToColor('SetupFranken.renameFlagship: ' .. faction.tokenName .. ' flagship "' .. faction.flagship .. '"', color, color)
     SetupFaction.renameFlagship(color, faction)
 end
 
@@ -1628,11 +1639,11 @@ function SetupFranken.unpackStartingTech(color)
         end
     end
     if not faction then
-        printToColor('SetupFranken.unpackStartingTech: missing starting tech for ' .. color, color, 'Red')
+        _safePrintToColor('SetupFranken.unpackStartingTech: missing starting tech for ' .. color, color, 'Red')
         return
     end
 
-    printToColor('SetupFranken.unpackStartingTech: ' .. faction.tokenName .. ' starting tech', color, color)
+    _safePrintToColor('SetupFranken.unpackStartingTech: ' .. faction.tokenName .. ' starting tech', color, color)
     SetupFaction.unpackStartingTech(color, faction, zoneAttributes)
 end
 
@@ -1662,7 +1673,7 @@ function SetupFranken.unpackStartingUnits(color)
         end
     end
     if not faction then
-        printToColor('SetupFranken.unpackStartingUnits: missing starting for ' .. color .. ', skipping starting units', color, 'Red')
+        _safePrintToColor('SetupFranken.unpackStartingUnits: missing starting for ' .. color .. ', skipping starting units', color, 'Red')
         return
     end
 
@@ -1675,11 +1686,11 @@ function SetupFranken.unpackStartingUnits(color)
     end
     if not homeSystemTile then
         -- Make this one non-fatal, HS may be ... somewhere else.
-        printToColor('SetupFranken.unpackStartingUnits: missing home system tile for ' .. color .. ', skipping starting units', color, 'Red')
+        _safePrintToColor('SetupFranken.unpackStartingUnits: missing home system tile for ' .. color .. ', skipping starting units', color, 'Red')
         return
     end
 
-    printToColor('SetupFranken.unpackStartingUnits: ' .. faction.tokenName .. ' starting units', color, color)
+    _safePrintToColor('SetupFranken.unpackStartingUnits: ' .. faction.tokenName .. ' starting units', color, color)
     SetupFaction.unpackUnits(color, faction, homeSystemTile)
 end
 
@@ -1721,7 +1732,7 @@ function unpackFrankenCoroutine()
     end
     coroutine.yield(0)
     if (not commandTokensBag) or (not ownerTokensBag) then
-        printToColor('UnpackFranken: unpack the faction sheet, command and owner tokens bags first.', color, 'Red')
+        _safePrintToColor('UnpackFranken: unpack the faction sheet, command and owner tokens bags first.', color, 'Red')
         return 1
     end
 

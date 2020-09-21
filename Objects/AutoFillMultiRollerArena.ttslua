@@ -102,11 +102,11 @@ function warpIn()
     local tokenToPos = {}
     local unitToPos = {}
 
-    local hex = CrLua.TI4.Hex.fromPosition(systemObject.getPosition())
+    local hex = _systemHelper.hexFromPosition(systemObject.getPosition())
     local bb = getBoundingBox(systemObject)
     local function checkUnit(unit)
         local p = unit.object.getPosition()
-        if isInsideBoundingBox(p, bb) and hex == CrLua.TI4.Hex.fromPosition(p) then
+        if isInsideBoundingBox(p, bb) and hex == _systemHelper.hexFromPosition(p) then
             p = self.positionToWorld(systemObject.positionToLocal(p))
             if unit.object.tag == 'Tile' then
                 tokenToPos[unit] = p
@@ -144,13 +144,13 @@ function warpOut()
     local tokenToPos = {}
     local unitToPos = {}
 
-    local hex = CrLua.TI4.Hex.fromPosition(systemObject.getPosition())
+    local hex = _systemHelper.hexFromPosition(systemObject.getPosition())
     local bb = getBoundingBox(self)
     local function checkUnit(unit)
         local p = unit.object.getPosition()
         if isInsideBoundingBox(p, bb) then
             p = systemObject.positionToWorld(self.positionToLocal(p))
-            if hex == CrLua.TI4.Hex.fromPosition(p) then
+            if hex == _systemHelper.hexFromPosition(p) then
                 if unit.object.tag == 'Tile' then
                     tokenToPos[unit] = p
                 else
@@ -240,12 +240,9 @@ end
 #include <~/CrLua/List>
 #include <~/CrLua/LockTable>
 #include <~/CrLua/Log>
-#include <~/CrLua/Polygon>
-#include <~/CrLua/RedBlobHex>
 #include <~/CrLua/Table>
 #include <~/CrLua/Util>
 
-#include <~/CrLua/TI4/Hex>
 #include <~/CrLua/TI4/Unit>
 
 #include <~/CrLua/TTS/HelperClient>
@@ -253,7 +250,6 @@ end
 --CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
 
 CrLua.assertRequired({
-    'TI4.Hex',
     'TI4.Unit',
     'List',
     'Log'

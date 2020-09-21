@@ -296,19 +296,13 @@ function getHexes(position)
     assert(type(position) == 'table' and type(position.x) == 'number')
 
     -- Get this hex, and adjacent hexes.
-    local hex = CrLua.TI4.Hex.fromPosition(position)
-    local adjacentHexes = CrLua.TI4.Hex.neighbors(hex)
+    local hex = _systemHelper.hexFromPosition(position)
+    local adjacentHexes = _systemHelper.hexNeighbors(hex)
 
-    -- Get the wormholes in this hex, plus other wormhole-adjacent hexes.
-    -- As a side-effect, the filter function adds 'hex' to each wormhole.
-    local function isWormholeInSelfHex(wormhole)
-        local position = wormhole.object.getPosition()
-        wormhole.hex = CrLua.TI4.Hex.fromPosition(position)
-        return wormhole.hex == hex
-    end
-    local wormholes, adjacentWormholes = CrLua.TI4.Wormhole.getAllWormholes(isWormholeInSelfHex)
-    for _, wormhole in ipairs(adjacentWormholes) do
-        table.insert(adjacentHexes, wormhole.hex)
+    -- Include through-wormhole.
+    local adjacentWormholeHexes = _systemHelper.hexAdjacentWormholes(hex)
+    for _, wormholeHex in ipairs(adjacentWormholeHexes) do
+        table.insert(adjacentHexes, wormholeHex)
     end
 
     -- Remove any duplicates.
@@ -327,7 +321,7 @@ function getUnits(hex, adjacentHexes)
     local function isInSelfOrAdjacentHex(unit)
         local position = unit.object.getPosition()
         unit.position = position
-        unit.hex = CrLua.TI4.Hex.fromPosition(position)
+        unit.hex = _systemHelper.hexFromPosition(position)
         return unit.hex == hex or adjacentHexesSet[unit.hex]
     end
     local units = CrLua.TI4.Unit.getAllUnits(isInSelfOrAdjacentHex)
@@ -401,7 +395,7 @@ function getArenaUnits(activatedSystemGuid)
     end
 
     local activatedSystemObject = getObjectFromGUID(activatedSystemGuid)
-    local hex = CrLua.TI4.Hex.fromPosition(activatedSystemObject.getPosition())
+    local hex = _systemHelper.hexFromPosition(activatedSystemObject.getPosition())
 
     local function checkUnit(unit)
         local p = unit.object.getPosition()
@@ -410,7 +404,7 @@ function getArenaUnits(activatedSystemGuid)
                 -- unit is in arena bounding box.  Get in-system position to
                 -- make sure it is actually in the hex.
                 p = activatedSystemObject.positionToWorld(arenaObject.positionToLocal(p))
-                if hex == CrLua.TI4.Hex.fromPosition(p) then
+                if hex == _systemHelper.hexFromPosition(p) then
                     unit.hex = hex
                     unit.position = p  -- world position inside activated system
                     return true
@@ -733,9 +727,7 @@ end
 #include <~/CrLua/CrLua>
 #include <~/CrLua/LockGlobals>
 
-#include <~/CrLua/TI4/Hex>
 #include <~/CrLua/TI4/Unit>
-#include <~/CrLua/TI4/Wormhole>
 
 #include <~/CrLua/TTS/ClickButtonHack>
 #include <~/CrLua/TTS/HelperClient>
@@ -745,8 +737,6 @@ end
 #include <~/CrLua/List>
 #include <~/CrLua/LockTable>
 #include <~/CrLua/Log>
-#include <~/CrLua/Polygon>
-#include <~/CrLua/RedBlobHex>
 #include <~/CrLua/Table>
 #include <~/CrLua/Util>
 
@@ -755,9 +745,8 @@ end
 --CrLua.UnitTest.runTests(TAG, CrLua, true)
 
 CrLua.assertRequired({
-    'TI4.Hex',
     'TI4.Unit',
-    'TI4.Wormhole',
+    'TTS.Object',
     'TTS.Player',
     'TTS.ClickButtonHack',
     'List',

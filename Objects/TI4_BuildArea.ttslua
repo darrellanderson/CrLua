@@ -210,6 +210,7 @@ local function _warpToSystem(system)
 
     local p0 = systemObject.getPosition()
     for i, unit in ipairs(units) do
+        _data.inside[unit] = nil
         local phi = math.rad(i * (360 / #units))
         local r = 2
         local collide = false
@@ -276,6 +277,7 @@ function trashTradeGoods()
     local graveyard = getGraveyard()
     if graveyard then
         for _, tradeGood in ipairs(tradeGoods) do
+            _data.inside[tradeGood] = nil
             graveyard.putObject(tradeGood)
         end
     end

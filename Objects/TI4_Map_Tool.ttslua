@@ -821,11 +821,27 @@ function count_slices(count)
     local equidistantPositions = {}
     for i, p1 in ipairs(homeSystemPositions) do
         local p2 = homeSystemPositions[i < #homeSystemPositions and (i + 1) or 1]
-        table.insert(equidistantPositions, {
+        local dir = {
             x = (p1.x + p2.x) / 2,
             y = (p1.y + p2.y) / 2,
             z = (p1.z + p2.z) / 2,
-        })
+        }
+        local d = math.sqrt(dir.x ^ 2 + dir.z ^ 2)
+        local normalized = {
+            x = dir.x / d,
+            y = dir.y,
+            z = dir.z / d
+        }
+        local d = math.sqrt(p1.x ^ 2 + p1.z ^ 2)
+        local p = {
+            x = normalized.x * d,
+            y = normalized.y,
+            z = normalized.z * d
+        }
+        if math.abs(p.z) < 1 then
+            p.x = p.x * 0.8  -- otherwise to far out, goes under bags
+        end
+        table.insert(equidistantPositions, p)
     end
 
     local hsValue = {}

@@ -89,6 +89,33 @@ local OBJECT_EFFECTS = {
     },
 }
 
+local WATCH_FOR_SPAWN = {
+    ['Commodities/Tradegoods x3'] = true,
+    ['Commodities/Tradegoods x1'] = true,
+    ['x1 Fighter Token'] = true,
+    ['x3 Fighter Token'] = true,
+    ['x1 Infantry'] = true,
+    ['x3 Infantry'] = true,
+    ['White Fighter'] = true,
+    ['Blue Fighter'] = true,
+    ['Purple Fighter'] = true,
+    ['Yellow Fighter'] = true,
+    ['Red Fighter'] = true,
+    ['Green Fighter'] = true,
+    ['Orange Fighter'] = true,
+    ['Pink Fighter'] = true,
+    ['Brown Fighter'] = true,
+    ['White Infantry'] = true,
+    ['Blue Infantry'] = true,
+    ['Purple Infantry'] = true,
+    ['Yellow Infantry'] = true,
+    ['Red Infantry'] = true,
+    ['Green Infantry'] = true,
+    ['Orange Infantry'] = true,
+    ['Pink Infantry'] = true,
+    ['Brown Infantry'] = true,
+}
+
 -------------------------------------------------------------------------------
 
 local _config = {
@@ -128,6 +155,8 @@ local _graveyardGuid = false
 
 function onLoad(saveState)
     CrLua.Log.d(TAG, 'onLoad')
+    math.randomseed(tonumber(self.getGUID(), 16))
+
     local saveState = saveState and JSON.decode(saveState)
     _data.width = saveState and saveState.width or _data.width
     _data.height = saveState and saveState.height or _data.height
@@ -187,6 +216,27 @@ function onObjectDestroy(dyingObject)
     if _data.inside[dyingObject] then
         _data.inside[dyingObject] = nil
         updateEverything()
+    end
+end
+
+function onObjectSpawn(object)
+    local guid = object.getGUID()
+
+    local function delayedCheckSpawn()
+        local object = getObjectFromGUID(guid)
+        if object and (not _data.inside[object]) and isInsideBuildArea(object) then
+            _data.inside[object] = true
+            updateProduceConsumeValues()
+        end
+    end
+
+    -- Often objects are drawn from a bag with a mouse points, and will be
+    -- "held by color" at spawn time with a certain "on object drop" detected
+    -- above.  Some scripts can create objects (e.g. numpad spawn, or swapping
+    -- tokens and plastic).  In those cases, check up on those objects after
+    -- a few seconds to see if they landed in zone.
+    if WATCH_FOR_SPAWN[object.getName()] and not object.held_by_color then
+        Wait.time(delayedCheckSpawn, 2.5 + math.random())
     end
 end
 

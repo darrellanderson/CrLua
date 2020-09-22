@@ -280,6 +280,7 @@ function warpToActiveSystem()
     else
         print(TAG .. ': no active system.')
     end
+    updateProduceConsumeValues()
 end
 
 function warpToHomeSystem()
@@ -292,6 +293,7 @@ function warpToHomeSystem()
     else
         print(TAG .. ': no home system.')
     end
+    updateProduceConsumeValues()
 end
 
 function trashTradeGoods()
@@ -331,6 +333,7 @@ function trashTradeGoods()
             graveyard.putObject(tradeGood)
         end
     end
+    updateProduceConsumeValues()
 end
 
 function togglePhilMode()

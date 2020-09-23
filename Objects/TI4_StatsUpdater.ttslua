@@ -38,6 +38,7 @@ local PERIODIC_SECONDS = 5
 
 local _waitId = false
 local _logNext = false
+local _periodicUpdates = false
 
 -------------------------------------------------------------------------------
 
@@ -489,6 +490,15 @@ function _periodicUpdateNotes()
     _waitId = Wait.time(_periodicUpdateNotes, math.max(PERIODIC_SECONDS - 0.5 + math.random(), 0.1))
 end
 
+function togglePeriodicUpdates()
+    _periodicUpdates = not _periodicUpdates
+    if _periodicUpdates then
+        startPeriodicUpdates()
+    else
+        stopPeriodicUpdates()
+    end
+end
+
 function startPeriodicUpdates()
     if not _waitId then
         printToAll('Showing TI4 stats in notes (lower right).  Stats are score, resources/influence (ready and total), commodities/trade goods, and tactics/fleet/stategy command token counts.  To disable, either right-click the table and select "Hide TI4 Stats" to hide for all, or individual players may disable them via Menu -> Configuration -> Interface -> Notes.')
@@ -518,8 +528,7 @@ end
 -------------------------------------------------------------------------------
 
 function onLoad(save_state)
-    addContextMenuItem('Show TI4 Stats', startPeriodicUpdates)
-    addContextMenuItem('Hide TI4 Stats', stopPeriodicUpdates)
+    addContextMenuItem('Toggle TI4 Stats', togglePeriodicUpdates)
     Notes.setNotes('')
 
     -- Only the GM/black player can see this object.  Others can still interact!

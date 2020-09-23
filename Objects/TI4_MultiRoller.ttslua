@@ -2,6 +2,7 @@
 -- @author the_Mantis
 -- @author MrStump for dice rolling functions
 -- @author Darrell use shared zone helper
+-- @author Plat combine larger font size + scale for crisper text
 
 --Distance the dice are placed from the tool
 radius = 5
@@ -14,11 +15,11 @@ ypos = 0.2
 zpos = {-0.9, -0.733, -0.566, -0.399, -0.232, -0.065, 0.102, 0.269, 0.436, 0.603, 0.85}
 
 --button parameters
-bFontSize = 40
-bFontSize = 40
-
+bScale = {0.2, 0.2, 0.2}
+bFontSize = 160
 --input parameters
-iFontSize = 50
+iScale = {0.2, 0.2, 0.2}
+iFontSize = 200
 
 --unit list
 unitList = {"Flagship", "War Sun", "Cruiser", "Dreadnought", "Destroyer", "Carrier", "Fighter", "Infantry", "PDS", "Space Dock"}
@@ -586,8 +587,9 @@ function addButton(click_function, label, position, width, height)
         function_owner = self,
         label          = label,
         position       = position,
-        width          = width,
-        height         = height,
+        width          = width / bScale[1],
+        height         = height / bScale[2],
+		scale          = bScale,
         font_size      = bFontSize,
     })
 end
@@ -599,8 +601,9 @@ function addInput(position, label, width, height)
         value          = 0,
         alignment      = 4,
         position       = position,
-        width          = width,
-        height         = height,
+        width          = width / iScale[1],
+        height         = height / iScale[2],
+		scale          = iScale,
         font_size      = iFontSize,
         --validation   = 2,
         label          = label

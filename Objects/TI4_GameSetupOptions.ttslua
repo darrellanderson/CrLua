@@ -33,6 +33,7 @@ local CONTRIBUTORS = {
     'Max Philippa',
     'Milty',
     'Nicest_guy_22',
+    'Plat',  -- crisper fonts on multiRoller
     'Positive',
     'Psicoma',
     'Raptor1210',
@@ -121,7 +122,7 @@ function _createUI()
             table.insert(toggles, {
                 tag = 'ToggleButton',
                 attributes = {
-                    id = idPrefix .. string.gsub(tostring(value), ' ', '_')
+                    id = idPrefix .. string.gsub(tostring(value), ' ', '_'),
                 },
                 value = value
             })
@@ -355,31 +356,64 @@ function setupGame(playerCount, extraRings, isRightClick)
     })
 end
 
-function setupCodexACs(codexACsVal)
+function setupCodexACs(useCodexACs)
     local actionDeck = false
-    local actionDeckPos = false
     local codexDeck = false
-    for i, obj in ipairs(getAllObjects()) do
-        if obj.getName() == 'Actions' then
-            actionDeck = obj
-        elseif obj.getName() == 'Codex Action Cards' then
-            codexDeck = obj
+    local variantsBag = false
+    for i, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        if object.tag == 'Deck' and name == 'Actions' then
+            actionDeck = object
+        elseif object.tag == 'Deck' and name == 'Codex Action Cards' then
+            codexDeck = object
+        elseif object.tag == 'Bag' and string.match(name, '^Variant Pieces') then
+            variantsBag = object
         end
     end
-    actionDeckPos = actionDeck and actionDeck.getPosition()
-    if codexACsVal == true then
-        if codexDeck and actionDeck then
-            codexDeck.setPositionSmooth({
-                x = actionDeckPos.x,
-                y = actionDeckPos.y + 3,
-                z = actionDeckPos.z
-            }, false, true)
-            Wait.time(function() actionDeck.shuffle() end, 5)
-        else
-            print('Warning: cannot find "Actions" and "Codex Action Cards" decks')
+
+    if not actionDeck then
+        printToAll('Setup codex action cards: cannot find action deck, skipping this step.', 'Red')
+        return
+    end
+    local actionDeckPos = actionDeck.getPosition()
+
+    if useCodexACs then
+        local aboveActionDeckPos = {
+            x = actionDeckPos.x,
+            y = actionDeckPos.y + 3,
+            z = actionDeckPos.z
+        }
+        if codexDeck then
+            local collide = false
+            local fast = true
+            codexDeck.setPositionSmooth(aboveActionDeckPos, collide, fast)
+            codexDeck.setRotationSmooth(actionDeck.getRotation(), collide, fast)
+        elseif variantsBag then
+            for _, entry in ipairs(variantsBag.getObjects()) do
+                if entry.name == 'Codex Action Cards' then
+                    codexDeck = variantsBag.takeObject({
+                        entry.guid,
+                        position = aboveActionDeckPos,
+                        rotation = actionDeck.getRotation(),
+                        smooth = true
+                    })
+                    break
+                end
+            end
         end
+        if codexDeck then
+            print('Setup codex action cards: adding to actions deck')
+        else
+            printToAll('Setup codex action cards: cannot find codex action deck, skipping this step.', 'Red')
+            return
+        end
+        Wait.time(function() actionDeck.shuffle() end, 5)
     else
-        print('Removing Codex action cards from deck.')
+        -- Remove any Codex ACs in the actions deck.  The Codex ACs start in
+        -- variants, so for this to happen they would have to have been added
+        -- to the Actions deck somehow first.  Since this is rare do not worry
+        -- too much about it, just pull out the cards and let the players take
+        -- it from there.
         local codexACSet = {}
         for _, codexAC in ipairs(CODEX_AC_LIST) do
             codexACSet[codexAC] = true

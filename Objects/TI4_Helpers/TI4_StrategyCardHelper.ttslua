@@ -615,7 +615,7 @@ function _getDealActionCardsCount(playerColor, faction, lowerNameToInZoneCards)
 end
 
 --- Move the speaker agenda token to match the speaker token.
-function _moveSpeakerAgendaToken()
+function moveSpeakerAgendaToken()
     local speakerTokenName = 'Speaker Token'
     local speakerTokenAgendaName = 'Speaker Token - Agenda'
 
@@ -805,7 +805,7 @@ function _doEndOfStatusPhaseCoroutine()
         coroutine.yield(0)
     end
 
-    _moveSpeakerAgendaToken()
+    moveSpeakerAgendaToken()
     coroutine.yield(0)
 
     return 1 -- REQUIRED to exit coroutine

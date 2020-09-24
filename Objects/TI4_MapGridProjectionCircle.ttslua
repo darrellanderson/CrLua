@@ -1,0 +1,7 @@
+function onLoad(save_state)
+    self.grid_projection = true
+end
+
+function onPlayerTurnStart(player_color_start, player_color_previous)
+    self.grid_projection = false
+end

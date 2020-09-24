@@ -82,6 +82,10 @@ function onLoad(save_state)
     resetScriptingZone()
 end
 
+function onDrop(playerColor)
+    Wait.time(resetScriptingZone, 3)
+end
+
 -------------------------------------------------------------------------------
 
 function isRelevantCard(enterObject)

@@ -543,20 +543,25 @@ end
 
 function _getAllocateCommandTokensCount(playerColor, faction, lowerNameToInZoneCards)
     assert(type(playerColor) == 'string' and type(lowerNameToInZoneCards) == 'table')
+
+    local factionLowerAbilitySet = {}
+    for _, ability in ipairs(faction and faction.abilities or {}) do
+        factionLowerAbilitySet[string.lower(ability)] = true
+    end
+    if lowerNameToInZoneCards['versatile'] then
+        factionLowerAbilitySet['versatile'] = true  -- franken
+    end
+
     local result = 2
-    local ownerFaction = _factionHelper.fromColor(playerColor)
-    if faction and faction.extraCommandTokens then
-        _safeBroadcastToColor('Faction extra command token active.', playerColor, {0.1,0.5,0.1})
-        result = result + faction.extraCommandTokens
+    if factionLowerAbilitySet['versatile'] then
+        _safeBroadcastToColor('Versatile active.', playerColor, {0.1,0.5,0.1})
+        result = result + 1
     end
     if lowerNameToInZoneCards['hyper metabolism'] then
         _safeBroadcastToColor('Hyper Metabolism active.', playerColor, {0.1,0.5,0.1})
         result = result + 1
     end
-    if lowerNameToInZoneCards['versatile'] then
-        _safeBroadcastToColor('Versatile active.', playerColor, {0.1,0.5,0.1})
-        result = result + 1
-    end
+    local ownerFaction = _factionHelper.fromColor(playerColor)
     if lowerNameToInZoneCards['cybernetic enhancements ω'] and ownerFaction.name ~= 'The L1Z1X Mindnet' then
         _safeBroadcastToColor('Cybernetic Enhancements Ω used. Returning to L1Z1X Mindnet player.', playerColor, {0.1,0.5,0.1})
         result = result + 1
@@ -594,21 +599,26 @@ end
 
 function _getDealActionCardsCount(playerColor, faction, lowerNameToInZoneCards)
     assert(type(playerColor) == 'string' and type(lowerNameToInZoneCards) == 'table')
+
+    local factionLowerAbilitySet = {}
+    for _, ability in ipairs(faction and faction.abilities or {}) do
+        factionLowerAbilitySet[string.lower(ability)] = true
+    end
+    if lowerNameToInZoneCards['scheming'] then
+        factionLowerAbilitySet['scheming'] = true  -- franken
+    end
+
     local result = 1
-    if faction and faction.extraActionCards then
-        _safeBroadcastToColor('Faction extra action cards active.', playerColor, {0.1,0.5,0.1})
-        result = result + faction.extraActionCards
+    if factionLowerAbilitySet['scheming'] then
+        _safeBroadcastToColor('Scheming active.', playerColor, {0.1,0.5,0.1})
+        result = result + 1
     end
     if lowerNameToInZoneCards['neural motivator'] then
         _safeBroadcastToColor('Neural Motivator active.', playerColor, {0.1,0.5,0.1})
         result = result + 1
     end
-    if lowerNameToInZoneCards['scheming'] then
-        _safeBroadcastToColor('Scheming active.', playerColor, {0.1,0.5,0.1})
-        result = result + 1
-    end
     if lowerNameToInZoneCards['minister of policy'] then
-        _safeBroadcastToColor('Minister of Policy.', playerColor, {0.1,0.5,0.1})
+        _safeBroadcastToColor('Minister of Policy active.', playerColor, {0.1,0.5,0.1})
         result = result + 1
     end
     return result

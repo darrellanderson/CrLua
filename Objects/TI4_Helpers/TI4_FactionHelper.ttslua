@@ -41,6 +41,8 @@ local _factionAttributes = {
         startingTech = { 'Magen Defense Grid' },
         flagship = 'Duha Menaimon',
         flagshipDescription = 'After you activate this system, you may produce up to 5 units in this system.',
+        abilities = { 'Mitosis' },
+        units = { 'Letani Warrior I', 'Letani Warrior II' },
     },
 
     ['The Barony Of Letnev'] = {
@@ -51,6 +53,8 @@ local _factionAttributes = {
         startingTech = { 'Antimass Deflectors', 'Plasma Scoring' },
         flagship = 'Arc Secundus',
         flagshipDescription = "Other players’ units in this system lose PLANETARY SHIELD.  At the start of each space combat round, repair this ship.  BOMBARDMENT 5 (X3)",
+        abilities = { 'Munitions Reserves', 'Armada' },
+        units = {},
     },
 
     ['The Clan Of Saar'] = {
@@ -60,7 +64,9 @@ local _factionAttributes = {
         startingUnits = { Infantry = 4, Fighter = 2, Cruiser = 1, Carrier = 2, Space_Dock = 1 },
         startingTech = { 'Antimass Deflectors' },
         flagship = 'Son of Ragh',
-        flagshipDescription = 'ANTI-FIGHTER BARRAGE 6 (X4)'
+        flagshipDescription = 'ANTI-FIGHTER BARRAGE 6 (X4)',
+        abilities = { 'Scavenge', 'Nomadic' },
+        units = { 'Floating Factory I', 'Floating Factory II' },
     },
 
     ['The Embers Of Muaat'] = {
@@ -71,6 +77,8 @@ local _factionAttributes = {
         startingTech = { 'Plasma Scoring' },
         flagship = 'The Inferno',
         flagshipDescription = "ACTION: Spend 1 token from your strategy pool to place 1 cruiser in this unit’s system.",
+        abilities = { 'Star Forge', 'Gashlai Physiology' },
+        units = { 'Prototype War Sun I', 'Prototype War Sun II' },
     },
 
     ['The Emirates Of Hacan'] = {
@@ -81,6 +89,8 @@ local _factionAttributes = {
         startingTech = { 'Antimass Deflectors', 'Sarween Tools' },
         flagship = 'Wrath of Kenara',
         flagshipDescription = 'After you roll a die during a space combat in this system, you may spend 1 trade good to apply +1 to the result.',
+        abilities = { 'Masters of Trade', 'Guild Ships', 'Arbiters' },
+        units = {},
     },
 
     ['The Federation Of Sol'] = {
@@ -91,7 +101,8 @@ local _factionAttributes = {
         startingTech = { 'Antimass Deflectors', 'Neural Motivator' },
         flagship = 'Genesis',
         flagshipDescription = "At the end of the status phase, place 1 infantry from your reinforcements in this system’s space area.",
-        extraCommandTokens = 1,
+        abilities = { 'Orbital Drop', 'Versatile' },
+        units = { 'Advanced Carrier I', 'Advanced Carrier II', 'Spec Ops I', 'Spec Ops II' },
     },
 
     ['The Ghosts Of Creuss'] = {
@@ -102,6 +113,8 @@ local _factionAttributes = {
         startingTech = { 'Gravity Drive' },
         flagship = 'Hil Colish',
         flagshipDescription = "This ship’s system contains a delta wormhole.  During movement, this ship may move before or after your other ships.",
+        abilities = { 'Quantum Entanglement', 'Slipstream', 'Creuss Gate' },
+        units = {},
     },
 
     ['The L1Z1X Mindnet'] = {
@@ -112,6 +125,8 @@ local _factionAttributes = {
         startingTech = { 'Neural Motivator', 'Plasma Scoring' },
         flagship = '[0.0.1]',
         flagshipDescription = 'During a space combat, hits produced by this ship and by your dreadnoughts in this system must be assigned to non-fighter ships if able.',
+        abilities = { 'Assimilate' },
+        units = { 'Super-Dreadnought I', 'Super-Dreadnought II' },
     },
 
     ['The Mentak Coalition'] = {
@@ -122,6 +137,8 @@ local _factionAttributes = {
         startingTech = { 'Sarween Tools', 'Plasma Scoring' },
         flagship = 'Fourth Moon',
         flagshipDescription = "Other players’ ships in this system cannot use SUSTAIN DAMAGE.",
+        abilities = { 'Ambush', 'Pillage' },
+        units = {},
     },
 
     ['The Naalu Collective'] = {
@@ -132,6 +149,8 @@ local _factionAttributes = {
         startingTech = { 'Neural Motivator', 'Sarween Tools' },
         flagship = 'Matriarch',
         flagshipDescription = 'During an invasion in this system, you may commit fighters to planets as if they were ground forces.  When combat ends, return those units to the space area.',
+        abilities = { 'Telepathic', 'Foresight' },
+        units = { 'Hybrid Crystal Fighter I', 'Hybrid Crystal Fighter II' },
     },
 
     ['The Nekro Virus'] = {
@@ -142,6 +161,8 @@ local _factionAttributes = {
         startingTech = { 'Dacxive Animators', 'Valefar Assimilator X', 'Valefar Assimilator Y' },
         flagship = 'The Alastor',
         flagshipDescription = 'At the start of space combat, choose any number of your ground forces in this system to participate in that combat as is they were ships.  These ground forces do not count against fleet supply.',
+        abilities = { 'Galactic Threat', 'Technological Singularity', 'Propagation' },
+        units = {},
     },
 
     ["The Sardakk N'orr"] = {
@@ -152,6 +173,8 @@ local _factionAttributes = {
         startingTech = {},
         flagship = "C'morran N'orr",
         flagshipDescription = "Apply +1 to the result of each of your other ship’s combat rolls in this system.",
+        abilities = { 'Unrelenting' },
+        units = { 'Exotrireme I', 'Exotrireme II' },
     },
 
     ['The Universities of Jol-Nar'] = {
@@ -162,6 +185,8 @@ local _factionAttributes = {
         startingTech = { 'Antimass Deflectors', 'Neural Motivator', 'Sarween Tools', 'Plasma Scoring' },
         flagship = 'J.N.S. Hylarim',
         flagshipDescription = 'When making a combat roll for this ship, each result of 9 or 10, before applying modifiers, produces 2 extra hits.',
+        abilities = { 'Fragile', 'Brilliant', 'Analytical' },
+        units = {},
     },
 
     ['The Winnu'] = {
@@ -172,7 +197,9 @@ local _factionAttributes = {
         startingTech = { 'Antimass Deflectors', 'Neural Motivator', 'Sarween Tools', 'Plasma Scoring' },
         flagship = 'Salai Sai Corian',
         flagshipDescription = "When this unit makes a combat roll, it rolls a number of dice equal to the number of your opponent’s non-fighter ships in this system.",
-        startMessage = 'Pick 1 technology and return the other 3 to your deck.'
+        startMessage = 'Pick 1 technology and return the other 3 to your deck.',
+        abilities = { 'Blood Ties', 'Reclamation' },
+        units = {},
     },
 
     ['The Xxcha Kingdom'] = {
@@ -183,6 +210,8 @@ local _factionAttributes = {
         startingTech = { 'Graviton Laser System' },
         flagship = 'Loncara Ssodu',
         flagshipDescription = "You may use this unit’s SPACE CANNON against ships that are in adjacent systems.  SPACE CANNON 5 (X3)",
+        abilities = { 'Peace Accords', 'Quash' },
+        units = {},
     },
 
     ['The Yin Brotherhood'] = {
@@ -193,6 +222,8 @@ local _factionAttributes = {
         startingTech = { 'Sarween Tools' },
         flagship = 'Van Hauge',
         flagshipDescription = 'When this ship is destroyed, destroy all ships in this system.',
+        abilities = { 'Indoctrination', 'Devotion' },
+        units = {},
     },
 
     ['The Yssaril Tribes'] = {
@@ -203,7 +234,8 @@ local _factionAttributes = {
         startingTech = { 'Neural Motivator' },
         flagship = "Y'sia Y'ssrila",
         flagshipDescription = "This ship can move through systems that contain another players’ ships.",
-        extraActionCards = 1,
+        abilities = { 'Stall Tactics', 'Scheming', 'Crafty' },
+        units = {},
     },
 
     -- Tactic Blue's homebrew
@@ -215,7 +247,9 @@ local _factionAttributes = {
         startingUnits = { Infantry = 2, Fighter = 6, Destroyer = 1, Carrier = 2, Space_Dock = 1 },
         startingTech = { 'Neural Motivator', 'Sarween Tools' },
         flagship = 'Advent Flagship',
-        flagshipDescription = '',
+        flagshipDescription = '-',
+        abilities = {},
+        units = {},
     },
 
     ['The Drahn Consortium'] = {
@@ -227,6 +261,8 @@ local _factionAttributes = {
         startingTech = { 'Neural Motivator', 'Plasma Scoring' },
         flagship = 'Nightingale II',
         flagshipDescription = 'Other players cannot play action cards during a space combat in this system.',
+        abilities = {},
+        units = {},
     },
 
     ['The Free Systems Alliance'] = {
@@ -238,6 +274,8 @@ local _factionAttributes = {
         startingTech = { 'Neural Motivator' },
         flagship = 'Vox',
         flagshipDescription = 'When this unit makes a combat roll, it rolls 1 additional die for each planet in this system of any single trait.',
+        abilities = {},
+        units = {},
     },
 
     ['The Fremen'] = {
@@ -249,6 +287,8 @@ local _factionAttributes = {
         startingTech = { 'Antimass Deflectors' },
         flagship = 'Shai-Hulud',
         flagshipDescription = 'During a round of combat in the system, 1 unit you control may roll 1 additional combat die.',
+        abilities = {},
+        units = {},
     },
 
     ['The Gheldor Authority'] = {
@@ -260,6 +300,8 @@ local _factionAttributes = {
         startingTech = { 'Magen Defense Grid' },
         flagship = "Gheld'atar",
         flagshipDescription = 'Units you control that are on planets adjacent to this system cannot lose PLANETARY SHIELD.',
+        abilities = {},
+        units = {},
     },
 
     ['The HCEN Defense System'] = {
@@ -271,6 +313,8 @@ local _factionAttributes = {
         startingTech = { 'Graviton Laser System' },
         flagship = 'Locus',
         flagshipDescription = 'At the start of your turn, you may move 1 of your PDS to a planet you control in this system.',
+        abilities = {},
+        units = {},
     },
 
     ['The Khet Drakkol Union'] = {
@@ -281,7 +325,9 @@ local _factionAttributes = {
         startingUnits = { Infantry = 4, Fighter = 3, Destroyer = 1, Dreadnought = 2, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Sarween Tools' },
         flagship = 'Khage',
-        flagshipDescription = '',
+        flagshipDescription = '-',
+        abilities = {},
+        units = {},
     },
 
     ['The Kortali Horde'] = {
@@ -293,6 +339,8 @@ local _factionAttributes = {
         startingTech = { 'Dacxive Animators' },
         flagship = "For'xdar",
         flagshipDescription = 'Planets controlled by other players in this system cannot be readied.',
+        abilities = {},
+        units = {},
     },
 
     ['The Lazax'] = {
@@ -304,7 +352,9 @@ local _factionAttributes = {
         startingTech = { 'Antimass Deflectors', 'Neural Motivator', 'Sarween Tools', 'Plasma Scoring' },
         flagship = 'Regulus',
         flagshipDescription = 'When this unit makes a combat roll, it rolls 1 additional die for each victory point you have.',
-        startMessage = 'Pick 1 technology and return the other 3 to your deck.'
+        startMessage = 'Pick 1 technology and return the other 3 to your deck.',
+        abilities = {},
+        units = {},
     },
 
     ['The Mahact Sorcerer Kings'] = {
@@ -316,6 +366,8 @@ local _factionAttributes = {
         startingTech = { },
         flagship = "Noctul H'rgan",
         flagshipDescription = "Other units you control in this system may instead have the abilities and attributes of another player’s units of the same type in this system.",
+        abilities = {},
+        units = {},
     },
 
     ['The Mandalorian Clans'] = {
@@ -327,6 +379,8 @@ local _factionAttributes = {
         startingTech = { 'Neural Motivator', 'Antimass Deflectors' },
         flagship = "Kyr'tsad",
         flagshipDescription = 'This ship cannot be destroyed by Direct Hit action cards.',
+        abilities = {},
+        units = {},
     },
 
     ["The Navigators' Guild"] = {
@@ -338,6 +392,8 @@ local _factionAttributes = {
         startingTech = { 'Antimass Deflectors', 'Sarween Tools' },
         flagship = 'Chogra Tuhn',
         flagshipDescription = "Other players' ships cannot move through this unit’s system.",
+        abilities = {},
+        units = {},
     },
 
     ['The Rhodyn Migrant Fleet'] = {
@@ -348,7 +404,9 @@ local _factionAttributes = {
         startingUnits = { Infantry = 4, Fighter = 2, Destroyer = 1, Space_Dock = 1, Flagship = 1 },
         startingTech = { 'Gravity Drive' },
         flagship = 'Mho Rhodyn',
-        flagshipDescription = "At the end of the status phase, place 1 fighter from your reinforcements into this system’s space area."
+        flagshipDescription = "At the end of the status phase, place 1 fighter from your reinforcements into this system’s space area.",
+        abilities = {},
+        units = {},
     },
 
     ['The Trader Emergency Coalition'] = {
@@ -359,7 +417,9 @@ local _factionAttributes = {
         startingUnits = { Infantry = 2, Fighter = 2, Cruiser = 1, Destroyer = 1, Carrier = 1, Space_Dock = 2 },
         startingTech = { 'Sarween Tools', 'Plasma Scoring' },
         flagship = 'Trader Flagship',
-        flagshipDescription = '',
+        flagshipDescription = '-',
+        abilities = {},
+        units = {},
     },
 
     ['The Vasari Empire'] = {
@@ -370,7 +430,9 @@ local _factionAttributes = {
         startingUnits = { Infantry = 3, Fighter = 2, Destroyer = 1, Carrier = 1, Dreadnought = 1, Space_Dock = 1 },
         startingTech = { 'Antimass Deflectors', 'Plasma Scoring' },
         flagship = 'Vasari Flagship',
-        flagshipDescription = '',
+        flagshipDescription = '-',
+        abilities = {},
+        units = {},
     },
 
     ['The Veldyr Sovereignty'] = {
@@ -382,6 +444,8 @@ local _factionAttributes = {
         startingTech = { 'Plasma Scoring' },
         flagship = 'Richtyrian',
         flagshipDescription = 'When this ship makes a combat roll, it rolls 1 additional die for each round of space combat that has been resolved this combat.',
+        abilities = {},
+        units = {},
     },
 
     ['The Zeth Contingency'] = {
@@ -393,7 +457,9 @@ local _factionAttributes = {
         startingTech = { 'Antimass Deflectors', 'Neural Motivator', 'Sarween Tools', 'Plasma Scoring' },
         flagship = "Eru'ishon",
         flagshipDescription = 'When this unit makes a combat roll, it rolls a number of dice equal to the greatest number of technologies you control in any color.',
-        startMessage = 'Pick 2 technologies and return the other 2 to your deck.'
+        startMessage = 'Pick 2 technologies and return the other 2 to your deck.',
+        abilities = {},
+        units = {},
     },
 
     ['The Savages of Cymiae'] = {
@@ -405,6 +471,8 @@ local _factionAttributes = {
         startingTech = { 'Plasma Scoring', 'Magen Defense Grid' },
         flagship = 'Robotic Reprocessing Center',
         flagshipDescription = 'Your infantry in this system gain SUSTAIN DAMAGE during ground combat.',
+        abilities = {},
+        units = {},
     },
 }
 
@@ -441,6 +509,110 @@ function fromTokenName(tokenName)
         return _tokenNameToFaction[tokenName]
     end
 end
+
+-------------------------------------------------------------------------------
+
+function verifyAllFactions()
+    local errors = false
+    for name, faction in pairs(_factionAttributes) do
+        local success, errorMessage = _factionIsValid(faction)
+        if not success then
+            errors = errors or {}
+            table.insert(errors, name .. ': ' .. errorMessage)
+        end
+    end
+    if errors then
+        error('verifyAllFactions ' .. table.concat(errors, ', '))
+    end
+    print('verifyAllFactions: success')
+end
+
+--- Let homebrew add custom factions via runtime injection.
+-- @param faction: faction table.
+function injectFaction(faction)
+    assert(type(faction) == 'table')
+
+    -- Unclear if the faction is shared with the caller, make a copy to be
+    -- sure any later mutations to the caller's version does not change this.
+    local function copyTable(t)
+        if t and type(t) == 'table' then
+            local copy = {}
+            for k, v in pairs(t) do
+                copy[k] = type(v) == 'table' and copyTable(v) or v
+            end
+            t = copy
+        end
+        return t
+    end
+    faction = copyTable(faction)
+
+    local success, errorMessage = _factionIsValid(faction)
+    if not success then
+        error('injectFaction: ' .. guid .. ' ' .. errorMessage)
+    end
+
+    _factionAttributes[faction.name] = faction
+    _tokenNameToFaction[faction.tokenName] = faction
+    if faction.frankenName and not _tokenNameToFaction[faction.frankenName] then
+        _tokenNameToFaction[faction.frankenName] = _tokenNameToFaction[faction.tokenName]
+    end
+end
+
+function _factionIsValid(faction)
+    local name = faction.name
+    if not name or type(name) ~= 'string' or string.len(name) == 0 then
+        return false, 'faction.name must be a non-empty string'
+    end
+
+    local tokenName = faction.tokenName
+    if not tokenName or type(tokenName) ~= 'string' or string.len(tokenName) == 0 then
+        return false, 'faction.tokenName must be a non-empty string'
+    end
+
+    local frankenName = faction.frankenName
+    if not frankenName or type(frankenName) ~= 'string' or string.len(frankenName) == 0 then
+        return false, 'faction.frankenName must be a non-empty string'
+    end
+
+    local home = faction.home
+    if not home or type(home) ~= 'number' then
+        return false, 'faction.home must be a number'
+    end
+
+    local startingUnits = faction.startingUnits
+    if not startingUnits or type(startingUnits) ~= 'table' then
+        return false, 'faction.startingUnits must be a table'
+    end
+
+    local startingTech = faction.startingTech
+    if not startingTech or type(startingTech) ~= 'table' then
+        return false, 'faction.startingTech must be a table'
+    end
+
+    local flagship = faction.flagship
+    if not flagship or type(flagship) ~= 'string' or string.len(flagship) == 0 then
+        return false, 'faction.flagship must be a non-empty string'
+    end
+
+    local flagshipDescription = faction.flagshipDescription
+    if not flagshipDescription or type(flagshipDescription) ~= 'string' or string.len(flagshipDescription) == 0 then
+        return false, 'faction.flagshipDescription must be a non-empty string'
+    end
+
+    local abilities = faction.abilities
+    if not abilities or type(abilities) ~= 'table' then
+        return false, 'faction.abilities must be a table'
+    end
+
+    local units = faction.units
+    if not units or type(units) ~= 'table' then
+        return false, 'faction.units must be a table'
+    end
+
+    return true
+end
+
+-------------------------------------------------------------------------------
 
 function _maybeUpdateFactions()
     if not _update.time or (Time.time - _update.time) > _update.periodicUpdateSeconds then
@@ -663,6 +835,8 @@ function onLoad(saveState)
     self.setScale({ x = 2, y = 0.01, z = 2 })
     self.setName('TI4_FACTION_HELPER')
     self.setDescription('Shared helper functions used by other objects, PLEASE LEAVE ON TABLE! This object is only visible to the black (GM) player.')
+
+    self.addContextMenuItem('Verify Factions', verifyAllFactions)
 
     -- Only the GM/black player can see this object.  Others can still interact!
     local invisibleTo = {}

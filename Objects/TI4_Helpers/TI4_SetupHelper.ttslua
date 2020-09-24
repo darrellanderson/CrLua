@@ -100,7 +100,8 @@ local SetupColor = {
     HAND = {
         ACTIVE = {
             OFFSET = { x = 0, y = 4, z = 21, dzMiddle = 5, yRot = 180 },
-            SCALE = { x = 22, y = 8, z = 4 }
+            -- Max SCALE.x is 22.  10 cards need 15.5, start overlapping at 11.
+            SCALE = { x = 15.5, y = 8, z = 4 }
         },
         INACTIVE = {
             POSITION = { x = 150, y = 4, z = 100, dx = 0, dz = -30 },
@@ -1396,6 +1397,7 @@ function SetupFaction.placeScoreCounters(ownerTokensBag, zone, zoneIndex, color)
         error('unpack faction place score counters: missing ' .. scoreboardName)
     end
     local scoreboard = getScoreboard()
+    coroutine.yield(0)
 
     -- Place token stack near scoreboard.  Follow board positioning similar
     -- to the mini-board layout agenda stuff users.
@@ -1450,6 +1452,7 @@ function SetupFaction.placeScoreCounters(ownerTokensBag, zone, zoneIndex, color)
         error('unpack faction place score counters: missing ' .. findName)
     end
     local secretsMat = getSecretsMat()
+    coroutine.yield(0)
     local p = secretsMat.call('suggestedOwnerTokenLocation', color)
     if p then
         local token = ownerTokensBag.takeObject({
@@ -1461,6 +1464,27 @@ function SetupFaction.placeScoreCounters(ownerTokensBag, zone, zoneIndex, color)
         local m = 2.25
         token.setScale({ x = scale.x * m, y = scale.y * m, z = scale.z * m })
         Wait.time(function() token.setLock(true) end, 3)
+    end
+
+    -- Place token on vote counter.
+    local function getVoteCounter()
+        local findName = color .. ' Player Votes'
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == findName then
+                return object
+            end
+        end
+        error('unpack faction place score counters: missing ' .. findName)
+    end
+    local voteCounter = getVoteCounter()
+    coroutine.yield(0)
+    if voteCounter then
+        local p = voteCounter.positionToWorld({ x = 0, y = 1, z = -1 })
+        local token = ownerTokensBag.takeObject({
+            position = { x = p.x, y = p.y + 1, z = p.z },
+            rotation = { x = 0, y = voteCounter.getRotation().y, z = 0 },
+            smooth = false
+        })
     end
 end
 

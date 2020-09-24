@@ -55,9 +55,9 @@ local SetupGeneric = {
         ['^Any Afters%?$'] = { x = -0.6, z = 3 },
     },
     NAME_TO_AGENDA_ZONE_OFFSET = {
-        ['^For:$'] = { x = -4.25, y = 0.3, lock = true },
-        ['^Against:$'] = { x = 4.25, y = 0.3, lock = true },
-        ['^Votes$'] = { x = 9 },
+        ['^For:$'] = { x = 4.25, y = 0.3, lock = true },
+        ['^Against:$'] = { x = -4.25, y = 0.3, lock = true },
+        ['^Votes$'] = { x = -9 },
         ['^Speaker Token %- Agenda$'] = { x = 0, y = 0.3, yRot = 180 },
     },
     NAME_TO_TABLE_POSITIONS = {

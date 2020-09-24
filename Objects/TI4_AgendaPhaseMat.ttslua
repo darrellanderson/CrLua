@@ -14,40 +14,56 @@ function getHelperClient(helperObjectName)
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
 local _strategyCardHelper = getHelperClient('TI4_STRATEGY_CARD_HELPER')
+local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
-local x = -3.85
-local z = 2
-local width = 1100
-local height = 400
-local fontSize = 150
-
 function onLoad(save_state)
-    local y = self.getBoundsNormalized().size.y / 2 + 0.01
+    local x = 1.44
+    local y = self.getBoundsNormalized().size.y + 0.01
+    local z = 5.9
+
+    local width = 600
+    local height = 400
+    local fontSize = 150
+
+    print('xxx ' .. y)
     self.createButton({
         click_function = 'resetAgendaTokens',
         function_owner = self,
-        label          = 'Reset\nWhen/After',
-        position       = { x = x, y = y, z = -z },
-        rotation       = { x = 0, y = 90, z = 0 },
+        label          = 'Reset',
+        position       = { x = -x, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
         scale          = self.getScale(),
         width          = width,
         height         = height,
         font_size      = fontSize,
-        tooltip        = 'Reset When/After Tokens',
+        tooltip        = 'Reset When/After Tokens, vote counters, agenda speaker token',
     })
 
     self.createButton({
         click_function = 'resetVotes',
         function_owner = self,
-        label          = 'Update\nAvail Votes',
-        position       = { x = x, y = y, z = z },
-        rotation       = { x = 0, y = 90, z = 0 },
+        label          = 'Update\nVotes',
+        position       = { x = 0, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
         scale          = self.getScale(),
         width          = width,
         height         = height,
         font_size      = fontSize,
         tooltip        = 'Recompute available votes from non-exhausted planet cards',
+    })
+
+    self.createButton({
+        click_function = 'resetPlanets',
+        function_owner = self,
+        label          = 'Ready\nPlanets',
+        position       = { x = x, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = self.getScale(),
+        width          = width,
+        height         = height,
+        font_size      = fontSize,
+        tooltip        = 'At the end of the Agenda Phase, ready player planet cards to be face-up',
     })
 
     self.setSnapPoints({
@@ -61,20 +77,43 @@ end
 
 function resetAgendaTokens()
     local resetNameSet = {
-        ['Any Whens?'] = true,
-        ['Any Afters?'] = true
+        ['Any Whens?'] = 'Tile',
+        ['Any Afters?'] = 'Tile'
     }
+    for _, color in ipairs(Player.getColors()) do
+        resetNameSet[color .. ' Player Votes'] = 'Counter'
+    end
+    local voteCounters = {}
     for _, object in ipairs(getAllObjects()) do
-        if object.tag == 'Tile' and resetNameSet[object.getName()] then
-            if object.is_face_down then
-                object.flip()
-            end
+        local tag = resetNameSet[object.getName()]
+        if tag and object.tag == tag and object.is_face_down then
+            object.flip()
         end
     end
+
+    _strategyCardHelper.moveSpeakerAgendaToken()
 end
 
 function resetVotes()
     for _, color in ipairs(_zoneHelper.zones()) do
         _strategyCardHelper.recomputeInfluence(color)
+    end
+end
+
+function resetPlanets()
+    local lowercaseNameToPlanet = _systemHelper.planets()
+    local guidToPosition = {}
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Card' and object.is_face_down and lowercaseNameToPlanet[string.lower(object.getName())] then
+            guidToPosition[object.getGUID()] = object.getPosition()
+        end
+    end
+
+    guidToZoneColor = _zoneHelper.zonesFromPositions(guidToPosition)
+    for guid, zoneColor in pairs(guidToZoneColor) do
+        if zoneColor then
+            local card = getObjectFromGUID(guid)
+            card.flip()
+        end
     end
 end

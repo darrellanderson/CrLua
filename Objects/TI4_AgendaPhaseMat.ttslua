@@ -13,9 +13,14 @@ function getHelperClient(helperObjectName)
     end
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
+local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 local _strategyCardHelper = getHelperClient('TI4_STRATEGY_CARD_HELPER')
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
+
+local CARD_SCALE_XZ = 2
+
+local _scriptingZone = false
 
 function onLoad(save_state)
     local x = 1.44
@@ -68,11 +73,88 @@ function onLoad(save_state)
     self.setSnapPoints({
         {
             position      = { x = 0, y = 0, z = 0 },
-            rotation      = { x = 0, y = 90, z = 0 },
+            rotation      = { x = 0, y = 0, z = 0 },
             rotation_snap = true
         }
     })
+
+    createScriptingZone()
+    resetScriptingZone()
 end
+
+-------------------------------------------------------------------------------
+
+function isRelevantCard(enterObject)
+    assert(type(enterObject) == 'userdata')
+    return enterObject.tag == 'Card' and _deckHelper.isAgendaCard(enterObject.getName())
+end
+
+function onObjectEnterScriptingZone(zone, enterObject)
+    if zone == _scriptingZone and isRelevantCard(enterObject) then
+        enterObject.setScale({
+            x = CARD_SCALE_XZ,
+            y = 1,
+            z = CARD_SCALE_XZ,
+        })
+    end
+
+    local size = enterObject.getBoundsNormalized().size
+end
+
+function onObjectLeaveScriptingZone(zone, leaveObject)
+    if zone == _scriptingZone and isRelevantCard(leaveObject) then
+        leaveObject.setScale({
+            x = 1,
+            y = 1,
+            z = 1,
+        })
+    end
+end
+
+-------------------------------------------------------------------------------
+
+function createScriptingZone()
+    assert(not _scriptingZone)
+
+    local zoneName = self.getGUID() .. ' SCRIPTING ZONE'
+
+    local function getScriptingZone()
+        for _, object in ipairs(getAllObjects()) do
+            if object.tag == 'Scripting' and object.getName() == zoneName then
+                return object
+            end
+        end
+    end
+
+    _scriptingZone = getScriptingZone() or spawnObject({
+        type              = 'ScriptingTrigger',
+        position          = self.getPosition(),
+        rotation          = self.getRotation(),
+        sound             = false,
+        snap_to_grid      = false
+    })
+    _scriptingZone.setName(zoneName)
+end
+
+-- Attaching via joint prevents mat from being movable (???).
+-- Just reposition zone when mat moves.
+function resetScriptingZone()
+    _scriptingZone.setPosition({
+        x = self.getPosition().x,
+        y = self.getPosition().y + 2,
+        z = self.getPosition().z,
+    })
+    _scriptingZone.setRotation(self.getRotation())
+
+    local size = self.getBoundsNormalized().size
+    _scriptingZone.setScale({
+        x = 2,
+        y = 4,  -- 4 is enough, could make larger to be safe
+        z = 3,
+    })
+end
+
+-------------------------------------------------------------------------------
 
 function resetAgendaTokens()
     local resetNameSet = {
@@ -116,3 +198,14 @@ function resetPlanets()
         end
     end
 end
+
+-------------------------------------------------------------------------------
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

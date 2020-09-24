@@ -26,7 +26,6 @@ function onLoad(save_state)
     local height = 400
     local fontSize = 150
 
-    print('xxx ' .. y)
     self.createButton({
         click_function = 'resetAgendaTokens',
         function_owner = self,

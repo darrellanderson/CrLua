@@ -434,9 +434,7 @@ function _cloneSystem(system, position, rotation, lock)
                 clonedSystem[k] = v
             end
         end
-        _systemHelper.injectHomebrewSystems({
-            [clonedSystem.guid] = clonedSystem
-        })
+        _systemHelper.injectSystem(clonedSystem)
     end
 
     Wait.condition(injectClone, cloneReady)

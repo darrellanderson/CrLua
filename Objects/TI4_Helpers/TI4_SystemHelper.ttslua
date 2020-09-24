@@ -578,9 +578,9 @@ function nonPlanetResourceInfluenceCards()
 end
 
 --- Let homebrew add custom systems via runtime injection.
--- @param systems: table mapping from guid to system table.
-function injectHomebrewSystems(systems)
-    assert(type(systems) == 'table')
+-- @param system: system table.
+function injectSystem(system)
+    assert(type(system) == 'table')
 
     -- Unclear if the systems are shared with the caller, make a copy to be
     -- sure any later mutations to the caller's version does not change this.
@@ -594,28 +594,19 @@ function injectHomebrewSystems(systems)
         end
         return t
     end
-    systems = copyTable(systems)
+    system = copyTable(system)
 
-    for guid, system in pairs(systems) do
-        local success, errorMessage = _systemIsValid(system)
-        if not success then
-            error('injectSystems: ' .. guid .. ' ' .. errorMessage)
-        end
-        system.guid = nil  -- force rebuild of any auto-generated fields
-        system._homebrew = true
-        _systems[guid] = system
+    local guid = system.guid
+    if not guid or type(guid) ~= 'string' then
+        error('injectSystem: missing guid')
     end
-end
-
---- Remove systems by guid.
--- @param guid table : list of guids
-function removeHomebrewSystems(guids)
-    assert(type(guids) == 'table')
-    for _, guid in ipairs(guids) do
-        local system = _systems[guid]
-        assert(system._homebrew)  -- prevent removing non-homebrew entries
-        _systems[guid] = nil
+    local success, errorMessage = _systemIsValid(system)
+    if not success then
+        error('injectSystem: ' .. guid .. ' ' .. errorMessage)
     end
+    system.guid = nil  -- force rebuild of any auto-generated fields
+    system._homebrew = true
+    _systems[guid] = system
 end
 
 function verifyAllSystems()
@@ -630,6 +621,7 @@ function verifyAllSystems()
     if errors then
         error('verifyAllSystems ' .. table.concat(errors, ', '))
     end
+    print('verifyAllSystems: success')
 end
 
 --- Verify system follows expectations.
@@ -1021,6 +1013,8 @@ function onLoad(saveState)
     self.setScale({ x = 2, y = 0.01, z = 2 })
     self.setName('TI4_SYSTEM_HELPER')
     self.setDescription('Shared helper functions used by other objects, PLEASE LEAVE ON TABLE! This object is only visible to the black (GM) player.')
+
+    self.addContextMenuItem('Verify', verifyAllSystems)
 
     -- Only the GM/black player can see this object.  Others can still interact!
     local invisibleTo = {}

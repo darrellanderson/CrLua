@@ -25,18 +25,14 @@ local SNAP_POINTS = {
         x = 0.5,
         z = 0.5
     },
-    SPACING = {
-        x = 2.5 * CARD_SCALE_XZ,
-        z = 3.5 * CARD_SCALE_XZ
+    CARD_SIZE = {
+        x = 2 * CARD_SCALE_XZ,
+        z = 3 * CARD_SCALE_XZ
     },
     ROTATION = {
         x = 0,
         y = 180,
         z = 180
-    },
-    BOX_SIZE = {
-        x = 0.5 * CARD_SCALE_XZ,
-        z = 1 * CARD_SCALE_XZ
     },
 }
 
@@ -59,6 +55,8 @@ function onObjectEnterScriptingZone(zone, enterObject)
             z = CARD_SCALE_XZ,
         })
     end
+
+    local size = enterObject.getBoundsNormalized().size
 end
 
 function onObjectLeaveScriptingZone(zone, leaveObject)
@@ -105,10 +103,12 @@ function resetScriptingZone()
         z = self.getPosition().z,
     })
     _scriptingZone.setRotation(self.getRotation())
+
+    local size = self.getBoundsNormalized().size
     _scriptingZone.setScale({
-        x = self.getScale().x * 1.75,
+        x = size.x,
         y = 4,  -- 4 is enough, could make larger to be safe
-        z = self.getScale().z * 1.75,
+        z = size.z,
     })
 end
 
@@ -116,55 +116,31 @@ end
 
 function onLoad(save_state)
     resetSnapPoints()
-    drawSnapPoints()
 
     createScriptingZone()
     resetScriptingZone()
-
-    self.addContextMenuItem('Redraw boxes', drawSnapPoints, false)
-    self.addContextMenuItem('Reset card zone', resetScriptingZone, false)
 end
 
 function onDrop(playerColor)
     Wait.time(resetScriptingZone, 3)
 end
 
-function onPlayerTurnStart(player_color_start, player_color_previous)
-    -- in case all lines are erased, redraw on turn start
-    drawSnapPoints()
-end
-
 function resetSnapPoints()
     local bounds = self.getBoundsNormalized()
-    local scale = self.getScale()
 
     -- Create as many snap points as fit inside bounds.
-    local numCols = math.floor(bounds.size.x / SNAP_POINTS.SPACING.x)
-    local numRows = math.floor(bounds.size.z / SNAP_POINTS.SPACING.z)
+    local numCols = math.floor(bounds.size.x / SNAP_POINTS.CARD_SIZE.x)
+    local numRows = math.floor(bounds.size.z / SNAP_POINTS.CARD_SIZE.z)
 
     -- Compute spacing in local space.
-    local size = {
-        x = bounds.size.x / scale.x,
-        z = bounds.size.z / scale.z
-    }
-    local spacing = {
-        x = SNAP_POINTS.SPACING.x / scale.x,
-        z = SNAP_POINTS.SPACING.z / scale.z,
-    }
-    local padding = {
-        x = (size.x - (spacing.x * numCols)) / 2,
-        z = (size.z - (spacing.z * numRows)) / 2,
-    }
+    local size = bounds.size
+    local cardSize = SNAP_POINTS.CARD_SIZE
+    local padding = SNAP_POINTS.PADDING
 
-    local x0 = -(size.x / 2) + padding.x + (spacing.x / 2)
-    local z0 = -(size.z / 2) + padding.z + (spacing.z / 2)
-    local dx = spacing.x
-    local dz = spacing.z
-
-    local w = padding.x * 2 + numCols * spacing.x
-    local h = padding.z * 2 + numRows * spacing.z
-
-    --print('xxx ' .. w .. 'x' .. h .. ' vs scale ' .. size.x .. 'x' .. size.z)
+    local x0 = -(size.x / 2) + padding.x + (cardSize.x / 2)
+    local z0 = -(size.z / 2) + padding.z + (cardSize.z / 2)
+    local dx = cardSize.x + padding.x
+    local dz = cardSize.z + padding.x
 
     _snapPointsGrid = {}
     local allSnapPoints = {}
@@ -186,35 +162,6 @@ function resetSnapPoints()
         table.insert(_snapPointsGrid, columnEntries)
     end
     self.setSnapPoints(allSnapPoints)
-end
-
-function drawSnapPoints()
-    local thickness = 0.01
-    local color = { r = 0.3, g = 0.3, b = 0.3 }
-
-    local lines = {}
-    local dx = SNAP_POINTS.BOX_SIZE.x / self.getScale().x
-    local dz = SNAP_POINTS.BOX_SIZE.z / self.getScale().z
-
-    for rowIdx, row in ipairs(_snapPointsGrid) do
-        for colIdx, snapPoint in ipairs(row) do
-            local p = assert(snapPoint.position)
-            local y = p.y + 0.02
-            table.insert(lines, {
-                points = {
-                    { x = p.x - dx, y = y, z = p.z - dz },
-                    { x = p.x - dx, y = y, z = p.z + dz },
-                    { x = p.x + dx, y = y, z = p.z + dz },
-                    { x = p.x + dx, y = y, z = p.z - dz },
-                },
-                thickness = thickness,
-                color = color,
-                loop = true,
-                square = true
-            })
-        end
-    end
-    self.setVectorLines(lines)
 end
 
 -------------------------------------------------------------------------------

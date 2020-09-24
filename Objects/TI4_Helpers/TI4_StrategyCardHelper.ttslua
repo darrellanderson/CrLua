@@ -641,7 +641,7 @@ function moveSpeakerAgendaToken()
         local voteCounter = zoneColor and colorToVoteCounter[zoneColor]
         if voteCounter then
             local pos = voteCounter.getPosition()
-            pos.z = pos.z + 4 * (pos.z > 0 and 1 or -1)
+            pos.z = pos.z + 4.3 * (pos.z > 0 and 1 or -1)
             local rot = voteCounter.getRotation()
             rot.y = (rot.y + 180) % 360
             local collide = false

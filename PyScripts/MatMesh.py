@@ -4,22 +4,26 @@ import math
 import sys
 
 # Agenda/Laws:
-MAT_W = 23
-MAT_H = 13.5
-MAT_D = 0.4
 CARD_W = 2 * 2
 CARD_H = 3 * 2
 ROWS = 2
 COLS = 5
 
 # Agenda phase mat:
-MAT_W = 4.5
-MAT_H = 13
-MAT_D = 0.4
 CARD_W = 2
 CARD_H = 3
 ROWS = 1
 COLS = 1
+
+# Secrets mat:
+CARD_W = 2
+CARD_H = 3
+ROWS = 5
+COLS = 8
+
+MAT_W = (CARD_W * COLS) + (0.5 * (COLS + 1))
+MAT_H = (CARD_H * ROWS) + (0.5 * (ROWS + 1))
+MAT_D = 0.4
 
 CORNERS0 = [
     (-MAT_W / 2.0, 0, -MAT_H / 2.0),
@@ -52,13 +56,22 @@ sys.stdout.write('# 1 vertex normal\n')
 sys.stdout.write('\n')
 
 # Vertex texture for "blank" and for card.
-u = 0
-v = 0
+u = 0.01
+v = 0.01
 sys.stdout.write('vt {:.6f} {:.6f}\n'.format(u, v))
+
+# Agenda:
 u0 = 274.0 / 2048.0
 u1 = 494.0 / 2048.0
 v0 = 1.0 - (48.0 / 1024.0)
 v1 = 1.0 - (357.0 / 1024.0)
+
+# Secret:
+u0 = 0.29
+u1 = 1
+v0 = 0
+v1 = 1
+
 UVs = [
     (u0, v0),
     (u0, v1),

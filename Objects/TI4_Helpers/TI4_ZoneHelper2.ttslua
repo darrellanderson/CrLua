@@ -598,9 +598,17 @@ function getMapRingsVectorLines()
         local p0 = { x = 0, y = y, z = tileRadius * 2 * ringIndex }
         local hex = _systemHelper.hexFromPosition(p0)
         local dir = 2
+        local ringPoints = {}
         for edge = 1, 6 do
             for i = 1, edgeLength do
                 local hexCenter = _systemHelper.hexToPosition(hex)
+                if i == 1 then
+                    table.insert(ringPoints, {
+                        x = hexCenter.x,
+                        y = y,
+                        z = hexCenter.z
+                    })
+                end
                 local points = {}
                 for angle = 0, 300, 60 do
                     table.insert(points, {
@@ -620,6 +628,13 @@ function getMapRingsVectorLines()
             end
             dir = dir == 6 and 1 or (dir + 1)
         end
+        table.insert(lines, {
+            points = ringPoints,
+            thickness = 2,
+            color = Color.fromString(ringColors[ringIndex] or 'Grey'):setAt('a', 0.2),
+            loop = true,
+            square = true
+        })
         edgeLength = edgeLength + 1
     end
     return lines

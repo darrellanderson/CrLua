@@ -393,7 +393,7 @@ function setupCodexACs(useCodexACs)
             for _, entry in ipairs(variantsBag.getObjects()) do
                 if entry.name == 'Codex Action Cards' then
                     codexDeck = variantsBag.takeObject({
-                        entry.guid,
+                        guid = entry.guid,
                         position = aboveActionDeckPos,
                         rotation = actionDeck.getRotation(),
                         smooth = true
@@ -402,6 +402,7 @@ function setupCodexACs(useCodexACs)
                 end
             end
         end
+
         if codexDeck then
             print('Setup codex action cards: adding to actions deck')
         else

@@ -602,7 +602,7 @@ function getMapRingsVectorLines()
             for i = 1, edgeLength do
                 local hexCenter = _systemHelper.hexToPosition(hex)
                 local points = {}
-                for angle = 0, 360, 60 do
+                for angle = 0, 300, 60 do
                     table.insert(points, {
                         x = hexCenter.x + math.cos(math.rad(angle)) * tileRadius / 6,
                         y = y,

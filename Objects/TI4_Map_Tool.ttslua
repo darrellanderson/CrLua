@@ -928,35 +928,6 @@ end
 
 function onButtonDrawLines()
     _zoneHelper.drawBordersVectorLines({})
-
-    -- Also draw map rings.  These are drawn via global.
-    local lines = {}
-    local tileDiameter = getInscribedTileRadius() * 2
-    local ringColors = {
-        'Teal', 'Orange', 'Pink'
-    }
-    local tableY = getTableY()
-    for i, color in ipairs(ringColors) do
-        local r = i * tileDiameter
-        local ring = {}
-        for degreesNorth = 0, 359, 60 do
-            local phi = math.rad(degreesNorth)
-            table.insert(ring, {
-                x = math.sin(phi) * r,
-                y = tableY + 0.01,
-                z = math.cos(phi) * r
-            })
-        end
-        table.insert(lines, {
-            points = ring,
-            color = color,
-            thickness = 0.1,
-            loop = true,
-            square = true
-        })
-    end
-
-    Global.setVectorLines(lines)
 end
 
 -------------------------------------------------------------------------------

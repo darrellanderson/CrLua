@@ -23,6 +23,7 @@ function getHelperClient(helperObjectName)
     end
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
+local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 
 local DEFAULT_VECTOR_LINE_THICKNESS = 0.15
 
@@ -569,6 +570,61 @@ function getBordersVectorLines(parameters)
     return lines
 end
 
+function getMapRingsVectorLines()
+    local tileRadius = math.sqrt((Grid.sizeX/2)^2 - (Grid.sizeX/4)^2)
+
+    local elevateY = 0.02
+    local y = _table.y + elevateY
+    local function polygonToPoints(polygon)
+        local points = {}
+        for _, p in ipairs(polygon) do
+            table.insert(points, { x = p[1], y = y, z = p[2] })
+        end
+        return points
+    end
+
+    local thickness = 0.1
+    local ringColors = {
+        'Teal',
+        'Orange',
+        'Pink',
+        'Blue',
+        'White',
+    }
+
+    local lines = {}
+    local edgeLength = 1
+    for ringIndex = 1, 3 + _extraRings do
+        local p0 = { x = 0, y = y, z = tileRadius * 2 * ringIndex }
+        local hex = _systemHelper.hexFromPosition(p0)
+        local dir = 2
+        for edge = 1, 6 do
+            for i = 1, edgeLength do
+                local hexCenter = _systemHelper.hexToPosition(hex)
+                local points = {}
+                for angle = 0, 360, 60 do
+                    table.insert(points, {
+                        x = hexCenter.x + math.cos(math.rad(angle)) * tileRadius / 6,
+                        y = y,
+                        z = hexCenter.z + math.sin(math.rad(angle)) * tileRadius / 6
+                    })
+                end
+                table.insert(lines, {
+                    points = points,
+                    thickness = thickness,
+                    color = ringColors[ringIndex] or 'Grey',
+                    loop = true,
+                    square = true
+                })
+                hex = _systemHelper.hexNeighbors(hex)[dir]
+            end
+            dir = dir == 6 and 1 or (dir + 1)
+        end
+        edgeLength = edgeLength + 1
+    end
+    return lines
+end
+
 -------------------------------------------------------------------------------
 
 function _boundingBox(polygonXZ)
@@ -807,6 +863,11 @@ function drawBordersVectorLines(highlightCurrentPlayer)
         for _, line2 in ipairs(lines2) do
             table.insert(lines, line2)
         end
+    end
+
+    -- Add system rings.
+    for _, line in ipairs(getMapRingsVectorLines()) do
+        table.insert(lines, line)
     end
 
     -- Move to local space.

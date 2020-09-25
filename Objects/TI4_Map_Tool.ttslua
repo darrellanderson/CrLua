@@ -927,36 +927,10 @@ end
 -------------------------------------------------------------------------------
 
 function onButtonDrawLines()
-    local function isZoneHelper2()
-        for _, object in ipairs(getAllObjects()) do
-            if object.getName() == 'TI4_ZONE_HELPER' then
-                return object.getVar('drawBordersVectorLines') and true
-            end
-        end
-    end
-
-    local lines = {}
-
-    if isZoneHelper2() then
-        _zoneHelper.drawBordersVectorLines({})
-    else
-        local _thickness = 0.1
-        for _, color in ipairs(_zoneHelper.zones()) do
-            table.insert(lines, {
-                points = _zoneHelper.zoneBorder({
-                    color = color,
-                    inset = _thickness / 2.0,
-                    clipToTable = true,
-                }),
-                color = color,
-                thickness = _thickness,
-                loop = true,
-                square = true
-            })
-        end
-    end
+    _zoneHelper.drawBordersVectorLines({})
 
     -- Also draw map rings.  These are drawn via global.
+    local lines = {}
     local tileDiameter = getInscribedTileRadius() * 2
     local ringColors = {
         'Teal', 'Orange', 'Pink'

@@ -180,9 +180,7 @@ function resetAgendaTokens()
 end
 
 function resetVotes()
-    for _, color in ipairs(_zoneHelper.zones()) do
-        _strategyCardHelper.recomputeInfluence(color)
-    end
+    _strategyCardHelper.recomputeInfluence(false)
 end
 
 function resetPlanets()

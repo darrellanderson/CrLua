@@ -204,7 +204,7 @@ end
 
 function returnStrategyCardsAndEndStatusPhase(obj, playerClickerColor, altClick)
     _reset('return')
-    _strategyCardHelper.endStatusPhaseInInitiativeOrder(_assignedTurnOrder)
+    _strategyCardHelper.endStatusPhase()
 end
 
 -------------------------------------------------------------------------------

@@ -697,6 +697,13 @@ function dealCoroutine()
         local deckTransform = _getTransform(params.deckAttributes, 'deck')
         local deck = _getDeck(deckTransform)
 
+        if deck.remainder then
+            deck = deck.remainder
+        end
+        while deck.spawning do
+            coroutine.yield(0)
+        end
+
         -- Deal as many cards as able.
         if deck then
             local dealCount = 0

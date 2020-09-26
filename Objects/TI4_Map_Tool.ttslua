@@ -82,6 +82,8 @@ local _mapString = false
 local _tileClonesGuidSet = {}
 local _hasCloneMenuGuidSet = {}
 
+local _clones = false
+
 -------------------------------------------------------------------------------
 
 -- Expose a function for outsiders (and self) to set the map string.
@@ -107,10 +109,34 @@ end
 
 -------------------------------------------------------------------------------
 
-function onLoad()
+function onLoad(saveState)
     createInputs()
     self.addContextMenuItem('Add Clone To Tiles', addCloneMenuOptionToSystemTiles)
+
+    -- If any clones are still on the table, add them to the systems table.
+    _clones = (saveState and string.len(saveState) > 0 and JSON.decode(saveState)) or {}
+    for _, clone in ipairs(_clones) do
+        if getObjectFromGUID(clone.guid) then
+            _systemHelper.injectSystem(clone)
+        end
+    end
+    if #_clones > 0 then
+        print('Map tool: registering ' .. (#_clones) .. ' cloned system tiles')
+    end
 end
+
+function onSave()
+    -- Only save clones still on table.
+    local activeClones = {}
+    for _, clone in ipairs(_clones) do
+        if getObjectFromGUID(clone.guid) then
+            table.insert(activeClones, clone)
+        end
+    end
+    return JSON.encode(activeClones)
+end
+
+-------------------------------------------------------------------------------
 
 function onObjectDestroy(dyingObject)
     _hasCloneMenuGuidSet[dyingObject.getGUID()] = nil
@@ -434,6 +460,7 @@ function _cloneSystem(system, position, rotation, lock)
                 clonedSystem[k] = v
             end
         end
+        table.insert(_clones, clonedSystem)
         _systemHelper.injectSystem(clonedSystem)
     end
 

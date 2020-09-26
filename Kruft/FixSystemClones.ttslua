@@ -1,0 +1,138 @@
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
+        return function(parameters) return helperObject.call(functionName, parameters) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
+
+local _diffuseUrlToSystemGuid = {
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574132572/B13E5E3CF78AB130ACB71ED15377524535DD5870/'] = '0ac98b',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574283031/FAFD6B1648E308B9616D60AE26DFAD07F81758B9/'] = 'aaae9f',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574283063/92A447E09CADA6F8AD40D774316A979780C913EE/'] = 'f11ef5',
+    ['http://cloud-3.steamusercontent.com/ugc/1495712136743144282/3FB9DA100936ACCB1210EAD4C2F061A5DC4AF51B/'] = '48ac87',
+    ['http://cloud-3.steamusercontent.com/ugc/1495712136743144334/A6F7D3C3FE2B82C2FED46B2BA334B2CA7E389843/'] = 'f8caf6',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574132271/9C0A7677A4E3BB2DF1BCA2D9A29D3D9EAA03BA13/'] = 'a284d1',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574132444/596723DA4F5CA5512C35B68B178F6AD00D85B09C/'] = 'd5ed63',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574132089/428341A22F4FA155B9E6D26F99F68C389CB4C68D/'] = '0ea77f',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574132319/CEEFEE6403ECEE5ACEFDB0D47872C699FB45BB41/'] = '7975f7',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574282965/9906280A1C59F4CBE3DF75829E1A3209E74DB486/'] = '71e1bf',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574283096/2564251DD0CC66D982F96DB54F48E9261C557AD5/'] = 'bc4bcc',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574132493/CBF6C71ECC378C53A9A00FBB54D14F09132FD522/'] = '4216fd',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574132213/9D0B997E270649E25A9251296B1352F3A6B9E269/'] = 'e0ff33',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574132379/D8727A7B038AAB85F7349EC39A9AF320F626D6C0/'] = 'dd2ca7',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574282989/A09C4FFD6CDA18FB62965914FE8AFAEA315F442F/'] = 'fc239f',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574132173/B82AE9B23DFC64C883B43A391ABDB8A651838CF4/'] = 'b958aa',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574282933/DA63A24217929615A3CDEA128B7FE66A481B5441/'] = 'f2798a',
+    ['http://cloud-3.steamusercontent.com/ugc/1495712136743144429/7079598367FD526796BB191831A25E0D226D8822/'] = '87a5a2',
+    ['http://cloud-3.steamusercontent.com/ugc/1495712136743144210/DBA44DB26C8E957D237A7FC8F5C3DF5E3898F399/'] = '48cc9f',
+    ['http://cloud-3.steamusercontent.com/ugc/1495712136743144388/B94FEBD1046621482C3D22E8EAE9F02F609CB37A/'] = 'eb99c0',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574138445/CC0B4D57A8ACE46615E9DB507303B722FE8935AE/'] = '04df02',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574134404/79B756F9ADF7C65F9C65436328F9A8913AC2AD5B/'] = '68ff91',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574134340/4B7917E1273120B02C5AE0779993362D2D108BAE/'] = 'ff5d4a',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574134279/036886F87E7BB03EB3D6F64FCFBA8438D51A940E/'] = '091456',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574134233/AAC2DD85EBE64EE64E942C9957EFE6842BFAACDB/'] = '9e78a2',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574134185/6F55D6C0313F1343069424B10D4A12328EA219D9/'] = '93ded7',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574134134/88E9F0C21C9ACB1492902223BD997B48EF1440C8/'] = 'aa722a',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574134062/73203A1C9BC0369E573780E6C38D821826D34492/'] = '59a527',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574134010/40F82DA3130C43B58AA5659CAE7CCA19FE51779F/'] = 'c7664d',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574133964/E427EF9811DB9DE030417EB8DF6D62E7089BD06C/'] = 'a682b7',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574133915/3C08A6E1D3ACAAEDDE72C46E3F19D2AD085B122A/'] = '8b7570',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574133840/D4459258953FB9124FBFC4E3A998601FB67A7561/'] = 'ab3334',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574133787/6887C57870A7992D5562F91C16D074398D803DD8/'] = '4e20b3',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574133742/2623DDE79DB7C4AE8F0183CF6F3FD1E52A04982F/'] = 'ce68ae',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574133691/53D85A7246D6CC8106ACA95042B55D8F5ED008C2/'] = '950735',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574133650/77D81E0B56874D54DE1829635867BB7DE4E37C5B/'] = '73e4db',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574133602/7A261CD11C788C6A3B78403D117C24F70F51E59C/'] = '35baa0',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574133556/12B1BAF62B77AB097C8291EFD4717C8675DDBA51/'] = '9e0a4a',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574133501/1F13469B5B532048678C61F99ECC20D952CA41BA/'] = '8b4ba2',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574133444/EFEAB0051FE2520BDE9B552DCD4BFB98BDAD3CD5/'] = '23c5e9',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574133398/34944C9FE9B5FD2C4A5B426B12FCD795AAA6291A/'] = '683401',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574133336/924207E15248E761625B87CCE335024EFBA1550A/'] = 'cf3242',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574133294/DED928A294A62E1F8A34BD72BF412FB6606C4585/'] = '0aafd9',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574133150/E1B2F000CC1EAA39BC1A3755FFF74DCDEFED5D23/'] = '0216be',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574133097/8CECEB98362CED5DB3C290933012387F74AE05DF/'] = 'd13aa2',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574133053/FE6836006B7CE2F8000D1C033EF5E1F824D6429C/'] = '9dce5a',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574133222/D7978A92BB96215132607720783114ABD78DCDE6/'] = '97ee53',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574132832/DF89F2AB7DC881E1DEC646FF97AC109C97F9C419/'] = 'ccd7ac',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574132624/FB28D049A2CD42CA2D1A61B94D79EC17A894BD81/'] = '0378a4',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574132991/23C9DCCECA493E66FAA10D9CD5AEBE1F70BC10DE/'] = 'cd58c7',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574132929/D1DB990D7481969A31D8C3D0091E4E284363BD9C/'] = '7db8d8',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574132784/3CC342CBF9619974C9457AFBA3711DD378D004B9/'] = 'dca098',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574132720/ACBCD65C7784BBFEB8F5758E26A7E849D0B747FE/'] = 'ff8f60',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574132669/D11060E2AFA8ED2E538E5EEF9302FAFF27CE5450/'] = '437f06',
+    ['http://cloud-3.steamusercontent.com/ugc/1499089960574132885/C0EB03A6116A7DBDA8A055268EFF29E2850FF465/'] = '47a55d',
+}
+
+local _guidToSystem = false
+
+function onLoad(saveState)
+    _guidToSystem = _systemHelper.systems()
+    self.addContextMenuItem('Fix system clones', fixSystemClones)
+end
+
+function _isClone(object)
+    if not object.tag == 'Generic' then
+        return false  -- not a system tile
+    end
+    if _guidToSystem[object.getGUID()] then
+        return false  -- this is an original system
+    end
+    if string.match(object.getName(), 'Arena$') then
+        return false  -- multiroller arena
+    end
+    local custom = object.getCustomObject()
+    --for k, v in pairs(custom) do print(k .. ' ' .. tostring(v)) end
+    return _diffuseUrlToSystemGuid[custom.diffuse] or false
+end
+
+function fixSystemClones()
+    local inject = {}
+
+    for _, object in ipairs(getAllObjects()) do
+        local originalSystemGuid = _isClone(object)
+        if originalSystemGuid then
+            local system = assert(_guidToSystem[originalSystemGuid])
+            print('Fixing ' .. object.getGUID() .. ' ' .. (system.string or '-'))
+            system = _copy(system)
+            system.guid = object.getGUID()
+            table.insert(inject, system)
+        end
+    end
+    print('Fixing ' .. (#inject) .. ' system clones')
+
+    for _, system in ipairs(inject) do
+        _systemHelper.injectSystem(system)
+    end
+end
+
+function _copy(t)
+    if t and type(t) == 'table' then
+        local copy = {}
+        for k, v in pairs(t) do
+            copy[k] = type(v) == 'table' and _copy(v) or v
+        end
+        t = copy
+    end
+    return t
+end
+
+-------------------------------------------------------------------------------
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

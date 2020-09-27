@@ -465,12 +465,39 @@ function updateNotesCoroutine()
         rows[i] = table.concat(row, gap) .. ' '
     end
 
-    -- Optionally print to console, do this before prepending empty lines!
-    -- Prepend a throwaway line in case timestamp prefix or something.
+    -- Optionally add to player notes, do this before prepending empty lines!
     if _logNext then
         _logNext = false
-        local logMessage = 'TI Stats:\n' .. table.concat(rows, '\n')
-        printToAll(logMessage)
+
+        local prefix = '[888888]!! '
+        local prefixPattern = '%[888888%]!! '
+        local rowsWithPrefix = {
+            prefix .. ' Lines starting with this prefix reset each turn.',
+            prefix .. ' Player stats when current turn (' .. (Turns.turn_color or 'N/A') .. ') started:'
+        }
+        for _, row in ipairs(rows) do
+            table.insert(rowsWithPrefix, prefix .. row)
+        end
+        local message = table.concat(rowsWithPrefix, '\n')
+
+        local colorSet = {}
+        for _, color in ipairs(_zoneHelper.zones()) do
+            colorSet[color] = true
+        end
+        for _, tab in ipairs(Notes.getNotebookTabs()) do
+            if colorSet[tab.color] then
+                -- Strip out previous notes.
+                local lines = {}
+                for line in string.gmatch(tab.body, '([^\n]*)\n?') do
+                    if not string.match(line, prefixPattern) then
+                        table.insert(lines, line)
+                    end
+                end
+
+                tab.body = message .. '\n[888888]\n' .. table.concat(lines, '\n')
+                Notes.editNotebookTab(tab)
+            end
+        end
     end
 
     -- Prepend lines so text is bottom-aligned.
@@ -502,7 +529,7 @@ end
 function startPeriodicUpdates()
     if not _waitId then
         printToAll('Showing TI4 stats in notes (lower right).  Stats are score, resources/influence (ready and total), commodities/trade goods, and tactics/fleet/stategy command token counts.  To disable, either right-click the table and select "Hide TI4 Stats" to hide for all, or individual players may disable them via Menu -> Configuration -> Interface -> Notes.')
-        _logNext = true
+        -- Only update player notes when a turn starts.
     end
     if _waitId then
         -- Already running?  Stop and schedule the next soon.  Do not

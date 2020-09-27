@@ -500,12 +500,15 @@ function updateNotesCoroutine()
         end
     end
 
-    -- Prepend lines so text is bottom-aligned.
-    while #rows < WINDOW_SIZE.ROWS do
-        table.insert(rows, 1, '')
+    -- Log to on-screen notes if updates are enabled.
+    if _periodicUpdates then
+        -- Prepend lines so text is bottom-aligned.
+        while #rows < WINDOW_SIZE.ROWS do
+            table.insert(rows, 1, '')
+        end
+        local notes = table.concat(rows, '\n')
+        Notes.setNotes(notes)
     end
-    local notes = table.concat(rows, '\n')
-    Notes.setNotes(notes)
 
     return 1
 end
@@ -569,13 +572,12 @@ function onLoad(save_state)
 end
 
 function onPlayerTurnStart(player_color_start, player_color_previous)
+    -- ALWAYS update player notes, even if not enabled.
     if _waitId then
-        -- Stop updates for a moment, schedule on "soon".  Do NOT act right
-        -- away because Active/Passed may pass a number of turns in succession.
         Wait.stop(_waitId)
-        _logNext = true
-        _waitId = Wait.time(_periodicUpdateNotes, 1)
     end
+    _logNext = true
+    _waitId = Wait.time(_periodicUpdateNotes, 1)
 end
 
 -------------------------------------------------------------------------------

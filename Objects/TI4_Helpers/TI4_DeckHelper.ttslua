@@ -308,6 +308,7 @@ local _discardDeckQueue = {}
 local _waitForDestroy = {}
 local _dealQueue = {}
 local _dealCoroutineIsActive = false
+local _dealCoroutineHeartbeat = false
 
 local function _getParent(parentName)
     local guid = _parentNameToGuid[parentName]
@@ -684,23 +685,34 @@ function deal(params)
     printToAll('Dealing ' .. params.count .. ' ' .. deckWithoutS .. ' card' .. (params.count > 1 and 's' or '') .. ' to ' .. params.color)
 
     table.insert(_dealQueue, params)
+
+    -- Paranoia that an error might kill the deal coroutine but leave it marked
+    -- as active.  If active but the heartbeat is too old cancel active status.
+    if _dealCoroutineIsActive and _dealCoroutineHeartbeat and Time.time > (_dealCoroutineHeartbeat + 1) then
+        _dealCoroutineIsActive = false
+        _dealCoroutineHeartbeat = false
+    end
+
     if not _dealCoroutineIsActive then
+        _dealCoroutineIsActive = true
+        _dealCoroutineHeartbeat = Time.time
         startLuaCoroutine(self, 'dealCoroutine')
     end
 end
 
 function dealCoroutine()
-    _dealCoroutineIsActive = true
-
     while #_dealQueue > 0 do
         local params = table.remove(_dealQueue, 1)
         local deckTransform = _getTransform(params.deckAttributes, 'deck')
         local deck = _getDeck(deckTransform)
 
+        _dealCoroutineHeartbeat = Time.time
+
         if deck.remainder then
             deck = deck.remainder
         end
         while deck.spawning do
+            _dealCoroutineHeartbeat = Time.time
             coroutine.yield(0)
         end
 
@@ -714,7 +726,15 @@ function dealCoroutine()
             end
             params.count = params.count - dealCount
             deck.deal(dealCount, params.color)
+            _dealCoroutineHeartbeat = Time.time
             coroutine.yield(0)
+
+            -- Wait a moment while any deal-in-progress cards move away.
+            local waitUntil = Time.time + 1
+            while Time.time < waitUntil do
+                _dealCoroutineHeartbeat = Time.time
+                coroutine.yield(0)
+            end
         end
 
         -- If not able to deal all cards shuffle discard.
@@ -728,21 +748,26 @@ function dealCoroutine()
                 local fast = true
                 discard.setPositionSmooth({
                     x = deckTransform.position.x,
-                    y = deckTransform.position.y + bounds.size.y / 2,
+                    y = deckTransform.position.y + bounds.size.y / 2 + 0.1,
                     z = deckTransform.position.z
                 }, collide, fast)
                 discard.setRotationSmooth(deckTransform.rotation, collide, fast)
-                discard.setName(params.deckAttributes.deckName)
+                _dealCoroutineHeartbeat = Time.time
                 coroutine.yield(0)
 
                 -- Give set position smooth time to work.
                 local waitUntil = Time.time + 1
                 while Time.time < waitUntil or discard.isSmoothMoving() do
+                    _dealCoroutineHeartbeat = Time.time
                     coroutine.yield(0)
                 end
+                _dealCoroutineHeartbeat = Time.time
+                coroutine.yield(0)
 
                 if discard.tag == 'Deck' then
+                    discard.setName(params.deckAttributes.deckName)
                     discard.shuffle()
+                    _dealCoroutineHeartbeat = Time.time
                     coroutine.yield(0)
                 end
 
@@ -754,8 +779,8 @@ function dealCoroutine()
             end
         end
     end
-
     _dealCoroutineIsActive = false
+    _dealCoroutineHeartbeat = false
     return 1
 end
 

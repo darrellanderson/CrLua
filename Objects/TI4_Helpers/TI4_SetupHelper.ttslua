@@ -956,9 +956,9 @@ function setupCoroutine()
         coroutine.yield(0)
 
         -- Tell any other listeners about the change.
-        for _, object in ipairs(getAllObjects()) do
+        for i, object in ipairs(getAllObjects()) do
             if object.getVar('onSetupHelperPlayerCountChanged') then
-                object.call('onSetupHelperPlayerCountChanged')
+                Wait.frames(function() object.call('onSetupHelperPlayerCountChanged') end, i)
             end
         end
         coroutine.yield(0)

@@ -820,73 +820,93 @@ end
 
 -------------------------------------------------------------------------------
 
-local _drawBordersViewObject = false
+local _viewTypeToStaticViewObject = {}
 local _drawBordersWaitId = false
 
-function _getOrCreateViewObject()
+function _getOrCreateViewObject(viewType)
+    assert(type(viewType) == 'string')
+
     -- Use a second object with unrestricted visibility.
+    local object = _viewTypeToStaticViewObject[viewType]
+    if object then
+        return object
+    end
 
-    local voName = self.getName() .. ' view object'
-
-    -- If not known, see if there is one already out there.
-    if not _drawBordersViewObject then
-        for _, object in ipairs(getAllObjects()) do
-            if object.getName() == voName then
-                _drawBordersViewObject = object
-                break
-            end
+    -- Not in cache.  Look for it on table.
+    local voName = self.getName() .. ' view object (' .. viewType .. ')'
+    for _, object in ipairs(getAllObjects()) do
+        if object.getName() == voName then
+            _viewTypeToStaticViewObject[viewType] = object
+            return object
         end
     end
 
-    -- If not out there, create one.
-    if not _drawBordersViewObject then
-        local pos = self.getPosition()
-        _drawBordersViewObject = spawnObject({
-            type              = 'BlockSquare',
-            position          = { x = pos.x, y = pos.y - 10, z = pos.z },
-            sound             = false,
-            snap_to_grid      = false,
-        })
-        _drawBordersViewObject.setName(voName)
-        _drawBordersViewObject.setDescription('Draw faction border lines on this, not global')
-        _drawBordersViewObject.setLock(true)
-        _drawBordersViewObject.interactable = false
-    end
+    -- Not on table, create it.
+    local pos = self.getPosition()
+    local dy = {
+        static = -5,
+        dynamic = -6
+    }
+    object = spawnObject({
+        type              = 'BlockSquare',
+        position          = { x = pos.x, y = pos.y + assert(dy[viewType]), z = pos.z },
+        sound             = false,
+        snap_to_grid      = false,
+    })
+    object.setName(voName)
+    object.setDescription('Draw faction border lines on this, not global')
+    object.setLock(true)
+    object.interactable = false
 
-    return _drawBordersViewObject
+    _viewTypeToStaticViewObject[viewType] = object
+    return object
 end
 
 function clearBordersVectorLines()
-    local viewObject = assert(_getOrCreateViewObject())
+    local viewObject = assert(_getOrCreateViewObject('static'))
+    viewObject.setVectorLines({})
+    local viewObject = assert(_getOrCreateViewObject('dynamic'))
     viewObject.setVectorLines({})
 end
 
 --- Draw borders using self local space.  This leaves any global lines in place.
 function drawBordersVectorLines(highlightCurrentPlayer)
+    _drawStaticVectorLines()
+    if highlightCurrentPlayer and Turns.enable and Turns.turn_color then
+        _drawDynamicVectorLines()
+    end
+end
+
+function _drawStaticVectorLines()
     local lines = getBordersVectorLines({
         ghostHomePositions = false,
     })
-
-    -- If it is a player's turn, inset a line in their zone.
-    if highlightCurrentPlayer and Turns.enable and Turns.turn_color then
-        local lines2 = getBordersVectorLines({
-            inset = DEFAULT_VECTOR_LINE_THICKNESS * 3,
-            thickness = DEFAULT_VECTOR_LINE_THICKNESS * 2,
-            colors = { Turns.turn_color },
-            borderOnly = true,
-        })
-        for _, line2 in ipairs(lines2) do
-            table.insert(lines, line2)
-        end
-    end
-
     -- Add system rings.
     for _, line in ipairs(getMapRingsVectorLines()) do
         table.insert(lines, line)
     end
 
     -- Move to local space.
-    local viewObject = assert(_getOrCreateViewObject())
+    local viewObject = assert(_getOrCreateViewObject('static'))
+    for _, line in ipairs(lines) do
+        for i, point in ipairs(line.points) do
+            line.points[i] = viewObject.positionToLocal(point)
+        end
+    end
+    viewObject.setVectorLines(lines)
+end
+
+function _drawDynamicVectorLines()
+    local lines = {}
+    if Turns.enable and Turns.turn_color then
+        lines = getBordersVectorLines({
+            inset = DEFAULT_VECTOR_LINE_THICKNESS * 3,
+            thickness = DEFAULT_VECTOR_LINE_THICKNESS * 2,
+            colors = { Turns.turn_color },
+            borderOnly = true,
+        })
+    end
+    local viewObject = assert(_getOrCreateViewObject('dynamic'))
     for _, line in ipairs(lines) do
         for i, point in ipairs(line.points) do
             line.points[i] = viewObject.positionToLocal(point)
@@ -896,7 +916,7 @@ function drawBordersVectorLines(highlightCurrentPlayer)
 end
 
 function onPlayerTurnStart(player_color_start, player_color_previous)
-    Wait.frames(function() drawBordersVectorLines(true) end, 4)
+    Wait.frames(function() _drawDynamicVectorLines() end, 4)
 end
 
 -------------------------------------------------------------------------------

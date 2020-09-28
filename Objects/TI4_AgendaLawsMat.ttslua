@@ -40,7 +40,19 @@ local SNAP_POINTS = {
 local _snapPointsGrid = false
 local _scriptingZone = false
 
+local _attachedGuidToName = {}
+local _laws = {}
+
+local _temporaryIgnoreSet = {}
+
 -------------------------------------------------------------------------------
+
+function recomputeLaws()
+    _laws = {}
+    for _, name in pairs(_attachedGuidToName) do
+        _laws[name] = true
+    end
+end
 
 function isRelevantCard(enterObject)
     assert(type(enterObject) == 'userdata')
@@ -54,6 +66,8 @@ function onObjectEnterScriptingZone(zone, enterObject)
             y = 1,
             z = CARD_SCALE_XZ,
         })
+        _attachedGuidToName[enterObject.getGUID()] = enterObject.getName()
+        recomputeLaws()
     end
 
     local size = enterObject.getBoundsNormalized().size
@@ -66,6 +80,8 @@ function onObjectLeaveScriptingZone(zone, leaveObject)
             y = 1,
             z = 1,
         })
+        _attachedGuidToName[leaveObject.getGUID()] = nil
+        recomputeLaws()
     end
 end
 
@@ -114,11 +130,18 @@ end
 
 -------------------------------------------------------------------------------
 
-function onLoad(save_state)
+function onLoad(saveState)
     resetSnapPoints()
 
     createScriptingZone()
     resetScriptingZone()
+
+    _attachedGuidToName = (saveState and string.len(saveState) > 0 and JSON.decode(saveState)) or {}
+    recomputeLaws()
+end
+
+function onSave()
+    return JSON.encode(_attachedGuidToName)
 end
 
 function onDrop(playerColor)
@@ -162,6 +185,37 @@ function resetSnapPoints()
         table.insert(_snapPointsGrid, columnEntries)
     end
     self.setSnapPoints(allSnapPoints)
+end
+
+-------------------------------------------------------------------------------
+
+function _antiIntellecualRevolution(triggerName)
+    broadcastToAll('Anti-Intellectual Revolution, ' .. triggerName .. ': after researching a techology destroy one non-fighter ship.', 'Red')
+end
+
+function onStrategyCardPlayed(strategyCardGuid)
+    local strategyCard = strategyCardGuid and getObjectFromGUID(strategyCardGuid)
+    strategyCard = strategyCard and strategyCard.getName()
+
+    if strategyCard == 'Technology' and _laws['Anti-Intellectual Revolution'] then
+        _antiIntellecualRevolution(strategyCard .. ' played')
+    end
+end
+
+function onObjectEnterContainer(container, enterObject)
+    local name = enterObject.getName()
+    if enterObject.tag == 'Card' and _laws['Anti-Intellectual Revolution'] and not _temporaryIgnoreSet[name] then
+        local triggerSet = {
+            ['Focused Research'] = true,
+            ['Technology Rider'] = true,
+            ['Ixthian Artifact'] = true,
+        }
+        if triggerSet[name] then
+            _temporaryIgnoreSet[name] = true
+            Wait.time(function() _temporaryIgnoreSet[name] = nil end, 10)
+            _antiIntellecualRevolution(name .. ' discarded')
+        end
+    end
 end
 
 -------------------------------------------------------------------------------

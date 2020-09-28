@@ -195,6 +195,18 @@ function _onClickPlay(strategyCard, parameters, playerColor)
         broadcastToAll('Activating ' .. strategyCard.getName(), playerColor)
         strategyCard.call(parameters.onPlayCallback, playerColor)
     end
+
+    -- Tell any interested parties.
+    local informObjects = {}
+    for _, object in ipairs(getAllObjects()) do
+        if object.getVar('onStrategyCardPlayed') then
+            table.insert(informObjects, object)
+        end
+    end
+    local guid = strategyCard.guid
+    for i, object in ipairs(informObjects) do
+        Wait.frames(function() object.call('onStrategyCardPlayed', guid) end, i)
+    end
 end
 
 -------------------------------------------------------------------------------

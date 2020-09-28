@@ -40,6 +40,8 @@ local _waitId = false
 local _logNext = false
 local _periodicUpdates = false
 
+local _noteBody = false
+
 -------------------------------------------------------------------------------
 
 function getHelperClient(helperObjectName)
@@ -466,37 +468,38 @@ function updateNotesCoroutine()
     end
 
     -- Optionally add to player notes, do this before prepending empty lines!
-    if _logNext then
-        _logNext = false
-
-        local prefix = '[888888]!! '
-        local prefixPattern = '%[888888%]!! '
-        local rowsWithPrefix = {
-            prefix .. ' Lines starting with this prefix reset each turn.',
-            prefix .. ' Player stats when current turn (' .. (Turns.turn_color or 'N/A') .. ') started:'
-        }
-        for _, row in ipairs(rows) do
-            table.insert(rowsWithPrefix, prefix .. row)
-        end
-        local message = table.concat(rowsWithPrefix, '\n')
-
-        local colorSet = {}
-        for _, color in ipairs(_zoneHelper.zones()) do
-            colorSet[color] = true
-        end
+    local tabPrefix = 'Player stats when current turn (' .. (Turns.turn_color or 'N/A') .. ') started:'
+    local tabMessage = tabPrefix .. '\n' .. table.concat(rows, '\n')
+    local function getTab()
+        local tabName = 'TI4 Stats'
         for _, tab in ipairs(Notes.getNotebookTabs()) do
-            if colorSet[tab.color] then
-                -- Strip out previous notes.
-                local lines = {}
-                for line in string.gmatch(tab.body, '([^\n]*)\n?') do
-                    if not string.match(line, prefixPattern) then
-                        table.insert(lines, line)
-                    end
-                end
-
-                tab.body = message .. '\n[888888]\n' .. table.concat(lines, '\n')
-                Notes.editNotebookTab(tab)
+            if tab.title == tabName then
+                return tab
             end
+        end
+        local tab = {
+            title = tabName,
+            body  = '',
+            color = 'Grey',
+        }
+        tab.index = Notes.addNotebookTab(tab)
+        if tab.index >= 0 then
+            return tab
+        end
+    end
+    local tab = getTab()
+
+    if _logNext and tab then
+        _logNext = false
+        _noteBody = tabMessage
+        tab.body = tabMessage
+        Notes.editNotebookTab(tab)
+    elseif _noteBody and tab then
+        -- Check if modified.
+        if tab.body ~= _noteBody then
+            print('TI4 Stats: ' .. tab.title .. ' edited, resetting')
+            tab.body = _noteBody
+            Notes.editNotebookTab(tab)
         end
     end
 

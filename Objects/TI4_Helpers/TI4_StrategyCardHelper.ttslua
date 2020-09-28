@@ -359,7 +359,7 @@ function recomputeInfluence(includeFaceDown)
                 end
             elseif tag == 'Card' then
                 if name == 'Representative Government' then
-                    if not card.is_face_down and not _deckHelper.isDiscard(guid) then
+                    if not object.is_face_down and not _deckHelper.isDiscard(guid) then
                         representativeGovernment = true
                         broadcastToAll('Representative Government active.', {0.1,0.5,0.1})
                     end

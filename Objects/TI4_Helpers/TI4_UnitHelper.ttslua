@@ -113,8 +113,8 @@ local _unitOverrides = {
     ['Prototype War Sun II'] = { upgrade = 'War Sun', disablePlanetaryShield = true, sustainDamage = true, bombardment = { dice = 3, hit = 3 }, cost = 10, spaceCombat = { dice = 3, hit = 3 }, move = 3, capacity = 6 },
     ['Spec Ops I'] = { override = 'Infantry', groundCombat = { hit = 7 } },
     ['Spec Ops II'] = { upgrade = 'Infantry', groundCombat = { hit = 6 } },
-    ['Super Dreadnought I'] = { override = 'Dreadnought', capacity = 2 },
-    ['Super Dreadnought II'] = { upgrade = 'Dreadnought', bombardment = { dice = 1, hit = 4 }, move = 2, capacity = 2 },
+    ['Super-Dreadnought I'] = { override = 'Dreadnought', capacity = 2 },
+    ['Super-Dreadnought II'] = { upgrade = 'Dreadnought', bombardment = { dice = 1, hit = 4 }, move = 2, capacity = 2 },
 
     -- Codex.
     ['????_REDACTED_????'] = { override = 'Destroyer', antiFighterBarrage = { dice = 3, hit = 6 }, spaceCombat = { hit = 7 }, capacity = 1 },
@@ -139,34 +139,46 @@ local _unitOverrides = {
     ['[0.0.1]'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 5 }, capacity = 5 },
 }
 
-local _rollModifiers = {
-    ['Antimass Deflectors'] = {
-        description = '-1 to all SPACE CANNON rolls',
-    },
-
-    ['Blitz'] = {
-        description = 'BOMBARDMENT 6 to non-fighter, non-bomdbardment ships',
-    },
-
-    ['Bunker'] = {
-        description = '-4 to all BOMBARDMENT rolls',
-        anywhereOnTable = true,
-    },
-
+local _flagshipModifiers = {
     ["C'morran N'orr"] = {
         description = "+1 to all COMBAT rolls for other ships with the C'morran N'orr",
     },
 
+    ['Fourth Moon'] = {
+        description = "Opponent's ships cannot use SUSTAIN DAMAGE",
+    },
+}
+
+local _rollModifiers = {
+    ['Antimass Deflectors'] = {
+        description = '-1 to all SPACE CANNON rolls',
+        combat = true,
+    },
+
+    ['Blitz'] = {
+        description = 'BOMBARDMENT 6 to non-fighter, non-bomdbardment ships',
+        combat = true,
+    },
+
+    ['Bunker'] = {
+        description = '-4 to all BOMBARDMENT rolls',
+        combat = true,
+        anywhereOnTable = true,
+    },
+
     ['Fighter Prototype'] = {
         description = "+2 to fighters' COMBAT rolls",
+        combat = true,
     },
 
     ['Fragile'] = {
         description = '-1 to all COMBAT rolls',
+        combat = true,
     },
 
     ['Morale Boost'] = {
         description = '+1 to all COMBAT rolls',
+        combat = true,
     },
     ['Morale Boost (1)'] = { alias = 'Morale Boost' },
     ['Morale Boost (2)'] = { alias = 'Morale Boost' },
@@ -175,18 +187,23 @@ local _rollModifiers = {
 
     ['Nebula Defence'] = {
         description = '+1 to all COMBAT rolls (defender)',
+        combat = true,
+        tag = 'Generic',  -- most are cards, not this one
     },
 
     ['Plasma Scoring'] = {
-        descirption = '+1 die to a single BOMBARDMENT roll'
+        description = '+1 die to a single BOMBARDMENT roll',
+        combat = true,
     },
 
     ['Prophecy of Ixth'] = {
         description = "+1 to fighter's COMBAT rolls",
+        combat = true,
     },
 
     ['Publicize Weapon Schematics'] = {
-        description = 'War Suns lose SUSTAIN DAMAGE'
+        description = 'War Suns lose SUSTAIN DAMAGE',
+        anywhereOnTable = true,
     },
 
     ['Regulated Conscription'] = {
@@ -195,11 +212,13 @@ local _rollModifiers = {
     },
 
     ['Tekklar Legion'] = {
-        description = '+1 to all COMBAT rolls for attacker',  -- -1 to Sardakk if other player has it
+        description = '+1 to all COMBAT rolls for attacker, -1 to Sardakk if opponent owns',  -- -1 to Sardakk if other player has it
+        combat = true,
     },
 
     ['Unrelenting'] = {
         description = '+1 to all COMBAT rolls',
+        combat = true,
     },
 }
 
@@ -216,42 +235,45 @@ function unitAttributesSummary(unitAttrs)
 
     local message = {}
     for unitType, attrs in pairs(unitAttrs) do
-        local unitMessage = {}
-        if attrs.name and attrs.name ~= unitType then
-            table.insert(unitMessage, 'name="' .. attrs.name .. '"')
-        end
-        for k, v in pairs(attrs) do
-            if k == 'antiFighterBarrage' then
-                table.insert(unitMessage, k .. '=' .. v.hit .. 'x' .. v.dice )
-            elseif k == 'bombardment' then
-                table.insert(unitMessage, k .. '=' .. v.hit .. 'x' .. v.dice )
-            elseif k == 'capacity' then
-                table.insert(unitMessage, k .. '=' .. v )
-            elseif k == 'cost' then
-                table.insert(unitMessage, k .. '=' .. v )
-            elseif k == 'disablePlanetaryShield' then
-                table.insert(unitMessage, k .. '=true')
-            elseif k == 'groundCombat' then
-                table.insert(unitMessage, k .. '=' .. v.hit .. 'x' .. v.dice )
-            elseif k == 'move' then
-                table.insert(unitMessage, k .. '=' .. v )
-            elseif k == 'planetaryShield' then
-                table.insert(unitMessage, k .. '=true')
-            elseif k == 'production' then
-                table.insert(unitMessage, k .. '=' .. v )
-            elseif k == 'spaceCannon' then
-                table.insert(unitMessage, k .. '=' .. v.hit .. 'x' .. v.dice )
-            elseif k == 'spaceCombat' then
-                table.insert(unitMessage, k .. '=' .. v.hit .. 'x' .. v.dice )
-            elseif k == 'structure' then
-                table.insert(unitMessage, k .. '=true')
-            elseif k == 'sustainDamage' then
-                table.insert(unitMessage, k .. '=true')
-            elseif not ignoreAttributeSet[k] then
-                error('unknown attribute "' .. k .. '"')
+        -- Only include if key is a unit type.  Let other fields exist.
+        if _unitTypes[unitType] then
+            local unitMessage = {}
+            if attrs.name and attrs.name ~= unitType then
+                table.insert(unitMessage, 'name="' .. attrs.name .. '"')
             end
+            for k, v in pairs(attrs) do
+                if k == 'antiFighterBarrage' then
+                    table.insert(unitMessage, k .. '=' .. v.hit .. 'x' .. v.dice )
+                elseif k == 'bombardment' then
+                    table.insert(unitMessage, k .. '=' .. v.hit .. 'x' .. v.dice )
+                elseif k == 'capacity' then
+                    table.insert(unitMessage, k .. '=' .. v )
+                elseif k == 'cost' then
+                    table.insert(unitMessage, k .. '=' .. v )
+                elseif k == 'disablePlanetaryShield' then
+                    table.insert(unitMessage, k .. '=true')
+                elseif k == 'groundCombat' then
+                    table.insert(unitMessage, k .. '=' .. v.hit .. 'x' .. v.dice )
+                elseif k == 'move' then
+                    table.insert(unitMessage, k .. '=' .. v )
+                elseif k == 'planetaryShield' then
+                    table.insert(unitMessage, k .. '=true')
+                elseif k == 'production' then
+                    table.insert(unitMessage, k .. '=' .. v )
+                elseif k == 'spaceCannon' then
+                    table.insert(unitMessage, k .. '=' .. v.hit .. 'x' .. v.dice )
+                elseif k == 'spaceCombat' then
+                    table.insert(unitMessage, k .. '=' .. v.hit .. 'x' .. v.dice )
+                elseif k == 'structure' then
+                    table.insert(unitMessage, k .. '=true')
+                elseif k == 'sustainDamage' then
+                    table.insert(unitMessage, k .. '=true')
+                elseif not ignoreAttributeSet[k] then
+                    error('unknown attribute "' .. k .. '"')
+                end
+            end
+            table.insert(message, unitType .. ': ' .. table.concat(unitMessage, ', '))
         end
-        table.insert(message, unitType .. ': ' .. table.concat(unitMessage, ', '))
     end
 
     return table.concat(message, '\n')
@@ -260,7 +282,7 @@ end
 --- Get unit attributes.
 -- @param unitOverrides table : list of unit override name strings.
 -- @return table : unit type to unit attributes tables.
-function unitAttributes(unitOverrides)
+function getUnitAttributes(unitOverrides)
     assert(type(unitOverrides) == 'table')
 
     -- Overwrite orig fields.
@@ -305,31 +327,44 @@ function unitAttributes(unitOverrides)
     return result
 end
 
-function applyRollModifiers(unitAttrs, myColor, myRollModifiers, opponentColor, opponentRollModifiers)
-    assert(type(unitAttrs) == 'table')
-    assert(type(myColor) == 'string' and type(myRollModifiers) == 'table')
-    assert(type(opponentColor) == 'string' and type(opponentRollModifiers) == 'table')
+function applyFlagshipModifiers(params)
+    assert(type(params.unitAttrs) == 'table')
+    assert(type(params.myColor) == 'string')
+    assert(not params.myUnitTypeToCount or type(params.myUnitTypeToCount) == 'table')
+    assert(not params.opponentColor or type(params.opponentColor) == 'string')
+    assert(not params.opponentUnitTypeToCount or type(params.opponentUnitTypeToCount) == 'table')
 
-    unitAttrs = _copy(unitAttrs)
+    -- XXX TODO
+end
+
+function applyRollModifiers(params)
+    assert(type(params.unitAttrs) == 'table', 'params.unitAttrs')
+    assert(type(params.myColor) == 'string', 'params.myColor')
+    assert(type(params.myRollModifiers) == 'table', 'params.myRollModifiers')
+    assert(type(params.myUnitTypeToCount) == 'table', 'params.myUnitTypeToCount')
+    assert(not params.opponentColor or type(params.opponentColor) == 'string', 'params.opponentColor')
+    assert(not params.opponentRollModifiers or type(params.opponentRollModifiers) == 'table', 'params.opponentRollModifiers')
+    assert(not params.opponentUnitTypeToCount or type(params.opponentUnitTypeToCount) == 'table', 'params.opponentUnitTypeToCount')
+
+    local unitAttrs = _copy(params.unitAttrs)
     local modifiers = {}
 
     local mySet = {}
-    for _, name in ipairs(myRollModifiers) do
-        mySet[name] = true
-    end
     local opponentSet = {}
-    for _, name in ipairs(opponentRollModifiers) do
+    local anySet = {}  -- "anywhere on table"
+    for _, name in ipairs(params.myRollModifiers or {}) do
+        mySet[name] = true
+        anySet[name] = true
+    end
+    for _, name in ipairs(params.opponentRollModifiers or {}) do
         opponentSet[name] = true
+        anySet[name] = true
     end
 
-    if opponentSet['Antimass Deflectors'] then
-        table.insert(modifiers, 'Antimass Deflectors')
-        for _, attr in pairs(unitAttrs) do
-            if attr.spaceCannon then
-                attr.spaceCannon.hit = attr.spaceCannon.hit + 1
-            end
-        end
-    end
+    local myFaction = _factionHelper.fromColor(params.myColor)
+    myFaction = myFaction and myFaction.name
+
+    -- Consider modifiers that add/remove features before buffs/debuffs.
 
     if mySet['Blitz'] then
         table.insert(modifiers, 'Blitz')
@@ -340,9 +375,140 @@ function applyRollModifiers(unitAttrs, myColor, myRollModifiers, opponentColor, 
         end
     end
 
-    -- TODO XXX MORE MODIFIERS HERE
+    -- Now do buffs/debuffs.
 
-    return unitAttrs, modifiers
+    if opponentSet['Antimass Deflectors'] then
+        table.insert(modifiers, 'Antimass Deflectors')
+        for _, attr in pairs(unitAttrs) do
+            if attr.spaceCannon then
+                attr.spaceCannon.hit = attr.spaceCannon.hit + 1
+            end
+        end
+    end
+
+    if anySet['Bunker'] then
+        table.insert(modifiers, 'Bunker')
+        for unitType, attr in pairs(unitAttrs) do
+            if attr.bombardment then
+                attr.bombardment.hit = attr.bombardment.hit + 4
+            end
+        end
+    end
+
+    if mySet['Fighter Prototype'] then
+        table.insert(modifiers, 'Fighter Prototype')
+        unitAttrs['Fighter'].spaceCombat.hit = unitAttrs['Fighter'].spaceCombat.hit - 2
+    end
+
+    if mySet['Fragile'] then
+        table.insert(modifiers, 'Fragile')
+        for unitType, attr in pairs(unitAttrs) do
+            if attr.spaceCombat then
+                attr.spaceCombat.hit = attr.spaceCombat.hit + 1
+            end
+            if attr.groundCombat then
+                attr.groundCombat.hit = attr.groundCombat.hit + 1
+            end
+        end
+    end
+
+    if mySet['Morale Boost'] then
+        table.insert(modifiers, 'Morale Boost')
+        for unitType, attr in pairs(unitAttrs) do
+            if attr.spaceCombat then
+                attr.spaceCombat.hit = attr.spaceCombat.hit - 1
+            end
+            if attr.groundCombat then
+                attr.groundCombat.hit = attr.groundCombat.hit - 1
+            end
+        end
+    end
+
+    if mySet['Nebula Defence'] then
+        table.insert(modifiers, 'Nebula Defence')
+        for unitType, attr in pairs(unitAttrs) do
+            if attr.spaceCombat then
+                attr.spaceCombat.hit = attr.spaceCombat.hit - 1
+            end
+            if attr.groundCombat then
+                attr.groundCombat.hit = attr.groundCombat.hit - 1
+            end
+        end
+    end
+
+    if mySet['Prophecy of Ixth'] then
+        table.insert(modifiers, 'Prophecy of Ixth')
+        unitAttrs['Fighter'].spaceCombat.hit = unitAttrs['Fighter'].spaceCombat.hit - 1
+    end
+
+    if mySet['Publicize Weapon Schematics'] then
+        table.insert(modifiers, 'Publicize Weapon Schematics')
+        unitAttrs['War Sun'].sustainDamage = false
+    end
+
+    if mySet['Regulated Conscription'] then
+        table.insert(modifiers, 'Regulated Conscription')
+        unitAttrs['Fighter'].cost = 1
+        unitAttrs['Infantry'].cost = 1
+    end
+
+    if mySet['Tekklar Legion'] then
+        table.insert(modifiers, 'Tekklar Legion')
+        for unitType, attr in pairs(unitAttrs) do
+            if attr.spaceCombat then
+                attr.spaceCombat.hit = attr.spaceCombat.hit - 1
+            end
+            if attr.groundCombat then
+                attr.groundCombat.hit = attr.groundCombat.hit - 1
+            end
+        end
+    elseif opponentSet['Tekklar Legion'] and myFaction == "The Sardakk N'orr" then
+        table.insert(modifiers, 'Tekklar Legion')
+        for unitType, attr in pairs(unitAttrs) do
+            if attr.spaceCombat then
+                attr.spaceCombat.hit = attr.spaceCombat.hit + 1
+            end
+            if attr.groundCombat then
+                attr.groundCombat.hit = attr.groundCombat.hit + 1
+            end
+        end
+    end
+
+    if mySet['Unrelenting'] then
+        table.insert(modifiers, 'Unrelenting')
+        for unitType, attr in pairs(unitAttrs) do
+            if attr.spaceCombat then
+                attr.spaceCombat.hit = attr.spaceCombat.hit - 1
+            end
+            if attr.groundCombat then
+                attr.groundCombat.hit = attr.groundCombat.hit - 1
+            end
+        end
+    end
+
+    -- Consider modifiers that pick the best choice.
+
+    if mySet['Plasma Scoring'] then
+        table.insert(modifiers, 'Plasma Scoring')
+        local best = false
+        for unitType, attr in pairs(unitAttrs) do
+            if attr.bombardment and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                if (not best) or attr.bombardment.hit < best.bombardment.hit then
+                    best = attr
+                end
+            end
+        end
+        if best then
+            best.bombardment.dice = best.bombardment.dice + 1
+        end
+    end
+
+    -- Respect single return value limitation for cross-object call.
+    unitAttrs._rollModifiers = {}
+    for _, modifier in ipairs(modifiers) do
+        table.insert(unitAttrs._rollModifiers, _rollModifiers[modifier])
+    end
+    return unitAttrs
 end
 
 --- Get a table from player color to list of unit override names.
@@ -365,7 +531,7 @@ function getColorToUnitOverrides()
                 addOverride(color, faction.flagship)
             end
             for _, unit in ipairs(faction.units or {}) do
-                local attrs = _unitOverrides[unit]
+                local attrs = assert(_unitOverrides[unit], 'unknown faction unit ' .. unit)
                 if attrs.override then
                     addOverride(color, unit)
                 end
@@ -426,19 +592,41 @@ function getColorToRollModifiers()
     end
 
     -- Cards/Franken tiles.  Add "anywhereOnTable" to ALL colors.
-    local tagSet = { ['Card'] = true, ['Tile'] = true }
     local inHandGuidSet = _zoneHelper.inHand()
+    local tagSet = { ['Card'] = true, ['Tile'] = true }
+    local function getRollModifier(object)
+        if inHandGuidSet[object.getGUID()] then
+            return false
+        end
+        local rollModifier = _rollModifiers[object.getName()]
+        if not rollModifier then
+            return false
+        end
+        if rollModifier.tag then
+            if object.tag ~= rollModifier.tag then
+                return false
+            end
+        elseif not tagSet[object.tag] then
+            return false
+        end
+        if object.tag == 'Card' and object.is_face_down then
+            return false
+        end
+        return rollModifier
+    end
+
     local guidToName = {}
     local guidToPosition = {}
     for _, object in ipairs(getAllObjects()) do
-        local guid = object.getGUID()
-        local name = object.getName()
-        if (not object.is_face_down) and (not inHandGuidSet[guid]) and tagSet[object.tag] and _rollModifiers[name] then
-            name = _rollModifiers[name].alias or name
+        local rollModifier = getRollModifier(object)
+        if rollModifier then
+            local guid = object.getGUID()
+            local name = object.getName()
+            name = _rollModifiers[name].alias or object.getName()
             guidToName[guid] = name
             guidToPosition[guid] = object.getPosition()
             if _rollModifiers[name].anywhereOnTable then
-                for _, color in ipairs(_zoneHelper.getZones()) do
+                for _, color in ipairs(_zoneHelper.zones()) do
                     addModifier(color, name)
                 end
             end
@@ -508,7 +696,7 @@ function _init()
         for unitType, _ in pairs(_unitTypes) do
             local name = color .. ' ' .. unitType
             _objectNameToUnitData[name] = {
-                tag = unitType == 'Infantry' and 'Figurine' or 'Generic',
+                tag = 'Generic',
                 unitType = unitType,
                 count = 1,
                 color = color
@@ -521,13 +709,15 @@ end
 -- { unitType, count, color, hex } keys.  Tokens and flagships have no color,
 -- call fillUnitColors to add them.
 -- @return table : list of unit data tables.
-function units()
+function getUnits()
     local result = {}
     local guidToPosition = {}
     for _, object in ipairs(getAllObjects()) do
         local unitData = _objectNameToUnitData[object.getName()]
-        if unitData and unitData.tag == object.tag then
-            local unitData = _copy(tagSetAndUnitData.unitData)
+        -- Treat 'figurine' as 'generic'.
+        local tag = object.tag == 'Figurine' and 'Generic' or object.tag
+        if unitData and unitData.tag == tag then
+            local unitData = _copy(unitData)
             unitData.guid = object.getGUID()
             unitData.position = object.getPosition()
             table.insert(result, unitData)
@@ -545,11 +735,14 @@ end
 -- @param units table : list of unit data tables.
 -- @return table : list of unit data tables with colors added.
 function fillUnitColors(units)
+    assert(type(units) == 'table', 'units must be a table')
     units = _copy(units)
+
     local hexToHaveColorUnits = {}
     local hexToNeedColorUnits = {}
     for _, unit in ipairs(units) do
         if unit.factionTokenName then
+            -- Flagships do not have color in the name, lazy get color here.
             local faction = unit.factionTokenName and _factionHelper.fromTokenName(unit.factionTokenName)
             unit.color = faction and faction.color
         end
@@ -557,14 +750,14 @@ function fillUnitColors(units)
             local entry = hexToHaveColorUnits[unit.hex]
             if not entry then
                 entry = {}
-                hexToHaveColorUnits[unit.hex] = {}
+                hexToHaveColorUnits[unit.hex] = entry
             end
             table.insert(entry, unit)
         else
             local entry = hexToNeedColorUnits[unit.hex]
             if not entry then
                 entry = {}
-                hexToNeedColorUnits[unit.hex] = {}
+                hexToNeedColorUnits[unit.hex] = entry
             end
             table.insert(entry, unit)
         end
@@ -573,26 +766,71 @@ function fillUnitColors(units)
     -- Set need-color units to closest have-color.
     for hex, needColorUnits in pairs(hexToNeedColorUnits) do
         local haveColorUnits = hexToHaveColorUnits[hex] or {}
-        local p0 = needColorUnit.position
-        local bestDistanceSq, bestColor = false, false
         for _, needColorUnit in ipairs(needColorUnits) do
-            local p1 = haveColorUnit.position
-            local dSq = (p0.x - p1.x) ^ 2 + (p0.z - p1.z) ^ 2
-            if not bestDistanceSq or dSq < bestDistanceSq then
-                bestHaveColorUnit = haveColorUnit
-                bestDistanceSq = dSq
+            local p0 = needColorUnit.position
+            local bestDistanceSq, bestHaveColorUnit = false, false
+            for _, haveColorUnit in ipairs(haveColorUnits) do
+                local p1 = haveColorUnit.position
+                local dSq = (p0.x - p1.x) ^ 2 + (p0.z - p1.z) ^ 2
+                if (not bestDistanceSq) or dSq < bestDistanceSq then
+                    bestHaveColorUnit = haveColorUnit
+                    bestDistanceSq = dSq
+                end
             end
             if bestHaveColorUnit then
-                needColorUnit.color = bestHaveColorUnit.color
+                needColorUnit.color = assert(bestHaveColorUnit.color)
             end
         end
     end
     return units
 end
 
+function getColorToUnits(units)
+    assert(type(units) == 'table', 'units must be a table')
+    local colorToUnits = {}
+    for _, unit in ipairs(units) do
+        if unit.color then
+            local entry = colorToUnits[unit.color]
+            if not entry then
+                entry = {}
+                colorToUnits[unit.color] = entry
+            end
+            table.insert(entry, unit)
+        end
+    end
+    return colorToUnits
+end
+
+function getUnitTypeToCount(units)
+    assert(type(units) == 'table', 'units must be a table')
+    local unitTypeToCount = {}
+    for _, unit in ipairs(units) do
+        unitTypeToCount[unit.unitType] = (unitTypeToCount[unit.unitType] or 0) + unit.count
+    end
+    return unitTypeToCount
+end
+
+function getUnitTypeToCountSummary(unitTypeToCount)
+    local message = {}
+    for unitType, count in pairs(unitTypeToCount) do
+        local plural = (count > 1 and unitType ~= 'Infantry') and 's' or ''
+        table.insert(message, count .. ' ' .. unitType .. plural)
+    end
+    return table.concat(message, ', ')
+end
+
 -------------------------------------------------------------------------------
 
+--- Add a new unit type.
+-- Unit override MUST have a name field.
+-- @param unitOverride table : see the _unitOverrides table above for examples.
 function injectUnitOverride(unitOverride)
+    assert(type(unitOverride) == 'table', 'injectUnitOverride must be a table')
+    local name = assert(unitOverride.name, 'missing unitOverride.name')
+    assert(string.len(name) > 0, 'empty unitOverride.name')
+    _validateUnitOverride(name, unitOverride)
+    assert(not _unitOverrides[name], 'already have unitOverride.name "' .. name .. '"')
+    _unitOverrides[name] = unitOverride
 end
 
 -------------------------------------------------------------------------------
@@ -626,8 +864,14 @@ function onLoad(saveState)
     self.addContextMenuItem('Verify tables', _verifyTables)
     self.addContextMenuItem('Verify factions', _verifyFactions)
     self.addContextMenuItem('Dump attributes', _dumpAttributes)
-    self.addContextMenuItem('Demo JSON', _demoJSON)
+    self.addContextMenuItem('Dump units', _dumpUnits)
 
+    -- Add name to roll modifiers entries.
+    for name, mod in pairs(_rollModifiers) do
+        mod.name = name
+    end
+
+    -- More complicated unit finding initialization.
     _init()
 end
 
@@ -637,6 +881,13 @@ function _verifyTables()
     end
     for name, override in pairs(_unitOverrides) do
         _validateUnitOverride(name, override)
+    end
+    for name, rollModifier in pairs(_rollModifiers) do
+        if rollModifier.alias then
+            assert(_rollModifiers[rollModifier.alias], name .. ' alias does not exist')
+        else
+            assert(rollModifier.description, name .. ' missing description')
+        end
     end
     print('verifyTables: done')
 end
@@ -653,41 +904,94 @@ function _verifyFactions()
 end
 
 function _dumpAttributes()
+    -- This method shows the intended way to get per-color unit attributes
+    -- with applied roll modifiers.
     -- Ideally this would be inside a coroutine with a yield(0) between most items.
     local colorToUnitOverrides = getColorToUnitOverrides()
     local colorToRollModifiers = getColorToRollModifiers()
 
     for _, color in ipairs(_zoneHelper.zones()) do
         local unitOverrides = colorToUnitOverrides[color] or {}
-        local unitAttrs = unitAttributes(unitOverrides)
+        local rollModifiers = colorToRollModifiers[color] or {}
 
-        local myColor = color
-        local myRollModifiers = colorToRollModifiers[color] or {}
-        local opponentColor = ''
-        local opponentRollModifiers = {}
-        local unitAttrs, modifiers = applyRollModifiers(unitAttrs, myColor, myRollModifiers, opponentColor, opponentRollModifiers)
+        -- Apply unit overrides.
+        local unitAttrs = getUnitAttributes(unitOverrides)
+
+        -- Apply roll modifiers.
+        local unitAttrs = applyRollModifiers({
+            unitAttrs = unitAttrs,
+            myColor = color,
+            myRollModifiers = rollModifiers,
+            myUnitTypeToCount = {},
+            opponentColor = false,
+            opponentRollModifiers = false,
+            opponentUnitTypeToCount = false
+        })
 
         local summary = unitAttributesSummary(unitAttrs)
         print(string.upper(color) .. ':\n' .. summary)
+
+        for i, rollModifier in ipairs(unitAttrs._rollModifiers) do
+            print(i .. '. ' .. rollModifier.name .. ': ' .. rollModifier.description)
+        end
     end
 end
 
-function _demoJSON()
-    local colorToUnitOverrides = getColorToUnitOverrides()
-    local colorToRollModifiers = getColorToRollModifiers()
+function _dumpUnits()
+    -- This method shows the intended way to get units on map.
+    -- Ideally this would be inside a coroutine with a yield(0) between most items.
 
+    -- Get the active hex, and adjacent (including wormholes).
+    local system = _systemHelper.getLastActivatedSystem()
+    if not system then
+        error('no active system')
+    end
+    local hex = _systemHelper.hexFromPosition(getObjectFromGUID(system.guid).getPosition())
+    local adjacentSet = {}
+    for _, adjacent in ipairs(_systemHelper.hexNeighbors(hex)) do
+        adjacentSet[adjacent] = true
+    end
+    for _, adjacent in ipairs(_systemHelper.hexAdjacentWormholes(hex)) do
+        adjacentSet[adjacent] = true
+    end
+
+    -- Get all units on the table.
+    local units = getUnits()
+
+    -- Select units in active hex and in adjacent hexes.
+    local hexUnits = {}
+    local adjUnits = {}
+    for _, unit in ipairs(units) do
+        if unit.hex == hex then
+            table.insert(hexUnits, unit)
+        elseif adjacentSet[unit.hex] then
+            table.insert(adjUnits, unit)
+        end
+    end
+
+    -- Assign colors to flagships and anonymous tokens.
+    hexUnits = fillUnitColors(hexUnits)
+    adjUnits = fillUnitColors(adjUnits)
+
+    -- Split into per-color unit lists.
+    local colorToHexUnits = getColorToUnits(hexUnits)
+    local colorToAdjUnits = getColorToUnits(adjUnits)
+
+    -- Summarize per-color counts.
     for _, color in ipairs(_zoneHelper.zones()) do
-        local unitOverrides = colorToUnitOverrides[color] or {}
-        local unitAttrs = unitAttributes(unitOverrides)
+        local units = colorToHexUnits[color]
+        if units then
+            local unitTypeToCount = getUnitTypeToCount(units)
+            local summary = getUnitTypeToCountSummary(unitTypeToCount)
+            print(color .. ' in hex: ' .. summary)
+        end
 
-        local myColor = color
-        local myRollModifiers = colorToRollModifiers[color] or {}
-        local opponentColor = ''
-        local opponentRollModifiers = {}
-        local unitAttrs, modifiers = applyRollModifiers(unitAttrs, myColor, myRollModifiers, opponentColor, opponentRollModifiers)
-
-        local json = JSON.encode(unitAttrs)
-        print(string.upper(color) .. ':\n' .. json)
+        local units = colorToAdjUnits[color]
+        if units then
+            local unitTypeToCount = getUnitTypeToCount(units)
+            local summary = getUnitTypeToCountSummary(unitTypeToCount)
+            print(color .. ' adjacent: ' .. summary)
+        end
     end
 end
 

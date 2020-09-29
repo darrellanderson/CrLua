@@ -25,15 +25,22 @@ local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
-local _nonFighterShipSet = {
-    ['Carrier'] = true,
-    ['Destroyer'] = true,
-    ['Cruiser'] = true,
-    ['Dreadnought'] = true,
-    ['Flagship'] = true,
-    ['War Sun'] = true,
-}
-
+-- Unit attributes:
+-- - antiFighterBarrage {dice=#,hit=#} table.
+-- - bombardment {dice=#,hit=#} table.
+-- - capacity number.
+-- - cost number : cost per unit.
+-- - disablePlanetaryShield boolean.
+-- - groundCombat {dice=#,hit=#} table.
+-- - move number.
+-- - name string : unit name when base unit is replaced (faction or unit upgrade).
+-- - override string : base unit type if this is a faction override.
+-- - planetaryShield boolean.
+-- - spaceCannon {dice=#,hit=#,range=#} table.
+-- - spaceCombat .
+-- - sustainDamage boolean.
+-- - unitLimit number : at most N units roll dice (Experimental Battlestation).
+-- - upgrade string : base unit type if this is a unit upgrade technology.
 local _unitTypes = {
     ['Carrier'] = {
         cost = 3,
@@ -75,7 +82,7 @@ local _unitTypes = {
     },
     ['PDS'] = {
         planetaryShield = true,
-        spaceCannon = { dice = 1, hit = 6 },
+        spaceCannon = { dice = 1, hit = 6, range = 0 },
         structure = true,
     },
     ['Space Dock'] = {
@@ -94,7 +101,7 @@ local _unitOverrides = {
     ['Dreadnought II'] = { upgrade = 'Dreadnought', move = 2 },
     ['Fighter II'] = { upgrade = 'Fighter', spaceCombat = { hit = 8 }, move = 2 },
     ['Infantry II'] = { upgrade = 'Infantry', groundCombat = { hit = 7 } },
-    ['PDS II'] = { upgrade = 'PDS', spaceCannon = { hit = 5 } },
+    ['PDS II'] = { upgrade = 'PDS', spaceCannon = { hit = 5, range = 1 } },
     ['Space Dock II'] = { upgrade = 'Space Dock', production = -4 },
     ['War Sun'] = { upgrade = 'War Sun', disablePlanetaryShield = true, sustainDamage = true, bombardment = { dice = 3, hit = 3 }, cost = 12, spaceCombat = { dice = 3, hit = 3 }, move = 2, capacity = 6 },
 
@@ -121,7 +128,7 @@ local _unitOverrides = {
 
     -- Flagships.
     ['Arc Secundus'] = { override = 'Flagship', disablePlanetaryShield = true, bombardment = { dice = 3, hit = 5 }, spaceCombat = { dice = 2, hit = 5 } },
-    ["C'Morran N'orr"] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 6 } },
+    ["C'morran N'orr"] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 6 } },
     ['Duha Menaimon'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 7 }, capacity = 5 },
     ['Fourth Moon'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 7 } },
     ['Genesis'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 5 }, capacity = 12 },
@@ -149,36 +156,106 @@ local _flagshipModifiers = {
     },
 }
 
+local OWNER = {
+    SELF = 'self',
+    OPPONENT = 'opponent',
+    ANY = 'any',
+}
+
+local TYPE = {
+    MUTATE = 'mutate', -- adds or removes attribute(s), do first.
+    ADJUST = 'adjust',  -- adjusts existing attribute(s).
+    CHOOSE = 'choose',  -- picks from available unit(s), do after all others.
+}
+
 local _rollModifiers = {
     ['Antimass Deflectors'] = {
         description = '-1 to all SPACE CANNON rolls',
-        combat = true,
+        owner = OWNER.OPPONENT,
+        type = TYPE.ADJUST,
+        apply = function(unitAttrs)
+            for _, attr in pairs(unitAttrs) do
+                if attr.spaceCannon then
+                    attr.spaceCannon.hit = attr.spaceCannon.hit + 1
+                end
+            end
+        end
     },
 
     ['Blitz'] = {
         description = 'BOMBARDMENT 6 to non-fighter, non-bomdbardment ships',
-        combat = true,
+        owner = OWNER.SELF,
+        type = TYPE.MUTATE,
+        apply = function(unitAttrs)
+            for unitType, attr in pairs(unitAttrs) do
+                if unitType ~= 'Fighter' and attr.spaceCombat and not attr.bombardment then
+                    attr.bombardment = { dice = 1, hit = 6 }
+                end
+            end
+        end
     },
 
     ['Bunker'] = {
         description = '-4 to all BOMBARDMENT rolls',
-        combat = true,
-        anywhereOnTable = true,
+        owner = OWNER.ANY,
+        type = TYPE.ADJUST,
+        apply = function(unitAttrs)
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.bombardment then
+                    attr.bombardment.hit = attr.bombardment.hit + 4
+                end
+            end
+        end
+    },
+
+    ['Experimental Battlestation'] = {
+        description = 'One in or adjacent Space Dock gets SPACE CANNON 5x3',
+        owner = OWNER.SELF,
+        type = TYPE.MUTATE,
+        apply = function(unitAttrs)
+            unitAttrs['Space Dock'].spaceCannon = { dice = 3, hit = 5, range = 1, unitLimit = 1 }
+        end
     },
 
     ['Fighter Prototype'] = {
         description = "+2 to fighters' COMBAT rolls",
-        combat = true,
+        owner = OWNER.SELF,
+        type = TYPE.ADJUST,
+        apply = function(unitAttrs)
+            unitAttrs['Fighter'].spaceCombat.hit = unitAttrs['Fighter'].spaceCombat.hit - 2
+        end
     },
 
     ['Fragile'] = {
         description = '-1 to all COMBAT rolls',
-        combat = true,
+        owner = OWNER.SELF,
+        type = TYPE.ADJUST,
+        apply = function(unitAttrs)
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.spaceCombat then
+                    attr.spaceCombat.hit = attr.spaceCombat.hit + 1
+                end
+                if attr.groundCombat then
+                    attr.groundCombat.hit = attr.groundCombat.hit + 1
+                end
+            end
+        end
     },
 
     ['Morale Boost'] = {
         description = '+1 to all COMBAT rolls',
-        combat = true,
+        owner = OWNER.SELF,
+        type = TYPE.ADJUST,
+        apply = function(unitAttrs)
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.spaceCombat then
+                    attr.spaceCombat.hit = attr.spaceCombat.hit - 1
+                end
+                if attr.groundCombat then
+                    attr.groundCombat.hit = attr.groundCombat.hit - 1
+                end
+            end
+        end
     },
     ['Morale Boost (1)'] = { alias = 'Morale Boost' },
     ['Morale Boost (2)'] = { alias = 'Morale Boost' },
@@ -187,38 +264,110 @@ local _rollModifiers = {
 
     ['Nebula Defence'] = {
         description = '+1 to all COMBAT rolls (defender)',
-        combat = true,
         tag = 'Generic',  -- most are cards, not this one
+        owner = OWNER.SELF,
+        type = TYPE.ADJUST,
+        apply = function(unitAttrs)
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.spaceCombat then
+                    attr.spaceCombat.hit = attr.spaceCombat.hit - 1
+                end
+                if attr.groundCombat then
+                    attr.groundCombat.hit = attr.groundCombat.hit - 1
+                end
+            end
+        end
     },
 
+    -- Plasma Scoring REQUIRES params.myUnitTypeToCount to choose best available.
     ['Plasma Scoring'] = {
-        description = '+1 die to a single BOMBARDMENT roll',
-        combat = true,
+        description = '+1 die to a single SPACE CANNON or BOMBARDMENT roll',
+        owner = OWNER.SELF,
+        type = TYPE.CHOOSE,
+        apply = function(unitAttrs, params)
+            local best = false
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.spaceCannon and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                    if (not best) or attr.spaceCannon.hit < best.spaceCannon.hit then
+                        best = attr
+                    end
+                end
+            end
+            if best then
+                best.spaceCannon.dice = best.spaceCannon.dice + 1
+            end
+            local best = false
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.bombardment and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                    if (not best) or attr.bombardment.hit < best.bombardment.hit then
+                        best = attr
+                    end
+                end
+            end
+            if best then
+                best.bombardment.dice = best.bombardment.dice + 1
+            end
+        end
     },
 
     ['Prophecy of Ixth'] = {
         description = "+1 to fighter's COMBAT rolls",
-        combat = true,
+        owner = OWNER.SELF,
+        type = TYPE.ADJUST,
+        apply = function(unitAttrs)
+            unitAttrs['Fighter'].spaceCombat.hit = unitAttrs['Fighter'].spaceCombat.hit - 1
+        end
     },
 
     ['Publicize Weapon Schematics'] = {
         description = 'War Suns lose SUSTAIN DAMAGE',
-        anywhereOnTable = true,
+        owner = OWNER.SELF,
+        type = TYPE.MUTATE,
+        apply = function(unitAttrs)
+            unitAttrs['War Sun'].sustainDamage = false
+        end
     },
 
     ['Regulated Conscription'] = {
         description = 'Fighters and infantry cost 1 each',
-        anywhereOnTable = true,
+        owner = OWNER.SELF,
+        type = TYPE.ADJUST,
+        apply = function(unitAttrs)
+            unitAttrs['Fighter'].cost = 1
+            unitAttrs['Infantry'].cost = 1
+        end
     },
 
     ['Tekklar Legion'] = {
-        description = '+1 to all COMBAT rolls for attacker, -1 to Sardakk if opponent owns',  -- -1 to Sardakk if other player has it
-        combat = true,
+        description = '+1 to ground COMBAT rolls for attacker, -1 to Sardakk if opponent owns',  -- -1 to Sardakk if other player has it
+        owner = OWNER.ANY,
+        type = TYPE.ADJUST,
+        apply = function(unitAttrs, params)
+            local myFaction = params.myColor and _factionHelper.fromColor(params.myColor)
+            local delta = (myFaction and myFaction.name == "The Sardakk N'orr") and -1 or 1
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.groundCombat then
+                    attr.groundCombat.hit = attr.groundCombat.hit - delta
+                end
+            end
+
+        end
     },
 
     ['Unrelenting'] = {
         description = '+1 to all COMBAT rolls',
-        combat = true,
+        owner = OWNER.SELF,
+        type = TYPE.ADJUST,
+        apply = function(unitAttrs)
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.spaceCombat then
+                    attr.spaceCombat.hit = attr.spaceCombat.hit - 1
+                end
+                if attr.groundCombat then
+                    attr.groundCombat.hit = attr.groundCombat.hit - 1
+                end
+            end
+        end
     },
 }
 
@@ -283,11 +432,12 @@ end
 -- @param unitOverrides table : list of unit override name strings.
 -- @return table : unit type to unit attributes tables.
 function getUnitAttributes(unitOverrides)
-    assert(type(unitOverrides) == 'table')
+    assert(type(unitOverrides) == 'table', 'unitOverrides not a table')
 
     -- Overwrite orig fields.
     local function apply(orig, override)
-        assert(type(orig) == 'table' and type(override) == 'table')
+        assert(type(orig) == 'table', 'orig not a table')
+        assert(type(override) == 'table', 'override not a table')
         for k, v in pairs(orig) do
             if type(v) == 'table' then
                 apply(v, override[k] or {})
@@ -308,7 +458,7 @@ function getUnitAttributes(unitOverrides)
     for unitType, attrs in pairs(result) do
         -- Apply any faction overrides.
         for _, name in ipairs(unitOverrides) do
-            local unitOverride = assert(_unitOverrides[name])
+            local unitOverride = assert(_unitOverrides[name], 'missing unit override ' .. name)
             if unitOverride.override == unitType then
                 apply(attrs, unitOverride)
                 attrs.name = name
@@ -349,164 +499,46 @@ function applyRollModifiers(params)
     local unitAttrs = _copy(params.unitAttrs)
     local modifiers = {}
 
-    local mySet = {}
-    local opponentSet = {}
-    local anySet = {}  -- "anywhere on table"
+    local ownerSet = {
+        [OWNER.SELF] = {},
+        [OWNER.OPPONENT] = {},
+        [OWNER.ANY] = {},
+    }
     for _, name in ipairs(params.myRollModifiers or {}) do
-        mySet[name] = true
-        anySet[name] = true
+        ownerSet[OWNER.SELF][name] = true
+        ownerSet[OWNER.ANY][name] = true
     end
     for _, name in ipairs(params.opponentRollModifiers or {}) do
-        opponentSet[name] = true
-        anySet[name] = true
+        ownerSet[OWNER.OPPONENT][name] = true
+        ownerSet[OWNER.ANY][name] = true
     end
 
-    local myFaction = _factionHelper.fromColor(params.myColor)
-    myFaction = myFaction and myFaction.name
-
-    -- Consider modifiers that add/remove features before buffs/debuffs.
-
-    if mySet['Blitz'] then
-        table.insert(modifiers, 'Blitz')
-        for unitType, attr in pairs(unitAttrs) do
-            if _nonFighterShipSet[unitType] and not attr.bombardment then
-                attr.bombardment = { dice = 1, hit = 6 }
-            end
+    for name, rollModifier in pairs(_rollModifiers) do
+        if rollModifier.type == TYPE.MUTATE and ownerSet[rollModifier.owner][name] then
+            table.insert(modifiers, name)
+            rollModifier.apply(unitAttrs, params)
         end
     end
-
-    -- Now do buffs/debuffs.
-
-    if opponentSet['Antimass Deflectors'] then
-        table.insert(modifiers, 'Antimass Deflectors')
-        for _, attr in pairs(unitAttrs) do
-            if attr.spaceCannon then
-                attr.spaceCannon.hit = attr.spaceCannon.hit + 1
-            end
+    for name, rollModifier in pairs(_rollModifiers) do
+        if rollModifier.type == TYPE.ADJUST and ownerSet[rollModifier.owner][name] then
+            table.insert(modifiers, name)
+            rollModifier.apply(unitAttrs, params)
         end
     end
-
-    if anySet['Bunker'] then
-        table.insert(modifiers, 'Bunker')
-        for unitType, attr in pairs(unitAttrs) do
-            if attr.bombardment then
-                attr.bombardment.hit = attr.bombardment.hit + 4
-            end
-        end
-    end
-
-    if mySet['Fighter Prototype'] then
-        table.insert(modifiers, 'Fighter Prototype')
-        unitAttrs['Fighter'].spaceCombat.hit = unitAttrs['Fighter'].spaceCombat.hit - 2
-    end
-
-    if mySet['Fragile'] then
-        table.insert(modifiers, 'Fragile')
-        for unitType, attr in pairs(unitAttrs) do
-            if attr.spaceCombat then
-                attr.spaceCombat.hit = attr.spaceCombat.hit + 1
-            end
-            if attr.groundCombat then
-                attr.groundCombat.hit = attr.groundCombat.hit + 1
-            end
-        end
-    end
-
-    if mySet['Morale Boost'] then
-        table.insert(modifiers, 'Morale Boost')
-        for unitType, attr in pairs(unitAttrs) do
-            if attr.spaceCombat then
-                attr.spaceCombat.hit = attr.spaceCombat.hit - 1
-            end
-            if attr.groundCombat then
-                attr.groundCombat.hit = attr.groundCombat.hit - 1
-            end
-        end
-    end
-
-    if mySet['Nebula Defence'] then
-        table.insert(modifiers, 'Nebula Defence')
-        for unitType, attr in pairs(unitAttrs) do
-            if attr.spaceCombat then
-                attr.spaceCombat.hit = attr.spaceCombat.hit - 1
-            end
-            if attr.groundCombat then
-                attr.groundCombat.hit = attr.groundCombat.hit - 1
-            end
-        end
-    end
-
-    if mySet['Prophecy of Ixth'] then
-        table.insert(modifiers, 'Prophecy of Ixth')
-        unitAttrs['Fighter'].spaceCombat.hit = unitAttrs['Fighter'].spaceCombat.hit - 1
-    end
-
-    if mySet['Publicize Weapon Schematics'] then
-        table.insert(modifiers, 'Publicize Weapon Schematics')
-        unitAttrs['War Sun'].sustainDamage = false
-    end
-
-    if mySet['Regulated Conscription'] then
-        table.insert(modifiers, 'Regulated Conscription')
-        unitAttrs['Fighter'].cost = 1
-        unitAttrs['Infantry'].cost = 1
-    end
-
-    if mySet['Tekklar Legion'] then
-        table.insert(modifiers, 'Tekklar Legion')
-        for unitType, attr in pairs(unitAttrs) do
-            if attr.spaceCombat then
-                attr.spaceCombat.hit = attr.spaceCombat.hit - 1
-            end
-            if attr.groundCombat then
-                attr.groundCombat.hit = attr.groundCombat.hit - 1
-            end
-        end
-    elseif opponentSet['Tekklar Legion'] and myFaction == "The Sardakk N'orr" then
-        table.insert(modifiers, 'Tekklar Legion')
-        for unitType, attr in pairs(unitAttrs) do
-            if attr.spaceCombat then
-                attr.spaceCombat.hit = attr.spaceCombat.hit + 1
-            end
-            if attr.groundCombat then
-                attr.groundCombat.hit = attr.groundCombat.hit + 1
-            end
-        end
-    end
-
-    if mySet['Unrelenting'] then
-        table.insert(modifiers, 'Unrelenting')
-        for unitType, attr in pairs(unitAttrs) do
-            if attr.spaceCombat then
-                attr.spaceCombat.hit = attr.spaceCombat.hit - 1
-            end
-            if attr.groundCombat then
-                attr.groundCombat.hit = attr.groundCombat.hit - 1
-            end
-        end
-    end
-
-    -- Consider modifiers that pick the best choice.
-
-    if mySet['Plasma Scoring'] then
-        table.insert(modifiers, 'Plasma Scoring')
-        local best = false
-        for unitType, attr in pairs(unitAttrs) do
-            if attr.bombardment and (params.myUnitTypeToCount[unitType] or 0) > 0 then
-                if (not best) or attr.bombardment.hit < best.bombardment.hit then
-                    best = attr
-                end
-            end
-        end
-        if best then
-            best.bombardment.dice = best.bombardment.dice + 1
+    for name, rollModifier in pairs(_rollModifiers) do
+        if rollModifier.type == TYPE.CHOOSE and ownerSet[rollModifier.owner][name] then
+            table.insert(modifiers, name)
+            rollModifier.apply(unitAttrs, params)
         end
     end
 
     -- Respect single return value limitation for cross-object call.
     unitAttrs._rollModifiers = {}
     for _, modifier in ipairs(modifiers) do
-        table.insert(unitAttrs._rollModifiers, _rollModifiers[modifier])
+        table.insert(unitAttrs._rollModifiers, {
+            name = modifier,
+            description = _rollModifiers[modifier].description
+        })
     end
     return unitAttrs
 end
@@ -893,7 +925,7 @@ function _verifyTables()
 end
 
 function _verifyFactions()
-    for _, faction in ipairs(_factionHelper.allFactions(true)) do
+    for _, faction in pairs(_factionHelper.allFactions(true)) do
         local flagship = assert(faction.flagship)
         assert(_unitOverrides[flagship], 'Missing flagship "' .. flagship .. '" ("' .. faction.name .. '")')
         for _, unit in ipairs(faction.units) do

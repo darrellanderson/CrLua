@@ -1001,11 +1001,16 @@ end
 -------------------------------------------------------------------------------
 
 local _activatedSystem = false
+local _lastActivatedSystem = false  -- rememeber even when turn changes
 
 --- Get the currently activated system.
 -- Objects may declare an 'onSystemActivation(system)' called on activation.
 function getActivatedSystem()
     return _activatedSystem
+end
+
+function getLastActivatedSystem()
+    return _lastActivatedSystem
 end
 
 -------------------------------------------------------------------------------
@@ -1056,6 +1061,7 @@ function onObjectDrop(playerColor, object)
     end
 
     _activatedSystem = system
+    _lastActivatedSystem = system
     local factionName = (faction and faction.name) or playerColor
     broadcastToAll(factionName .. ' activated ' .. system.string, playerColor)
     local systemObject = getObjectFromGUID(system.guid)

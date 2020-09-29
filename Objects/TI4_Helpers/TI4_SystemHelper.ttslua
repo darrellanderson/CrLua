@@ -973,8 +973,10 @@ function hexAdjacentWormholes(hex)
             local wormholeHex = hexFromPosition(object.getPosition())
             if hex == wormholeHex then
                 wormholesInThisHexSet[wormhole] = true
+            else
+                -- Only include wormholes in other hexes.
+                wormholeToHexSet[wormhole][wormholeHex] = true
             end
-            wormholeToHexSet[wormhole][wormholeHex] = true
         end
     end
 

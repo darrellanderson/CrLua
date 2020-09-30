@@ -872,6 +872,11 @@ function _init()
     end
 end
 
+function isUnitName(name)
+    assert(type(name) == 'string')
+    return _objectNameToUnitData[name] and true or false
+end
+
 --- Get all units on the table.  Unit data tables contain:
 -- { unitType, count, color, hex } keys.  Tokens and flagships have no color,
 -- call fillUnitColors to add them.

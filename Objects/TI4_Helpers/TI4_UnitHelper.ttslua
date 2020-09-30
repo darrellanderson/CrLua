@@ -25,9 +25,21 @@ local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
+local OWNER = {
+    SELF = 'self',
+    OPPONENT = 'opponent',
+    ANY = 'any',
+}
+
+local TYPE = {
+    MUTATE = 'mutate', -- adds or removes attribute(s), do first.
+    ADJUST = 'adjust',  -- adjusts existing attribute(s).
+    CHOOSE = 'choose',  -- picks from available unit(s), do after all others.
+}
+
 -- Unit attributes:
 -- - antiFighterBarrage {dice=#,hit=#} table.
--- - bombardment {dice=#,hit=#} table.
+-- - bombardment {dice=#,hit=#,extraDice=#} table.
 -- - capacity number.
 -- - cost number : cost per unit.
 -- - disablePlanetaryShield boolean.
@@ -36,8 +48,8 @@ local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 -- - name string : unit name when base unit is replaced (faction or unit upgrade).
 -- - override string : base unit type if this is a faction override.
 -- - planetaryShield boolean.
--- - spaceCannon {dice=#,hit=#,range=#} table.
--- - spaceCombat .
+-- - spaceCannon {dice=#,hit=#,range=#,extraDice=#} table.
+-- - spaceCombat {dice=#,hit=#}.
 -- - sustainDamage boolean.
 -- - unitLimit number : at most N units roll dice (Experimental Battlestation).
 -- - upgrade string : base unit type if this is a unit upgrade technology.
@@ -61,7 +73,7 @@ local _unitTypes = {
     },
     ['Dreadnought'] = {
         sustainDamage = true,
-        bombardment = { dice = 1, hit = 5 },
+        bombardment = { dice = 1, hit = 5, extraDice = 0 },
         cost = 4,
         spaceCombat = { dice = 1, hit = 5 },
         move = 2,
@@ -82,7 +94,7 @@ local _unitTypes = {
     },
     ['PDS'] = {
         planetaryShield = true,
-        spaceCannon = { dice = 1, hit = 6, range = 0 },
+        spaceCannon = { dice = 1, hit = 6, range = 0, extraDice = 0 },
         structure = true,
     },
     ['Space Dock'] = {
@@ -103,7 +115,7 @@ local _unitOverrides = {
     ['Infantry II'] = { upgrade = 'Infantry', groundCombat = { hit = 7 } },
     ['PDS II'] = { upgrade = 'PDS', spaceCannon = { hit = 5, range = 1 } },
     ['Space Dock II'] = { upgrade = 'Space Dock', production = -4 },
-    ['War Sun'] = { upgrade = 'War Sun', disablePlanetaryShield = true, sustainDamage = true, bombardment = { dice = 3, hit = 3 }, cost = 12, spaceCombat = { dice = 3, hit = 3 }, move = 2, capacity = 6 },
+    ['War Sun'] = { upgrade = 'War Sun', disablePlanetaryShield = true, sustainDamage = true, bombardment = { dice = 3, hit = 3, extraDice = 0 }, cost = 12, spaceCombat = { dice = 3, hit = 3 }, move = 2, capacity = 6 },
 
     -- Faction unit overrides and upgrades.
     ['Advanced Carrier I'] = { override = 'Carrier', capacity = 6 },
@@ -127,14 +139,14 @@ local _unitOverrides = {
     ['????_REDACTED_????'] = { override = 'Destroyer', antiFighterBarrage = { dice = 3, hit = 6 }, spaceCombat = { hit = 7 }, capacity = 1 },
 
     -- Flagships.
-    ['Arc Secundus'] = { override = 'Flagship', disablePlanetaryShield = true, bombardment = { dice = 3, hit = 5 }, spaceCombat = { dice = 2, hit = 5 } },
+    ['Arc Secundus'] = { override = 'Flagship', disablePlanetaryShield = true, bombardment = { dice = 3, hit = 5, extraDice = 0 }, spaceCombat = { dice = 2, hit = 5 } },
     ["C'morran N'orr"] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 6 } },
     ['Duha Menaimon'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 7 }, capacity = 5 },
     ['Fourth Moon'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 7 } },
     ['Genesis'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 5 }, capacity = 12 },
     ['Hil Colish'] = { override = 'Flagship', spaceCombat = { dice = 1, hit = 5 } },
     ['J.N.S. Hylarim'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 6 } },
-    ['Loncara Ssodu'] = { override = 'Flagship', spaceCannon = { dice = 3, hit = 5 }, spaceCombat = { dice = 2, hit = 7 } },
+    ['Loncara Ssodu'] = { override = 'Flagship', spaceCannon = { dice = 3, hit = 5, range = 1, extraDice = 0 }, spaceCombat = { dice = 2, hit = 7 } },
     ['Matriarch'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 9 }, capacity = 6 },
     ['Salai Sai Corian'] = { override = 'Flagship', spaceCombat = { dice = 1, hit = 7 } },
     ['Son of Ragh'] = { override = 'Flagship', antiFighterBarrage = { dice = 4, hit = 6 }, spaceCombat = { dice = 2, hit = 5 } },
@@ -149,23 +161,22 @@ local _unitOverrides = {
 local _flagshipModifiers = {
     ["C'morran N'orr"] = {
         description = "+1 to all COMBAT rolls for other ships with the C'morran N'orr",
+        owner = OWNER.SELF,
+        type = TYPE.ADJUST,
+        apply = function(unitAttrs)
+            for unitType, attr in pairs(unitAttrs) do
+                if unitType ~= 'Flagship' and attr.spaceCombat then
+                    attr.spaceCombat.hit = attr.spaceCombat.hit - 1
+                end
+            end
+        end
     },
 
     ['Fourth Moon'] = {
         description = "Opponent's ships cannot use SUSTAIN DAMAGE",
+        owner = OWNER.OPPONENT,
+        type = TYPE.MUTATE,
     },
-}
-
-local OWNER = {
-    SELF = 'self',
-    OPPONENT = 'opponent',
-    ANY = 'any',
-}
-
-local TYPE = {
-    MUTATE = 'mutate', -- adds or removes attribute(s), do first.
-    ADJUST = 'adjust',  -- adjusts existing attribute(s).
-    CHOOSE = 'choose',  -- picks from available unit(s), do after all others.
 }
 
 local _rollModifiers = {
@@ -294,7 +305,7 @@ local _rollModifiers = {
                 end
             end
             if best then
-                best.spaceCannon.dice = best.spaceCannon.dice + 1
+                best.spaceCannon.extraDice = best.spaceCannon.extraDice + 1
             end
             local best = false
             for unitType, attr in pairs(unitAttrs) do
@@ -305,7 +316,7 @@ local _rollModifiers = {
                 end
             end
             if best then
-                best.bombardment.dice = best.bombardment.dice + 1
+                best.bombardment.extraDice = best.bombardment.extraDice + 1
             end
         end
     },

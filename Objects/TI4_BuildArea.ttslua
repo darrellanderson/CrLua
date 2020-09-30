@@ -22,13 +22,6 @@ local OBJECT_EFFECTS = {
         requireFaceUp = true,
         sarween = true,
     },
-    ['Prototype War Sun II'] = {
-        anywhereInPlayerZone = true,
-        requireFaceUp = true,
-        unitAttributesOverrides = {
-            ['War Sun'] = { cost = 10 },
-        },
-    },
     ['Mirror Computing'] = {
         anywhereInPlayerZone = true,
         requireFaceUp = true,
@@ -44,26 +37,6 @@ local OBJECT_EFFECTS = {
     ['Hegemonic Trade Policy'] = {
         requireFaceUp = true,
         hegemonic = true,
-    },
-    ['Space Dock II'] = {
-        anywhereInPlayerZone = true,
-        requireFaceUp = true,
-        baseProduction = 4,
-    },
-    ['Floating Factory II'] = {
-        anywhereInPlayerZone = true,
-        requireFaceUp = true,
-        baseProduction = 4,
-    },
-
-    -- Agendas
-    ['Regulated Conscription'] = {
-        anywhereOnTable = true,
-        requireFaceUp = true,
-        unitAttributesOverrides = {
-            ['Fighter'] = { cost = 1 },
-            ['Infantry'] = { cost = 1 },
-        },
     },
 
     -- Actions
@@ -87,33 +60,6 @@ local OBJECT_EFFECTS = {
         requireFaceUp = true,
         warmachine = true,
     },
-}
-
-local WATCH_FOR_SPAWN = {
-    ['Commodities/Tradegoods x3'] = true,
-    ['Commodities/Tradegoods x1'] = true,
-    ['x1 Fighter Token'] = true,
-    ['x3 Fighter Token'] = true,
-    ['x1 Infantry'] = true,
-    ['x3 Infantry'] = true,
-    ['White Fighter'] = true,
-    ['Blue Fighter'] = true,
-    ['Purple Fighter'] = true,
-    ['Yellow Fighter'] = true,
-    ['Red Fighter'] = true,
-    ['Green Fighter'] = true,
-    ['Orange Fighter'] = true,
-    ['Pink Fighter'] = true,
-    ['Brown Fighter'] = true,
-    ['White Infantry'] = true,
-    ['Blue Infantry'] = true,
-    ['Purple Infantry'] = true,
-    ['Yellow Infantry'] = true,
-    ['Red Infantry'] = true,
-    ['Green Infantry'] = true,
-    ['Orange Infantry'] = true,
-    ['Pink Infantry'] = true,
-    ['Brown Infantry'] = true,
 }
 
 -------------------------------------------------------------------------------
@@ -147,9 +93,13 @@ local _data = {
 local _deckHelper = false
 local _factionHelper = false
 local _systemHelper = false
+local _unitHelper = false
 local _zoneHelper = false
 
 local _graveyardGuid = false
+
+local _unitAttributes = false
+local _unitAttributesLastUpdateTime = false
 
 -------------------------------------------------------------------------------
 
@@ -167,6 +117,7 @@ function onLoad(saveState)
     _deckHelper = CrLua.TTS.HelperClient.get('TI4_DECK_HELPER')
     _factionHelper = CrLua.TTS.HelperClient.get('TI4_FACTION_HELPER')
     _systemHelper = CrLua.TTS.HelperClient.get('TI4_SYSTEM_HELPER')
+    _unitHelper = CrLua.TTS.HelperClient.get('TI4_UNIT_HELPER')
     _zoneHelper = CrLua.TTS.HelperClient.get('TI4_ZONE_HELPER')
 
     self.addContextMenuItem("Warp to active", warpToActiveSystem, false)
@@ -191,7 +142,7 @@ function onObjectDrop(playerColor, droppedObject)
         CrLua.Log.d(TAG, 'onObjectDrop: self')
         _graveyardGuid = false
         updateEverything()
-    elseif isInsideBuildArea(droppedObject) then
+    elseif isInsideBuildArea(droppedObject.getPosition()) then
         _data.inside[droppedObject] = true
         updateProduceConsumeValues()
     end
@@ -224,7 +175,7 @@ function onObjectSpawn(object)
 
     local function delayedCheckSpawn()
         local object = getObjectFromGUID(guid)
-        if object and (not _data.inside[object]) and isInsideBuildArea(object) then
+        if object and (not _data.inside[object]) and isInsideBuildArea(object.getPosition()) then
             _data.inside[object] = true
             updateProduceConsumeValues()
         end
@@ -235,12 +186,65 @@ function onObjectSpawn(object)
     -- above.  Some scripts can create objects (e.g. numpad spawn, or swapping
     -- tokens and plastic).  In those cases, check up on those objects after
     -- a few seconds to see if they landed in zone.
-    if WATCH_FOR_SPAWN[object.getName()] and not object.held_by_color then
-        Wait.time(delayedCheckSpawn, 2.5 + math.random())
+    local name = object.getName()
+    if (not object.held_by_color) and string.len(name) > 0 then
+        if OBJECT_EFFECTS[name] or _unitHelper.isUnitName(name) then
+            Wait.time(delayedCheckSpawn, 2.5 + math.random())
+        end
     end
 end
 
 -------------------------------------------------------------------------------
+
+function _getUnitAttributes(unitType)
+    assert(type(unitType) == 'string')
+    if _unitAttributes and (_unitAttributesLastUpdateTime or 0) > (Time.time - 15) then
+        return _unitAttributes[unitType]
+    end
+
+    local color = getPlayerColor()
+
+    local unitOverrides = _unitHelper.getColorToUnitOverrides()[color] or {}
+    local unitModifiers = _unitHelper.getColorToUnitModifiers()[color] or {}
+
+    -- Apply unit overrides.
+    local unitAttrs = _unitHelper.getUnitAttributes(unitOverrides)
+
+    -- Apply unit modifiers.
+    unitAttrs = _unitHelper.applyUnitModifiers({
+        unitAttrs = assert(unitAttrs),
+        myColor = color,
+        myUnitModifiers = unitModifiers,
+        myUnitTypeToCount = {},
+        opponentColor = false,
+        opponentUnitModifiers = false,
+        opponentUnitTypeToCount = false
+    })
+
+    _unitAttributes = unitAttrs
+    _unitAttributesLastUpdateTime = Time.time
+    return _unitAttributes[unitType]
+end
+
+function _getProduction()
+    local spaceDock = _getUnitAttributes('Space Dock')
+    local production = (spaceDock and spaceDock.production) or 0
+    if production < 0 then
+        return 'R+' .. (-production)
+    end
+    return '' .. production
+end
+
+--- Get UnitHelper units {guid, unitType, count}.
+function _getUnitsInsideBuildArea()
+    local units = {}
+    for _, unit in ipairs(_unitHelper.getUnits()) do
+        if isInsideBuildArea(unit.position) then
+            table.insert(units, unit)
+        end
+    end
+    return units
+end
 
 local function _warpToSystem(system)
     assert(type(system) == 'table')
@@ -251,21 +255,22 @@ local function _warpToSystem(system)
         error('missing system guid ' .. system.guid)
     end
 
-    local units = {}
-    for object, _ in pairs(_data.inside) do
-        if CrLua.TI4.Unit.fromObject(object) then
-            table.insert(units, object)
+    local unitObjects = {}
+    for _, unit in ipairs(_getUnitsInsideBuildArea()) do
+        local unitObject = getObjectFromGUID(unit.guid)
+        if unitObject then
+            table.insert(unitObjects, unitObject)
         end
     end
 
     local p0 = systemObject.getPosition()
-    for i, unit in ipairs(units) do
-        _data.inside[unit] = nil
-        local phi = math.rad(i * (360 / #units))
+    for i, unitObject in ipairs(unitObjects) do
+        _data.inside[unitObject] = nil
+        local phi = math.rad(i * (360 / #unitObjects))
         local r = 2
         local collide = false
         local fast = true
-        unit.setPositionSmooth({
+        unitObject.setPositionSmooth({
             x = p0.x + r * math.cos(phi),
             y = p0.y + 3,
             z = p0.z + r * math.sin(phi)
@@ -280,7 +285,8 @@ function warpToActiveSystem()
     else
         print(TAG .. ': no active system.')
     end
-    updateProduceConsumeValues()
+    Wait.time(updateProduceConsumeValues, 1)
+    Wait.time(updateProduceConsumeValues, 3)  -- again, in case warp was slow
 end
 
 function warpToHomeSystem()
@@ -293,7 +299,8 @@ function warpToHomeSystem()
     else
         print(TAG .. ': no home system.')
     end
-    updateProduceConsumeValues()
+    Wait.time(updateProduceConsumeValues, 1)
+    Wait.time(updateProduceConsumeValues, 3)  -- again, in case warp was slow
 end
 
 function trashTradeGoods()
@@ -410,7 +417,7 @@ end
 function updateInsideBuildArea()
     _data.inside = {}
     for _, object in ipairs(getAllObjects()) do
-        if isInsideBuildArea(object) then
+        if isInsideBuildArea(object.getPosition()) then
             _data.inside[object] = true
         end
     end
@@ -443,9 +450,9 @@ function getLocalBoundingBox()
     }
 end
 
-function isInsideBuildArea(object)
-    assert(type(object) == 'userdata')
-    local p = self.positionToLocal(object.getPosition())
+function isInsideBuildArea(position)
+    assert(type(position) == 'table')
+    local p = self.positionToLocal(position)
     local bb = _data.boundingBox
     return bb.min.x <= p.x and p.x <= bb.max.x and bb.min.z <= p.z and p.z <= bb.max.z
 end
@@ -512,18 +519,18 @@ function getProduceConsumeItems()
         consumeObjectNameToCount = {},
         produceUnitNameToUnitWithCount = {},
         objectEffectsOverrides = {},
-        unitAttributesOverrides = {},
-        production = BASE_PRODUCTION,
         sarween = false,
         hegemonic = false,
         warmachine = false,
     }
-    local function addUnit(unit)
-        if result.produceUnitNameToUnitWithCount[unit.unitName] then
-            unit.count = unit.count + result.produceUnitNameToUnitWithCount[unit.unitName].count
+
+    for _, unit in ipairs(_getUnitsInsideBuildArea()) do
+        if result.produceUnitNameToUnitWithCount[unit.unitType] then
+            unit.count = unit.count + result.produceUnitNameToUnitWithCount[unit.unitType].count
         end
-        result.produceUnitNameToUnitWithCount[unit.unitName] = unit
+        result.produceUnitNameToUnitWithCount[unit.unitType] = unit
     end
+
     local function addItem(name)
         local resourcesAndInfluence = getResourcesAndInfluence(name)
         if resourcesAndInfluence then
@@ -537,27 +544,19 @@ function getProduceConsumeItems()
             if objectEffects.objectEffectsOverrides then
                 result.objectEffectsOverrides = CrLua.Table.join(result.objectEffectsOverrides, objectEffects.objectEffectsOverrides)
             end
-            if objectEffects.unitAttributesOverrides then
-                result.unitAttributesOverrides = CrLua.Table.join(result.unitAttributesOverrides, objectEffects.unitAttributesOverrides)
-            end
             result.sarween = result.sarween or objectEffects.sarween
             result.hegemonic = result.hegemonic or objectEffects.hegemonic
             result.warmachine = result.warmachine or objectEffects.warmachine
-            result.production = math.max(result.production, objectEffects.baseProduction or 0)
         end
     end
 
     for object, _ in pairs(objects) do
-        local name = object.getName()
-        local unit = CrLua.TI4.Unit.fromObject(object)
-        if unit then
-            addUnit(unit)
-        elseif object.tag == 'Deck' then
+        if object.tag == 'Deck' then
             for _, entry in ipairs(object.getObjects()) do
                 addItem(entry.name)
             end
         else
-            addItem(name)
+            addItem(object.getName())
         end
     end
 
@@ -589,11 +588,9 @@ function getProduceConsumeResourcesAndCost(produceConsumeItems)
         end
     end
 
-    for unitName, unit in pairs(produceConsumeItems.produceUnitNameToUnitWithCount) do
-        local unitAttributes = CrLua.TI4.Unit.attributes(unit)
-        local unitAttributesOverrides = produceConsumeItems.unitAttributesOverrides[unitName]
-        unitAttributes = CrLua.Table.join(unitAttributes, unitAttributesOverrides or {})
-        result.cost = result.cost + math.ceil(unit.count * (unitAttributes.cost or 0))
+    for unitType, unit in pairs(produceConsumeItems.produceUnitNameToUnitWithCount) do
+        local unitAttrs = _getUnitAttributes(unit.unitType)
+        result.cost = result.cost + math.ceil(unit.count * (unitAttrs.cost or 0))
         result.numUnits = result.numUnits + unit.count
     end
 
@@ -788,7 +785,7 @@ function drawUi(items, resourcesAndCost)
     end
     local r2c1 = 'Resources: ' .. (resourcesAndCost and resourcesAndCost.resources or '-')
     local r1c2 = '# Units: ' .. (resourcesAndCost and resourcesAndCost.numUnits or '-')
-    local r2c2 = 'Production: R+' .. (items and items.production or '-')
+    local r2c2 = 'Production: ' .. _getProduction()
     if items and items.warmachine then
         r2c2 = r2c2 .. '+WM'
     end
@@ -797,7 +794,6 @@ function drawUi(items, resourcesAndCost)
     local w1 = w * 0.45
     local w2 = w - (2 * w1)
     local fontSize = 40
-
 
     local columnWidths = trimFloat(w1) .. ' ' .. trimFloat(w1) .. ' ' .. trimFloat(w2)
 
@@ -923,13 +919,13 @@ function announce(items, resourcesAndCost)
     assert(type(items) == 'table' and type(resourcesAndCost) == 'table')
     CrLua.Log.d(TAG, 'announce')
     local produce = {}
-    for unitName, unit in pairs(items.produceUnitNameToUnitWithCount) do
+    for unitType, unit in pairs(items.produceUnitNameToUnitWithCount) do
         if unit.count > 1 then
-            if unitName ~= 'Infantry' then
-                unitName = unitName .. 's'
+            if unitType ~= 'Infantry' then
+                unitType = unitType .. 's'
             end
         end
-        table.insert(produce, unit.count .. ' ' .. unitName)
+        table.insert(produce, unit.count .. ' ' .. unitType)
     end
 
     local tradegoods = 0
@@ -952,7 +948,7 @@ function announce(items, resourcesAndCost)
         _data.playerColor,
         ' producing ' .. resourcesAndCost.numUnits .. ' units',
         ' { ' .. table.concat(produce, ', ') .. ' }',
-        ' with production R+' .. items.production,
+        ' with production ' .. _getProduction(),
         items.warmachine and '+WM' or '',
         ' and total cost ' .. resourcesAndCost.cost,
         items.sarween and '-ST' or '',
@@ -980,19 +976,15 @@ end
 #include <~/CrLua/CrLua>
 #include <~/CrLua/LockGlobals>
 
-#include <~/CrLua/List>
 #include <~/CrLua/LockTable>
 #include <~/CrLua/Log>
 #include <~/CrLua/Table>
-#include <~/CrLua/Util>
 
 #include <~/CrLua/TTS/HelperClient>
-
-#include <~/CrLua/TI4/Unit>
 
 --CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
 --#include <~/CrLua/UnitTest>
 --CrLua.UnitTest.runTests('CrLua.TI4.System', CrLua.TI4.System, true)
 
-CrLua.assertRequired({ 'Log', 'TI4.Unit' })
+CrLua.assertRequired({ 'Log', 'Table', 'TTS.HelperClient' })
 CrLua.lock()

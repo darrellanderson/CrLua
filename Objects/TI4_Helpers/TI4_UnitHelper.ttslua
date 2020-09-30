@@ -290,7 +290,7 @@ local _flagshipModifiers = {
     },
 }
 
-local _rollModifiers = {
+local _unitModifiers = {
     ['Antimass Deflectors'] = {
         description = '-1 to all SPACE CANNON rolls',
         owner = OWNER.OPPONENT,
@@ -609,9 +609,9 @@ function applyFlagshipModifiers(params)
     local unitAttrs = _copy(params.unitAttrs)
 
     if params.myUnitTypeToCount and (params.myUnitTypeToCount['Flagship'] or 0) > 0 then
-        local rollModifier = _flagshipModifiers[unitAttrs['Flagship'].name]
-        if rollModifier and rollModifier.owner == OWNER.SELF then
-            rollModifier.apply(unitAttrs, params)
+        local unitModifier = _flagshipModifiers[unitAttrs['Flagship'].name]
+        if unitModifier and unitModifier.owner == OWNER.SELF then
+            unitModifier.apply(unitAttrs, params)
         end
     end
 
@@ -622,13 +622,13 @@ function applyFlagshipModifiers(params)
     return unitAttrs
 end
 
-function applyRollModifiers(params)
+function applyUnitModifiers(params)
     assert(type(params.unitAttrs) == 'table', 'params.unitAttrs')
     assert(type(params.myColor) == 'string', 'params.myColor')
-    assert(type(params.myRollModifiers) == 'table', 'params.myRollModifiers')
+    assert(type(params.myUnitModifiers) == 'table', 'params.myUnitModifiers')
     assert(type(params.myUnitTypeToCount) == 'table', 'params.myUnitTypeToCount')
     assert(not params.opponentColor or type(params.opponentColor) == 'string', 'params.opponentColor')
-    assert(not params.opponentRollModifiers or type(params.opponentRollModifiers) == 'table', 'params.opponentRollModifiers')
+    assert(not params.opponentUnitModifiers or type(params.opponentUnitModifiers) == 'table', 'params.opponentUnitModifiers')
     assert(not params.opponentUnitTypeToCount or type(params.opponentUnitTypeToCount) == 'table', 'params.opponentUnitTypeToCount')
 
     local unitAttrs = _copy(params.unitAttrs)
@@ -639,40 +639,40 @@ function applyRollModifiers(params)
         [OWNER.OPPONENT] = {},
         [OWNER.ANY] = {},
     }
-    for _, name in ipairs(params.myRollModifiers or {}) do
+    for _, name in ipairs(params.myUnitModifiers or {}) do
         ownerSet[OWNER.SELF][name] = true
         ownerSet[OWNER.ANY][name] = true
     end
-    for _, name in ipairs(params.opponentRollModifiers or {}) do
+    for _, name in ipairs(params.opponentUnitModifiers or {}) do
         ownerSet[OWNER.OPPONENT][name] = true
         ownerSet[OWNER.ANY][name] = true
     end
 
-    for name, rollModifier in pairs(_rollModifiers) do
-        if rollModifier.type == TYPE.MUTATE and ownerSet[rollModifier.owner][name] then
+    for name, unitModifier in pairs(_unitModifiers) do
+        if unitModifier.type == TYPE.MUTATE and ownerSet[unitModifier.owner][name] then
             table.insert(modifiers, name)
-            rollModifier.apply(unitAttrs, params)
+            unitModifier.apply(unitAttrs, params)
         end
     end
-    for name, rollModifier in pairs(_rollModifiers) do
-        if rollModifier.type == TYPE.ADJUST and ownerSet[rollModifier.owner][name] then
+    for name, unitModifier in pairs(_unitModifiers) do
+        if unitModifier.type == TYPE.ADJUST and ownerSet[unitModifier.owner][name] then
             table.insert(modifiers, name)
-            rollModifier.apply(unitAttrs, params)
+            unitModifier.apply(unitAttrs, params)
         end
     end
-    for name, rollModifier in pairs(_rollModifiers) do
-        if rollModifier.type == TYPE.CHOOSE and ownerSet[rollModifier.owner][name] then
+    for name, unitModifier in pairs(_unitModifiers) do
+        if unitModifier.type == TYPE.CHOOSE and ownerSet[unitModifier.owner][name] then
             table.insert(modifiers, name)
-            rollModifier.apply(unitAttrs, params)
+            unitModifier.apply(unitAttrs, params)
         end
     end
 
     -- Respect single return value limitation for cross-object call.
-    unitAttrs._rollModifiers = {}
+    unitAttrs._unitModifiers = {}
     for _, modifier in ipairs(modifiers) do
-        table.insert(unitAttrs._rollModifiers, {
+        table.insert(unitAttrs._unitModifiers, {
             name = modifier,
-            description = _rollModifiers[modifier].description
+            description = _unitModifiers[modifier].description
         })
     end
     return unitAttrs
@@ -736,15 +736,15 @@ function getColorToUnitOverrides()
     return colorToUnitOverrides
 end
 
---- Get a table from player color to list of roll modifier names.
-function getColorToRollModifiers()
-    local colorToRollModifierSet = {}
+--- Get a table from player color to list of unit modifier names.
+function getColorToUnitModifiers()
+    local colorToUnitModifierSet = {}
 
     local function addModifier(color, name)
-        local entry = colorToRollModifierSet[color]
+        local entry = colorToUnitModifierSet[color]
         if not entry then
             entry = {}
-            colorToRollModifierSet[color] = entry
+            colorToUnitModifierSet[color] = entry
         end
         entry[name] = true
     end
@@ -752,7 +752,7 @@ function getColorToRollModifiers()
     -- Faction abilities.
     for color, faction in pairs(_factionHelper.allFactions()) do
         for _, ability in ipairs(faction and faction.abilities or {}) do
-            if _rollModifiers[ability] then
+            if _unitModifiers[ability] then
                 addModifier(color, ability)
             end
         end
@@ -761,16 +761,16 @@ function getColorToRollModifiers()
     -- Cards/Franken tiles.  Add "anywhereOnTable" to ALL colors.
     local inHandGuidSet = _zoneHelper.inHand()
     local tagSet = { ['Card'] = true, ['Tile'] = true }
-    local function getRollModifier(object)
+    local function getUnitModifier(object)
         if inHandGuidSet[object.getGUID()] then
             return false
         end
-        local rollModifier = _rollModifiers[object.getName()]
-        if not rollModifier then
+        local unitModifier = _unitModifiers[object.getName()]
+        if not unitModifier then
             return false
         end
-        if rollModifier.tag then
-            if object.tag ~= rollModifier.tag then
+        if unitModifier.tag then
+            if object.tag ~= unitModifier.tag then
                 return false
             end
         elseif not tagSet[object.tag] then
@@ -779,20 +779,20 @@ function getColorToRollModifiers()
         if object.tag == 'Card' and object.is_face_down then
             return false
         end
-        return rollModifier
+        return unitModifier
     end
 
     local guidToName = {}
     local guidToPosition = {}
     for _, object in ipairs(getAllObjects()) do
-        local rollModifier = getRollModifier(object)
-        if rollModifier then
+        local unitModifier = getUnitModifier(object)
+        if unitModifier then
             local guid = object.getGUID()
             local name = object.getName()
-            name = _rollModifiers[name].alias or object.getName()
+            name = _unitModifiers[name].alias or object.getName()
             guidToName[guid] = name
             guidToPosition[guid] = object.getPosition()
-            if _rollModifiers[name].anywhereOnTable then
+            if _unitModifiers[name].anywhereOnTable then
                 for _, color in ipairs(_zoneHelper.zones()) do
                     addModifier(color, name)
                 end
@@ -805,15 +805,15 @@ function getColorToRollModifiers()
         addModifier(zoneColor, name)
     end
 
-    local colorToRollModifiers = {}
-    for color, rollModifiersSet in pairs(colorToRollModifierSet) do
+    local colorToUnitModifiers = {}
+    for color, unitModifiersSet in pairs(colorToUnitModifierSet) do
         local entry = {}
-        for name, _ in pairs(rollModifiersSet) do
+        for name, _ in pairs(unitModifiersSet) do
             table.insert(entry, name)
         end
-        colorToRollModifiers[color] = entry
+        colorToUnitModifiers[color] = entry
     end
-    return colorToRollModifiers
+    return colorToUnitModifiers
 end
 
 -------------------------------------------------------------------------------
@@ -1033,8 +1033,8 @@ function onLoad(saveState)
     self.addContextMenuItem('Dump attributes', _dumpAttributes)
     self.addContextMenuItem('Dump units', _dumpUnits)
 
-    -- Add name to roll modifiers entries.
-    for name, mod in pairs(_rollModifiers) do
+    -- Add name to unit modifiers entries.
+    for name, mod in pairs(_unitModifiers) do
         mod.name = name
     end
 
@@ -1049,11 +1049,11 @@ function _verifyTables()
     for name, override in pairs(_unitOverrides) do
         _validateUnitOverride(name, override)
     end
-    for name, rollModifier in pairs(_rollModifiers) do
-        if rollModifier.alias then
-            assert(_rollModifiers[rollModifier.alias], name .. ' alias does not exist')
+    for name, unitModifier in pairs(_unitModifiers) do
+        if unitModifier.alias then
+            assert(_unitModifiers[unitModifier.alias], name .. ' alias does not exist')
         else
-            assert(rollModifier.description, name .. ' missing description')
+            assert(unitModifier.description, name .. ' missing description')
         end
     end
     print('verifyTables: done')
@@ -1077,14 +1077,14 @@ end
 
 function _dumpAttributes()
     -- This method shows the intended way to get per-color unit attributes
-    -- with applied roll modifiers.
+    -- with applied unit modifiers.
     -- Ideally this would be inside a coroutine with a yield(0) between most items.
     local colorToUnitOverrides = getColorToUnitOverrides()
-    local colorToRollModifiers = getColorToRollModifiers()
+    local colorToUnitModifiers = getColorToUnitModifiers()
 
     for _, color in ipairs(_zoneHelper.zones()) do
         local unitOverrides = colorToUnitOverrides[color] or {}
-        local rollModifiers = colorToRollModifiers[color] or {}
+        local unitModifiers = colorToUnitModifiers[color] or {}
 
         -- Apply unit overrides.
         local unitAttrs = getUnitAttributes(unitOverrides)
@@ -1096,22 +1096,22 @@ function _dumpAttributes()
             opponentUnitTypeToCount = false
         })
 
-        -- Apply roll modifiers.
-        unitAttrs = applyRollModifiers({
+        -- Apply unit modifiers.
+        unitAttrs = applyUnitModifiers({
             unitAttrs = assert(unitAttrs),
             myColor = color,
-            myRollModifiers = rollModifiers,
+            myUnitModifiers = unitModifiers,
             myUnitTypeToCount = {},
             opponentColor = false,
-            opponentRollModifiers = false,
+            opponentUnitModifiers = false,
             opponentUnitTypeToCount = false
         })
 
         local summary = unitAttributesSummary(unitAttrs)
         print(string.upper(color) .. ':\n' .. summary)
 
-        for i, rollModifier in ipairs(unitAttrs._rollModifiers) do
-            print(i .. '. ' .. rollModifier.name .. ': ' .. rollModifier.description)
+        for i, unitModifier in ipairs(unitAttrs._unitModifiers) do
+            print(i .. '. ' .. unitModifier.name .. ': ' .. unitModifier.description)
         end
     end
 end

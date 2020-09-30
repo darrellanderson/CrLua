@@ -38,6 +38,7 @@ local TYPE = {
 }
 
 -- Unit attributes:
+--
 -- - antiFighterBarrage {dice=#,hit=#} table.
 -- - bombardment {dice=#,hit=#,extraDice=#} table.
 -- - capacity number.
@@ -49,10 +50,13 @@ local TYPE = {
 -- - override string : base unit type if this is a faction override.
 -- - planetaryShield boolean.
 -- - spaceCannon {dice=#,hit=#,range=#,extraDice=#} table.
--- - spaceCombat {dice=#,hit=#}.
+-- - spaceCombat {dice=#,hit=#,extraHitsOn={count=#,value=#}}.
 -- - sustainDamage boolean.
 -- - unitLimit number : at most N units roll dice (Experimental Battlestation).
 -- - upgrade string : base unit type if this is a unit upgrade technology.
+--
+-- The spaceCombat.extraHitsOn attribute is for expressing Jol-Nar's flagship,
+-- which gets 2 additional hits on a 9 or 10, extraHitsOn={count=2,value=9}.
 local _unitTypes = {
     ['Carrier'] = {
         cost = 3,
@@ -135,9 +139,6 @@ local _unitOverrides = {
     ['Super-Dreadnought I'] = { override = 'Dreadnought', capacity = 2 },
     ['Super-Dreadnought II'] = { upgrade = 'Dreadnought', bombardment = { dice = 1, hit = 4 }, move = 2, capacity = 2 },
 
-    -- Codex.
-    ['????_REDACTED_????'] = { override = 'Destroyer', antiFighterBarrage = { dice = 3, hit = 6 }, spaceCombat = { hit = 7 }, capacity = 1 },
-
     -- Flagships.
     ['Arc Secundus'] = { override = 'Flagship', disablePlanetaryShield = true, bombardment = { dice = 3, hit = 5, extraDice = 0 }, spaceCombat = { dice = 2, hit = 5 } },
     ["C'morran N'orr"] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 6 } },
@@ -145,7 +146,7 @@ local _unitOverrides = {
     ['Fourth Moon'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 7 } },
     ['Genesis'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 5 }, capacity = 12 },
     ['Hil Colish'] = { override = 'Flagship', spaceCombat = { dice = 1, hit = 5 } },
-    ['J.N.S. Hylarim'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 6 } },
+    ['J.N.S. Hylarim'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 6, extraHitsOn = { count = 2, value = 9 } } },
     ['Loncara Ssodu'] = { override = 'Flagship', spaceCannon = { dice = 3, hit = 5, range = 1, extraDice = 0 }, spaceCombat = { dice = 2, hit = 7 } },
     ['Matriarch'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 9 }, capacity = 6 },
     ['Salai Sai Corian'] = { override = 'Flagship', spaceCombat = { dice = 1, hit = 7 } },
@@ -156,6 +157,60 @@ local _unitOverrides = {
     ['Wrath of Kenara'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 7 } },
     ["Y'sia Y'ssrila"] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 5 }, move = 2 },
     ['[0.0.1]'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 5 }, capacity = 5 },
+
+    -- Codex.
+    ['????_REDACTED_????'] = { override = 'Destroyer', antiFighterBarrage = { dice = 3, hit = 6 }, spaceCombat = { hit = 7 }, capacity = 1 },
+
+    -- Blue Space.
+    ['Battlecruiser I'] = { override = 'Cruiser', },
+    ['Battlecruiser II'] = { upgrade = 'Cruiser', spaceCombat = { hit = 6 } },
+    ['Lancer Dreadnought I'] = { override = 'Dreadnought', spaceCannon = { dice = 1, hit = 6, range = 0 } },
+    ['Lancer Dreadnought II'] = { upgrade = 'Dreadnought' },
+    ['Wraith Corvette I'] = { override = 'Destroyer', antiFighterBarrage = { dice = 3 }, spaceCombat = { hit = 8 } },
+    ['Wraith Corvette II'] = { upgrade = 'Destroyer', antiFighterBarrage = { dice = 4, hit = 6 }, spaceCombat = { hit = 7 } },
+    ['Raid Shuttle I'] = { override = 'Carrier', },
+    ['Raid Shuttle II'] = { upgrade = 'Carrier', bombardment = { dice = 1, hit = 8 }, spaceCombat = { hit = 8 } },
+    ['Heavy Bomber I'] = { override = 'Fighter', bombardment = { dice = 1, hit = 9 }, spaceCombat = { hit = 8 } },
+    ['Heavy Bomber II'] = { upgrade = 'Fighter', bombardment = { dice = 1, hit = 8 }, spaceCombat = { hit = 7 } },
+    ['Ashkari I'] = { override = 'Infantry', groundCombat = { hit = 7 } },
+    ['Ashkari II'] = { upgrade = 'Infantry', groundCombat = { hit = 6 } },
+    ['Unholy Abominations I'] = { override = 'Infantry', groundCombat = { hit = 5 } },
+    ['Unholy Abominations II'] = { upgrade = 'Infantry', groundCombat = { hit = 4 } },
+    ['Tachyon Lance I'] = { override = 'PDS', spaceCannon = { hit = 5 } },
+    ['Tachyon Lance II'] = { upgrade = 'PDS', spaceCannon = { hit = 4, range = 1 } },
+    ['Perdition Array I'] = { override = 'PDS', spaceCannon = { hit = 5 } },
+    ['Perdition Array II'] = { upgrade = 'PDS', spaceCannon = { hit = 4, range = 1 } },
+    ['Planetary Fortress I'] = { override = 'Space Dock', planetaryShield = true },
+    ['Planetary Fortress II'] = { upgrade = 'Space Dock' },
+
+    -- Blue Space flagships.
+    ['Nightingale II'] = { override = 'Flagship', spaceCombat = { dice = 1, hit = 9 } },
+    ['Shai-Hulud'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 9 } },
+    ['Khage'] = { override = 'Flagship', bombardment = { dice = 3, hit = 5 }, spaceCombat = { dice = 5, hit = 3 } },
+    ['Richtyrian'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 7 } },
+    ["Kyr'tsad"] = { override = 'Flagship', bombardment = { dice = 2, hit = 5 }, spaceCombat = { dice = 2, hit = 5 } },
+    ['Vox'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 7 } },
+    ['Chogra Tuhn'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 5 } },
+    ["For'xdar"] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 7 } },
+    ['Mho Rhodyn'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 7 } },
+    ['Locus'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 9 } },
+    ["Gheld'atar"] = { override = 'Flagship', bombardment = { dice = 4, hit = 5 }, spaceCombat = { dice = 2, hit = 7 } },
+    ["Eru'ishon"] = { override = 'Flagship', spaceCombat = { dice = 1, hit = 7 } },
+    ['Regulus'] = { override = 'Flagship', spaceCombat = { dice = 1, hit = 5 } },
+    ["Noctul H'rgan"] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 7 } },
+    ['Robotic Reprocessing Center'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 7 } },
+
+    ['Advent Flagship'] = { override = 'Flagship' },
+    ['Coronata'] = { upgrade = 'Flagship', spaceCombat = { dice = 2, hit = 7 } },
+    ['Eradica'] = { upgrade = 'Flagship', spaceCombat = { dice = 5, hit = 2 } },
+
+    ['Vasari Flagship'] = { override = 'Flagship' },
+    ['Vorastra'] = { upgrade = 'Flagship', spaceCombat = { dice = 2, hit = 7 } },
+    ['Kultorask'] = { upgrade = 'Flagship', spaceCombat = { dice = 2, hit = 5 } },
+
+    ['Trader Flagship'] = { override = 'Flagship' },
+    ['Anklyon'] = { upgrade = 'Flagship', spaceCombat = { dice = 2, hit = 7 } },
+    ['Ragnarov'] = { upgrade = 'Flagship', spaceCombat = { dice = 2, hit = 5 } },
 }
 
 local _flagshipModifiers = {
@@ -176,6 +231,51 @@ local _flagshipModifiers = {
         description = "Opponent's ships cannot use SUSTAIN DAMAGE",
         owner = OWNER.OPPONENT,
         type = TYPE.MUTATE,
+        apply = function(unitAttrs)
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.sustainDamage then
+                    attr.sustainDamage = false
+                end
+            end
+        end
+    },
+
+    ['Matriarch'] = {
+        description = 'Fighters may participate in ground combat',
+        owner = OWNER.SELF,
+        type = TYPE.CHOOSE,  -- copy combat attributes AFTER all adjustments
+        apply = function(unitAttrs)
+            unitAttrs['Fighter'].groundCombat = _copy(unitAttrs['Fighter'].spaceCombat)
+        end
+    },
+
+    ['Salai Sai Corian'] = {
+        description = "Rolls number of dice equal to number of opponent's non-fighter ships",
+        owner = OWNER.OPPONENT,
+        type = TYPE.MUTATE,
+        apply = function(unitAttrs, params)
+            local dice = 0
+            local opponentUnitTypeToCount = params.opponentUnitTypeToCount or {}
+            for unitType, attr in pairs(unitAttrs) do
+                if unitType ~= 'Fighter' and attr.spaceCombat then
+                    dice = dice + (opponentUnitTypeToCount[unitType] or 0)
+                end
+            end
+            unitAttrs['Flagship'].spaceCombat.dice = dice
+        end
+    },
+
+    ['The Alastor'] = {
+        description = "Ground forces may participate in space combat",
+        owner = OWNER.SELF,
+        type = TYPE.CHOOSE,  -- copy combat attributes AFTER all adjustments
+        apply = function(unitAttrs)
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.groundCombat then
+                    attr.spaceCombat = _copy(attr.groundCombat)
+                end
+            end
+        end
     },
 }
 
@@ -354,6 +454,8 @@ local _rollModifiers = {
         owner = OWNER.ANY,
         type = TYPE.ADJUST,
         apply = function(unitAttrs, params)
+            -- Get faction from color, which is ultimately derived from the faction sheet.
+            -- This is Franken friendly, as Franken faction sheet matches promissory note.
             local myFaction = params.myColor and _factionHelper.fromColor(params.myColor)
             local delta = (myFaction and myFaction.name == "The Sardakk N'orr") and -1 or 1
             for unitType, attr in pairs(unitAttrs) do
@@ -469,7 +571,7 @@ function getUnitAttributes(unitOverrides)
     for unitType, attrs in pairs(result) do
         -- Apply any faction overrides.
         for _, name in ipairs(unitOverrides) do
-            local unitOverride = assert(_unitOverrides[name], 'missing unit override ' .. name)
+            local unitOverride = assert(_unitOverrides[name], 'missing unit override "' .. name .. '"')
             if unitOverride.override == unitType then
                 apply(attrs, unitOverride)
                 attrs.name = name
@@ -490,12 +592,23 @@ end
 
 function applyFlagshipModifiers(params)
     assert(type(params.unitAttrs) == 'table')
-    assert(type(params.myColor) == 'string')
     assert(not params.myUnitTypeToCount or type(params.myUnitTypeToCount) == 'table')
-    assert(not params.opponentColor or type(params.opponentColor) == 'string')
     assert(not params.opponentUnitTypeToCount or type(params.opponentUnitTypeToCount) == 'table')
 
-    -- XXX TODO
+    local unitAttrs = _copy(params.unitAttrs)
+
+    if params.myUnitTypeToCount and (params.myUnitTypeToCount['Flagship'] or 0) > 0 then
+        local rollModifier = _flagshipModifiers[unitAttrs['Flagship'].name]
+        if rollModifier and rollModifier.owner == OWNER.SELF then
+            rollModifier.apply(unitAttrs, params)
+        end
+    end
+
+    -- Worth it to support opponent flagship?  Opponent color is not sufficient
+    -- for Franken.  For now ignore those, they are rare and do not effect
+    -- roll mechanics (they do things like remove sustain damage, etc).
+
+    return unitAttrs
 end
 
 function applyRollModifiers(params)
@@ -936,12 +1049,17 @@ function _verifyTables()
 end
 
 function _verifyFactions()
+    local flagshipSet = {}
     for _, faction in pairs(_factionHelper.allFactions(true)) do
         local flagship = assert(faction.flagship)
+        flagshipSet[flagship] = true
         assert(_unitOverrides[flagship], 'Missing flagship "' .. flagship .. '" ("' .. faction.name .. '")')
         for _, unit in ipairs(faction.units) do
             assert(_unitOverrides[unit], 'Missing unit "' .. unit .. '" ("' .. faction.name .. '")')
         end
+    end
+    for flagship, _ in pairs(_flagshipModifiers) do
+        assert(flagshipSet[flagship], 'Modifier "' .. flagship .. '" not a flagship?')
     end
     print('verifyFactions: done')
 end
@@ -960,9 +1078,16 @@ function _dumpAttributes()
         -- Apply unit overrides.
         local unitAttrs = getUnitAttributes(unitOverrides)
 
+        -- Apply flagship effects.
+        unitAttrs = applyFlagshipModifiers({
+            unitAttrs = assert(unitAttrs),
+            myUnitTypeToCount = {},
+            opponentUnitTypeToCount = false
+        })
+
         -- Apply roll modifiers.
-        local unitAttrs = applyRollModifiers({
-            unitAttrs = unitAttrs,
+        unitAttrs = applyRollModifiers({
+            unitAttrs = assert(unitAttrs),
             myColor = color,
             myRollModifiers = rollModifiers,
             myUnitTypeToCount = {},

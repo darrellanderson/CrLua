@@ -192,7 +192,7 @@ function resetPlanets()
         end
     end
 
-    guidToZoneColor = _zoneHelper.zonesFromPositions(guidToPosition)
+    local guidToZoneColor = _zoneHelper.zonesFromPositions(guidToPosition)
     for guid, zoneColor in pairs(guidToZoneColor) do
         if zoneColor then
             local card = getObjectFromGUID(guid)

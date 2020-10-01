@@ -210,15 +210,12 @@ local _unitOverrides = {
     ['Regulus'] = { override = 'Flagship', spaceCombat = { dice = 1, hit = 5 } },
     ["Noctul H'rgan"] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 7 } },
     ['Robotic Reprocessing Center'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 7 } },
-
     ['Advent Flagship'] = { override = 'Flagship' },
     ['Coronata'] = { upgrade = 'Flagship', spaceCombat = { dice = 2, hit = 7 } },
     ['Eradica'] = { upgrade = 'Flagship', spaceCombat = { dice = 5, hit = 2 } },
-
     ['Vasari Flagship'] = { override = 'Flagship' },
     ['Vorastra'] = { upgrade = 'Flagship', spaceCombat = { dice = 2, hit = 7 } },
     ['Kultorask'] = { upgrade = 'Flagship', spaceCombat = { dice = 2, hit = 5 } },
-
     ['Trader Flagship'] = { override = 'Flagship' },
     ['Anklyon'] = { upgrade = 'Flagship', spaceCombat = { dice = 2, hit = 7 } },
     ['Ragnarov'] = { upgrade = 'Flagship', spaceCombat = { dice = 2, hit = 5 } },
@@ -493,6 +490,21 @@ local _unitModifiers = {
             end
         end
     },
+
+    -- BLUE Space
+
+    ['Tachyon Lance II'] = {
+        description = 'SPACE CANNON of units in this system may target adjacent systems',
+        owner = OWNER.SELF,
+        type = TYPE.ADJUST,
+        apply = function(unitAttrs)
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.spaceCannon and (attr.spaceCannon.range or 0) == 0 then
+                    attr.spaceCannon.range = 1
+                end
+            end
+        end
+    }
 }
 
 --- Get a (for debugging) text summary.
@@ -534,7 +546,7 @@ function unitAttributesSummary(unitAttrs)
                 elseif k == 'production' then
                     table.insert(unitMessage, k .. '=' .. v )
                 elseif k == 'spaceCannon' then
-                    table.insert(unitMessage, k .. '=' .. v.hit .. 'x' .. v.dice )
+                    table.insert(unitMessage, k .. '=' .. v.hit .. 'x' .. v.dice .. '@' .. (v.range or 0) )
                 elseif k == 'spaceCombat' then
                     table.insert(unitMessage, k .. '=' .. v.hit .. 'x' .. v.dice )
                 elseif k == 'structure' then

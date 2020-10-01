@@ -933,8 +933,8 @@ function hexesFromPositions(guidToPosition)
 end
 
 --- Get a position from a hex.
--- @param params hex : hex encoded as string.
--- @return position table : {xyz}.
+-- @param hex : hex encoded as string.
+-- @return table : position {xyz}.
 function hexToPosition(hex)
     assert(type(hex) == 'string')
     local q, r, s = string.match(hex, '<(%-?%d+),(%-?%d+),(%-?%d+)>')
@@ -944,6 +944,29 @@ function hexToPosition(hex)
     return { x = x + _LAYOUT.origin.x, y = 0, z = z + _LAYOUT.origin.z }
 end
 
+--- Get clockwise winding corners about a hex.
+-- @param hex : hex encoded as string.
+-- @return table : list of {xyz} positions.
+function hexCorners(hex)
+    local center = hexToPosition(hex)
+    local function hexCornerOffset(corner)
+        local angle = 2.0 * math.pi * (_M.start_angle - corner) / 6.0
+        return {
+            x = center.x + _LAYOUT.size.x * math.cos(angle),
+            y = center.y,
+            z = center.z + _LAYOUT.size.z * math.sin(angle)
+        }
+    end
+    local corners = {}
+    for i = 0, 5 do
+        table.insert(corners, hexCornerOffset(i))
+    end
+    return corners
+end
+
+--- Get clockwise winding neighbors about a hex.
+-- @param hex : hex encoded as string.
+-- @return table : list of neighbor hex strings.
 function hexNeighbors(hex)
     assert(type(hex) == 'string')
     local q, r, s = string.match(hex, '<(%-?%d+),(%-?%d+),(%-?%d+)>')
@@ -960,6 +983,9 @@ function hexNeighbors(hex)
     }
 end
 
+--- Get wormhole-adjacent hexes.
+-- @param hex : hex encoded as string.
+-- @return table : list of wormhole-adjacent hex strings.
 function hexAdjacentWormholes(hex)
     assert(type(hex) == 'string')
 

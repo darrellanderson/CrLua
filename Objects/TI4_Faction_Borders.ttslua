@@ -47,17 +47,29 @@ function getHelperClient(helperObjectName)
         end
         error('missing object "' .. helperObjectName .. '"')
     end
+    -- Nested tables are considered cross script.  Make a local copy.
+    local function copyTable(t)
+        if t and type(t) == 'table' then
+            local copy = {}
+            for k, v in pairs(t) do
+                copy[k] = type(v) == 'table' and copyTable(v) or v
+            end
+            t = copy
+        end
+        return t
+    end
     local helperObject = false
     local function getCallWrapper(functionName)
         helperObject = helperObject or getHelperObject()
         if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
-        return function(parameters) return helperObject.call(functionName, parameters) end
+        return function(parameters) return copyTable(helperObject.call(functionName, parameters)) end
     end
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
 
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
+local _unitHelper = getHelperClient('TI4_UNIT_HELPER')
 
 -------------------------------------------------------------------------------
 
@@ -543,12 +555,12 @@ function warnSystem(system, message)
         ' (' .. system.string .. ')'
     }
     message = table.concat(messageParts, '')
-    printToAll(message, _clickPlayerColor and _clickPlayerColor or nil)
+    printToAll(message, 'Orange')
 
-    if _clickPlayerColor then
-        local systemObject = getObjectFromGUID(system.guid)
-        Player[_clickPlayerColor].pingTable(systemObject.getPosition())
-    end
+    --if _clickPlayerColor then
+    --    local systemObject = getObjectFromGUID(system.guid)
+    --    Player[_clickPlayerColor].pingTable(systemObject.getPosition())
+    --end
 end
 
 -------------------------------------------------------------------------------
@@ -603,7 +615,32 @@ function updateCache()
     end
     coroutine.yield(0)
 
-    local hexToOwners = getSystemOwners()
+    local ownerTokens = getOwnerTokens()
+    coroutine.yield(0)
+
+    local units = _unitHelper.getUnits()
+    coroutine.yield(0)
+    units = _unitHelper.fillUnitColors(units)
+    coroutine.yield(0)
+    local colorToUnitOverrides = _unitHelper.getColorToUnitOverrides()
+    coroutine.yield(0)
+    local colorToUnitModifiers = _unitHelper.getColorToUnitModifiers()
+    coroutine.yield(0)
+
+    -- Get with-override unit attributes.  Do not consider flagships or other
+    -- unit modifiers (not needed for control, plus fighters-on-ground does
+    -- not count as a ground unit -- so do not set that via flagship modifier).
+    local colorToUnitTypeToUnitAttrs = {}
+    for _, color in ipairs(colors) do
+        local unitOverrides = colorToUnitOverrides[color] or {}
+        local unitAttrs = _unitHelper.getUnitAttributes(unitOverrides)
+        colorToUnitTypeToUnitAttrs[color] = unitAttrs
+    end
+    coroutine.yield(0)
+
+    local hexToThings = getHexToThings(ownerTokens, units, colorToUnitTypeToUnitAttrs)
+    coroutine.yield(0)
+    local hexToOwners = getHexToOwners(hexToThings)
     coroutine.yield(0)
 
     _cache.originalPolygons.planets = {}
@@ -731,39 +768,53 @@ end
 -------------------------------------------------------------------------------
 
 --- Get owner tokens.
--- Results have {color,hex,system,planet fields.}
+-- Results have {guid, position, color} fields.
 function getOwnerTokens()
-    -- Map from token faction to color.
-    local tokenFactionColor = {}
+    -- Map from owner token name to color.
+    local ownerTokenNameToColor = {}
     for _, faction in pairs(_factionHelper.allFactions()) do
         if faction.tokenName and faction.color then
-            tokenFactionColor[faction.tokenName] = faction.color
+            ownerTokenNameToColor[faction.tokenName .. ' Owner Token'] = faction.color
         end
     end
 
+    local guidToPosition = {}
     local result = {}
     for _, object in ipairs(getAllObjects()) do
-        local name = object.getName()
-        local tokenFaction = string.match(name, '^(.*) Owner Token$')
-        if tokenFaction and tokenFactionColor[tokenFaction] then
+        local color = ownerTokenNameToColor[object.getName()]
+        if color then
+            local guid = object.getGUID()
+            local position = object.getPosition()
             table.insert(result, {
                 ownerToken = true,
-                object = object,
-                color = tokenFactionColor[tokenFaction],
+                guid = guid,
+                position = position,
+                color = color,
             })
+            guidToPosition[guid] = position
         end
     end
+
+    local guidToHex = _systemHelper.hexesFromPositions(guidToPosition)
+    for _, entry in ipairs(result) do
+        entry.hex = guidToHex[entry.guid]
+    end
+
     return result
 end
 
 --- Get map from hex to list of {object, color, hex, system, ground, planet} tables.
-function getAllUnitsAndOwnerTokens()
+function getHexToThings(ownerTokens, units, colorToUnitTypeToUnitAttrs)
+    assert(type(ownerTokens) == 'table')
+    assert(type(units) == 'table')
+    assert(type(colorToUnitTypeToUnitAttrs) == 'table')
+
     -- Map from hex to system.
     local hexToSystem = {}
     for guid, system in pairs(_systemHelper.systems()) do
         local systemObject = getObjectFromGUID(guid)
         if systemObject then
-            local hex = CrLua.TI4.Hex.fromPosition(systemObject.getPosition())
+            local hex = _systemHelper.hexFromPosition(systemObject.getPosition())
             if hexToSystem[hex] then
                 warnSystem(system, 'Multiple system tiles in same hex?')
             else
@@ -776,26 +827,24 @@ function getAllUnitsAndOwnerTokens()
     local hexToThings = {}
     local function fillHexToThings(things)
         for _, thing in ipairs(things) do
-            if type(thing.object) ~= 'userdata' then
-                error(TAG .. ': thing.object is unexpected type "' .. type(thing.object))
-            end
-
-            local position = thing.object.getPosition()
-            thing.hex = CrLua.TI4.Hex.fromPosition(position)
+            assert(thing.hex, 'thing.hex')
+            assert(thing.position, 'thing.position')
             thing.system = hexToSystem[thing.hex]
 
             if thing.system then
                 -- Assign planet name for ground units and owner tokens.
-                if not thing.ownerToken then
-                    local attributes = CrLua.TI4.Unit.attributes(thing)
-                    if attributes['ground'] or attributes['structure'] then
+                if thing.unitType then
+                    local unitTypeToUnitAttrs = thing.color and colorToUnitTypeToUnitAttrs[thing.color] or {}
+                    local attrs = unitTypeToUnitAttrs[thing.unitType] or {}
+                    if attrs.groundCombat or attrs.structure then
                         thing.ground = true
                     end
                 end
+
                 if thing.ownerToken or thing.ground then
                     local planet = _systemHelper.planetFromPosition({
                         systemGuid = thing.system.guid,
-                        position = position,
+                        position = thing.position,
                         exact = true
                     })
                     thing.planetName = planet and planet.name
@@ -812,7 +861,7 @@ function getAllUnitsAndOwnerTokens()
                 end
 
                 -- Keep all things in space, plus ground units on planets.
-                if thing.ownerToken or not thing.ground or thing.planetName then
+                if thing.ownerToken or (not thing.ground) or thing.planetName then
                     local entry = hexToThings[thing.hex]
                     if not entry then
                         entry = {}
@@ -826,13 +875,10 @@ function getAllUnitsAndOwnerTokens()
 
     -- Get units first, then (since exclusively units) attempt to assign unit
     -- tokens (e.g., x1 Infantry) to nearby plastic in the same hex.
-    fillHexToThings(CrLua.TI4.Unit.getAllUnits())
-    for hex, units in pairs(hexToThings) do
-        CrLua.TI4.Unit.assignUnitTokenColors(units)
-    end
+    fillHexToThings(units)
 
     -- Now add owner tokens.
-    fillHexToThings(getOwnerTokens(), false)
+    fillHexToThings(ownerTokens, false)
 
     -- It is possible orphaned tokens are on the board (someone forgot to
     -- place plastic?).  Issue a warning and remove those things.
@@ -841,7 +887,9 @@ function getAllUnitsAndOwnerTokens()
             local thing = things[i]
             if not thing.color then
                 table.remove(things, i)
-                warnSystem(thing.system, 'Item “' .. thing.object.getName() .. '” has not been assigned a color')
+                local object = getObjectFromGUID(thing.guid)
+                local name = object and object.getName() or thing.guid
+                warnSystem(thing.system, 'Item “' .. name .. '” has not been assigned a color')
             end
         end
     end
@@ -852,8 +900,7 @@ end
 --- Get a map from hex to owner table with {ground, space, planetName[]} owners.
 -- If planets are split between different players do not assign ground owner.
 -- If any planet is not owned, do not assign ground owner.
-function getSystemOwners()
-    local hexToThings = getAllUnitsAndOwnerTokens()
+function getHexToOwners(hexToThings)
     local hexToOwners = {}
     for hex, things in pairs(hexToThings) do
         for _, thing in ipairs(things) do
@@ -953,12 +1000,33 @@ end
 
 -------------------------------------------------------------------------------
 
+function commonEdge(hexString, neighborHexString)
+    assert(type(hexString) == 'string' and type(neighborHexString) == 'string')
+
+    local neighbors = _systemHelper.hexNeighbors(hexString)
+    local which = false
+    for i, neighbor in ipairs(neighbors) do
+        if neighbor == neighborHexString then
+            which = i
+            break
+        end
+    end
+    if not which then
+        return false
+    end
+
+    local corners = _systemHelper.hexCorners(hexString)
+
+    -- First corner is at the END of first neighbor.
+    local prev = which > 1 and (which - 1) or 6
+    return corners[prev], corners[which]
+end
+
 function commonEdgeWithMid(hex1, hex2)
-    local a1, a2 = table.unpack(CrLua.TI4.Hex.commonEdge(hex1, hex2))
+    local a1, a2 = commonEdge(hex1, hex2)
     local midpoint = { x = (a1.x + a2.x) / 2, y = (a1.y + a2.y) / 2, z = (a1.z + a2.z) / 2 }
     return a1, midpoint, a2
 end
-
 
 function almostEqual(a, b, epsilon)
     assert(type(a) == 'table' and type(b) == 'table')
@@ -989,9 +1057,10 @@ function getControlEdges(hexSet)
     assert(type(hexSet) == 'table')
     local edgeSet = {}
     for hex, _ in pairs(hexSet) do
-        for _, neighbor in ipairs(CrLua.TI4.Hex.neighbors(hex)) do
+        for _, neighbor in ipairs(_systemHelper.hexNeighbors(hex)) do
             if not hexSet[neighbor] then
-                edgeSet[edge(hex, neighbor)] = CrLua.TI4.Hex.commonEdge(hex, neighbor)
+                local e1, e2 = commonEdge(hex, neighbor)
+                edgeSet[edge(hex, neighbor)] = { e1, e2 }
             end
         end
     end
@@ -1036,7 +1105,7 @@ function applyPartialControlEdges(edgeSet, partialHexSet)
     for partialHex, partial in pairs(partialHexSet) do
         local system = assert(partial.system)
         local zonePoints = getZonePoints(system)
-        local neighbors = CrLua.TI4.Hex.neighbors(partialHex)
+        local neighbors = _systemHelper.hexNeighbors(partialHex)
 
         if #system.planets == 2 and #zonePoints == 2 then
             assert(#partial.planetNames == 1)
@@ -1064,7 +1133,7 @@ function applyPartialControlEdges(edgeSet, partialHexSet)
             -- Zone points are not edge aligned, make at-corner versions.
             local zoneCorners = {}
             for _, neighbor in ipairs(neighbors) do
-                local a1, a2 = table.unpack(CrLua.TI4.Hex.commonEdge(partialHex, neighbor))
+                local a1, a2 = commonEdge(partialHex, neighbor)
                 for i = 1, 3 do
                     if almostEqual(zonePoints[i], a1, 1) then
                         zoneCorners[i] = a1
@@ -1101,7 +1170,7 @@ function applyPartialControlEdges(edgeSet, partialHexSet)
     for partialHex, partial in pairs(partialHexSet) do
         local system = assert(partial.system)
         local zonePoints = getZonePoints(system)
-        local neighbors = CrLua.TI4.Hex.neighbors(partialHex)
+        local neighbors = _systemHelper.hexNeighbors(partialHex)
 
         if #system.planets == 2 and #zonePoints == 2 then
             assert(#partial.planetNames == 1)
@@ -1167,7 +1236,7 @@ function applyPartialControlEdges(edgeSet, partialHexSet)
     for partialHex, partial in pairs(partialHexSet) do
         local system = assert(partial.system)
         local zonePoints = getZonePoints(system)
-        local neighbors = CrLua.TI4.Hex.neighbors(partialHex)
+        local neighbors = _systemHelper.hexNeighbors(partialHex)
 
         if #system.planets == 2 and #zonePoints == 2 then
             assert(#partial.planetNames == 1)
@@ -1414,16 +1483,12 @@ end
 #include <~/CrLua/CrLua>
 #include <~/CrLua/LockGlobals>
 
-#include <~/CrLua/TI4/Hex>
-#include <~/CrLua/TI4/Unit>
-
 #include <~/CrLua/TTS/HelperClient>
 
 #include <~/CrLua/List>
 #include <~/CrLua/LockTable>
 #include <~/CrLua/Log>
 #include <~/CrLua/Polygon>
-#include <~/CrLua/RedBlobHex>
 #include <~/CrLua/Table>
 #include <~/CrLua/Util>
 
@@ -1431,5 +1496,5 @@ end
 --#include <~/CrLua/UnitTest>
 --CrLua.UnitTest.runTests(TAG, CrLua, true)
 
-CrLua.assertRequired({ 'TI4.Hex', 'TI4.Unit', 'List', 'Log', 'Table' })
+CrLua.assertRequired({ 'List', 'Log', 'Polygon', 'Table', 'Util', 'TTS.HelperClient' })
 CrLua.lock()

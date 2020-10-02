@@ -55,33 +55,40 @@ local PLASMA_SCORING_BUTTON = {
     ['Space Dock'] = 'PS10'
 }
 
+-------------------------------------------------------------------------------
+
 -- Register click functions.
-function getOnClickFunctionName(name, planetIndex)
-    return 'onClick_' .. name .. (planetIndex and ('_' .. planetIndex) or '')
+function getOnClickFunctionName(autoFillType, planetIndex)
+    assert(AUTOFILL_TYPE[autoFillType])
+    return 'onClick_' .. autoFillType .. (planetIndex and ('_' .. planetIndex) or '')
 end
-function getOnClickFunctionBody(autoFillAttrs, planetIndex)
-    return function(clickObject, clickerColor, altClick)
+function getOnClickFunctionBody(autoFillType, planetIndex)
+    local function body(clickObject, clickerColor, altClick)
         autoFill({
             clickerColor = clickerColor,
             altClick = altClick and true or false,
-            autoFillType = autoFillAttrs,
+            autoFillType = autoFillType,
             planetIndex = planetIndex or false
         })
     end
+    return body
 end
-for name, attrs in pairs(AUTOFILL_TYPE) do
-    if attrs.perPlanet then
-        for i = 1, 5 do
-            local n = getOnClickFunctionName(name, i)
-            local f = getOnClickFunctionBody(autoFillAttrs, i)
+function createOnClickFunctions()
+    for autoFillType, attrs in pairs(AUTOFILL_TYPE) do
+        if attrs.perPlanet then
+            for i = 1, 5 do
+                local n = getOnClickFunctionName(autoFillType, i)
+                local f = getOnClickFunctionBody(autoFillType, i)
+                self.setVar(n, f)
+            end
+        else
+            local n = getOnClickFunctionName(autoFillType, false)
+            local f = getOnClickFunctionBody(autoFillType, false)
             self.setVar(n, f)
         end
-    else
-        local n = getOnClickFunctionName(name, false)
-        local f = getOnClickFunctionBody(autoFillAttrs, false)
-        self.setVar(n, f)
     end
 end
+createOnClickFunctions()
 
 -------------------------------------------------------------------------------
 
@@ -159,170 +166,251 @@ end
 
 -------------------------------------------------------------------------------
 
-
-
-
-
--------------------------------------------------------------------------------
-
-function getButtonId(autoFillType, planetIndex)
-    assert(AUTOFILL_TYPE[autoFillType])
-    assert(not planetIndex or type(planetIndex) == 'number')
-    return autoFillType .. '@' .. (planetIndex or 0)
-end
-
-function onButtonClick(player, option, id)
-    CrLua.Log.d(TAG, 'onButtonClick: id=' .. id)
-    local clickerColor = assert(player and player.color)
-    local altClick = tonumber(option) == -2 and true or false
-    local autoFillType, planetIndex = string.match(id, '^([%a_]+)@(%d)$')
-    planetIndex = tonumber(planetIndex)
-    CrLua.Log.d(TAG, 'onButtonClick: ' .. table.concat({
-        'color=' .. clickerColor,
-        'altClick=' .. tostring(altClick),
-        'type=' .. (autoFillType or 'nil'),
-        'planetIndex=' .. (planetIndex or 'nil'),
-    }, ' '))
-
-    autoFill({
-        clickerColor = clickerColor,
-        altClick = altClick and true or false,
-        autoFillType = autoFillType,
-        planetIndex = planetIndex > 0 and planetIndex or false,
-    })
-end
-
--------------------------------------------------------------------------------
-
 function updateUi()
     local system = _systemHelper.getActivatedSystem()
-    local planets = system and system.planets or {}
+    local planets = system and system.planets or false
 
-    local result = {}
+    -- Object in game space is x=1.43, y=0.2, z=2
+    -- Object in button space is x=715, y=0.2, z=1000
 
-    local function getAutoFillButton(autoFillType, planetIndex)
-        assert(AUTOFILL_TYPE[autoFillType])
-        assert(not planetIndex or type(planetIndex) == 'number')
+    local NO_LABEL = '---'
 
-        local tooltip = AUTOFILL_TYPE[autoFillType].name
+    local fontSize = 44
+    local labelFontSize = 30
+    local scaleUpDown = 4
 
-        local buttonLabel = AUTOFILL_TYPE[autoFillType].name
-        if planetIndex == 0 then
-            buttonLabel = '---'
-        elseif planetIndex then
-            buttonLabel = planets[planetIndex].name
-        end
+    local gapXZ = 0.04
+    local gapU = gapXZ / 1.43
+    local hMajorZ = 0.3
+    local hMinorZ = 0.03
+
+    local hMajor = hMajorZ / 2 * 1000
+    local hMinor = hMinorZ / 2 * 1000
+
+    local panelX = 1.43 - (gapXZ * 2)  -- remove gap padding
+
+    self.clearButtons()
+
+    local function numColsAttrs(cols)
+        local gapTotalU = gapU * (cols - 1)
+        local colTotalU = 1 - gapTotalU
+        local w = colTotalU / cols
+        local u0 = w / 2
+        local du = w + gapU
+
+        -- Slightly off for some reason.  Ad-hoc fix.
+        --u0 = u0 - (cols - 1) * 0.01
+        w = w - 0.01 + (cols - 1) * 0.01
 
         return {
-            tag = 'Button',
-            attributes = {
-                id = getButtonId(autoFillType, planetIndex),
-                --tooltip = tooltip,
-                --tooltipPosition = 'Above'
-            },
-            value = buttonLabel
+            x0 = (u0 * panelX) - (panelX / 2),
+            dx = du * panelX,
+            w = w * (panelX * 500)
         }
     end
 
-    local function getLabel(autoFillType)
-        return {
-            tag = 'Text',
-            value = AUTOFILL_TYPE[autoFillType].name
-        }
-    end
-
-    local function getAutoFillButtonRow(autoFillType)
-        local row = {}
-        for i = 1, math.max(1, #planets) do
-            table.insert(row, getAutoFillButton(autoFillType, i <= #planets and i or 0))
-        end
-        return {
-            tag = 'HorizontalLayout',
-            children = row
-        }
-    end
-
-    local function getAutoFillElements()
-        return {
-            {
-                tag = 'HorizontalLayout',
-                children = {
-                    getAutoFillButton('SPACE_CANNON_OFFENSE', false),
-                    getAutoFillButton('ANTI_FIGHTER_BARRAGE', false),
-                }
-            },
-            {
-                tag = 'HorizontalLayout',
-                children = {
-                    getAutoFillButton('SPACE_COMBAT', false),
-                }
-            },
-            getLabel('BOMBARDMENT'),
-            getAutoFillButtonRow('BOMBARDMENT'),
-            getLabel('SPACE_CANNON_DEFENSE'),
-            getAutoFillButtonRow('SPACE_CANNON_DEFENSE'),
-            getLabel('GROUND_COMBAT'),
-            getAutoFillButtonRow('GROUND_COMBAT'),
-        }
-    end
-
-    self.UI.setXmlTable({
-        {
-            tag = 'Defaults',
-            children = {
-                {
-                    tag = 'Button',
-                    attributes = {
-                        onClick = 'onButtonClick',
-                        fontSize = 12,
-                        fontStyle = 'Bold',
-                    }
-                },
-                {
-                    tag = 'Text',
-                    attributes = {
-                        fontSize = 10,
-                        fontStyle = 'Bold',
-                        alignment = 'MiddleCenter',
-                        horizontalOverflow = 'Overflow',
-                        verticalOverflow = 'Overflow',
-                        preferredHeight = 12,
-                    }
-                },
-                {
-                    tag = 'VerticalLayout',
-                    attributes = {
-                        padding = '10 10 10 10',
-                        spacing = 5,
-                    }
-                },
-                {
-                    tag = 'HorizontalLayout',
-                    attributes = {
-                        spacing = 5,
-                    }
-                },
-            }
-        },
-        {
-            tag = 'Panel',
-            attributes = {
-                position = '0 0 2',  -- 0.05
-                rotation = '0 180 90',
-                width = 200,
-                height = 280,
-            },
-            children = {
-                {
-                    tag = 'VerticalLayout',
-                    attributes = {
-                        childForceExpandHeight = false,
-                    },
-                    children = getAutoFillElements()
-                },
-            }
-        }
+    -- ROW
+    local attrs = numColsAttrs(2)
+    local x = attrs.x0
+    local y = 0.21
+    local z = -1 + gapXZ + (hMajorZ / 2)
+    local w = attrs.w
+    local h = hMajor
+    self.createButton({
+        click_function = getOnClickFunctionName('SPACE_CANNON_OFFENSE', false),
+        function_owner = self,
+        label          = 'Space Cannon\nOffense',
+        position       = { x = x, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+        width          = w * scaleUpDown,
+        height         = h * scaleUpDown,
+        font_size      = fontSize * scaleUpDown,
+        tooltip        = 'Space Cannon Offense',
     })
+    x = x + attrs.dx
+    self.createButton({
+        click_function = getOnClickFunctionName('ANTI_FIGHTER_BARRAGE', false),
+        function_owner = self,
+        label          = 'Anti-Fighter\nBarrage',
+        position       = { x = x, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+        width          = attrs.w * scaleUpDown,
+        height         = h * scaleUpDown,
+        font_size      = fontSize * scaleUpDown,
+        tooltip        = 'Anti-Fighter Barrage',
+    })
+
+    -- ROW
+    z = z + gapXZ + hMajorZ + hMinorZ
+    --z = z + gapXZ + hMajorZ
+    local attrs = numColsAttrs(1)
+    local x = attrs.x0
+    local w = attrs.w
+    self.createButton({
+        click_function = getOnClickFunctionName('SPACE_COMBAT', false),
+        function_owner = self,
+        label          = 'Space Combat',
+        position       = { x = x, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+        width          = w * scaleUpDown,
+        height         = h * scaleUpDown,
+        font_size      = fontSize * scaleUpDown,
+        tooltip        = 'Space combat',
+    })
+
+    -- LABEL+ROW
+    z = z + gapXZ + (hMajorZ + hMinorZ) / 2
+    self.createButton({
+        click_function = 'doNothing',
+        function_owner = self,
+        label          = string.upper('Bombardment'),
+        position       = { x = 0, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+        width          = 0,
+        height         = 0,
+        font_size      = labelFontSize * scaleUpDown,
+        tooltip        = nil,
+    })
+    z = z + gapXZ + (hMajorZ + hMinorZ) / 2
+    local attrs = numColsAttrs(planets and #planets or 1)
+    local x = attrs.x0
+    local w = attrs.w
+    if not planets then
+        self.createButton({
+            click_function = 'doNothing',
+            function_owner = self,
+            label          = NO_LABEL,
+            position       = { x = x, y = y, z = z },
+            rotation       = { x = 0, y = 0, z = 0 },
+            scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+            width          = w * scaleUpDown,
+            height         = h * scaleUpDown,
+            font_size      = fontSize * scaleUpDown,
+            tooltip        = nil,
+        })
+    else
+        for i, planet in ipairs(planets) do
+            self.createButton({
+                click_function = getOnClickFunctionName('BOMBARDMENT', i),
+                function_owner = self,
+                label          = planet.name,
+                position       = { x = x, y = y, z = z },
+                rotation       = { x = 0, y = 0, z = 0 },
+                scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+                width          = w * scaleUpDown,
+                height         = h * scaleUpDown,
+                font_size      = fontSize * scaleUpDown,
+                tooltip        = 'Bombard ' .. planet.name,
+            })
+            x = x + attrs.dx
+        end
+    end
+
+    -- LABEL+ROW
+    z = z + gapXZ + (hMajorZ + hMinorZ) / 2
+    self.createButton({
+        click_function = 'doNothing',
+        function_owner = self,
+        label          = string.upper('Space Cannon Defense'),
+        position       = { x = 0, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+        width          = 0,
+        height         = 0,
+        font_size      = labelFontSize * scaleUpDown,
+        tooltip        = nil,
+    })
+    z = z + gapXZ + (hMajorZ + hMinorZ) / 2
+    local attrs = numColsAttrs(planets and #planets or 1)
+    local x = attrs.x0
+    local w = attrs.w
+    if not planets then
+        self.createButton({
+            click_function = 'doNothing',
+            function_owner = self,
+            label          = NO_LABEL,
+            position       = { x = x, y = y, z = z },
+            rotation       = { x = 0, y = 0, z = 0 },
+            scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+            width          = w * scaleUpDown,
+            height         = h * scaleUpDown,
+            font_size      = fontSize * scaleUpDown,
+            tooltip        = nil,
+        })
+    else
+        for i, planet in ipairs(planets) do
+            self.createButton({
+                click_function = getOnClickFunctionName('SPACE_CANNON_DEFENSE', i),
+                function_owner = self,
+                label          = planet.name,
+                position       = { x = x, y = y, z = z },
+                rotation       = { x = 0, y = 0, z = 0 },
+                scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+                width          = w * scaleUpDown,
+                height         = h * scaleUpDown,
+                font_size      = fontSize * scaleUpDown,
+                tooltip        = 'Space Cannon Defense on ' .. planet.name,
+            })
+            x = x + attrs.dx
+        end
+    end
+
+    -- LABEL+ROW
+    z = z + gapXZ + (hMajorZ + hMinorZ) / 2
+    self.createButton({
+        click_function = 'doNothing',
+        function_owner = self,
+        label          = string.upper('Ground Combat'),
+        position       = { x = 0, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+        width          = 0,
+        height         = 0,
+        font_size      = labelFontSize * scaleUpDown,
+        tooltip        = nil,
+    })
+    z = z + gapXZ + (hMajorZ + hMinorZ) / 2
+    local attrs = numColsAttrs(planets and #planets or 1)
+    local x = attrs.x0
+    local w = attrs.w
+    if not planets then
+        self.createButton({
+            click_function = 'doNothing',
+            function_owner = self,
+            label          = NO_LABEL,
+            position       = { x = x, y = y, z = z },
+            rotation       = { x = 0, y = 0, z = 0 },
+            scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+            width          = w * scaleUpDown,
+            height         = h * scaleUpDown,
+            font_size      = fontSize * scaleUpDown,
+            tooltip        = nil,
+        })
+    else
+        for i, planet in ipairs(planets) do
+            self.createButton({
+                click_function = getOnClickFunctionName('GROUND_COMBAT', i),
+                function_owner = self,
+                label          = planet.name,
+                position       = { x = x, y = y, z = z },
+                rotation       = { x = 0, y = 0, z = 0 },
+                scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+                width          = w * scaleUpDown,
+                height         = h * scaleUpDown,
+                font_size      = fontSize * scaleUpDown,
+                tooltip        = 'Ground combat on ' .. planet.name,
+            })
+            x = x + attrs.dx
+        end
+    end
+end
+
+function doNothing()
+    --
 end
 
 -------------------------------------------------------------------------------

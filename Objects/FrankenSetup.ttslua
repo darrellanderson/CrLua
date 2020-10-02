@@ -221,20 +221,6 @@ local function unpackToTable()
     end
 end
 
-local function replaceMultiRollers(name)
-    local toReplace = {}
-    for _, object in ipairs(getAllObjects()) do
-        if string.match(object.getName(), '^TI4 MultiRoller') then
-            table.insert(toReplace, object)
-        end
-    end
-
-    -- MultiRoller is now Franken aware.
-    for _, object in ipairs(toReplace) do
-        object.call('setFranken')
-    end
-end
-
 -------------------------------------------------------------------------------
 
 local function createBags()
@@ -263,7 +249,17 @@ local function createBags()
 end
 
 local function unpackToBags(bags)
-    for name, count in pairs(UNPACK_TO_BAGS) do
+    local unpackSet = UNPACK_TO_BAGS
+
+    -- Override unpack counts for FrankenBlu.
+    local tint = self.getColorTint()
+    tint = string.upper(Color(tint.r, tint.g, tint.b, 1):toHex())
+    if tint == '005DC7' then
+        print('Using larger unpack numbers for FrankenBlu')
+        unpackSet = UNPACK_TO_BAGS_BLU
+    end
+
+    for name, count in pairs(unpackSet) do
         local container = takeToAbove(self, name)
         assert(container, 'missing ' .. name)
         coroutine.yield(0)
@@ -371,8 +367,20 @@ function doSetupCoroutine()
         coroutine.yield(0)
     end
 
-    replaceMultiRollers()
-    coroutine.yield(0)
+    local f = 'onFrankenEnabled'
+    local inform = {}
+    for _, object in ipairs(getAllObjects()) do
+        if object.getVar(f) then
+            table.insert(inform, object)
+        end
+    end
+    for i, object in ipairs(inform) do
+        local function delayedInform()
+            print('Sending ' .. f .. ' to ' .. object.getName())
+            object.call(f, true)
+        end
+        Wait.frames(delayedInform, i)
+    end
 
     return 1
 end
@@ -465,10 +473,10 @@ function createCustomSelectionUiLuaCoroutine()
     local numRows = 1
     for _, entries in pairs(nameToEntries) do
         local entriesPerColumn = math.ceil(#entries / numCols)
-        print('xxx ' .. (#entries) .. ' ' .. entriesPerColumn .. ' ' .. (#entries / numCols) .. ' ' .. numRows)
+        --print('xxx ' .. (#entries) .. ' ' .. entriesPerColumn .. ' ' .. (#entries / numCols) .. ' ' .. numRows)
         numRows = math.max(numRows, entriesPerColumn + 4)
     end
-    print('Table ' .. numCols .. 'x' .. numRows)
+    --print('Table ' .. numCols .. 'x' .. numRows)
 
     -- Create columns and add tabs.
     local cols = {}

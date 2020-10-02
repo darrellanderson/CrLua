@@ -30,6 +30,7 @@ function getHelperClient(helperObjectName)
     end
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
+local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 local _factionAttributes = {
 
@@ -248,7 +249,7 @@ local _factionAttributes = {
         startingTech = { 'Neural Motivator', 'Sarween Tools' },
         flagship = 'Advent Flagship',
         flagshipDescription = '-',
-        abilities = {},
+        abilities = { 'Ascended Populace', 'Drone Hosts', 'Drone Swarm' },
         units = {},
     },
 
@@ -261,8 +262,8 @@ local _factionAttributes = {
         startingTech = { 'Neural Motivator', 'Plasma Scoring' },
         flagship = 'Nightingale II',
         flagshipDescription = 'Other players cannot play action cards during a space combat in this system.',
-        abilities = {},
-        units = {},
+        abilities = { 'Bounty Hunters', 'Contract Network', 'Smuggler Captiains' },
+        units = { 'Wrath Corvette I', 'Wrath Corvette II' },
     },
 
     ['The Free Systems Alliance'] = {
@@ -274,7 +275,7 @@ local _factionAttributes = {
         startingTech = { 'Neural Motivator' },
         flagship = 'Vox',
         flagshipDescription = 'When this unit makes a combat roll, it rolls 1 additional die for each planet in this system of any single trait.',
-        abilities = {},
+        abilities = { 'Diplomats', 'Rally to the Cause', 'Free People' },
         units = {},
     },
 
@@ -287,8 +288,8 @@ local _factionAttributes = {
         startingTech = { 'Antimass Deflectors' },
         flagship = 'Shai-Hulud',
         flagshipDescription = 'During a round of combat in the system, 1 unit you control may roll 1 additional combat die.',
-        abilities = {},
-        units = {},
+        abilities = { 'Guerilla Warriors', 'Fedaykin', 'Water Reclamation' },
+        units = { 'Ashkari I', 'Ashkari II' },
     },
 
     ['The Gheldor Authority'] = {
@@ -300,8 +301,8 @@ local _factionAttributes = {
         startingTech = { 'Magen Defense Grid' },
         flagship = "Gheld'atar",
         flagshipDescription = 'Units you control that are on planets adjacent to this system cannot lose PLANETARY SHIELD.',
-        abilities = {},
-        units = {},
+        abilities = { 'Entrenchment', 'Forge Lords' },
+        units = { 'Planetary Fortress I', 'Planetary Fortress II' },
     },
 
     ['The HCEN Defense System'] = {
@@ -313,8 +314,8 @@ local _factionAttributes = {
         startingTech = { 'Graviton Laser System' },
         flagship = 'Locus',
         flagshipDescription = 'At the start of your turn, you may move 1 of your PDS to a planet you control in this system.',
-        abilities = {},
-        units = {},
+        abilities = { 'Autonomous Installations', 'Mobile Defense Platforms', 'Overcharge' },
+        units = { 'Perdition Array I', 'Perdition Array II' },
     },
 
     ['The Khet Drakkol Union'] = {
@@ -326,7 +327,7 @@ local _factionAttributes = {
         startingTech = { 'Sarween Tools' },
         flagship = 'Khage',
         flagshipDescription = '-',
-        abilities = {},
+        abilities = { 'Enlistment Doctrine', 'Warrior Code' },
         units = {},
     },
 
@@ -339,7 +340,7 @@ local _factionAttributes = {
         startingTech = { 'Dacxive Animators' },
         flagship = "For'xdar",
         flagshipDescription = 'Planets controlled by other players in this system cannot be readied.',
-        abilities = {},
+        abilities = { 'Relentless', 'Merciless' },
         units = {},
     },
 
@@ -353,8 +354,8 @@ local _factionAttributes = {
         flagship = 'Regulus',
         flagshipDescription = 'When this unit makes a combat roll, it rolls 1 additional die for each victory point you have.',
         startMessage = 'Pick 1 technology and return the other 3 to your deck.',
-        abilities = {},
-        units = {},
+        abilities = { 'Imperious', 'Right to Rule' },
+        units = { 'Heavy Bomber I', 'Heavy Bomber II' },
     },
 
     ['The Mahact Sorcerer Kings'] = {
@@ -366,7 +367,7 @@ local _factionAttributes = {
         startingTech = { },
         flagship = "Noctul H'rgan",
         flagshipDescription = "Other units you control in this system may instead have the abilities and attributes of another player’s units of the same type in this system.",
-        abilities = {},
+        abilities = { 'Genetic Sorcerers' },
         units = {},
     },
 
@@ -379,8 +380,8 @@ local _factionAttributes = {
         startingTech = { 'Neural Motivator', 'Antimass Deflectors' },
         flagship = "Kyr'tsad",
         flagshipDescription = 'This ship cannot be destroyed by Direct Hit action cards.',
-        abilities = {},
-        units = {},
+        abilities = { 'Manalorian Steel', 'Clan Unity' },
+        units = { 'Battlecruiser I', 'Battlecruiser II', 'Raid Shuttle I', 'Raid Shuttle II' },
     },
 
     ["The Navigators' Guild"] = {
@@ -392,7 +393,7 @@ local _factionAttributes = {
         startingTech = { 'Antimass Deflectors', 'Sarween Tools' },
         flagship = 'Chogra Tuhn',
         flagshipDescription = "Other players' ships cannot move through this unit’s system.",
-        abilities = {},
+        abilities = { 'Destabilization', 'Navigators', 'The Wound' },
         units = {},
     },
 
@@ -405,7 +406,7 @@ local _factionAttributes = {
         startingTech = { 'Gravity Drive' },
         flagship = 'Mho Rhodyn',
         flagshipDescription = "At the end of the status phase, place 1 fighter from your reinforcements into this system’s space area.",
-        abilities = {},
+        abilities = { 'Regular Refits', 'Civilian Fleet' },
         units = {},
     },
 
@@ -418,7 +419,7 @@ local _factionAttributes = {
         startingTech = { 'Sarween Tools', 'Plasma Scoring' },
         flagship = 'Trader Flagship',
         flagshipDescription = '-',
-        abilities = {},
+        abilities = { 'Rapid Development', 'Trade Points', 'Industrialists' },
         units = {},
     },
 
@@ -431,7 +432,7 @@ local _factionAttributes = {
         startingTech = { 'Antimass Deflectors', 'Plasma Scoring' },
         flagship = 'Vasari Flagship',
         flagshipDescription = '-',
-        abilities = {},
+        abilities = { 'Phase Gates', 'Dark Fleet' },
         units = {},
     },
 
@@ -444,8 +445,8 @@ local _factionAttributes = {
         startingTech = { 'Plasma Scoring' },
         flagship = 'Richtyrian',
         flagshipDescription = 'When this ship makes a combat roll, it rolls 1 additional die for each round of space combat that has been resolved this combat.',
-        abilities = {},
-        units = {},
+        abilities = { 'War Profiteers', 'Development Contracts', 'Sylvari Veil' },
+        units = { 'Lancer Dreadnought I', 'Lancer Dreadnought II', 'Tachyon Lance I', 'Tachyon Lance II' },
     },
 
     ['The Zeth Contingency'] = {
@@ -458,7 +459,7 @@ local _factionAttributes = {
         flagship = "Eru'ishon",
         flagshipDescription = 'When this unit makes a combat roll, it rolls a number of dice equal to the greatest number of technologies you control in any color.',
         startMessage = 'Pick 2 technologies and return the other 2 to your deck.',
-        abilities = {},
+        abilities = { 'Obsessive Scholars', 'Adaptive Intelligence' },
         units = {},
     },
 
@@ -476,13 +477,18 @@ local _factionAttributes = {
     },
 }
 
+local _frankenEnabled = false
 local _colorToFaction = {}
 local _tokenNameToFaction = {}
 
 local _update = {
     time = false,
-    periodicUpdateSeconds = 10,
+    periodicUpdateSeconds = 30,
 }
+
+function isFrankenEnabled()
+    return _frankenEnabled
+end
 
 function allFactions(includeFactionsNotAtTable)
     assert(not includeFactionsNotAtTable or type(includeFactionsNotAtTable) == 'boolean')
@@ -628,6 +634,19 @@ function updateFactions()
         factionLowerToFactionName[string.lower(factionName)] = factionName
     end
 
+    local flagshipSet = {}
+    local abilitySet = {}
+    local guidToName = {}
+    local guidToPosition = {}
+    if _frankenEnabled then
+        for _, faction in pairs(_factionAttributes) do
+            flagshipSet[faction.flagship] = true
+            for _, ability in ipairs(faction.abilities) do
+                abilitySet[ability] = true
+            end
+        end
+    end
+
     -- Find command sheets (indexed by color), faction sheets (indexed by
     -- faction name), and command token bags (indexed by "token faction" name,
     -- which may differ slightly from the faction sheet faction name).
@@ -651,6 +670,11 @@ function updateFactions()
         if factionName then
             factionSheetGuidToFactionSheet[guid] = object
             factionSheetGuidToFactionName[guid] = factionName
+        end
+
+        if _frankenEnabled and object.tag == 'Tile' and (flagshipSet[name] or abilitySet[name]) then
+            guidToName[guid] = name
+            guidToPosition[guid] = object.getPosition()
         end
     end
 
@@ -741,6 +765,26 @@ function updateFactions()
     for factionName, attributes in pairs(_factionAttributes) do
         if attributes.frankenName and not _tokenNameToFaction[attributes.frankenName] then
             _tokenNameToFaction[attributes.frankenName] = _tokenNameToFaction[attributes.tokenName]
+        end
+    end
+
+    -- If franken is enabled, reset flagship and abilities based on franken tiles.
+    if _frankenEnabled then
+        local guidToColor = _zoneHelper.zonesFromPositions(guidToPosition)
+        for color, faction in pairs(_colorToFaction) do
+            faction.flagship = '?'
+            faction.abilities = {}
+            faction.units = {}
+            for guid, tileColor in pairs(guidToColor) do
+                local name = guidToName[guid]
+                if color == tileColor then
+                    if flagshipSet[name] then
+                        faction.flagship = name
+                    elseif abilitySet[name] then
+                        table.insert(faction.abilities, name)
+                    end
+                end
+            end
         end
     end
 end
@@ -837,6 +881,7 @@ function onLoad(saveState)
     self.setDescription('Shared helper functions used by other objects, PLEASE LEAVE ON TABLE! This object is only visible to the black (GM) player.')
 
     self.addContextMenuItem('Verify Factions', verifyAllFactions)
+    self.addContextMenuItem('Report Factions', reportFactions)
 
     -- Only the GM/black player can see this object.  Others can still interact!
     local invisibleTo = {}
@@ -847,8 +892,52 @@ function onLoad(saveState)
     end
     self.setInvisibleTo(invisibleTo)
 
+    local state = saveState and string.len(saveState) > 0 and JSON.decode(saveState) or {}
+    _frankenEnabled = saveState.frankenEnabled or false
+
     -- Add faction names to attributes.
     for factionName, attributes in pairs(_factionAttributes) do
         attributes.name = factionName
     end
 end
+
+function onSave()
+    return JSON.encode({
+        frankenEnabled = _frankenEnabled or false
+    })
+end
+
+function onFrankenEnabled(value)
+    _frankenEnabled = value or false
+    updateFactions()
+end
+
+function reportFactions()
+    _maybeUpdateFactions()
+    local message = { 'FactionHelper.reportFactions: franken=' .. tostring(_frankenEnabled)}
+    for _, color in ipairs(_zoneHelper.zones()) do
+        local faction = _colorToFaction[color]
+        if faction then
+            local hex = Color.fromString(color):toHex()
+            table.insert(message, table.concat({
+                '[' .. hex .. ']' .. color,
+                'name={' .. (faction.name or '-') .. '}',
+                'flagship={' .. (faction.flagship or '-') .. '}',
+                'abilities={' .. table.concat(faction.abilities or {}, ', ') .. '}',
+                'units={' .. table.concat(faction.units or {}, ', ') .. '}',
+            }, ' '))
+        end
+    end
+    print(table.concat(message, '\n'))
+end
+
+-------------------------------------------------------------------------------
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

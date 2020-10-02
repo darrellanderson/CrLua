@@ -55,6 +55,34 @@ local PLASMA_SCORING_BUTTON = {
     ['Space Dock'] = 'PS10'
 }
 
+-- Register click functions.
+function getOnClickFunctionName(name, planetIndex)
+    return 'onClick_' .. name .. (planetIndex and ('_' .. planetIndex) or '')
+end
+function getOnClickFunctionBody(autoFillAttrs, planetIndex)
+    return function(clickObject, clickerColor, altClick)
+        autoFill({
+            clickerColor = clickerColor,
+            altClick = altClick and true or false,
+            autoFillType = autoFillAttrs,
+            planetIndex = planetIndex or false
+        })
+    end
+end
+for name, attrs in pairs(AUTOFILL_TYPE) do
+    if attrs.perPlanet then
+        for i = 1, 5 do
+            local n = getOnClickFunctionName(name, i)
+            local f = getOnClickFunctionBody(autoFillAttrs, i)
+            self.setVar(n, f)
+        end
+    else
+        local n = getOnClickFunctionName(name, false)
+        local f = getOnClickFunctionBody(autoFillAttrs, false)
+        self.setVar(n, f)
+    end
+end
+
 -------------------------------------------------------------------------------
 
 function getHelperClient(helperObjectName)
@@ -87,6 +115,8 @@ local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _unitHelper = getHelperClient('TI4_UNIT_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
+local _bombardmentPlasmaScoringOnPlanet = false
+
 -------------------------------------------------------------------------------
 
 function onLoad(save_state)
@@ -96,6 +126,7 @@ end
 
 function onSystemActivation(system)
     CrLua.Log.d(TAG, 'onSystemActivation')
+    _bombardmentPlasmaScoringOnPlanet = false
     updateUi()
 end
 
@@ -125,6 +156,12 @@ function updateColorToMultiRoller()
         data.colorToMultiRoller[color] = multiRoller
     end
 end
+
+-------------------------------------------------------------------------------
+
+
+
+
 
 -------------------------------------------------------------------------------
 
@@ -625,6 +662,11 @@ function autoFillCoroutine()
                     fillUnitTypeToCount[unitType] = selfUnitTypeToCount[unitType] or 0
                 end
             end
+
+            if not _bombardmentPlasmaScoringOnPlanet then
+                _bombardmentPlasmaScoringOnPlanet = planet
+            end
+
         end
 
     elseif autofillTypeAttributes == AUTOFILL_TYPE.SPACE_CANNON_DEFENSE then
@@ -674,6 +716,13 @@ function autoFillCoroutine()
                 break
             end
         end
+    end
+
+    -- Only bombard the first clicked planet.
+    local psAlreadyUsed = false
+    if autofillTypeAttributes == AUTOFILL_TYPE.BOMBARDMENT and psUnitType and _bombardmentPlasmaScoringOnPlanet and _bombardmentPlasmaScoringOnPlanet ~= planet then
+        psUnitType = false
+        psAlreadyUsed = true
     end
 
     local antimassDeflectors = false
@@ -728,6 +777,10 @@ function autoFillCoroutine()
         if modifier.type == 'mutate' then
             table.insert(messages, '(' .. modifier.name .. ': ' .. modifier.description .. ')')
         end
+    end
+
+    if psAlreadyUsed then
+        table.insert(messages, '(Plasma Scoring was used on “' .. _bombardmentPlasmaScoringOnPlanet .. '”)')
     end
 
     if antimassDeflectors then

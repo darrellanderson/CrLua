@@ -22,6 +22,7 @@ function getHelperClient(helperObjectName)
     end
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
+local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 -- Unpack items directly to these positions.
@@ -393,6 +394,10 @@ function removeHiddenZones()
     end
 end
 
+function reportFactions()
+    _factionHelper.reportFactions()
+end
+
 function onLoad(saveState)
     local function doSimpleSetup()
         _useToggles = false
@@ -401,6 +406,8 @@ function onLoad(saveState)
     self.addContextMenuItem('Setup Franken', doSimpleSetup)
     self.addContextMenuItem('Custom Franken..', createCustomSelectionUi)
     self.addContextMenuItem('Remove hidden zones', removeHiddenZones)
+
+    self.addContextMenuItem('Report Factions', reportFactions)
 
     --createCustomSelectionUi() -- for testing
 end

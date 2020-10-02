@@ -55,7 +55,7 @@ local TYPE = {
 -- - capacity number.
 -- - cost number : cost per unit.
 -- - disablePlanetaryShield boolean.
--- - groundCombat {dice=#,hit=#} table.
+-- - groundCombat {dice=#,hit=#,anyPlanet} table.
 -- - move number.
 -- - name string : unit name when base unit is replaced (faction or unit upgrade).
 -- - override string : base unit type if this is a faction override.
@@ -66,8 +66,12 @@ local TYPE = {
 -- - unitLimit number : at most N units roll dice (Experimental Battlestation).
 -- - upgrade string : base unit type if this is a unit upgrade technology.
 --
+-- The groundCombat.anyPlanet means unit participates in ground combat for any
+-- planet in the system (e.g. Naalu fighters with the flagship).
+--
 -- The spaceCombat.extraHitsOn attribute is for expressing Jol-Nar's flagship,
 -- which gets 2 additional hits on a 9 or 10, extraHitsOn={count=2,value=9}.
+--
 local _unitTypes = {
     ['Carrier'] = {
         cost = 3,
@@ -254,6 +258,7 @@ local _flagshipModifiers = {
         type = TYPE.CHOOSE,  -- copy combat attributes AFTER all adjustments
         apply = function(unitAttrs)
             unitAttrs['Fighter'].groundCombat = _copy(unitAttrs['Fighter'].spaceCombat)
+            unitAttrs['Fighter'].groundCombat.anyPlanet = true
         end
     },
 
@@ -413,7 +418,7 @@ local _unitModifiers = {
                 end
             end
             if best then
-                best.spaceCannon.extraDice = best.spaceCannon.extraDice + 1
+                best.spaceCannon.extraDice = (best.spaceCannon.extraDice or 0) + 1
             end
             local best = false
             for unitType, attr in pairs(unitAttrs) do
@@ -424,7 +429,7 @@ local _unitModifiers = {
                 end
             end
             if best then
-                best.bombardment.extraDice = best.bombardment.extraDice + 1
+                best.bombardment.extraDice = (best.bombardment.extraDice or 0) + 1
             end
         end
     },
@@ -619,10 +624,12 @@ function applyFlagshipModifiers(params)
     assert(not params.opponentUnitTypeToCount or type(params.opponentUnitTypeToCount) == 'table')
 
     local unitAttrs = _copy(params.unitAttrs)
+    local modifiers = {}
 
     if params.myUnitTypeToCount and (params.myUnitTypeToCount['Flagship'] or 0) > 0 then
         local unitModifier = _flagshipModifiers[unitAttrs['Flagship'].name]
         if unitModifier and unitModifier.owner == OWNER.SELF then
+            table.insert(modifiers, unitAttrs['Flagship'].name)
             unitModifier.apply(unitAttrs, params)
         end
     end
@@ -630,6 +637,16 @@ function applyFlagshipModifiers(params)
     -- Worth it to support opponent flagship?  Opponent color is not sufficient
     -- for Franken.  For now ignore those, they are rare and do not effect
     -- roll mechanics (they do things like remove sustain damage, etc).
+
+    unitAttrs._flagshipModifiers = {}
+    for _, modifier in ipairs(modifiers) do
+        table.insert(unitAttrs._flagshipModifiers, {
+            name = modifier,
+            description = _flagshipModifiers[modifier].description,
+            owner = _flagshipModifiers[modifier].owner,
+            type = _flagshipModifiers[modifier].type,
+        })
+    end
 
     return unitAttrs
 end
@@ -684,7 +701,9 @@ function applyUnitModifiers(params)
     for _, modifier in ipairs(modifiers) do
         table.insert(unitAttrs._unitModifiers, {
             name = modifier,
-            description = _unitModifiers[modifier].description
+            description = _unitModifiers[modifier].description,
+            owner = _unitModifiers[modifier].owner,
+            type = _unitModifiers[modifier].type,
         })
     end
     return unitAttrs

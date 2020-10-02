@@ -14,8 +14,9 @@ function getHelperClient(helperObjectName)
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
 
-local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
+local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 local _setupHelper = getHelperClient('TI4_SETUP_HELPER')
+local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 function onLoad()
     createButtons()
@@ -40,16 +41,7 @@ function clickSetup(_, playerColor)
         error('Unpack: button not inside player zone')
     end
 
-    local function isFranken()
-        for _, object in ipairs(getAllObjects()) do
-            if string.match(object.getName(), '^TI4 MultiRoller') then
-                return object.call('isFranken')
-            end
-        end
-        error('Unpack: missing MultiRoller')
-    end
-
-    if isFranken() then
+    if _factionHelper.isFrankenEnabled() then
         _setupHelper.unpackFranken({
             color = color,
             unpackButtonGuid = self.getGUID()

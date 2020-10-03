@@ -61,7 +61,7 @@ local TYPE = {
 -- - override string : base unit type if this is a faction override.
 -- - planetaryShield boolean.
 -- - spaceCannon {dice=#,hit=#,range=#,extraDice=#} table.
--- - spaceCombat {dice=#,hit=#,extraHitsOn={count=#,value=#}}.
+-- - spaceCombat {dice=#,hit=#,extraHitsOn={count=#,value=#},diceAsCount=boolean}.
 -- - sustainDamage boolean.
 -- - unitLimit number : at most N units roll dice (Experimental Battlestation).
 -- - upgrade string : base unit type if this is a unit upgrade technology.
@@ -71,6 +71,9 @@ local TYPE = {
 --
 -- The spaceCombat.extraHitsOn attribute is for expressing Jol-Nar's flagship,
 -- which gets 2 additional hits on a 9 or 10, extraHitsOn={count=2,value=9}.
+--
+-- spaceCombat.diceAsCount is an awkward way for Winnu flagship to signal the
+-- dice number is non-standard, and should override unit count for MultiRoller.
 --
 local _unitTypes = {
     ['Carrier'] = {
@@ -264,17 +267,18 @@ local _flagshipModifiers = {
 
     ['Salai Sai Corian'] = {
         description = "Rolls number of dice equal to number of opponent's non-fighter ships",
-        owner = OWNER.OPPONENT,
+        owner = OWNER.SELF,
         type = TYPE.MUTATE,
         apply = function(unitAttrs, params)
-            local dice = 0
+            local count = 0
             local opponentUnitTypeToCount = params.opponentUnitTypeToCount or {}
             for unitType, attr in pairs(unitAttrs) do
-                if unitType ~= 'Fighter' and attr.spaceCombat then
-                    dice = dice + (opponentUnitTypeToCount[unitType] or 0)
+                if unitType ~= 'Fighter' and unitType ~= 'Infantry' and attr.spaceCombat then
+                    count = count + (opponentUnitTypeToCount[unitType] or 0)
                 end
             end
-            unitAttrs['Flagship'].spaceCombat.dice = dice
+            unitAttrs['Flagship'].spaceCombat.dice = count
+            unitAttrs['Flagship'].spaceCombat.diceAsCount = true  -- for multiroller unit count
         end
     },
 
@@ -627,7 +631,8 @@ function applyFlagshipModifiers(params)
     local modifiers = {}
 
     if params.myUnitTypeToCount and (params.myUnitTypeToCount['Flagship'] or 0) > 0 then
-        local unitModifier = _flagshipModifiers[unitAttrs['Flagship'].name]
+        local flagship = unitAttrs['Flagship'].name
+        local unitModifier = _flagshipModifiers[flagship]
         if unitModifier and unitModifier.owner == OWNER.SELF then
             table.insert(modifiers, unitAttrs['Flagship'].name)
             unitModifier.apply(unitAttrs, params)

@@ -477,7 +477,6 @@ local _factionAttributes = {
     },
 }
 
-local _frankenEnabled = false
 local _colorToFaction = {}
 local _tokenNameToFaction = {}
 
@@ -486,8 +485,12 @@ local _update = {
     periodicUpdateSeconds = 30,
 }
 
+local _state = {
+    frankenEnabled = false
+}
+
 function isFrankenEnabled()
-    return _frankenEnabled
+    return _state.frankenEnabled
 end
 
 function allFactions(includeFactionsNotAtTable)
@@ -638,7 +641,7 @@ function updateFactions()
     local abilitySet = {}
     local guidToName = {}
     local guidToPosition = {}
-    if _frankenEnabled then
+    if _state.frankenEnabled then
         for _, faction in pairs(_factionAttributes) do
             flagshipSet[faction.flagship] = true
             for _, ability in ipairs(faction.abilities) do
@@ -672,7 +675,7 @@ function updateFactions()
             factionSheetGuidToFactionName[guid] = factionName
         end
 
-        if _frankenEnabled and object.tag == 'Tile' and (flagshipSet[name] or abilitySet[name]) then
+        if _state.frankenEnabled and object.tag == 'Tile' and (flagshipSet[name] or abilitySet[name]) then
             guidToName[guid] = name
             guidToPosition[guid] = object.getPosition()
         end
@@ -769,7 +772,7 @@ function updateFactions()
     end
 
     -- If franken is enabled, reset flagship and abilities based on franken tiles.
-    if _frankenEnabled then
+    if _state.frankenEnabled then
         local guidToColor = _zoneHelper.zonesFromPositions(guidToPosition)
         for color, faction in pairs(_colorToFaction) do
             faction.flagship = '?'
@@ -892,8 +895,7 @@ function onLoad(saveState)
     end
     self.setInvisibleTo(invisibleTo)
 
-    local state = saveState and string.len(saveState) > 0 and JSON.decode(saveState) or {}
-    _frankenEnabled = saveState.frankenEnabled or false
+    _state = saveState and string.len(saveState) > 0 and JSON.decode(saveState) or _state
 
     -- Add faction names to attributes.
     for factionName, attributes in pairs(_factionAttributes) do
@@ -902,19 +904,17 @@ function onLoad(saveState)
 end
 
 function onSave()
-    return JSON.encode({
-        frankenEnabled = _frankenEnabled or false
-    })
+    return JSON.encode(_state)
 end
 
 function onFrankenEnabled(value)
-    _frankenEnabled = value or false
+    _state.frankenEnabled = value or false
     updateFactions()
 end
 
 function reportFactions()
     _maybeUpdateFactions()
-    local message = { 'FactionHelper.reportFactions: franken=' .. tostring(_frankenEnabled)}
+    local message = { 'FactionHelper.reportFactions: Franken=' .. tostring(_state.frankenEnabled)}
     for _, color in ipairs(_zoneHelper.zones()) do
         local faction = _colorToFaction[color]
         if faction then

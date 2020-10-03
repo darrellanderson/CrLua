@@ -777,6 +777,10 @@ function autoFillCoroutine()
         error(TAG .. ' unknown type "' .. typeAttributes.name .. "'")
     end
 
+    if unitTypeToAttrs['Flagship'].spaceCombat.diceAsCount then
+        fillUnitTypeToCount['Flagship'] = unitTypeToAttrs['Flagship'].spaceCombat.dice
+    end
+
     -- Compute best PS unit based on available candidates.  Assigns extra die
     -- to the best non-zero-count unit.
     local psUnitType = false

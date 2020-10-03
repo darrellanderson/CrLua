@@ -35,24 +35,12 @@ local data = {
 }
 
 local AUTOFILL_TYPE = {
-    SPACE_CANNON_OFFENSE = { name = 'Space Cannon Offense', clickButtonLabel = 'SPC' },
-    ANTI_FIGHTER_BARRAGE = { name = 'Anti-Fighter Barrage', clickButtonLabel = 'AFB' },
-    SPACE_COMBAT = { name = 'Space Combat', clickButtonLabel = 'CMBT' },
-    BOMBARDMENT = { name = 'Bombardment', perPlanet = true, clickButtonLabel = 'BOMB' },
-    SPACE_CANNON_DEFENSE = { name = 'Space Cannon Defense', perPlanet = true, clickButtonLabel = 'SPC' },
-    GROUND_COMBAT = { name = 'Ground Combat', perPlanet = true, clickButtonLabel = 'CMBT' }
-}
-
-local PLASMA_SCORING_BUTTON = {
-    ['Flagship'] = 'PS1',
-    ['War Sun'] = 'PS2',
-    ['Cruiser'] = 'PS3',
-    ['Dreadnought'] = 'PS4',
-    ['Destroyer'] = 'PS5',
-    ['Carrier'] = 'PS6',
-    ['Fighter'] = 'PS7',
-    ['PDS'] = 'PS9',
-    ['Space Dock'] = 'PS10'
+    SPACE_CANNON_OFFENSE = { name = 'Space Cannon Offense', rollType = 'spaceCannon' },
+    ANTI_FIGHTER_BARRAGE = { name = 'Anti-Fighter Barrage', rollType = 'antiFighterBarrage' },
+    SPACE_COMBAT = { name = 'Space Combat', rollType = 'spaceCombat' },
+    BOMBARDMENT = { name = 'Bombardment', perPlanet = true, rollType = 'bombardment' },
+    SPACE_CANNON_DEFENSE = { name = 'Space Cannon Defense', perPlanet = true, rollType = 'spaceCannon' },
+    GROUND_COMBAT = { name = 'Ground Combat', perPlanet = true, rollType = 'groundCombat' }
 }
 
 -------------------------------------------------------------------------------
@@ -145,7 +133,6 @@ function updateColorToMultiRoller()
     for _, object in ipairs(getAllObjects()) do
         local name = object.getName()
         if string.match(name, '^TI4 MultiRoller') then
-            object = CrLua.TTS.ClickButtonHack.inject(object)
             table.insert(multiRollers, object)
         end
         local color = string.match(name, '^Command Sheet %((%a+)%)$')
@@ -886,15 +873,13 @@ function autoFillCoroutine()
 
     CrLua.Log.d(TAG, 'autoFillCoroutine: injecting MR')
     local doClick = not params.altClick
-    injectValues{
-        multiRoller = assert(multiRoller),
-        unitCount = assert(fillUnitTypeToCount),
-        hasAntimassDeflectors = antimassDeflectors,
-        suggestPdsUnitName = psUnitType,
-        clickerColor = assert(params.clickerColor),
-        clickButtonLabel = autofillTypeAttributes.clickButtonLabel,
-        doClick = doClick
-    }
+    multiRoller.call('inject', {
+        clickerColor = params.clickerColor,
+        unitTypeToCount = fillUnitTypeToCount,
+        plasmaScoring = psUnitType and true or false,
+        antimassDeflectors = antimassDeflectors and true or false,
+        rollType = doClick and autofillTypeAttributes.rollType or false
+    })
     if not doClick then
         printToAll('AutoFill: left click to fill and roll.', params.clickerColor)
     end
@@ -904,55 +889,9 @@ end
 
 -------------------------------------------------------------------------------
 
-function injectValues(params)
-    local multiRoller = assert(params.multiRoller)
-    local color = assert(params.clickerColor)
-    local unitCount = params.unitCount
-
-    --multiRoller.call('resetCounters')
-    CrLua.TTS.ClickButtonHack.invoke(multiRoller, 'RESET', color)
-
-    local inputs = params.multiRoller.getInputs()
-    for unitName, count in pairs(unitCount) do
-        local inputLabel = 'UNIT:' .. unitName
-        local found = false
-        for _, input in ipairs(inputs) do
-            if input.label == inputLabel then
-                found = true
-                params.multiRoller.editInput({ index = input.index, value = count })
-                break
-            end
-        end
-        if not found then
-            error('Warning: no input ' .. inputLabel)
-        end
-    end
-
-    if params.hasAntimassDeflectors then
-        --multiRoller.call('clickAMD')
-        CrLua.TTS.ClickButtonHack.invoke(multiRoller, 'AMD', color)
-    end
-
-    if params.suggestPdsUnitName then
-        local button = assert(PLASMA_SCORING_BUTTON[params.suggestPdsUnitName])
-        multiRoller.call(button)
-    end
-
-    -- "Update" by calling the associated function.  Call can only pass one argument!
-    --multiRoller.call('detectCards', color)
-    CrLua.TTS.ClickButtonHack.invoke(multiRoller, 'UPDATE', color)
-
-    if params.doClick then
-        CrLua.TTS.ClickButtonHack.invoke(multiRoller, params.clickButtonLabel, color)
-    end
-end
-
--------------------------------------------------------------------------------
-
 #include <~/CrLua/CrLua>
 #include <~/CrLua/LockGlobals>
 
-#include <~/CrLua/TTS/ClickButtonHack>
 #include <~/CrLua/TTS/Object>
 #include <~/CrLua/TTS/Player>
 
@@ -968,7 +907,6 @@ end
 CrLua.assertRequired({
     'TTS.Object',
     'TTS.Player',
-    'TTS.ClickButtonHack',
     'List',
     'Log' })
 CrLua.lock()

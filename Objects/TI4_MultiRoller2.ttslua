@@ -1,0 +1,869 @@
+--- TI4 multiRoller
+-- @author the_Mantis
+-- @author MrStump for dice rolling functions
+-- @author Darrell use shared zone helper
+-- @author Plat combine larger font size + scale for crisper text
+
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
+        return function(parameters) return helperObject.call(functionName, parameters) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
+local _unitHelper = getHelperClient('TI4_UNIT_HELPER')
+local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
+
+local _unitTypeToFields = {}
+local _amd = {}
+local _ps = {}
+
+local _lastUpdateFrame = false
+local _unitAttrs = false
+local _rollQueue = {}
+
+local _rollInProgress = false
+local _dice = {}
+
+-------------------------------------------------------------------------------
+
+--- Let outsiders ("auto-fill multiroller") set values and optionally roll.
+function inject(params)
+    assert(type(params) == 'table')
+    assert(type(params.clickerColor) == 'string')
+    assert(type(params.unitTypeToCount) == 'table')
+    assert(type(params.plasmaScoring) == 'boolean')
+    assert(type(params.antimassDeflectors) == 'boolean')
+    assert((not params.rollType) or type(params.rollType) == 'string')
+
+    clickReset()
+
+    for unitType, count in pairs(params.unitTypeToCount) do
+        setCount(unitType, count)
+    end
+
+    params.plasmaScoring = params.plasmaScoring and true or false
+    _ps.active = _ps.active and true or false
+    if params.plasmaScoring ~= _ps.active then
+        clickPS()
+    end
+
+    params.antimassDeflectors = params.antimassDeflectors and true or false
+    _amd.active = _amd.active and true or false
+    if params.antimassDeflectors ~= _amd.active then
+        clickAMD()
+    end
+
+    updateUnitValues(true)
+
+    local clickObject = self
+    local clickerColor = params.clickerColor
+    local altClick = false
+    if params.rollType == 'antiFighterBarrage' then
+        clickAFB(clickObject, clickerColor, altClick)
+    elseif params.rollType == 'spaceCombat' or params.rollType == 'groundCombat' then
+        clickCombat(clickObject, clickerColor, altClick)
+    elseif params.rollType == 'spaceCannon' then
+        clickSPC(clickObject, clickerColor, altClick)
+    elseif params.rollType == 'bombardment' then
+        clickBomb(clickObject, clickerColor, altClick)
+    elseif params.rollType then
+        error('unknown roll type ' .. params.rollType)
+    end
+end
+
+-------------------------------------------------------------------------------
+
+-- Initial dice position relative to tool.
+local DICE = {
+    radius = 5,
+    height = 4
+}
+
+local UNIT_DATA = {
+    {
+        unitType = 'Flagship',
+        antiFighterBarrage = true,
+        combat = true,
+        spaceCannon = true,
+        bombardment = true
+    },
+    {
+        unitType = 'War Sun',
+        combat = true,
+        bombardment = true
+    },
+    {
+        unitType = 'Cruiser',
+        combat = true,
+        bombardment = true
+    },
+    {
+        unitType = 'Dreadnought',
+        combat = true,
+        spaceCannon = true,
+        bombardment = true
+    },
+    {
+        unitType = 'Destroyer',
+        antiFighterBarrage = true,
+        combat = true,
+        bombardment = true
+    },
+    {
+        unitType = 'Carrier',
+        combat = true,
+        bombardment = true
+    },
+    {
+        unitType = 'Fighter',
+        combat = true,
+        bombardment = true
+    },
+    {
+        unitType = 'Infantry',
+        combat = true,
+    },
+    {
+        unitType = 'PDS',
+        spaceCannon = true,
+    },
+    {
+        unitType = 'Space Dock',
+        spaceCannon = true,
+    },
+}
+
+local DICE_COLOR = {
+    ['Dreadnought'] = 'Purple',
+    ['Flagship'] = 'Black',
+    ['Destroyer'] = 'Red',
+    ['War Sun'] = 'Orange',
+    ['Carrier'] = 'Blue',
+    ['Fighter'] = 'Teal',
+    ['Infantry'] = 'Green',
+    ['Cruiser'] = 'Brown',
+    ['PDS'] = 'Orange',
+    ['Space Dock'] = 'Yellow',
+    ['Mech'] = 'Pink'
+}
+
+-------------------------------------------------------------------------------
+
+function onLoad(saveState)
+    createUi()
+end
+
+-------------------------------------------------------------------------------
+
+function getInput(index)
+    for _, input in ipairs(self.getInputs()) do
+        if input.index == index then
+            return input
+        end
+    end
+end
+
+function getButton(index)
+    for _, button in ipairs(self.getButtons()) do
+        if button.index == index then
+            return button
+        end
+    end
+end
+
+function getCount(unitType)
+    assert(type(unitType) == 'string')
+    local input = getInput(_unitTypeToFields[unitType].count)
+    return tonumber(input.value)
+end
+
+function setCount(unitType, count)
+    assert(type(unitType) == 'string' and type(count) == 'number')
+    local input = getInput(_unitTypeToFields[unitType].count)
+    input.value = count
+    self.editInput(input)
+end
+
+-------------------------------------------------------------------------------
+
+function createUi()
+    self.clearInputs()
+    self.clearButtons()
+
+    local count = {
+        w = 72,
+        h = 72,
+        fontSize = 50
+    }
+    local plusMinus = {
+        w = 50,
+        h = 50,
+        fontSize = 50
+    }
+    local hitValue = {
+        w = 140,
+        h = 72,
+        fontSize = 50
+    }
+    local buttonValue = {
+        w = 145,
+        h = 72,
+        fontSize = 40
+    }
+    local scaleUpDown = 4
+
+    local xCount = -0.8
+    local x0 = -0.1
+    local y = 0.21
+    local z = -0.9
+    local dx = 0.3
+    local dz = 0.167
+
+    local nextIndex = 0
+    for i, unitData in ipairs(UNIT_DATA) do
+        local unitType = unitData.unitType
+        _unitTypeToFields[unitType] = {}
+
+        local function minus()
+            setCount(unitType, math.max(getCount(unitType) - 1, 0))
+            updateUnitValues()
+        end
+        local function plus()
+            setCount(unitType, math.min(getCount(unitType) + 1, 100))
+            updateUnitValues()
+        end
+        self.setVar('minus' .. i, minus)
+        self.setVar('plus' .. i, plus)
+
+        local x = xCount
+        _unitTypeToFields[unitType].count = nextIndex
+        nextIndex = nextIndex + 1
+        self.createInput({
+            input_function = 'doNothing',
+            function_owner = self,
+            label          = '',
+            alignment      = 4,  -- right
+            position       = { x = x, y = y, z = z },
+            rotation       = { x = 0, y = 0, z = 0 },
+            scale          = { x = 1 / scaleUpDown, y = 1, z = 1 / scaleUpDown },
+            width          = count.w * scaleUpDown,
+            height         = count.h * scaleUpDown,
+            font_size      = count.fontSize * scaleUpDown,
+            value          = 0,
+            validation     = 2,  -- integer
+            tab            = 1,  -- ignore
+        })
+        self.createButton({
+            click_function = 'minus' .. i,
+            function_owner = self,
+            label          = '-',
+            position       = { x = x - 0.12, y = y, z = z },
+            rotation       = { x = 0, y = 0, z = 0 },
+            scale          = { x = 1 / scaleUpDown, y = 1, z = 1 / scaleUpDown },
+            width          = plusMinus.w * scaleUpDown,
+            height         = plusMinus.h * scaleUpDown,
+            font_size      = plusMinus.fontSize * scaleUpDown,
+        })
+        self.createButton({
+            click_function = 'plus' .. i,
+            function_owner = self,
+            label          = '+',
+            position       = { x = x + 0.12, y = y, z = z },
+            rotation       = { x = 0, y = 0, z = 0 },
+            scale          = { x = 1 / scaleUpDown, y = 1, z = 1 / scaleUpDown },
+            width          = plusMinus.w * scaleUpDown,
+            height         = plusMinus.h * scaleUpDown,
+            font_size      = plusMinus.fontSize * scaleUpDown,
+        })
+
+        x = x0
+        if unitData.antiFighterBarrage then
+            _unitTypeToFields[unitType].antiFighterBarrage = nextIndex
+            nextIndex = nextIndex + 1
+            self.createInput({
+                input_function = 'doNothing',
+                function_owner = self,
+                label          = '',
+                alignment      = 4,  -- right
+                position       = { x = x, y = y, z = z },
+                rotation       = { x = 0, y = 0, z = 0 },
+                scale          = { x = 1 / scaleUpDown, y = 1, z = 1 / scaleUpDown },
+                width          = hitValue.w * scaleUpDown,
+                height         = hitValue.h * scaleUpDown,
+                font_size      = hitValue.fontSize * scaleUpDown,
+                value          = 0,
+                tab            = 1,  -- ignore
+            })
+        end
+
+        x = x + dx
+        if unitData.combat then
+            _unitTypeToFields[unitType].combat = nextIndex
+            nextIndex = nextIndex + 1
+            self.createInput({
+                input_function = 'doNothing',
+                function_owner = self,
+                label          = '',
+                alignment      = 4,  -- right
+                position       = { x = x, y = y, z = z },
+                rotation       = { x = 0, y = 0, z = 0 },
+                scale          = { x = 1 / scaleUpDown, y = 1, z = 1 / scaleUpDown },
+                width          = hitValue.w * scaleUpDown,
+                height         = hitValue.h * scaleUpDown,
+                font_size      = hitValue.fontSize * scaleUpDown,
+                value          = 0,
+                tab            = 1,  -- ignore
+            })
+        end
+
+        x = x + dx
+        if unitData.spaceCannon then
+            _unitTypeToFields[unitType].spaceCannon = nextIndex
+            nextIndex = nextIndex + 1
+            self.createInput({
+                input_function = 'doNothing',
+                function_owner = self,
+                label          = '',
+                alignment      = 4,  -- right
+                position       = { x = x, y = y, z = z },
+                rotation       = { x = 0, y = 0, z = 0 },
+                scale          = { x = 1 / scaleUpDown, y = 1, z = 1 / scaleUpDown },
+                width          = hitValue.w * scaleUpDown,
+                height         = hitValue.h * scaleUpDown,
+                font_size      = hitValue.fontSize * scaleUpDown,
+                value          = 0,
+                tab            = 1,  -- ignore
+            })
+        end
+
+        x = x + dx
+        if unitData.bombardment then
+            _unitTypeToFields[unitType].bombardment = nextIndex
+            nextIndex = nextIndex + 1
+            self.createInput({
+                input_function = 'doNothing',
+                function_owner = self,
+                label          = '',
+                alignment      = 4,  -- right
+                position       = { x = x, y = y, z = z },
+                rotation       = { x = 0, y = 0, z = 0 },
+                scale          = { x = 1 / scaleUpDown, y = 1, z = 1 / scaleUpDown },
+                width          = hitValue.w * scaleUpDown,
+                height         = hitValue.h * scaleUpDown,
+                font_size      = hitValue.fontSize * scaleUpDown,
+                value          = 0,
+                tab            = 1,  -- ignore
+            })
+        end
+
+        z = z + dz
+    end
+
+    local x = -0.8
+    z = 0.85
+    local dx = 0.32
+
+    self.createButton({
+        click_function = 'clickReset',
+        function_owner = self,
+        label          = 'RESET',
+        position       = { x = x, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1 / scaleUpDown, y = 1, z = 1 / scaleUpDown },
+        width          = buttonValue.w * scaleUpDown,
+        height         = buttonValue.h * scaleUpDown,
+        font_size      = buttonValue.fontSize * scaleUpDown,
+        tooltip        = '',
+    })
+
+    x = x + dx
+    self.createButton({
+        click_function = 'clickUpdate',
+        function_owner = self,
+        label          = 'UPDATE',
+        position       = { x = x, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1 / scaleUpDown, y = 1, z = 1 / scaleUpDown },
+        width          = buttonValue.w * scaleUpDown,
+        height         = buttonValue.h * scaleUpDown,
+        font_size      = buttonValue.fontSize * scaleUpDown,
+        tooltip        = '',
+    })
+
+    x = x + dx
+    self.createButton({
+        click_function = 'clickAFB',
+        function_owner = self,
+        label          = 'AFB',
+        position       = { x = x, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1 / scaleUpDown, y = 1, z = 1 / scaleUpDown },
+        width          = buttonValue.w * scaleUpDown,
+        height         = buttonValue.h * scaleUpDown,
+        font_size      = buttonValue.fontSize * scaleUpDown,
+        tooltip        = '',
+    })
+
+    x = x + dx
+    self.createButton({
+        click_function = 'clickCombat',
+        function_owner = self,
+        label          = 'CMBT',
+        position       = { x = x, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1 / scaleUpDown, y = 1, z = 1 / scaleUpDown },
+        width          = buttonValue.w * scaleUpDown,
+        height         = buttonValue.h * scaleUpDown,
+        font_size      = buttonValue.fontSize * scaleUpDown,
+        tooltip        = '',
+    })
+
+    x = x + dx
+    self.createButton({
+        click_function = 'clickSPC',
+        function_owner = self,
+        label          = 'SPC',
+        position       = { x = x, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1 / scaleUpDown, y = 1, z = 1 / scaleUpDown },
+        width          = buttonValue.w * scaleUpDown,
+        height         = buttonValue.h * scaleUpDown,
+        font_size      = buttonValue.fontSize * scaleUpDown,
+        tooltip        = '',
+    })
+
+    x = x + dx
+    self.createButton({
+        click_function = 'clickBomb',
+        function_owner = self,
+        label          = 'BOMB',
+        position       = { x = x, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1 / scaleUpDown, y = 1, z = 1 / scaleUpDown },
+        width          = buttonValue.w * scaleUpDown,
+        height         = buttonValue.h * scaleUpDown,
+        font_size      = buttonValue.fontSize * scaleUpDown,
+        tooltip        = '',
+    })
+
+    z = z - dz
+    _ps.index = #self.getButtons()
+    self.createButton({
+        click_function = 'clickPS',
+        function_owner = self,
+        label          = 'PS',
+        position       = { x = x, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1 / scaleUpDown, y = 1, z = 1 / scaleUpDown },
+        width          = buttonValue.w * scaleUpDown,
+        height         = buttonValue.h * scaleUpDown,
+        font_size      = buttonValue.fontSize * scaleUpDown,
+        tooltip        = 'Click to toggle Plasma Scoring',
+    })
+
+    z = z - dz
+    _amd.index = #self.getButtons()
+    self.createButton({
+        click_function = 'clickAMD',
+        function_owner = self,
+        label          = 'AMD',
+        position       = { x = x, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1 / scaleUpDown, y = 1, z = 1 / scaleUpDown },
+        width          = buttonValue.w * scaleUpDown,
+        height         = buttonValue.h * scaleUpDown,
+        font_size      = buttonValue.fontSize * scaleUpDown,
+        tooltip        = 'Click to toggle Antimass Deflectors',
+    })
+
+end
+
+function doNothing() end
+
+-------------------------------------------------------------------------------
+
+function clickReset(clickObject, clickerColor, altClick)
+    for _, input in ipairs(self.getInputs()) do
+        input.value = 0
+        self.editInput(input)
+    end
+    if _ps.active then
+        clickPS()
+    end
+    if _amd.active then
+        clickAMD()
+    end
+    deleteDice()
+end
+
+function clickUpdate(clickObject, clickerColor, altClick)
+    updateUnitValues()
+end
+
+function clickAFB(clickObject, clickerColor, altClick)
+    roll(clickerColor, 'ANTI-FIGHTER BARRAGE', { 'antiFighterBarrage' })
+end
+
+function clickCombat(clickObject, clickerColor, altClick)
+    roll(clickerColor, 'COMBAT', { 'spaceCombat', 'groundCombat' })
+end
+
+function clickSPC(clickObject, clickerColor, altClick)
+    roll(clickerColor, 'SPACE CANNON', { 'spaceCannon' })
+end
+
+function clickBomb(clickObject, clickerColor, altClick)
+    roll(clickerColor, 'BOMBARDMENT', { 'bombardment' })
+end
+
+function clickPS(clickObject, clickerColor, altClick)
+    _ps.active = not _ps.active
+    local button = getButton(_ps.index)
+    button.color = _ps.active and 'Green' or 'White'
+    self.editButton(button)
+    updateUnitValues()
+end
+
+function clickAMD(clickObject, clickerColor, altClick)
+    _amd.active = not _amd.active
+    local button = getButton(_amd.index)
+    button.color = _amd.active and 'Green' or 'White'
+    self.editButton(button)
+    updateUnitValues()
+end
+
+-------------------------------------------------------------------------------
+
+function myColor()
+    local p0 = self.getPosition()
+    local best = false
+    local bestDistanceSq = false
+    for _, attrs in ipairs(_zoneHelper.zonesAttributes()) do
+        local p1 = attrs.center
+        local dSq = (p0.x - p1.x) ^ 2 + (p0.z - p1.z) ^ 2
+        if (not best) or dSq < bestDistanceSq then
+            best = attrs.color
+            bestDistanceSq = dSq
+        end
+    end
+    return best
+end
+
+function getName(color)
+    local player = Player[color]
+    return player and player.steam_name or color
+end
+
+function updateUnitValues(force)
+    if (not force) and _lastUpdateFrame == Time.frame_count then
+        return
+    end
+    _lastUpdateFrame = Time.frame_count
+
+    local color = myColor()
+
+    local unitTypeToCount = {}
+    for _, unitData in ipairs(UNIT_DATA) do
+        unitTypeToCount[unitData.unitType] = _unitTypeToFields[unitData.unitType].count
+    end
+
+    local unitOverrides = _unitHelper.getColorToUnitOverrides()[color] or {}
+    local unitModifiers = _unitHelper.getColorToUnitModifiers()[color] or {}
+
+    -- Remove PS if not selected.
+    if _ps.active then
+        local found = false
+        for _, modifier in ipairs(unitModifiers) do
+            if modifier == 'Plasma Scoring' then
+                found = true
+                break
+            end
+        end
+        if not found then
+            table.insert(unitModifiers, 'Plasma Scoring')
+        end
+    else
+        for i = #unitModifiers, 1, -1 do
+            if unitModifiers[i] == 'Plasma Scoring' then
+                table.remove(unitModifiers, i)
+            end
+        end
+    end
+
+    _unitAttrs = _unitHelper.getUnitAttributes(unitOverrides)
+
+    -- Apply flagships.
+    _unitAttrs = _unitHelper.applyFlagshipModifiers({
+        unitAttrs = assert(_unitAttrs),
+        myUnitTypeToCount = unitTypeToCount,
+        opponentUnitTypeToCount = false
+    })
+
+    -- Apply unit modifiers.
+    _unitAttrs = _unitHelper.applyUnitModifiers({
+        unitAttrs = assert(_unitAttrs),
+        myColor = color,
+        myUnitModifiers = unitModifiers,
+        myUnitTypeToCount = unitTypeToCount,
+        opponentColor = false,
+        opponentUnitModifiers = _amd.active and { 'Antimass Deflectors' },
+        opponentUnitTypeToCount = false
+    })
+
+    local function updateInput(unitType, inputField, hitAndDice)
+        assert(type(unitType) == 'string' and type(inputField) == 'string')
+        local fields = _unitTypeToFields[unitType]
+        local index = fields and fields[inputField]
+        local input = index and getInput(index)
+        if input then
+            if hitAndDice and getCount(unitType) > 0 then
+                local extra = hitAndDice.extraDice and hitAndDice.extraDice > 0
+                input.value = hitAndDice.hit .. 'x' .. hitAndDice.dice .. (extra and '+' or '')
+            else
+                input.value = 0
+            end
+            self.editInput(input)
+        end
+    end
+
+    for unitType, attrs in pairs(_unitAttrs) do
+        updateInput(unitType, 'antiFighterBarrage', attrs.antiFighterBarrage)
+        updateInput(unitType, 'combat', attrs.spaceCombat or attrs.groundCombat)
+        updateInput(unitType, 'spaceCannon', attrs.spaceCannon)
+        updateInput(unitType, 'bombardment', attrs.bombardment)
+    end
+end
+
+function deleteDice()
+    while #_dice > 0 do
+        local die = table.remove(_dice)
+        local object = getObjectFromGUID(die.guid)
+        if object then
+            destroyObject(object)
+        end
+    end
+end
+
+function roll(clickerColor, rollLabel, rollTypes)
+    assert(type(clickerColor) == 'string' and type(rollLabel) == 'string' and type(rollTypes) == 'table')
+
+    if _rollInProgress then
+        broadcastToColor('Dice are already being rolled.', clickerColor, {0.8,0.2,0.2})
+        return
+    end
+
+    updateUnitValues()
+
+    local color = assert(myColor())
+    local name = assert(getName(color))
+
+    local modifiers = {}
+    for _, modifier in ipairs(_unitAttrs._flagshipModifiers) do
+        table.insert(modifiers, modifier.name .. ' (' .. modifier.description .. ')')
+    end
+    for _, modifier in ipairs(_unitAttrs._unitModifiers) do
+        table.insert(modifiers, modifier.name .. ' (' .. modifier.description .. ')')
+    end
+
+    printToAll('Roll Modifiers detected: ' .. ((#modifiers > 0) and table.concat(modifiers, ', ') or 'none'), color)
+    printToAll(name .. ' rolling for ' .. rollLabel, color)
+
+    local unitTypeToHitDiceAndCount = false
+    for _, unitData in ipairs(UNIT_DATA) do
+        local unitType = unitData.unitType
+        for _, rollType in ipairs(rollTypes) do
+            local hitAndDice = _unitAttrs[unitType][rollType]
+            local count = getCount(unitType)
+            if hitAndDice and count > 0 then
+                unitTypeToHitDiceAndCount = unitTypeToHitDiceAndCount or {}
+                unitTypeToHitDiceAndCount[unitType] = {
+                    hitAndDice = hitAndDice,
+                    count = count
+                }
+                break
+            end
+        end
+    end
+
+    if not unitTypeToHitDiceAndCount then
+        printToAll('No valid units for ' .. rollLabel, color)
+    else
+        _rollInProgress = true
+        table.insert(_rollQueue, {
+            name = name,
+            color = color,
+            unitTypeToHitDiceAndCount = unitTypeToHitDiceAndCount
+        })
+        startLuaCoroutine(self, 'rollCoroutine')
+    end
+end
+
+function rollCoroutine()
+    local params = table.remove(_rollQueue)
+    if not params then
+        return
+    end
+    local name = assert(params.name)
+    local color = assert(params.color)
+    local unitTypeToHitDiceAndCount = assert(params.unitTypeToHitDiceAndCount)
+
+    deleteDice()
+    math.randomseed(os.time())
+
+    -- Gather dice information (wait until we know count to spawn dice).
+    for unitType, hitDiceAndCount in pairs(unitTypeToHitDiceAndCount) do
+        local hitAndDice = hitDiceAndCount.hitAndDice
+        for _ = 1, hitDiceAndCount.count * hitAndDice.dice + (hitAndDice.extraDice or 0) do
+            table.insert(_dice, {
+                unitType = unitType,
+                unitName = _unitAttrs[unitType].name or unitType,
+                hit = hitDiceAndCount.hitAndDice.hit,
+                crit = hitDiceAndCount.hitAndDice.extraHitsOn,
+            })
+        end
+    end
+
+    for i, die in ipairs(_dice) do
+        local pos = self.getPosition()
+        local phi = math.rad(i * 360 / #_dice)
+        die.object = spawnObject({
+            type = 'Die_10',
+            position = {
+                x = pos.x + DICE.radius * math.cos(phi),
+                y = pos.y + DICE.height,
+                z = pos.z + DICE.radius * math.sin(phi),
+            },
+            rotation = randomRotation(),
+        })
+        die.object.setName(die.unitName)
+        die.object.setColorTint(Color.fromString(DICE_COLOR[die.unitType]))
+    end
+    for _, die in ipairs(_dice) do
+        while die.object and die.object.spawning do
+            coroutine.yield(0)
+        end
+        die.guid = die.object.getGUID()
+        die.object = nil  -- reset deletes dice
+    end
+    coroutine.yield(0)
+
+    for _, die in ipairs(_dice) do
+        local object = getObjectFromGUID(die.guid)
+        if object then
+            object.interactable = false
+            object.roll()
+        end
+    end
+    coroutine.yield(0)
+
+    local timeout = Time.time + 3
+    for _, die in ipairs(_dice) do
+        local object = getObjectFromGUID(die.guid)
+        while object and (not object.resting) and Time.time < timeout do
+            coroutine.yield(0)
+        end
+    end
+    for _, die in ipairs(_dice) do
+        local object = getObjectFromGUID(die.guid)
+        if object then
+            object.interactable = true
+        end
+    end
+    coroutine.yield(0)
+
+    local message = {}
+    local hits = 0
+    for unitType, _ in pairs(unitTypeToHitDiceAndCount) do
+        local unitDice = {}
+        for _, die in ipairs(_dice) do
+            if die.unitType == unitType then
+                table.insert(unitDice, die)
+            end
+        end
+        if #unitDice > 0 then
+            local die = unitDice[1]
+            local item = '[HIT:' .. die.hit
+            if die.crit then
+                item = item .. ', CRIT(x' .. (die.crit.count + 1) .. '):' .. die.crit.value
+            end
+            item = item .. ']: '
+
+            local values = {}
+            for _, die in ipairs(unitDice) do
+                local object = getObjectFromGUID(die.guid)
+                local value = object and object.getValue() or 0
+                local suffix = ''
+                if value >= die.hit then
+                    hits = hits + 1
+                    suffix = '#'
+                end
+                if die.crit and value >= die.crit.value then
+                    hits = hits + die.crit.count
+                    for _ = 1, die.crit.count do
+                        suffix = suffix .. '#'
+                    end
+                end
+                table.insert(values, value .. suffix)
+            end
+            table.insert(message, die.unitName .. ' ' .. item .. table.concat(values, ', '))
+        end
+    end
+
+    broadcastToAll(name .. ' rolled: [ffffff]' .. table.concat(message, ', '), color)
+    broadcastToAll(name .. ' landed ' .. hits .. ' hit' .. (hits == 1 and '' or 's') .. '.', color)
+
+    _rollInProgress = false
+    return 1
+end
+
+function randomRotation()
+    --Credit for this function goes to Revinor (forums)
+    --Get 3 random numbers
+    local u1 = math.random();
+    local u2 = math.random();
+    local u3 = math.random();
+    --Convert them into quats to avoid gimbal lock
+    local u1sqrt = math.sqrt(u1);
+    local u1m1sqrt = math.sqrt(1-u1);
+    local qx = u1m1sqrt *math.sin(2*math.pi*u2);
+    local qy = u1m1sqrt *math.cos(2*math.pi*u2);
+    local qz = u1sqrt *math.sin(2*math.pi*u3);
+    local qw = u1sqrt *math.cos(2*math.pi*u3);
+    --Apply rotation
+    local ysqr = qy * qy;
+    local t0 = -2.0 * (ysqr + qz * qz) + 1.0;
+    local t1 = 2.0 * (qx * qy - qw * qz);
+    local t2 = -2.0 * (qx * qz + qw * qy);
+    local t3 = 2.0 * (qy * qz - qw * qx);
+    local t4 = -2.0 * (qx * qx + ysqr) + 1.0;
+    --Correct
+    if t2 > 1.0 then t2 = 1.0 end
+    if t2 < -1.0 then ts = -1.0 end
+    --Convert back to X/Y/Z
+    local xr = math.asin(t2);
+    local yr = math.atan2(t3, t4);
+    local zr = math.atan2(t1, t0);
+    --Return result
+    return {math.deg(xr),math.deg(yr),math.deg(zr)}
+end
+
+-------------------------------------------------------------------------------
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

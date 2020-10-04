@@ -1041,6 +1041,54 @@ end
 
 -------------------------------------------------------------------------------
 
+function diplomacySystem(clickerColor, systemObject)
+    local system = _systems[systemObject.getGUID()]
+    printToAll(clickerColor .. ' applying Diplomcay to ' .. system.string)
+    local bagNameSet = {}
+    for _, faction in pairs(_factionHelper.allFactions()) do
+        if faction.color ~= clickerColor then
+            bagNameSet[faction.tokenName .. ' Command Tokens Bag'] = true
+        end
+    end
+    local bags = {}
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Bag' and bagNameSet[object.getName()] then
+            table.insert(bags, object)
+        end
+    end
+    local p = systemObject.getPosition()
+    local r = 1
+    for i, bag in ipairs(bags) do
+        local phi = math.rad(360 * i / #bags)
+        if bag.getQuantity() > 0 then
+            bag.takeObject({
+                position = {
+                    x = p.x + math.cos(phi) * r,
+                    y = 5,
+                    z= p.z + math.sin(phi) * r,
+                },
+                smooth = false,
+            })
+        else
+            printToAll('Diplomacy ' .. system.string .. ': ' .. bag.getName() .. ' empty, please assign token')
+        end
+    end
+end
+
+function _addContextMenuItems(systemObject)
+    assert(type(systemObject) == 'userdata')
+    assert(_systems[systemObject.getGUID()])
+    systemObject.addContextMenuItem('Diplomacy System', function(clickerColor) diplomacySystem(clickerColor, systemObject) end, false)
+end
+
+function onObjectLeaveContainer(container, leaveObject)
+    if _systems[leaveObject.getGUID()] then
+        _addContextMenuItems(leaveObject)
+    end
+end
+
+-------------------------------------------------------------------------------
+
 function onLoad(saveState)
     self.setColorTint({ r = 0.25, g = 0.25, b = 0.25 })
     self.setScale({ x = 2, y = 0.01, z = 2 })
@@ -1057,6 +1105,15 @@ function onLoad(saveState)
         end
     end
     self.setInvisibleTo(invisibleTo)
+
+    local function delayedAddContextMenuItems()
+        for _, object in ipairs(getAllObjects()) do
+            if _systems[object.getGUID()] then
+                _addContextMenuItems(object)
+            end
+        end
+    end
+    Wait.frames(delayedAddContextMenuItems, 9)
 end
 
 function onPlayerTurnEnd(player_color_end, player_color_next)

@@ -1064,10 +1064,15 @@ function diplomacySystem(clickerColor, systemObject)
             bag.takeObject({
                 position = {
                     x = p.x + math.cos(phi) * r,
-                    y = 5,
+                    y = 3 + i * 0.2,
                     z= p.z + math.sin(phi) * r,
                 },
-                smooth = false,
+                rotation = {
+                    x = 0,
+                    y = -math.deg(phi),
+                    z = 0
+                },
+                smooth = true,
             })
         else
             printToAll('Diplomacy ' .. system.string .. ': ' .. bag.getName() .. ' empty, please assign token')

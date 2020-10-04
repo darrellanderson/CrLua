@@ -190,7 +190,7 @@ end
 -------------------------------------------------------------------------------
 
 function _antiIntellecualRevolution(triggerName)
-    broadcastToAll('Anti-Intellectual Revolution, ' .. triggerName .. ': after researching a techology destroy one non-fighter ship.', 'Red')
+    broadcastToAll('Anti-Intellectual Revolution, ' .. triggerName .. ': after researching a technology, destroy one non-fighter ship.', 'Yellow')
 end
 
 function onStrategyCardPlayed(strategyCardGuid)

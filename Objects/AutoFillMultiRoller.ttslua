@@ -490,7 +490,6 @@ function rewritePositionAndHexForInArenaUnits(hex, units)
         end
     end
 
-    CrLua.Log.d(TAG, 'getArenaUnits: #units=' .. (result and #result or 0))
     return true
 end
 

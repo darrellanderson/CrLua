@@ -847,7 +847,7 @@ local function _scoreObjective(playerColor, card)
     local position = card.positionToWorld({
         x = x0 + dx * ((zoneAttrs.index - 1) % halfPlayerCount),
         y = 0,
-        z = 1 * ((zoneAttrs.index < halfPlayerCount) and -1 or 1)
+        z = 1 * ((zoneAttrs.index <= halfPlayerCount) and -1 or 1)
     })
     position.y = position.y + 2
     local rotation = {

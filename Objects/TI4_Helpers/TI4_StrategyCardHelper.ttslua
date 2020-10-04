@@ -258,11 +258,9 @@ end
 function dealAllActionCards(dealOrder)
     local lookForSet = {
         ['Neural Motivator'] = true,
-        ['Scheming'] = true,
         ['Minister of Policy'] = true,
     }
 
-    local isFranken = false
     local guidToPosition = {}
     local guidToName = {}
 
@@ -270,9 +268,6 @@ function dealAllActionCards(dealOrder)
     for _, object in ipairs(getAllObjects()) do
         local name = object.getName()
         local guid = object.getGUID()
-        if string.match(name, '^TI4 MultiRoller') then
-            isFranken = isFranken and string.find(string.lower(name), 'franken')
-        end
         if lookForSet[name] and (not inHandGuidSet[guid]) and (not object.is_face_down) then
             guidToPosition[guid] = object.getPosition()
             guidToName[guid] = name
@@ -289,14 +284,12 @@ function dealAllActionCards(dealOrder)
         end
 
         local abilitiesSet = {}
+        for _, ability in ipairs(faction.abilities) do
+            abilitiesSet[ability] = true
+        end
         for guid, color2 in pairs(guidToColor) do
             if color == color2 then
                 abilitiesSet[guidToName[guid]] = true
-            end
-        end
-        if not isFranken then
-            for _, ability in ipairs(faction.abilities) do
-                abilitiesSet[ability] = true
             end
         end
 
@@ -506,12 +499,10 @@ end
 function _allocateCommandTokens()
     local lookForSet = {
         ['Hyper Metabolism'] = true,
-        ['Versatile'] = true,
         ['Cybernetic Enhancements Ω'] = true,
     }
 
     local nameToCommandTokensBag = {}
-    local isFranken = false
     local guidToPosition = {}
     local guidToName = {}
 
@@ -524,9 +515,6 @@ function _allocateCommandTokens()
             if tokenName then
                 nameToCommandTokensBag[tokenName] = object
             end
-        end
-        if string.match(name, '^TI4 MultiRoller') then
-            isFranken = isFranken and string.find(string.lower(name), 'franken')
         end
         if lookForSet[name] and (not inHandGuidSet[guid]) and (not object.is_face_down) then
             guidToPosition[guid] = object.getPosition()
@@ -558,16 +546,15 @@ function _allocateCommandTokens()
         end
 
         local abilitiesSet = {}
+        for _, ability in ipairs(faction.abilities) do
+            abilitiesSet[ability] = true
+        end
         for guid, color2 in pairs(guidToColor) do
             if color == color2 then
                 abilitiesSet[guidToName[guid]] = true
             end
         end
-        if not isFranken then
-            for _, ability in ipairs(faction.abilities) do
-                abilitiesSet[ability] = true
-            end
-        end
+
         local count = 2
         if abilitiesSet['Hyper Metabolism'] then
             count = count + 1

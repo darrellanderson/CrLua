@@ -928,7 +928,7 @@ function reportFactions()
             }, ' '))
         end
     end
-    print(table.concat(message, '\n'))
+    printToAll(table.concat(message, '\n'))
 end
 
 -------------------------------------------------------------------------------

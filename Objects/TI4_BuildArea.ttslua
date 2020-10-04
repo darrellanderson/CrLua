@@ -240,7 +240,10 @@ function _getUnitsInsideBuildArea()
     local units = {}
     for _, unit in ipairs(_unitHelper.getUnits()) do
         if isInsideBuildArea(unit.position) then
-            table.insert(units, unit)
+            local unitObject = getObjectFromGUID(unit.guid)
+            if unitObject and not unitObject.held_by_color then
+                table.insert(units, unit)
+            end
         end
     end
     return units

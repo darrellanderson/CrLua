@@ -828,7 +828,8 @@ local function _putAgendaBottom(playerColor, card)
     _putAgendaCard(card, false)
 end
 local function _scoreObjective(playerColor, card)
-    if card.is_face_down then
+    local inHandGuidSet = _zoneHelper.inHand()
+    if card.is_face_down or inHandGuidSet[card.getGUID()] then
         return
     end
     printToAll(playerColor .. ' scoring ' .. card.getName(), playerColor)
@@ -845,9 +846,10 @@ local function _scoreObjective(playerColor, card)
     local dx = -1.6 / (halfPlayerCount - 1)
     local position = card.positionToWorld({
         x = x0 + dx * ((zoneAttrs.index - 1) % halfPlayerCount),
-        y = 2,
+        y = 0,
         z = 1 * ((zoneAttrs.index < halfPlayerCount) and -1 or 1)
     })
+    position.y = position.y + 2
     local rotation = {
         x = 0,
         y = card.getRotation().y + 90,
@@ -867,13 +869,19 @@ local function _scoreObjective(playerColor, card)
     end
 end
 
-function onObjectLeaveContainer(container, leaveObject)
-    local deckName = leaveObject.tag == 'Card' and getDeckName(leaveObject.getName())
+local function _applyContextMenuItems(card)
+    local deckName = card.tag == 'Card' and getDeckName(card.getName())
     if deckName == 'Agenda' then
-        leaveObject.addContextMenuItem('Place Agenda Top', function(playerColor) _putAgendaTop(playerColor, leaveObject) end, false)
-        leaveObject.addContextMenuItem('Place Agenda Bottom', function(playerColor) _putAgendaBottom(playerColor, leaveObject) end, false)
-    elseif deckName == 'Public Objectives I' or deckName == 'Public Objectives II' then
-        leaveObject.addContextMenuItem('Score Objective', function(playerColor) _scoreObjective(playerColor, leaveObject) end, false)
+        card.addContextMenuItem('Place Agenda Top', function(playerColor) _putAgendaTop(playerColor, card) end, false)
+        card.addContextMenuItem('Place Agenda Bottom', function(playerColor) _putAgendaBottom(playerColor, card) end, false)
+    elseif deckName == 'Public Objectives I' or deckName == 'Public Objectives II' or deckName == 'Secret Objectives' then
+        card.addContextMenuItem('Score Objective', function(playerColor) _scoreObjective(playerColor, card) end, false)
+    end
+end
+
+function onObjectLeaveContainer(container, leaveObject)
+    if leaveObject.tag == 'Card' then
+        _applyContextMenuItems(leaveObject)
     end
 end
 
@@ -1013,6 +1021,15 @@ function onLoad(saveState)
 
     resetPlanetCardNames()
     resetSnapPoints()
+
+    local function delayedApplyContextMenuItems()
+        for _, object in ipairs(getAllObjects()) do
+            if object.tag == 'Card' then
+                _applyContextMenuItems(object)
+            end
+        end
+    end
+    Wait.frames(delayedApplyContextMenuItems, 7)
 end
 
 function testDiscardCards()

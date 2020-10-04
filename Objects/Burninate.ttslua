@@ -71,9 +71,13 @@ function onUpdate()
         _lastCheck = now
 
         local burnNameSet = {}
-        for color, faction in pairs(_factionHelper.allFactions()) do
+        for _, color in ipairs(Player.getColors()) do
+            burnNameSet[color .. ' Mech'] = true
+            burnNameSet[color .. ' Carrier'] = true
             burnNameSet[color .. ' Dreadnought'] = true
             burnNameSet[color .. ' War Sun'] = true
+        end
+        for color, faction in pairs(_factionHelper.allFactions()) do
             burnNameSet[faction.flagship] = true
         end
 
@@ -87,7 +91,7 @@ function onUpdate()
             if not burnNameSet[object.getName()] then
                 return false
             end
-            return _zoneHelper.inTableZone(object.getPosition())
+            return not _zoneHelper.zoneFromPosition(object.getPosition())
         end
 
         local burnableObjects = {}

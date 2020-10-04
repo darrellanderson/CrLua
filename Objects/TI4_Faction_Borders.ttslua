@@ -691,6 +691,8 @@ function updateCache()
         local position = object.positionToWorld({ x = 0, y = system.y, z = 0 })
         _cache.y = position.y + 0.05
     end
+
+    return 1
 end
 
 function removePolygons()
@@ -700,7 +702,7 @@ end
 
 function drawPolygons()
     if not _cache then
-        updateCache()
+        return
     end
     assert(_cache and _cache.originalPolygons)
     local y = assert(_cache.y)

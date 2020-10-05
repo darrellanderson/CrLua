@@ -446,6 +446,11 @@ function _returnCommandTokens()
         bagNameSet[faction.tokenName .. ' Command Tokens Bag'] = true
     end
 
+    local zoneExceptionObjectNameSet = {
+        ['Ghosts of Creuss Tile'] = true
+    }
+    local zoneExceptionObjects = {}
+
     -- Get bags and tokens.
     local tokenNameToBag = {}
     local commandTokens = {}
@@ -456,6 +461,8 @@ function _returnCommandTokens()
             tokenNameToBag[tokenName .. ' Command Token'] = object
         elseif tokenNameSet[name] then
             table.insert(commandTokens, object)
+        elseif zoneExceptionObjectNameSet[name] then
+            table.insert(zoneExceptionObjects, object)
         end
     end
     coroutine.yield(0)
@@ -468,11 +475,30 @@ function _returnCommandTokens()
     local guidToColor = _zoneHelper.zonesFromPositions(guidToPosition)
     coroutine.yield(0)
 
+    local exceptionPosRadiusSq = {}
+    for _, exceptionObject in ipairs(zoneExceptionObjects) do
+        local bounds = exceptionObject.getBounds()
+        local radius = math.max(bounds.size.x, bounds.size.z) / 2
+        exceptionPosRadiusSq[exceptionObject.getPosition()] = radius * radius
+    end
+    local function shouldPut(commandToken)
+        if not guidToColor[commandToken.getGUID()] then
+            return true  -- not in any player zone
+        end
+        local p1 = commandToken.getPosition()
+        for p2, radius in pairs(exceptionPosRadiusSq) do
+            local dSq = (p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2
+            if dSq <= radius then
+                return true  -- inside exception circle
+            end
+        end
+    end
+
     -- Put tokens.
     for _, commandToken in ipairs(commandTokens) do
         local guid = commandToken.getGUID()
         local bag = tokenNameToBag[commandToken.getName()]
-        if (not guidToColor[guid]) and bag then
+        if shouldPut(commandToken) and bag then
             _putTokenGuidSet[guid] = true
             bag.putObject(commandToken)
         end

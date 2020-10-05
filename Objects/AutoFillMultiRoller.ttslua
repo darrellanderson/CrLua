@@ -759,6 +759,9 @@ function autoFillCoroutine()
             end
         end
 
+        -- Reset for L1Z1X Harrow (bombardment each ground combat round).
+        _bombardmentPlasmaScoringOnPlanet = false
+
     else
         error(TAG .. ' unknown type "' .. typeAttributes.name .. "'")
     end

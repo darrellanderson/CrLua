@@ -167,12 +167,20 @@ function resetAgendaTokens()
     }
     for _, color in ipairs(Player.getColors()) do
         resetNameSet[color .. ' Player Votes'] = 'Counter'
+        resetNameSet['For:'] = 'Counter'
+        resetNameSet['Against:'] = 'Counter'
     end
     local voteCounters = {}
     for _, object in ipairs(getAllObjects()) do
-        local tag = resetNameSet[object.getName()]
-        if tag and object.tag == tag and object.is_face_down then
-            object.flip()
+        local name = object.getName()
+        local tag = resetNameSet[name]
+        if tag and object.tag == tag then
+            if object.is_face_down then
+                object.flip()
+            end
+            if name == 'For:' or name == 'Against:' then
+                object.setValue(0)
+            end
         end
     end
 

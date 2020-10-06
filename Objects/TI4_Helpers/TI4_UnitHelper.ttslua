@@ -98,7 +98,8 @@ local _unitTypes = {
         bombardment = { dice = 1, hit = 5, extraDice = 0 },
         cost = 4,
         spaceCombat = { dice = 1, hit = 5 },
-        move = 2,
+        move = 1,
+        capacity = 1,
     },
     ['Fighter'] = {
         cost = 0.5,

@@ -233,8 +233,8 @@ def wrapTextBoldStart(draw, font1, font2, font3, text, x, y, maxX, fill, lineH, 
     i = 0
     for word in words:
         isAction = (i == 0 and word.lower() == 'action:') or (i == 1 and word == ':' and words[i-1].lower() == 'action')
-        isFor = word.lower() == 'for:' or (i > 0 and word == ':' and words[i-1].lower() == 'for')
-        isAgainst = word.lower() == 'against:' or (i > 0 and word == ':' and words[i-1].lower() == 'against')
+        isFor = word.lower() == 'for:' or (i > 0 and word == ':' and words[i-1].lower() == 'pour')
+        isAgainst = word.lower() == 'against:' or (i > 0 and word == ':' and words[i-1].lower() == 'contre')
 
         dy = 0
         if font == font3:
@@ -363,15 +363,15 @@ AGENDA_BODY_TEXT_SIZE = 28
 AGENDA_BODY_TEXT_H = 35
 
 PROMISSORY_TITLE_L = 250
-PROMISSORY_TITLE_R = 130 # 100
+PROMISSORY_TITLE_R = 100 # 100
 PROMISSORY_TITLE_Y1 = 55
 PROMISSORY_TITLE_Y2 = 35
 PROMISSORY_TITLE_TEXT_SIZE = 39
 PROMISSORY_TITLE_TEXT_H = 39
 
-PROMISSORY_BODY_L = 70
-PROMISSORY_BODY_R = 65 # 25
-PROMISSORY_BODY_Y = 206
+PROMISSORY_BODY_L = 80
+PROMISSORY_BODY_R = 80
+PROMISSORY_BODY_Y = 180
 PROMISSORY_BODY_TEXT_SIZE = 31
 PROMISSORY_BODY_TEXT_H = 37
 PROMISSORY_BODY_UPPER_TEXT_SIZE = 24
@@ -403,7 +403,7 @@ def actionCard(title, body, flavor, cardImage, titlesize, fontsize):
 
     body = body.replace('Action:', 'ACTION:')
     body = body.replace('Action :', 'ACTION :')
-    if 'ACTION:' in body:
+    if ('ACTION:' in body) or ('ACTION :') in body:
         font1 = getFont('MyriadProBoldItalic.ttf', ACTION_BODY_TEXT_SIZE + fontsize)
     else:
         font1 = getFont('MyriadProBold.ttf', ACTION_BODY_TEXT_SIZE + fontsize)
@@ -418,6 +418,7 @@ def actionCard(title, body, flavor, cardImage, titlesize, fontsize):
     lineH = ACTION_BODY_TEXT_H + fontsize
     for line in text.split('\n'):
         y = wrapTextBoldStart(draw, font1, font2, font3, line, x, y, maxX, color, lineH, 2)
+        font1 = font2
 
     font = getFont('MyriadWebProItalic.ttf', ACTION_FLAVOR_TEXT_SIZE + fontsize)
     color = (255, 255, 255, 255)
@@ -603,12 +604,12 @@ def agendaCard(title, type, body, cardImage, titlesize, fontsize):
         text = text[:i] + text[j+1:]
         y = wrapTextCenter(draw, font2, whenText, x, y, maxX, color, lineH)
 
-    if 'Elect ' in text:
+    if 'Elect ' in text or 'Élisez ' in text:
         font1 = getFont('MyriadProSemibold.otf', AGENDA_BODY_TEXT_SIZE + fontsize)
         x = AGENDA_BODY_ELECT_L
         maxX = CARD_W - AGENDA_BODY_ELECT_R
         for line in text.split('\n'):
-            if line.startswith('Elect '):
+            if line.startswith('Elect ') or lines.startswith('Élisez '):
                 y = wrapTextCenter(draw, font1, line, x, y, maxX, color, lineH)
             else:
                 y = wrapTextCenter(draw, font2, line, x, y, maxX, color, lineH)
@@ -617,8 +618,8 @@ def agendaCard(title, type, body, cardImage, titlesize, fontsize):
         x = AGENDA_BODY_FORAGAINST_L
         maxX = CARD_W - AGENDA_BODY_FORAGAINST_R
         for line in text.split('\n'):
-            isFor = line.startswith('For:') or line.startswith('For :')
-            isAgainst = line.startswith('Against:') or line.startswith('Against :')
+            isFor = line.startswith('For:') or line.startswith('Pour :')
+            isAgainst = line.startswith('Against:') or line.startswith('Contre :')
             if isFor or isAgainst:
                 y = wrapTextBoldStart(draw, font1, font2, font3, line, x, y, maxX, color, lineH, 1)
             else:
@@ -632,7 +633,7 @@ def promissoryCard(color, title, body, titlesize, fontsize):
     draw = ImageDraw.Draw(img)
 
     font = getFont('HandelGothicDBold.otf', PROMISSORY_TITLE_TEXT_SIZE + titlesize)
-    color = (0, 0, 0, 255)
+    color = (255, 255, 255, 255)
     text = title
     x = PROMISSORY_TITLE_L
     y1 = PROMISSORY_TITLE_Y1
@@ -642,12 +643,7 @@ def promissoryCard(color, title, body, titlesize, fontsize):
     y = nudgeY(font, text, maxX, y1, y2)
     wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
 
-    body = body.replace('Action:', 'ACTION:')
-    body = body.replace('Action :', 'ACTION :')
-    if 'ACTION:' in body:
-        font1 = getFont('MyriadProBoldItalic.ttf', PROMISSORY_BODY_TEXT_SIZE + fontsize)
-    else:
-        font1 = getFont('MyriadProBold.ttf', PROMISSORY_BODY_TEXT_SIZE + fontsize)
+    font1 = getFont('MyriadProBold.ttf', PROMISSORY_BODY_TEXT_SIZE + fontsize)
     font2 = getFont('MyriadProSemibold.otf', PROMISSORY_BODY_TEXT_SIZE + fontsize)
     font3 = getFont('HandelGothicDBold.otf', PROMISSORY_BODY_UPPER_TEXT_SIZE + fontsize)
 
@@ -659,6 +655,7 @@ def promissoryCard(color, title, body, titlesize, fontsize):
     lineH = PROMISSORY_BODY_TEXT_H + fontsize
     for line in text.split('\n'):
         y = wrapTextBoldStart(draw, font1, font2, font3, line, x, y, maxX, color, lineH, 2)
+        font1 = font2
 
     return imageToJPEG(img)
 
@@ -811,7 +808,7 @@ class CardHandler(webapp2.RequestHandler):
         hash.update(points.encode('utf-8'))
         hash.update(titlesize.encode('utf-8'))
         hash.update(fontsize.encode('utf-8'))
-        hash.update('version6')
+        hash.update('version8')
         key = hash.hexdigest().lower()
 
         cardOptions = CARD_OPTIONS[card]
@@ -1158,7 +1155,7 @@ app = webapp2.WSGIApplication([
     #('/testpublic', TestPublicHandler),
     #('/testagenda', TestAgenda1Handler),
     #('/testagenda2', TestAgenda2Handler),
-    #('/mutatesystem', MutateSystemTile),
+    ('/mutatesystem', MutateSystemTile),
     #('/mutatefaction', MutateFactionTokens),
     #('/radialdither', RadialDither),
     #('/4k', FourK),

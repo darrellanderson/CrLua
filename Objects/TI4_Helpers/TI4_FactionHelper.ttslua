@@ -560,6 +560,10 @@ function injectFaction(faction)
         error('injectFaction: ' .. guid .. ' ' .. errorMessage)
     end
 
+    if _factionAttributes[faction.name] then
+        print('injectFaction: WARNING, already have "' .. faction.name ..'", replacing with new attributes.')
+    end
+
     _factionAttributes[faction.name] = faction
     _tokenNameToFaction[faction.tokenName] = faction
     if faction.frankenName and not _tokenNameToFaction[faction.frankenName] then

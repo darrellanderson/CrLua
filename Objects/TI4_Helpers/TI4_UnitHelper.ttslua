@@ -1045,7 +1045,9 @@ function injectUnitOverride(unitOverride)
     local name = assert(unitOverride.name, 'missing unitOverride.name')
     assert(string.len(name) > 0, 'empty unitOverride.name')
     _validateUnitOverride(name, unitOverride)
-    assert(not _unitOverrides[name], 'already have unitOverride.name "' .. name .. '"')
+    if _unitOverrides[name] then
+        print('injectUnitOverride: WARNING, already have "' .. name ..'", replacing with new attributes.')
+    end
     _unitOverrides[name] = _copy(unitOverride)
 end
 

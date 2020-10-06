@@ -802,10 +802,17 @@ function getColorToUnitModifiers()
         if inHandGuidSet[object.getGUID()] then
             return false
         end
-        local unitModifier = _unitModifiers[object.getName()]
+
+        local name = object.getName()
+        local unitModifier = _unitModifiers[name]
         if not unitModifier then
             return false
         end
+        if unitModifier.alias then
+            name = unitModifier.alias
+            unitModifier = _unitModifiers[unitModifier.alias]
+        end
+
         if unitModifier.tag then
             if object.tag ~= unitModifier.tag then
                 return false
@@ -816,23 +823,22 @@ function getColorToUnitModifiers()
         if object.tag == 'Card' and object.is_face_down then
             return false
         end
-        return unitModifier
+        return name, unitModifier
     end
 
     local guidToName = {}
     local guidToPosition = {}
     for _, object in ipairs(getAllObjects()) do
-        local unitModifier = getUnitModifier(object)
+        local name, unitModifier = getUnitModifier(object)
         if unitModifier then
-            local guid = object.getGUID()
-            local name = object.getName()
-            name = _unitModifiers[name].alias or object.getName()
-            guidToName[guid] = name
-            guidToPosition[guid] = object.getPosition()
-            if _unitModifiers[name].anywhereOnTable then
+            if _unitModifiers[name].owner == OWNER.ANY then
                 for _, color in ipairs(_zoneHelper.zones()) do
                     addModifier(color, name)
                 end
+            else
+                local guid = object.getGUID()
+                guidToName[guid] = name
+                guidToPosition[guid] = object.getPosition()
             end
         end
     end
@@ -1039,7 +1045,49 @@ function injectUnitOverride(unitOverride)
     assert(string.len(name) > 0, 'empty unitOverride.name')
     _validateUnitOverride(name, unitOverride)
     assert(not _unitOverrides[name], 'already have unitOverride.name "' .. name .. '"')
-    _unitOverrides[name] = unitOverride
+    _unitOverrides[name] = _copy(unitOverride)
+end
+
+function injectUnitModifier(unitModifier)
+    assert(type(unitModifier) == 'table', 'injectUnitOverride must be a table')
+    local name = assert(unitModifier.name, 'missing unitModifier.name')
+    assert(string.len(name) > 0, 'empty unitModifier.name')
+    _validateUnitModifier(name, unitModifier)
+    assert(not _unitModifiers[name], 'already have unitOverride.name "' .. name .. '"')
+
+    -- Add an apply function.
+    assert(not unitModifier.apply, 'cannot declare ' .. name .. '.apply')
+    local applyFunctionName = assert(unitModifier.applyFunctionName, 'missing ' .. name .. '.applyFunctionName')
+    local applyFunctionGuid = assert(unitModifier.applyFunctionGuid, 'missing ' .. name .. '.applyFunctionGuid')
+
+    local function validateApplyObject()
+        local applyObject = getObjectFromGUID(applyFunctionGuid)
+        if not applyObject then
+            error('missing injectUnitModifier "' .. name .. '" guid ' .. applyFunctionGuid)
+        end
+        if not applyObject.getVar(applyFunctionName) then
+            error('missing injectUnitModifier "' .. name .. '" function ' .. applyFunctionName)
+        end
+        return applyObject
+    end
+    validateApplyObject()
+
+    local function apply(unitAttrs, params)
+        local applyObject = validateApplyObject()
+        unitAttrs._params = params
+        local result = applyObject.call(applyFunctionName, unitAttrs)
+        if result then
+            result = _copy(result)
+            result._params = nil
+        else
+            result = unitAttrs
+        end
+        return result
+    end
+    unitModifier = _copy(unitModifier)
+    unitModifier.apply = apply
+
+    _unitModifiers[name] = unitModifier
 end
 
 -------------------------------------------------------------------------------
@@ -1095,7 +1143,7 @@ function _verifyTables()
         if unitModifier.alias then
             assert(_unitModifiers[unitModifier.alias], name .. ' alias does not exist')
         else
-            assert(unitModifier.description, name .. ' missing description')
+            _validateUnitModifier(name, unitModifier)
         end
     end
     print('verifyTables: done')
@@ -1272,6 +1320,26 @@ function _validateUnitOverride(name, unitOverride)
             assert(_unitTypes[v], name .. '.upgrade')
         end
     end
+end
+
+function _validateUnitModifier(name, unitModifier)
+    assert(type(name) == 'string' and type(unitModifier) == 'table')
+
+    assert(type(unitModifier.description) == 'string', 'missing ' .. name .. '.description')
+    assert(type(unitModifier.owner) == 'string', 'missing ' .. name .. '.owner')
+    assert(type(unitModifier.type) == 'string', 'missing ' .. name .. '.type')
+
+    local legalOwnerSet = {}
+    for _, value in pairs(OWNER) do
+        legalOwnerSet[value] = true
+    end
+    assert(legalOwnerSet[unitModifier.owner], 'bad ' .. name .. '.owner')
+
+    local legalTypeSet = {}
+    for _, value in pairs(TYPE) do
+        legalTypeSet[value] = true
+    end
+    assert(legalTypeSet[unitModifier.type], 'bad ' .. name .. '.type')
 end
 
 -------------------------------------------------------------------------------

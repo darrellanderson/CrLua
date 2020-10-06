@@ -604,12 +604,13 @@ def agendaCard(title, type, body, cardImage, titlesize, fontsize):
         text = text[:i] + text[j+1:]
         y = wrapTextCenter(draw, font2, whenText, x, y, maxX, color, lineH)
 
-    if 'Elect ' in text or 'Élisez ' in text:
+    electFr = unicode('Élisez ', 'utf-8')
+    if ('Elect ' in text) or (electFr in text):
         font1 = getFont('MyriadProSemibold.otf', AGENDA_BODY_TEXT_SIZE + fontsize)
         x = AGENDA_BODY_ELECT_L
         maxX = CARD_W - AGENDA_BODY_ELECT_R
         for line in text.split('\n'):
-            if line.startswith('Elect ') or lines.startswith('Élisez '):
+            if line.startswith('Elect ') or line.startswith(electFr):
                 y = wrapTextCenter(draw, font1, line, x, y, maxX, color, lineH)
             else:
                 y = wrapTextCenter(draw, font2, line, x, y, maxX, color, lineH)

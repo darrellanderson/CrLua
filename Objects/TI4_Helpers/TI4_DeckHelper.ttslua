@@ -30,11 +30,11 @@ local DECKS = {
         transform = {
             parent = 'Public Objectives I Mat',
             deck = {
-                position = { x = 7.64, y = 0, z = 0.27 },
+                position = { x = 7.64, y = 0.26, z = 0.27 },
                 rotation = { x = 0, y = 0, z = 180 },
             },
             extraSnapPoints = {
-                p0 = { x = 3.62, y = 0, z = 0.27 },
+                p0 = { x = 3.62, y = 0.26, z = 0.27 },
                 d = { x = -2.81, y = 0, z = 0 },
                 count = 5
             }
@@ -56,11 +56,11 @@ local DECKS = {
         transform = {
             parent = 'Public Objectives II Mat',
             deck = {
-                position = { x = 7.54, y = 0, z = 0.34 },
+                position = { x = 7.54, y = 0.26, z = 0.34 },
                 rotation = { x = 0, y = 0, z = 180 },
             },
             extraSnapPoints = {
-                p0 = { x = 3.69, y = 0, z = 0.34 },
+                p0 = { x = 3.69, y = 0.26, z = 0.34 },
                 d = { x = -2.83, y = 0, z = 0 },
                 count = 5
             }
@@ -82,7 +82,7 @@ local DECKS = {
         transform = {
             parent = 'Cards Mat',
             deck = {
-                position = { x = 2.81, y = 0, z = -1.86 },
+                position = { x = 2.81, y = 0.26, z = -1.86 },
                 rotation = { x = 0, y = 0, z = 180 },
             }
         },
@@ -114,11 +114,11 @@ local DECKS = {
         transform = {
             parent = 'Cards Mat',
             deck = {
-                position = { x = 0.00, y = 0, z = -1.86 },
+                position = { x = 0.00, y = 0.26, z = -1.86 },
                 rotation = { x = 0, y = 0, z = 180 },
             },
             discard = {
-                position = { x = 0.0, y = 0, z = 2.53 },
+                position = { x = 0.0, y = 0.26, z = 2.53 },
                 rotation = { x = 0, y = 0, z = 0 },
             }
         },
@@ -179,7 +179,7 @@ local DECKS = {
         transform = {
             parent = 'Cards Mat',
             deck = {
-                position = { x = -2.81, y = 0, z = -1.86 },
+                position = { x = -2.81, y = 0.26, z = -1.86 },
                 rotation = { x = 0, y = 0, z = 180 },
             },
             discard = {
@@ -295,7 +295,7 @@ local DECKS = {
         transform = {
             parent = 'Cards Mat',
             deck = {
-                position = { x = 2.81, y = 0, z = 2.53 },
+                position = { x = 2.81, y = 0.26, z = 2.53 },
                 rotation = { x = 0, y = 0, z = 180 },
             },
         },

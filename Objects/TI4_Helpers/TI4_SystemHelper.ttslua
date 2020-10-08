@@ -1043,7 +1043,7 @@ end
 
 function diplomacySystem(clickerColor, systemObject)
     local system = _systems[systemObject.getGUID()]
-    printToAll(clickerColor .. ' applying Diplomcay to ' .. system.string)
+    printToAll(clickerColor .. ' applying Diplomacy to ' .. system.string)
     local bagNameSet = {}
     for _, faction in pairs(_factionHelper.allFactions()) do
         if faction.color ~= clickerColor then

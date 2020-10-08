@@ -356,7 +356,7 @@ def agendaCard(title, type, body, cardImage, titlesize, fontsize):
         textBlock = TextBlock()
         textBlock.setCenterH(True)
         textBlock.setFont(font)
-        textBlock.setBounds(25, y, CARD_W - 25, 700)
+        textBlock.setBounds(50, y, CARD_W - 50, 700)
         textBlock.setLineHeight(37 + fontsize)
         textBlock.setNewlineScale(PARAGRAPH_LINE_HEIGHT_SCALE)
         textBlock.setText(whenText)
@@ -371,7 +371,7 @@ def agendaCard(title, type, body, cardImage, titlesize, fontsize):
             textBlock.setCenterH(True)
             textBlock.setFont(font)
             textBlock.setOverride(FONT_3_WORDS, overrideFont)
-            textBlock.setBounds(25, y, CARD_W - 25, 700)
+            textBlock.setBounds(50, y, CARD_W - 50, 700)
             textBlock.setLineHeight(37 + fontsize)
             textBlock.setNewlineScale(PARAGRAPH_LINE_HEIGHT_SCALE)
             if line.startswith('Elect ') or line.startswith(electFr):
@@ -387,7 +387,7 @@ def agendaCard(title, type, body, cardImage, titlesize, fontsize):
             textBlock = TextBlock()
             textBlock.setFont(font)
             textBlock.setOverride(FONT_3_WORDS, overrideFont)
-            textBlock.setBounds(25, y, CARD_W - 25, 700)
+            textBlock.setBounds(50, y, CARD_W - 50, 700)
             textBlock.setLineHeight(37 + fontsize)
             textBlock.setNewlineScale(PARAGRAPH_LINE_HEIGHT_SCALE)
             if isFor or isAgainst:

@@ -320,7 +320,7 @@ def agendaCard(title, type, body, cardImage, titlesize, fontsize):
     textBlock = TextBlock()
     textBlock.setFont(font)
     textBlock.setCenterH(True)
-    textBlock.setBounds(30, 20, CARD_W - 30, 100)
+    textBlock.setBounds(30, 40, CARD_W - 30, 120)
     textBlock.setLineHeight(44 + titlesize)
     textBlock.setCenterV(True)
     textBlock.setText(title)

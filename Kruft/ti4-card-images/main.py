@@ -126,13 +126,13 @@ def actionCard(title, body, flavor, cardImage, titlesize, fontsize):
     # BODY
     body = body.replace('Action:', 'ACTION:')
     body = body.replace('Action :', 'ACTION :')
-    font = FontData('MyriadProSemibold.otf', 31 + titlesize, (255, 255, 255, 255))
+    font = FontData('MyriadProSemibold.otf', 31 + fontsize, (255, 255, 255, 255))
     boldStartFont = False
     if body.startswith('ACTION'):
-        boldStartFont = FontData('MyriadProBoldItalic.ttf', 31 + titlesize, (255, 255, 255, 255))
+        boldStartFont = FontData('MyriadProBoldItalic.ttf', 31 + fontsize, (255, 255, 255, 255))
     else:
-        boldStartFont = FontData('MyriadProBold.ttf', 31 + titlesize, (255, 255, 255, 255))
-    overrideFont = FontData('HandelGothicDBold.otf', 24 + titlesize, (255, 255, 255, 255))
+        boldStartFont = FontData('MyriadProBold.ttf', 31 + fontsize, (255, 255, 255, 255))
+    overrideFont = FontData('HandelGothicDBold.otf', 24 + fontsize, (255, 255, 255, 255))
     overrideFont.applyOffset(font)
     textBlock = TextBlock()
     textBlock.setFont(font)
@@ -145,7 +145,7 @@ def actionCard(title, body, flavor, cardImage, titlesize, fontsize):
     textBlock.draw(draw)
 
     # FLAVOR
-    font = FontData('MyriadWebProItalic.ttf', 27 + titlesize, (255, 255, 255, 255))
+    font = FontData('MyriadWebProItalic.ttf', 27 + fontsize, (255, 255, 255, 255))
     textBlock = TextBlock()
     textBlock.setFont(font)
     textBlock.setCenterH(True)
@@ -203,7 +203,7 @@ def secretObjectiveCard(title, type, body, footer, cardImage, titlesize, fontsiz
 
     # BODY
     font = FontData('MyriadProSemibold.otf', 38 + fontsize, (255, 255, 255, 255))
-    overrideFont = FontData('HandelGothicDBold.otf', 32 + titlesize, (255, 255, 255, 255))
+    overrideFont = FontData('HandelGothicDBold.otf', 32 + fontsize, (255, 255, 255, 255))
     overrideFont.applyOffset(font)
     textBlock = TextBlock()
     textBlock.setFont(font)
@@ -276,7 +276,7 @@ def publicObjectiveCard(level, title, type, body, footer, cardImage, titlesize, 
 
     # BODY
     font = FontData('MyriadProSemibold.otf', 39 + fontsize, (255, 255, 255, 255))
-    overrideFont = FontData('HandelGothicDBold.otf', 33 + titlesize, (255, 255, 255, 255))
+    overrideFont = FontData('HandelGothicDBold.otf', 33 + fontsize, (255, 255, 255, 255))
     overrideFont.applyOffset(font)
     textBlock = TextBlock()
     textBlock.setFont(font)

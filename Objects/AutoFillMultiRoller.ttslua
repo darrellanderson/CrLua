@@ -655,6 +655,10 @@ function autoFillCoroutine()
 
     -- Split into self and enemy units.
     CrLua.Log.d(TAG, 'autoFillCoroutine: split self/enemy')
+    local adjacentHexSet = {}
+    for _, adjacentHex in ipairs(adjacentHexes) do
+        adjacentHexSet[adjacentHex] = true
+    end
     local selfUnitsInHex = {}
     local enemyUnitsInHex = {}
     local selfUnitsAdacent = {}
@@ -666,7 +670,7 @@ function autoFillCoroutine()
                 elseif unit.color == enemyColor then
                     table.insert(enemyUnitsInHex, unit)
                 end
-            elseif unit.color == selfColor then
+            elseif adjacentHexSet[unit.hex] and unit.color == selfColor then
                 table.insert(selfUnitsAdacent, unit)
             end
         end
@@ -707,7 +711,7 @@ function autoFillCoroutine()
                 fillUnitTypeToCount[unitType] = selfUnitTypeToCount[unitType] or 0
                 if attrs.spaceCannon.range and attrs.spaceCannon.range > 0 then
                     fillUnitTypeToCount[unitType] = fillUnitTypeToCount[unitType] + (selfAdjUnitTypeToCount[unitType] or 0)
-                    adjacentUnitTypeToCount[unitType] = selfAdjUnitTypeToCount[unitType] or 0
+                    adjacentUnitTypeToCount[unitType] = (adjacentUnitTypeToCount[unitType] or 0) + (selfAdjUnitTypeToCount[unitType] or 0)
                 end
             end
         end

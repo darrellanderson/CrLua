@@ -7,6 +7,8 @@
 """
 """
 
+from tech import TechHandler
+
 from textLayout import FontData
 from textLayout import TextBlock
 
@@ -133,7 +135,8 @@ def actionCard(title, body, flavor, cardImage, titlesize, fontsize):
     else:
         boldStartFont = FontData('MyriadProBold.ttf', 31 + fontsize, (255, 255, 255, 255))
     overrideFont = FontData('HandelGothicDBold.otf', 24 + fontsize, (255, 255, 255, 255))
-    overrideFont.applyOffset(font)
+    #overrideFont.applyOffset(font)
+    overrideFont.setOffset(2)
     textBlock = TextBlock()
     textBlock.setFont(font)
     textBlock.setBoldStart(boldStartFont)
@@ -204,7 +207,8 @@ def secretObjectiveCard(title, type, body, footer, cardImage, titlesize, fontsiz
     # BODY
     font = FontData('MyriadProSemibold.otf', 38 + fontsize, (255, 255, 255, 255))
     overrideFont = FontData('HandelGothicDBold.otf', 32 + fontsize, (255, 255, 255, 255))
-    overrideFont.applyOffset(font)
+    #overrideFont.applyOffset(font)
+    overrideFont.setOffset(0)
     textBlock = TextBlock()
     textBlock.setFont(font)
     textBlock.setOverride(FONT_3_WORDS, overrideFont)
@@ -277,7 +281,8 @@ def publicObjectiveCard(level, title, type, body, footer, cardImage, titlesize, 
     # BODY
     font = FontData('MyriadProSemibold.otf', 39 + fontsize, (255, 255, 255, 255))
     overrideFont = FontData('HandelGothicDBold.otf', 33 + fontsize, (255, 255, 255, 255))
-    overrideFont.applyOffset(font)
+    #overrideFont.applyOffset(font)
+    overrideFont.setOffset(0)
     textBlock = TextBlock()
     textBlock.setFont(font)
     textBlock.setOverride(FONT_3_WORDS, overrideFont)
@@ -342,7 +347,8 @@ def agendaCard(title, type, body, cardImage, titlesize, fontsize):
     # BODY
     font = FontData('MyriadProRegular.ttf', 28 + fontsize, (0, 0, 0, 255))
     overrideFont = FontData('HandelGothicDBold.otf', 24 + fontsize, (0, 0, 0, 255))
-    overrideFont.applyOffset(font)
+    #overrideFont.applyOffset(font)
+    overrideFont.setOffset(-1)
     y = 225
 
     # Tolerate odd spreadsheet text syntax.
@@ -366,7 +372,7 @@ def agendaCard(title, type, body, cardImage, titlesize, fontsize):
     electFr = unicode('Élisez ', 'utf-8')
     if ('Elect ' in body) or (electFr in body):
         boldFont = FontData('MyriadProSemibold.otf', 28 + fontsize, (0, 0, 0, 255))
-        for line in body.split('\n'):
+        for line in filter(None, body.split('\n')):
             textBlock = TextBlock()
             textBlock.setCenterH(True)
             textBlock.setFont(font)
@@ -381,7 +387,7 @@ def agendaCard(title, type, body, cardImage, titlesize, fontsize):
             y += textBlock._lineH * (PARAGRAPH_LINE_HEIGHT_SCALE - 1)
     else:
         startFont = FontData('MyriadProSemiboldItalic.ttf', 28 + fontsize, (0, 0, 0, 255))
-        for line in body.split('\n'):
+        for line in filter(None, body.split('\n')):
             isFor = line.startswith('For:') or line.startswith('Pour :')
             isAgainst = line.startswith('Against:') or line.startswith('Contre :')
             textBlock = TextBlock()
@@ -419,7 +425,8 @@ def promissoryCard(color, title, body, titlesize, fontsize):
     font = FontData('MyriadProRegular.ttf', 31 + fontsize, (0, 0, 0, 255))
     boldFont = FontData('MyriadProBold.ttf', 31 + fontsize, (0, 0, 0, 255))
     overrideFont = FontData('HandelGothicDBold.otf', 24 + fontsize, (0, 0, 0, 255))
-    overrideFont.applyOffset(font)
+    #overrideFont.applyOffset(font)
+    overrideFont.setOffset(2)
     textBlock = TextBlock()
     textBlock.setFont(font)
     textBlock.setBoldStart(boldFont)
@@ -463,8 +470,12 @@ def nobilityCard(color, title, type, body, footer, points, titlesize, fontsize):
 
     # BODY
     font = FontData('MyriadProSemibold.otf', 39 + fontsize, (255, 255, 255, 255))
+    overrideFont = FontData('HandelGothicDBold.otf', 33 + fontsize, (255, 255, 255, 255))
+    #overrideFont.applyOffset(font)
+    overrideFont.setOffset(0)
     textBlock = TextBlock()
     textBlock.setFont(font)
+    textBlock.setOverride(FONT_3_WORDS, overrideFont)
     textBlock.setCenterH(True)
     textBlock.setCenterV(True)
     textBlock.setBounds(25, 206, CARD_W - 25, 560)
@@ -604,7 +615,7 @@ class CardHandler(webapp2.RequestHandler):
         fontsize = int(fontsize)
 
         jpg = memcache.get(key=key)
-        jpg = None
+        #jpg = None
         if jpg is None:
             if cardType == 'action':
                 jpg = actionCard(title, body, flavor, cardImage, titlesize, fontsize)
@@ -937,6 +948,7 @@ class Proxy(webapp2.RequestHandler):
 app = webapp2.WSGIApplication([
     ('/img', CardHandler),
     ('/back', BackHandler),
+    #('/tech', TechHandler),
     #('/getaction', getActionHandler),
     #('/getagenda', getAgendaHandler),
     #('/testaction', TestActionHandler),

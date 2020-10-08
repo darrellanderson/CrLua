@@ -20,6 +20,7 @@ class FontData:
         dir = os.path.dirname(__file__)
         static = os.path.join(dir, 'static')
         file = os.path.join(static, fontName)
+        self._fontSize = fontSize
         self._font = ImageFont.truetype(file, fontSize)
         self._color = color
         self._dy = 0
@@ -29,6 +30,10 @@ class FontData:
         _, h1 = otherFontData._font.getsize('X')
         _, h2 = self._font.getsize('X')
         self._dy = h1 - h2
+        print('applyOffset.dy: me=' + str(otherFontData._fontSize) + ' them=' + str(otherFontData._fontSize) + ' d=' + str(self._dy))
+
+    def setOffset(self, dy):
+        self._dy = dy
 
     def width(self, text):
         (w, _) = self._font.getsize(text)
@@ -59,7 +64,8 @@ class WordData:
         return self._width
 
     def draw(self, imageDraw, x, y, lineH):
-        self._fontData.draw(self._word, imageDraw, x, y, lineH)
+        if not self._word.isspace():
+            self._fontData.draw(self._word, imageDraw, x, y, lineH)
 
     def getWord(self):
         return self._word
@@ -110,7 +116,7 @@ class Parse:
     def parseWordsAndPunctuation(line):
         r = re.compile(r'[\w]+|[^\s\w]', re.UNICODE)
         result = []
-        for line in line.split('\n'):  # split by and restore newlines
+        for line in filter(None, line.split('\n')):  # split by and restore newlines
             for word in line.split():
                 for item in r.findall(word):
                     result.append(item)  # words and punctuation as separate items
@@ -118,7 +124,8 @@ class Parse:
             if len(result) > 0:
                 result.pop()  # remove last space
             result.append('\n')
-        result.pop()  # remove last return
+        if len(result) > 0:
+            result.pop()  # remove last return
         return result
 
 class Format:

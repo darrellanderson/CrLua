@@ -7,6 +7,9 @@
 """
 """
 
+from textLayout import FontData
+from textLayout import TextBlock
+
 from PIL import Image
 from PIL import ImageFont
 from PIL import ImageDraw
@@ -27,7 +30,7 @@ import os.path
 import urllib
 import webapp2
 
-PARAGRAPH_LINE_HEIGHT_SCALE = 1.4
+PARAGRAPH_LINE_HEIGHT_SCALE = 1.5
 
 # -----------------------------------------------------------------------------
 
@@ -36,12 +39,6 @@ def getImage(name):
     static = os.path.join(dir, 'static')
     file = os.path.join(static, name)
     return Image.open(file)
-
-def getFont(name, size):
-    dir = os.path.dirname(__file__)
-    static = os.path.join(dir, 'static')
-    file = os.path.join(static, name)
-    return ImageFont.truetype(file, size)
 
 def imageToJPEG(image):
     # BytesIO is bugged, write to a file.
@@ -54,10 +51,6 @@ def imageToJPEG(image):
     f.close()
     os.remove(file)
     return jpg
-
-def nudgeY(font, text, maxX, y1, y2):
-    (w, h) = font.getsize(text)
-    return y1 if w <= maxX else y2
 
 def getImageFromUrl(url):
     logging.info('getImageFromUrl: ' + url)
@@ -74,123 +67,6 @@ def getImageFromUrl(url):
     return img
 
 # -----------------------------------------------------------------------------
-
-_visualizeMargins = False
-
-def wrapText(draw, font, text, x, y, maxX, fill, lineH):
-    if _visualizeMargins:
-        w = maxX
-        h = 30
-        color = (128, 128, 128, 64)
-        draw.rectangle([(x, y), (x+w, y+h)], color)
-
-    words = filter(None, text.split(' '))
-    text = ''
-    lineWidth = 0
-    (spaceW, h) = font.getsize(' ')
-    for word in words:
-        (w, h) = font.getsize(word)
-        if lineWidth > 0 and lineWidth + w > maxX:
-            draw.text((x, y), text, font=font, fill=fill)
-            text = ''
-            lineWidth = 0
-            y += lineH
-        text += word + ' '
-        lineWidth += w + spaceW
-    draw.text((x, y), text, font=font, fill=fill)
-    return y + (lineH * PARAGRAPH_LINE_HEIGHT_SCALE)
-
-def wrapTextCenter(draw, font, text, x, y, maxX, fill, lineH):
-    if _visualizeMargins:
-        w = maxX / 2
-        h = 30
-        color = (128, 128, 128, 64)
-        draw.rectangle([(x - w, y), (x + w, y+h)], color)
-
-    words = filter(None, text.split(' '))
-    text = ''
-    lineWidth = 0
-    (spaceW, h) = font.getsize(' ')
-    for word in words:
-        (w, h) = font.getsize(word)
-        if lineWidth > 0 and lineWidth + w > maxX:
-            x2 = x - (lineWidth / 2)
-            draw.text((x2, y), text, font=font, fill=fill)
-            text = ''
-            lineWidth = 0
-            y += lineH
-        text += word + ' '
-        lineWidth += w + spaceW
-    x2 = x - (lineWidth / 2)
-    draw.text((x2, y), text, font=font, fill=fill)
-    return y + (lineH * PARAGRAPH_LINE_HEIGHT_SCALE)
-
-def wrapTextCenterHV(draw, font, text, x, y, maxX, fill, lineH):
-    if _visualizeMargins:
-        w = maxX / 2
-        h = 30
-        color = (128, 128, 128, 64)
-        draw.rectangle([(x - w, y), (x + w, y+h)], color)
-
-    text = text.replace('\n', ' \n ')
-    lines = []
-    (spaceW, h) = font.getsize(' ')
-    words = filter(None, text.split(' '))
-    text = ''
-    lineWidth = 0
-    for word in words:
-        (w, h) = font.getsize(word)
-        if word == '\n' or (lineWidth > 0 and lineWidth + w > maxX):
-            lines.append(text)
-            text = ''
-            lineWidth = 0
-        if word == '\n':
-            lines.append('')
-        else:
-            text += word + ' '
-            lineWidth += w + spaceW
-    lines.append(text)
-    y = y - (len(lines) * lineH / 2)
-    for line in lines:
-        (lineWidth, h) = font.getsize(line)
-        x2 = x - (lineWidth / 2)
-        draw.text((x2, y), line, font=font, fill=fill)
-        y += lineH
-    return y + (lineH * PARAGRAPH_LINE_HEIGHT_SCALE)
-
-def wrapTextCenterAlignBottom(draw, font, text, x, y, maxX, fill, lineH):
-    if _visualizeMargins:
-        w = maxX / 2
-        h = 30
-        color = (128, 128, 128, 64)
-        draw.rectangle([(x - w, y), (x + w, y+h)], color)
-
-    text = text.replace('\n', ' \n ')
-    lines = []
-    (spaceW, h) = font.getsize(' ')
-    words = filter(None, text.split(' '))
-    text = ''
-    lineWidth = 0
-    for word in words:
-        (w, h) = font.getsize(word)
-        if word == '\n' or (lineWidth > 0 and lineWidth + w > maxX):
-            lines.append(text)
-            text = ''
-            lineWidth = 0
-        if word == '\n':
-            lines.append('')
-        else:
-            text += word + ' '
-            lineWidth += w + spaceW
-    lines.append(text)
-    top = y - (len(lines) * lineH)
-    y = top
-    for line in lines:
-        (lineWidth, h) = font.getsize(line)
-        x2 = x - (lineWidth / 2)
-        draw.text((x2, y), line, font=font, fill=fill)
-        y += lineH
-    return top
 
 FONT_3_WORDS = {
     'SPACE',
@@ -216,221 +92,70 @@ FONT_3_WORDS = {
     unicode('SPATIAL', 'utf-8'),
 }
 
-def wrapTextBoldStart(draw, font1, font2, font3, text, x, y, maxX, fill, lineH, dyfont3):
-    if _visualizeMargins:
-        w = maxX - x
-        h = 30
-        color = (128, 128, 128, 64)
-        draw.rectangle([(x, y), (x+w, y+h)], color)
+ELECT_WORDS = {
+    'Elect',
+    unicode('Élisez', 'utf-8'),
+}
 
-    font = font1
-    (spaceW, h) = font.getsize(' ')
-    words = filter(None, text.split(' '))
-    text = ''
-    startX = x
-    indent = 0
-    restoreFont = font1
-    i = 0
-    for word in words:
-        isAction = (i == 0 and word.lower() == 'action:') or (i == 1 and word == ':' and words[i-1].lower() == 'action')
-        isFor = word.lower() == 'for:' or (i > 0 and word == ':' and words[i-1].lower() == 'pour')
-        isAgainst = word.lower() == 'against:' or (i > 0 and word == ':' and words[i-1].lower() == 'contre')
-
-        dy = 0
-        if font == font3:
-            font = restoreFont
-        if word in FONT_3_WORDS or re.sub(r'[^\w\s]', '', word) in FONT_3_WORDS:
-            restoreFont = font
-            font = font3
-            dy = dyfont3
-        if word.startswith('^'):
-            word = word[1:]
-            restoreFont = font
-            font = font3
-            dy = dyfont3
-        (w, h) = font.getsize(word)
-        if x + w > maxX:
-            x = startX + indent
-            y += lineH
-        draw.text((x, y + dy), word, font=font, fill=fill)
-        x += w + spaceW
-        if (word.endswith(':') or word.endswith('.')) and font == font1:
-            font = font2
-            if (not isAction) and (not isFor) and (not isAgainst):
-                x = startX
-                y += lineH * PARAGRAPH_LINE_HEIGHT_SCALE
-            if isFor or isAgainst:
-                indent = 20
-        i = i + 1
-    return y + (lineH * PARAGRAPH_LINE_HEIGHT_SCALE)
-
-# -----------------------------------------------------------------------------
+FOR_AGAINST_WORDS = {
+    'For',
+    'Against',
+    unicode('Pour', 'utf-8'),
+    unicode('Contre', 'utf-8'),
+}
 
 CARD_W = 500
 CARD_H = 750
 
-ACTION_TITLE_L = 85
-ACTION_TITLE_R = 105
-ACTION_TITLE_Y1 = 96
-ACTION_TITLE_Y2 = 76
-ACTION_TITLE_TEXT_SIZE = 39
-ACTION_TITLE_TEXT_H = 39
-
-ACTION_BODY_L = 70
-ACTION_BODY_R = 25
-ACTION_BODY_Y = 206
-ACTION_BODY_TEXT_SIZE = 31
-ACTION_BODY_TEXT_H = 37
-ACTION_BODY_UPPER_TEXT_SIZE = 24
-
-ACTION_FLAVOR_L = 275
-ACTION_FLAVOR_R = 100
-ACTION_FLAVOR_LINE_DY = 15
-ACTION_FLAVOR_Y = 730
-ACTION_FLAVOR_TEXT_SIZE = 27
-ACTION_FLAVOR_TEXT_H = 31
-
-SECRET_TITLE_L = 250
-SECRET_TITLE_R = 100
-SECRET_TITLE_Y1 = 35
-SECRET_TITLE_Y2 = 15
-SECRET_TITLE_TEXT_SIZE = 44
-SECRET_TITLE_TEXT_H = 44
-
-SECRET_TYPE_L = 250
-SECRET_TYPE_R = 100
-SECRET_TYPE_Y = 128
-SECRET_TYPE_TEXT_SIZE = 31
-SECRET_TYPE_TEXT_H = 31
-
-SECRET_BODY_L = 250
-SECRET_BODY_R = 95
-SECRET_BODY_Y = 395
-SECRET_BODY_TEXT_SIZE = 38
-SECRET_BODY_TEXT_H = 47
-
-SECRET_FOOTER_L = 250
-SECRET_FOOTER_R = 95
-SECRET_FOOTER_Y = 707
-SECRET_FOOTER_TEXT_SIZE = 30
-SECRET_FOOTER_TEXT_H = 47
-
-PUBLIC_TITLE_L = 250
-PUBLIC_TITLE_R = 100
-PUBLIC_TITLE_Y1 = 35
-PUBLIC_TITLE_Y2 = 15
-PUBLIC_TITLE_TEXT_SIZE = 43
-PUBLIC_TITLE_TEXT_H = 43
-
-PUBLIC_TYPE_L = 250
-PUBLIC_TYPE_R = 100
-PUBLIC_TYPE_Y = 128
-PUBLIC_TYPE_TEXT_SIZE = 34
-PUBLIC_TYPE_TEXT_H = 34
-
-PUBLIC_BODY_L = 250
-PUBLIC_BODY_R = 80
-PUBLIC_BODY_Y = 395
-PUBLIC_BODY_TEXT_SIZE = 39
-PUBLIC_BODY_TEXT_H = 48
-
-PUBLIC_FOOTER_L = 250
-PUBLIC_FOOTER_R = 95
-PUBLIC_FOOTER_Y = 705
-PUBLIC_FOOTER_TEXT_SIZE = 32
-PUBLIC_FOOTER_TEXT_H = 47
-
-AGENDA_TITLE_L = 250
-AGENDA_TITLE_R = 65
-AGENDA_TITLE_Y1 = 55
-AGENDA_TITLE_Y2 = 35
-AGENDA_TITLE_TEXT_SIZE = 44
-AGENDA_TITLE_TEXT_H = 44
-
-AGENDA_TYPE_L = 250
-AGENDA_TYPE_R = 100
-AGENDA_TYPE_Y = 165
-AGENDA_TYPE_TEXT_SIZE = 31
-AGENDA_TYPE_TEXT_H = 31
-AGENDA_BODY_UPPER_TEXT_SIZE = 24
-
-AGENDA_BODY_ELECT_L = 250
-AGENDA_BODY_ELECT_R = 105
-AGENDA_BODY_FORAGAINST_L = 60
-AGENDA_BODY_FORAGAINST_R = 105
-AGENDA_BODY_Y = 225
-AGENDA_BODY_TEXT_SIZE = 28
-AGENDA_BODY_TEXT_H = 35
-
-PROMISSORY_TITLE_L = 250
-PROMISSORY_TITLE_R = 100 # 100
-PROMISSORY_TITLE_Y1 = 55
-PROMISSORY_TITLE_Y2 = 35
-PROMISSORY_TITLE_TEXT_SIZE = 39
-PROMISSORY_TITLE_TEXT_H = 39
-
-PROMISSORY_BODY_L = 80
-PROMISSORY_BODY_R = 80
-PROMISSORY_BODY_Y = 180
-PROMISSORY_BODY_TEXT_SIZE = 31
-PROMISSORY_BODY_TEXT_H = 37
-PROMISSORY_BODY_UPPER_TEXT_SIZE = 24
-
-# REPLACE THESE WITH PER CARD CONSTANTS
-TITLE_SIZE = 44
-TITLE_LINEH = 44
-TYPE_SIZE = 32
-TYPE_LINEH = 32
-BODY_SM_SIZE = 31
-BODY_SM_LINEH = 37
-BODY_LG_SIZE = 40
-BODY_LG_LINEH = 47
+# -----------------------------------------------------------------------------
 
 def actionCard(title, body, flavor, cardImage, titlesize, fontsize):
     img = getImage(cardImage)
     draw = ImageDraw.Draw(img)
 
-    font = getFont('HandelGothicDBold.otf', ACTION_TITLE_TEXT_SIZE + titlesize)
-    color = (255, 232, 150, 255)
-    text = title
-    x = ACTION_TITLE_L
-    y1 = ACTION_TITLE_Y1
-    y2 = ACTION_TITLE_Y2
-    maxX = CARD_W - ACTION_TITLE_R
-    lineH = ACTION_TITLE_TEXT_H + titlesize
-    y = nudgeY(font, text, maxX, y1, y2)
-    wrapText(draw, font, text, x, y, maxX, color, lineH)
+    # TITLE
+    font = FontData('HandelGothicDBold.otf', 39 + titlesize, (255, 232, 150, 255))
+    textBlock = TextBlock()
+    textBlock.setFont(font)
+    textBlock.setBounds(85, 70, CARD_W - 30, 150)
+    textBlock.setLineHeight(39 + titlesize)
+    textBlock.setCenterV(True)
+    textBlock.setText(title)
+    textBlock.draw(draw)
 
+    # BODY
     body = body.replace('Action:', 'ACTION:')
     body = body.replace('Action :', 'ACTION :')
-    if ('ACTION:' in body) or ('ACTION :') in body:
-        font1 = getFont('MyriadProBoldItalic.ttf', ACTION_BODY_TEXT_SIZE + fontsize)
+    font = FontData('MyriadProSemibold.otf', 31 + titlesize, (255, 255, 255, 255))
+    boldStartFont = False
+    if body.startswith('ACTION'):
+        boldStartFont = FontData('MyriadProBoldItalic.ttf', 31 + titlesize, (255, 255, 255, 255))
     else:
-        font1 = getFont('MyriadProBold.ttf', ACTION_BODY_TEXT_SIZE + fontsize)
-    font2 = getFont('MyriadProSemibold.otf', ACTION_BODY_TEXT_SIZE + fontsize)
-    font3 = getFont('HandelGothicDBold.otf', ACTION_BODY_UPPER_TEXT_SIZE + fontsize)
+        boldStartFont = FontData('MyriadProBold.ttf', 31 + titlesize, (255, 255, 255, 255))
+    overrideFont = FontData('HandelGothicDBold.otf', 24 + titlesize, (255, 255, 255, 255))
+    overrideFont.applyOffset(font)
+    textBlock = TextBlock()
+    textBlock.setFont(font)
+    textBlock.setBoldStart(boldStartFont)
+    textBlock.setOverride(FONT_3_WORDS, overrideFont)
+    textBlock.setBounds(70, 206, CARD_W - 25, CARD_H - 25)
+    textBlock.setLineHeight(37 + fontsize)
+    textBlock.setNewlineScale(PARAGRAPH_LINE_HEIGHT_SCALE)
+    textBlock.setText(body)
+    textBlock.draw(draw)
 
-    color = (255, 255, 255, 255)
-    text = body
-    x = ACTION_BODY_L
-    y = ACTION_BODY_Y
-    maxX = CARD_W - ACTION_BODY_R
-    lineH = ACTION_BODY_TEXT_H + fontsize
-    for line in text.split('\n'):
-        y = wrapTextBoldStart(draw, font1, font2, font3, line, x, y, maxX, color, lineH, 2)
-        font1 = font2
-
-    font = getFont('MyriadWebProItalic.ttf', ACTION_FLAVOR_TEXT_SIZE + fontsize)
-    color = (255, 255, 255, 255)
-    text = flavor
-    x = ACTION_FLAVOR_L
-    y = ACTION_FLAVOR_Y
-    maxX = CARD_W - ACTION_FLAVOR_R
-    lineH = ACTION_FLAVOR_TEXT_H + fontsize
-    top = wrapTextCenterAlignBottom(draw, font, text, x, y, maxX, color, lineH)
-
-    y = top - ACTION_FLAVOR_LINE_DY
-    draw.line([(107, y), (CARD_W - 69, y)], fill=(255, 255, 255, 255), width=3)
+    # FLAVOR
+    font = FontData('MyriadWebProItalic.ttf', 27 + titlesize, (255, 255, 255, 255))
+    textBlock = TextBlock()
+    textBlock.setFont(font)
+    textBlock.setCenterH(True)
+    textBlock.setAlignBottom(True)
+    textBlock.setBounds(70, 206, CARD_W - 25, CARD_H - 25)
+    textBlock.setLineHeight(31 + fontsize)
+    textBlock.setText(flavor)
+    y, h = textBlock.draw(draw)
+    y = (y - h) - 15
+    draw.line([(107, y), (CARD_W - 69, y)], fill=(255, 255, 255, 255), width=2)
 
     return imageToJPEG(img)
 
@@ -438,42 +163,12 @@ def secretObjectiveCard(title, type, body, footer, cardImage, titlesize, fontsiz
     img = getImage(cardImage)
     draw = ImageDraw.Draw(img)
 
-    font = getFont('HandelGothicDBold.otf', SECRET_TITLE_TEXT_SIZE + titlesize)
-    color = (254, 196, 173, 255)
-    text = title
-    x = SECRET_TITLE_L
-    y1 = SECRET_TITLE_Y1
-    y2 = SECRET_TITLE_Y2
-    maxX = CARD_W - SECRET_TITLE_R
-    lineH = SECRET_TITLE_TEXT_H + titlesize
-    y = nudgeY(font, text, maxX, y1, y2)
-    wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
-
     x = 125
     y = 130
     w = 250
     h = 30
     color = (12, 12, 14, 255)
     draw.rectangle([(x, y), (x+w, y+h)], color)
-
-    font = getFont('HandelGothicDBold.otf', SECRET_TYPE_TEXT_SIZE)
-    items = type.split('|')
-    text = items[0]
-    color = ImageColor.getrgb('#' + items[1])
-    x = SECRET_TYPE_L
-    y = SECRET_TYPE_Y
-    maxX = CARD_W - SECRET_TYPE_R
-    lineH = SECRET_TYPE_TEXT_H
-    wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
-
-    font = getFont('MyriadProSemibold.otf', SECRET_BODY_TEXT_SIZE + fontsize)
-    color = (255, 255, 255, 255)
-    text = body
-    x = SECRET_BODY_L
-    y = SECRET_BODY_Y
-    maxX = CARD_W - SECRET_BODY_R
-    lineH = SECRET_BODY_TEXT_H + fontsize
-    y = wrapTextCenterHV(draw, font, text, x, y, maxX, color, lineH)
 
     x = 125
     y = 710
@@ -482,15 +177,57 @@ def secretObjectiveCard(title, type, body, footer, cardImage, titlesize, fontsiz
     color = (12, 12, 14, 255)
     draw.rectangle([(x, y), (x+w, y+h)], color)
 
-    font = getFont('HandelGothicDBold.otf', SECRET_FOOTER_TEXT_SIZE)
-    items = footer.split('|')
-    text = items[0]
+    # TITLE
+    font = FontData('HandelGothicDBold.otf', 39 + titlesize, (254, 196, 173, 255))
+    textBlock = TextBlock()
+    textBlock.setFont(font)
+    textBlock.setCenterH(True)
+    textBlock.setBounds(30, 20, CARD_W - 30, 100)
+    textBlock.setLineHeight(39 + titlesize)
+    textBlock.setCenterV(True)
+    textBlock.setText(title)
+    textBlock.draw(draw)
+
+    # TYPE
+    items = type.split('|')
+    type = items[0]
     color = ImageColor.getrgb('#' + items[1])
-    x = SECRET_FOOTER_L
-    y = SECRET_FOOTER_Y
-    maxX = CARD_W - SECRET_FOOTER_R
-    lineH = SECRET_FOOTER_TEXT_H
-    wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
+    font = FontData('HandelGothicDBold.otf', 31, color)
+    textBlock = TextBlock()
+    textBlock.setFont(font)
+    textBlock.setCenterH(True)
+    textBlock.setBounds(125, 130, 375, 160)
+    textBlock.setLineHeight(31)
+    textBlock.setText(type)
+    textBlock.draw(draw)
+
+    # BODY
+    font = FontData('MyriadProSemibold.otf', 38 + fontsize, (255, 255, 255, 255))
+    overrideFont = FontData('HandelGothicDBold.otf', 32 + titlesize, (255, 255, 255, 255))
+    overrideFont.applyOffset(font)
+    textBlock = TextBlock()
+    textBlock.setFont(font)
+    textBlock.setOverride(FONT_3_WORDS, overrideFont)
+    textBlock.setCenterH(True)
+    textBlock.setCenterV(True)
+    textBlock.setBounds(25, 206, CARD_W - 25, 560)
+    textBlock.setLineHeight(47 + fontsize)
+    textBlock.setNewlineScale(PARAGRAPH_LINE_HEIGHT_SCALE)
+    textBlock.setText(body)
+    y, h = textBlock.draw(draw)
+
+    # FOOTER
+    items = footer.split('|')
+    footer = items[0]
+    color = ImageColor.getrgb('#' + items[1])
+    font = FontData('HandelGothicDBold.otf', 30, (255, 255, 255, 255))
+    textBlock = TextBlock()
+    textBlock.setFont(font)
+    textBlock.setCenterH(True)
+    textBlock.setBounds(125, 705, 375, 740)
+    textBlock.setLineHeight(30)
+    textBlock.setText(footer)
+    y, h = textBlock.draw(draw)
 
     return imageToJPEG(img)
 
@@ -498,76 +235,78 @@ def publicObjectiveCard(level, title, type, body, footer, cardImage, titlesize, 
     img = getImage(cardImage)
     draw = ImageDraw.Draw(img)
 
-    font = getFont('HandelGothicDBold.otf', PUBLIC_TITLE_TEXT_SIZE + titlesize)
-    color = (249, 249, 169, 255) if level == 1 else (173, 239, 254, 255)
-    text = title
-    x = PUBLIC_TITLE_L
-    y1 = PUBLIC_TITLE_Y1
-    y2 = PUBLIC_TITLE_Y2
-    maxX = CARD_W - PUBLIC_TITLE_R
-    lineH = PUBLIC_TITLE_TEXT_H + titlesize
-    y = nudgeY(font, text, maxX, y1, y2)
-    wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
-
-    x = 120
+    x = 125
     y = 130
-    w = 260
-    h = 35
-    color = (12, 12, 14, 255)
-    draw.rectangle([(x, y), (x+w, y+h)], color)
-
-    font = getFont('HandelGothicDBold.otf', PUBLIC_TYPE_TEXT_SIZE)
-    items = type.split('|')
-    text = items[0]
-    color = ImageColor.getrgb('#' + items[1])
-    x = PUBLIC_TYPE_L
-    y = PUBLIC_TYPE_Y
-    maxX = CARD_W - PUBLIC_TYPE_R
-    lineH = PUBLIC_TYPE_TEXT_H
-    wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
-
-    font = getFont('MyriadProSemibold.otf', PUBLIC_BODY_TEXT_SIZE + fontsize)
-    color = (255, 255, 255, 255)
-    text = body
-    x = PUBLIC_BODY_L
-    y = PUBLIC_BODY_Y
-    maxX = CARD_W - PUBLIC_BODY_R
-    lineH = PUBLIC_BODY_TEXT_H + fontsize
-    y = wrapTextCenterHV(draw, font, text, x, y, maxX, color, lineH)
-
-    x = 110
-    y = 710
-    w = 280
+    w = 250
     h = 30
     color = (12, 12, 14, 255)
     draw.rectangle([(x, y), (x+w, y+h)], color)
 
-    font = getFont('HandelGothicDBold.otf', PUBLIC_FOOTER_TEXT_SIZE)
-    items = footer.split('|')
-    text = items[0]
+    x = 100
+    y = 710
+    w = 300
+    h = 30
+    color = (12, 12, 14, 255)
+    draw.rectangle([(x, y), (x+w, y+h)], color)
+
+    # TITLE
+    color = (249, 249, 169, 255) if level == 1 else (173, 239, 254, 255)
+    font = FontData('HandelGothicDBold.otf', 43 + titlesize, color)
+    textBlock = TextBlock()
+    textBlock.setFont(font)
+    textBlock.setCenterH(True)
+    textBlock.setBounds(30, 20, CARD_W - 30, 100)
+    textBlock.setLineHeight(43 + titlesize)
+    textBlock.setCenterV(True)
+    textBlock.setText(title)
+    textBlock.draw(draw)
+
+    # TYPE
+    items = type.split('|')
+    type = items[0]
     color = ImageColor.getrgb('#' + items[1])
-    x = PUBLIC_FOOTER_L
-    y = PUBLIC_FOOTER_Y
-    maxX = CARD_W - PUBLIC_FOOTER_R
-    lineH = PUBLIC_FOOTER_TEXT_H
-    wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
+    font = FontData('HandelGothicDBold.otf', 31, color)
+    textBlock = TextBlock()
+    textBlock.setFont(font)
+    textBlock.setCenterH(True)
+    textBlock.setBounds(125, 130, 375, 160)
+    textBlock.setLineHeight(31)
+    textBlock.setText(type)
+    textBlock.draw(draw)
+
+    # BODY
+    font = FontData('MyriadProSemibold.otf', 39 + fontsize, (255, 255, 255, 255))
+    overrideFont = FontData('HandelGothicDBold.otf', 33 + titlesize, (255, 255, 255, 255))
+    overrideFont.applyOffset(font)
+    textBlock = TextBlock()
+    textBlock.setFont(font)
+    textBlock.setOverride(FONT_3_WORDS, overrideFont)
+    textBlock.setCenterH(True)
+    textBlock.setCenterV(True)
+    textBlock.setBounds(25, 206, CARD_W - 25, 560)
+    textBlock.setLineHeight(48 + fontsize)
+    textBlock.setNewlineScale(PARAGRAPH_LINE_HEIGHT_SCALE)
+    textBlock.setText(body)
+    y, h = textBlock.draw(draw)
+
+    # FOOTER
+    items = footer.split('|')
+    footer = items[0]
+    color = ImageColor.getrgb('#' + items[1])
+    font = FontData('HandelGothicDBold.otf', 32, (255, 255, 255, 255))
+    textBlock = TextBlock()
+    textBlock.setFont(font)
+    textBlock.setCenterH(True)
+    textBlock.setBounds(100, 705, 400, 740)
+    textBlock.setLineHeight(32)
+    textBlock.setText(footer)
+    y, h = textBlock.draw(draw)
 
     return imageToJPEG(img)
 
 def agendaCard(title, type, body, cardImage, titlesize, fontsize):
     img = getImage(cardImage)
     draw = ImageDraw.Draw(img)
-
-    font = getFont('HandelGothicDBold.otf', AGENDA_TITLE_TEXT_SIZE + titlesize)
-    color = (149, 202, 255, 255)
-    text = title
-    x = AGENDA_TITLE_L
-    y1 = AGENDA_TITLE_Y1
-    y2 = AGENDA_TITLE_Y2
-    maxX = CARD_W - AGENDA_TITLE_R
-    lineH = AGENDA_TITLE_TEXT_H + titlesize
-    y = nudgeY(font, text, maxX, y1, y2)
-    wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
 
     x = 200
     y = 160
@@ -576,55 +315,87 @@ def agendaCard(title, type, body, cardImage, titlesize, fontsize):
     color = (24, 26, 25, 255)
     draw.rectangle([(x, y), (x+w, y+h)], color)
 
-    font = getFont('MyriadProBold.ttf', AGENDA_TYPE_TEXT_SIZE)
+    # TITLE
+    font = FontData('HandelGothicDBold.otf', 44 + titlesize, (149, 202, 255, 255))
+    textBlock = TextBlock()
+    textBlock.setFont(font)
+    textBlock.setCenterH(True)
+    textBlock.setBounds(30, 20, CARD_W - 30, 100)
+    textBlock.setLineHeight(44 + titlesize)
+    textBlock.setCenterV(True)
+    textBlock.setText(title)
+    textBlock.draw(draw)
+
+    # TYPE
     items = type.split('|')
-    text = items[0]
+    type = items[0]
     color = ImageColor.getrgb('#' + items[1])
-    x = AGENDA_TYPE_L
-    y = AGENDA_TYPE_Y
-    maxX = CARD_W - AGENDA_TYPE_R
-    lineH = AGENDA_TYPE_TEXT_H
-    wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
+    font = FontData('HandelGothicDBold.otf', 31, color)
+    textBlock = TextBlock()
+    textBlock.setFont(font)
+    textBlock.setCenterH(True)
+    textBlock.setBounds(150, 160, 350, 190)
+    textBlock.setLineHeight(31)
+    textBlock.setText(type)
+    textBlock.draw(draw)
 
-    #font1 = getFont('MyriadProBold.ttf', AGENDA_BODY_TEXT_SIZE)
-    #font2 = getFont('MyriadProSemibold.otf', AGENDA_BODY_TEXT_SIZE)
-    font2 = getFont('MyriadProRegular.ttf', AGENDA_BODY_TEXT_SIZE + fontsize)
-    font3 = getFont('HandelGothicDBold.otf', AGENDA_BODY_UPPER_TEXT_SIZE + fontsize)
-    color = (0, 0, 0, 255)
-    text = body
-    y = AGENDA_BODY_Y
-    lineH = AGENDA_BODY_TEXT_H + fontsize
+    # BODY
+    font = FontData('MyriadProRegular.ttf', 28 + fontsize, (0, 0, 0, 255))
+    overrideFont = FontData('HandelGothicDBold.otf', 24 + fontsize, (0, 0, 0, 255))
+    overrideFont.applyOffset(font)
+    y = 225
 
-    if '(When' in text:
-        i = text.find('(When')
-        j = text.find(')', i + 1)
-        whenText = text[i+1:j]
-        if text[j+1] == '\n':
+    # Tolerate odd spreadsheet text syntax.
+    if '(When' in body:
+        i = body.find('(When')
+        j = body.find(')', i + 1)
+        whenText = body[i+1:j]
+        if len(body) > j+ 1 and body[j+1] == '\n':
             j += 1
-        text = text[:i] + text[j+1:]
-        y = wrapTextCenter(draw, font2, whenText, x, y, maxX, color, lineH)
+        body = body[:i] + body[j+1:]
+        textBlock = TextBlock()
+        textBlock.setCenterH(True)
+        textBlock.setFont(font)
+        textBlock.setBounds(25, y, CARD_W - 25, 700)
+        textBlock.setLineHeight(37 + fontsize)
+        textBlock.setNewlineScale(PARAGRAPH_LINE_HEIGHT_SCALE)
+        textBlock.setText(whenText)
+        y, _ = textBlock.draw(draw)
+        y += textBlock._lineH * (PARAGRAPH_LINE_HEIGHT_SCALE - 1)
 
     electFr = unicode('Élisez ', 'utf-8')
-    if ('Elect ' in text) or (electFr in text):
-        font1 = getFont('MyriadProSemibold.otf', AGENDA_BODY_TEXT_SIZE + fontsize)
-        x = AGENDA_BODY_ELECT_L
-        maxX = CARD_W - AGENDA_BODY_ELECT_R
-        for line in text.split('\n'):
+    if ('Elect ' in body) or (electFr in body):
+        boldFont = FontData('MyriadProSemibold.otf', 28 + fontsize, (0, 0, 0, 255))
+        for line in body.split('\n'):
+            textBlock = TextBlock()
+            textBlock.setCenterH(True)
+            textBlock.setFont(font)
+            textBlock.setOverride(FONT_3_WORDS, overrideFont)
+            textBlock.setBounds(25, y, CARD_W - 25, 700)
+            textBlock.setLineHeight(37 + fontsize)
+            textBlock.setNewlineScale(PARAGRAPH_LINE_HEIGHT_SCALE)
             if line.startswith('Elect ') or line.startswith(electFr):
-                y = wrapTextCenter(draw, font1, line, x, y, maxX, color, lineH)
-            else:
-                y = wrapTextCenter(draw, font2, line, x, y, maxX, color, lineH)
+                textBlock.setFont(boldFont)
+            textBlock.setText(line.strip())
+            y, _ = textBlock.draw(draw)
+            y += textBlock._lineH * (PARAGRAPH_LINE_HEIGHT_SCALE - 1)
     else:
-        font1 = getFont('MyriadProSemiboldItalic.ttf', AGENDA_BODY_TEXT_SIZE + fontsize)
-        x = AGENDA_BODY_FORAGAINST_L
-        maxX = CARD_W - AGENDA_BODY_FORAGAINST_R
-        for line in text.split('\n'):
+        startFont = FontData('MyriadProSemiboldItalic.ttf', 28 + fontsize, (0, 0, 0, 255))
+        for line in body.split('\n'):
             isFor = line.startswith('For:') or line.startswith('Pour :')
             isAgainst = line.startswith('Against:') or line.startswith('Contre :')
+            textBlock = TextBlock()
+            textBlock.setFont(font)
+            textBlock.setOverride(FONT_3_WORDS, overrideFont)
+            textBlock.setBounds(25, y, CARD_W - 25, 700)
+            textBlock.setLineHeight(37 + fontsize)
+            textBlock.setNewlineScale(PARAGRAPH_LINE_HEIGHT_SCALE)
             if isFor or isAgainst:
-                y = wrapTextBoldStart(draw, font1, font2, font3, line, x, y, maxX, color, lineH, 1)
-            else:
-                y = wrapText(draw, font2, line, x, y, maxX, color, lineH)
+                textBlock.setBoldStart(startFont)
+                textBlock.setIndent(20)
+            textBlock.setText(line.strip())
+            y, _ = textBlock.draw(draw)
+            y += textBlock._lineH * (PARAGRAPH_LINE_HEIGHT_SCALE - 1)
 
     return imageToJPEG(img)
 
@@ -633,30 +404,31 @@ def promissoryCard(color, title, body, titlesize, fontsize):
     img = getImage(filename)
     draw = ImageDraw.Draw(img)
 
-    font = getFont('HandelGothicDBold.otf', PROMISSORY_TITLE_TEXT_SIZE + titlesize)
-    color = (255, 255, 255, 255)
-    text = title
-    x = PROMISSORY_TITLE_L
-    y1 = PROMISSORY_TITLE_Y1
-    y2 = PROMISSORY_TITLE_Y2
-    maxX = CARD_W - PROMISSORY_TITLE_R
-    lineH = PROMISSORY_TITLE_TEXT_H + titlesize
-    y = nudgeY(font, text, maxX, y1, y2)
-    wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
+    # TITLE
+    font = FontData('HandelGothicDBold.otf', 39 + titlesize, (255, 255, 255, 255))
+    textBlock = TextBlock()
+    textBlock.setFont(font)
+    textBlock.setCenterH(True)
+    textBlock.setBounds(30, 20, CARD_W - 30, 100)
+    textBlock.setLineHeight(39 + titlesize)
+    textBlock.setCenterV(True)
+    textBlock.setText(title)
+    textBlock.draw(draw)
 
-    font1 = getFont('MyriadProBold.ttf', PROMISSORY_BODY_TEXT_SIZE + fontsize)
-    font2 = getFont('MyriadProSemibold.otf', PROMISSORY_BODY_TEXT_SIZE + fontsize)
-    font3 = getFont('HandelGothicDBold.otf', PROMISSORY_BODY_UPPER_TEXT_SIZE + fontsize)
-
-    color = (0, 0, 0, 255)
-    text = body
-    x = PROMISSORY_BODY_L
-    y = PROMISSORY_BODY_Y
-    maxX = CARD_W - PROMISSORY_BODY_R
-    lineH = PROMISSORY_BODY_TEXT_H + fontsize
-    for line in text.split('\n'):
-        y = wrapTextBoldStart(draw, font1, font2, font3, line, x, y, maxX, color, lineH, 2)
-        font1 = font2
+    # BODY
+    font = FontData('MyriadProRegular.ttf', 31 + fontsize, (0, 0, 0, 255))
+    boldFont = FontData('MyriadProBold.ttf', 31 + fontsize, (0, 0, 0, 255))
+    overrideFont = FontData('HandelGothicDBold.otf', 24 + fontsize, (0, 0, 0, 255))
+    overrideFont.applyOffset(font)
+    textBlock = TextBlock()
+    textBlock.setFont(font)
+    textBlock.setBoldStart(boldFont)
+    textBlock.setOverride(FONT_3_WORDS, overrideFont)
+    textBlock.setBounds(40, 150, CARD_W - 40, 670)
+    textBlock.setLineHeight(37)
+    textBlock.setNewlineScale(PARAGRAPH_LINE_HEIGHT_SCALE)
+    textBlock.setText(body)
+    textBlock.draw(draw)
 
     return imageToJPEG(img)
 
@@ -665,53 +437,65 @@ def nobilityCard(color, title, type, body, footer, points, titlesize, fontsize):
     img = getImage(filename)
     draw = ImageDraw.Draw(img)
 
-    font = getFont('HandelGothicDBold.otf', TITLE_SIZE + titlesize)
-    color = (255, 255, 255, 255)
-    text = title
-    x = 250
-    y1 = 35
-    y2 = 15
-    maxX = 400
-    lineH = TITLE_LINEH + titlesize
-    y = nudgeY(font, text, maxX, y1, y2)
-    wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
+    # TITLE
+    font = FontData('HandelGothicDBold.otf', 44 + titlesize, (255, 255, 255, 255))
+    textBlock = TextBlock()
+    textBlock.setFont(font)
+    textBlock.setCenterH(True)
+    textBlock.setBounds(30, 20, CARD_W - 30, 100)
+    textBlock.setLineHeight(44 + titlesize)
+    textBlock.setCenterV(True)
+    textBlock.setText(title)
+    textBlock.draw(draw)
 
-    font = getFont('MyriadProBold.ttf', TYPE_SIZE)
+    # TYPE
     items = type.split('|')
-    text = items[0]
+    type = items[0]
     color = ImageColor.getrgb('#' + items[1])
-    x = 250
-    y = 135
-    maxX = 400
-    lineH = TYPE_LINEH
-    wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
+    font = FontData('HandelGothicDBold.otf', 31, color)
+    textBlock = TextBlock()
+    textBlock.setFont(font)
+    textBlock.setCenterH(True)
+    textBlock.setBounds(125, 130, 375, 160)
+    textBlock.setLineHeight(31)
+    textBlock.setText(type)
+    textBlock.draw(draw)
 
-    font = getFont('MyriadProSemibold.otf', BODY_LG_SIZE + fontsize)
-    color = (255, 255, 255, 255)
-    text = body
-    x = 250
-    y = 375
-    maxX = 450
-    lineH = BODY_LG_LINEH + fontsize
-    y = wrapTextCenterHV(draw, font, text, x, y, maxX, color, lineH)
+    # BODY
+    font = FontData('MyriadProSemibold.otf', 39 + fontsize, (255, 255, 255, 255))
+    textBlock = TextBlock()
+    textBlock.setFont(font)
+    textBlock.setCenterH(True)
+    textBlock.setCenterV(True)
+    textBlock.setBounds(25, 206, CARD_W - 25, 560)
+    textBlock.setLineHeight(48 + fontsize)
+    textBlock.setNewlineScale(PARAGRAPH_LINE_HEIGHT_SCALE)
+    textBlock.setText(body)
+    textBlock.draw(draw)
 
-    font = getFont('MyriadProBold.ttf', 40)
+    # FOOTER
     color = (255, 255, 255, 255) if footer.lower() == 'public' else (255, 0, 0, 255)
-    text = footer
-    x = 250
-    y = 520
-    maxX = 450
-    lineH = 40
-    y = wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
+    font = FontData('MyriadProBold.ttf', 40, color)
+    textBlock = TextBlock()
+    textBlock.setFont(font)
+    textBlock.setCenterH(True)
+    textBlock.setBounds(25, 520, CARD_W - 25, 560)
+    textBlock.setLineHeight(40)
+    textBlock.setNewlineScale(PARAGRAPH_LINE_HEIGHT_SCALE)
+    textBlock.setText(footer)
+    textBlock.draw(draw)
 
-    font = getFont('HandelGothicDBold.otf', 130)
-    color = (255, 255, 255, 255)
-    text = str(points)
-    x = 265
-    y = 565
-    maxX = 450
-    lineH = 130
-    y = wrapTextCenter(draw, font, text, x, y, maxX, color, lineH)
+    # POINTS
+    color = (255, 255, 255, 255) if footer.lower() == 'public' else (255, 0, 0, 255)
+    font = FontData('HandelGothicDBold.otf', 130, color)
+    textBlock = TextBlock()
+    textBlock.setFont(font)
+    textBlock.setCenterH(True)
+    textBlock.setBounds(200, 565, 300, 700)
+    textBlock.setLineHeight(130)
+    textBlock.setNewlineScale(PARAGRAPH_LINE_HEIGHT_SCALE)
+    textBlock.setText(points)
+    textBlock.draw(draw)
 
     return imageToJPEG(img)
 
@@ -775,7 +559,8 @@ CARD_OPTIONS = {
     },
     'promissory-c' : {
         'cardType' : 'promissory',
-        'cardImage' : False
+        'cardImage' : False,
+        'back' : 'Promissory_Note_Back.jpg',
     },
     'nobility' : {
         'cardType' : 'nobility',
@@ -809,7 +594,7 @@ class CardHandler(webapp2.RequestHandler):
         hash.update(points.encode('utf-8'))
         hash.update(titlesize.encode('utf-8'))
         hash.update(fontsize.encode('utf-8'))
-        hash.update('version8')
+        hash.update('version9')
         key = hash.hexdigest().lower()
 
         cardOptions = CARD_OPTIONS[card]
@@ -819,7 +604,7 @@ class CardHandler(webapp2.RequestHandler):
         fontsize = int(fontsize)
 
         jpg = memcache.get(key=key)
-        #jpg = None
+        jpg = None
         if jpg is None:
             if cardType == 'action':
                 jpg = actionCard(title, body, flavor, cardImage, titlesize, fontsize)
@@ -912,10 +697,13 @@ class getAgendaHandler(webapp2.RequestHandler):
 
 class TestActionHandler(webapp2.RequestHandler):
     def get(self):
-        title = 'Bribery'
-        body = 'After the speaker votes on an agenda: Spend any number of trade goods. For each trade good spent, cast 1 additional vote for any outcome.'
+        title = 'Bribery\nLine2'
+        body = 'After the speaker votes on an agenda: Spend\n any BOMBARDMENT of trade goods. For each trade good spent, cast 1 additional vote for any outcome.'
         flavor = u'\u201CWe think that this initiative would spell disaster for the galaxy, not just the Creuss.\u201D Taivra said, quietly slipping Z\u2018eu an envelope. \u201CDon\u2019t you agree?\u201D'
-        jpg = actionCard(title.upper(), body, flavor, 2)
+        cardImage = 'ActionCard_c.jpg'
+        titlesize = 0
+        fontsize = 0
+        jpg = actionCard(title.upper(), body, flavor, cardImage, titlesize, fontsize)
         self.response.headers['Content-Type'] = 'image/jpeg'
         self.response.out.write(jpg)
 
@@ -1149,18 +937,18 @@ class Proxy(webapp2.RequestHandler):
 app = webapp2.WSGIApplication([
     ('/img', CardHandler),
     ('/back', BackHandler),
-    ('/getaction', getActionHandler),
-    ('/getagenda', getAgendaHandler),
+    #('/getaction', getActionHandler),
+    #('/getagenda', getAgendaHandler),
     #('/testaction', TestActionHandler),
     #('/testsecret', TestSecretHandler),
     #('/testpublic', TestPublicHandler),
     #('/testagenda', TestAgenda1Handler),
     #('/testagenda2', TestAgenda2Handler),
-    ('/mutatesystem', MutateSystemTile),
+    #('/mutatesystem', MutateSystemTile),
     #('/mutatefaction', MutateFactionTokens),
     #('/radialdither', RadialDither),
     #('/4k', FourK),
-    ('/cardsheet', CardSheet),
-    ('/proxy', Proxy),
+    #('/cardsheet', CardSheet),
+    #('/proxy', Proxy),
 
-], debug=True)
+], debug=False)

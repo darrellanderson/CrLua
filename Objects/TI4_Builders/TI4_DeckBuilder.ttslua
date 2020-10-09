@@ -8,6 +8,7 @@ function onLoad(save_state)
     CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.INFO)
     self.addContextMenuItem('Action Deck', buildActionDeck)
     self.addContextMenuItem('Agenda Deck', buildAgendaDeck)
+    self.addContextMenuItem('Promissory Deck', buildPromissoryDeck)
 end
 
 -------------------------------------------------------------------------------
@@ -136,6 +137,7 @@ local function spawnDeck(deckName, cards, cardSheetUrl, backUrl)
     while Time.time < waitUntil do
         coroutine.yield(0)
     end
+    return deck
 end
 
 -------------------------------------------------------------------------------
@@ -146,7 +148,7 @@ local function buildDeck(deckName, cards, back)
 
     print('cards[1] = {')
     for k, v in pairs(cards[1]) do
-        print('   ' .. k .. ' = ' .. v)
+        print('   ' .. k .. ' = ' .. tostring(v))
     end
     print('}')
 
@@ -162,14 +164,17 @@ local function buildDeck(deckName, cards, back)
     end
     print('#decks = ' .. #decks)
 
+    local firstDeckObject = false
     for i, cards in ipairs(decks) do
         local file = '/tmp/t.decks/t_' .. deckName .. '_' .. i .. '.jpg'
         buildSheet(cards, back, file)
 
         local frontUrl = 'localhost:8080/proxy?file=' .. file
         local backUrl = 'localhost:8080/proxy?file=' .. back
-        spawnDeck(deckName, cards, frontUrl, backUrl)
+        local deckObject = spawnDeck(deckName, cards, frontUrl, backUrl)
+        firstDeckObject = firstDeckObject or deckObject
     end
+    return firstDeckObject
 end
 
 -------------------------------------------------------------------------------
@@ -179,7 +184,7 @@ function buildActionDeck()
 end
 
 function buildActionDeckCoroutine()
-    local cards = getCards('Sheet1', 'A', 'B', 'H')
+    local cards = getCards('Actions', 'A', 'B', 'H')
     local back = '/tmp/t.decks/Action_Back.jpg'
     buildDeck('Actions', cards, back)
     print('done!')
@@ -193,13 +198,100 @@ function buildAgendaDeck()
 end
 
 function buildAgendaDeckCoroutine()
-    local cards = getCards('Sheet2', 'A', False, 'G')
+    local cards = getCards('Agenda', 'A', false, 'G')
     local back = '/tmp/t.decks/Agenda_Back.jpg'
     buildDeck('Agenda', cards, back)
     print('done!')
     return 1
 end
 
+-------------------------------------------------------------------------------
+
+function buildPromissoryDeck()
+    startLuaCoroutine(self, 'buildPromissoryDeckCoroutine')
+end
+
+function buildPromissoryDeckCoroutine()
+    local cards = getCards('Promissory', 'A', false, 'E')
+    local back = '/tmp/t.decks/Promissory_Note_Back.jpg'
+    local deck = buildDeck('Promissory', cards, back)
+
+    local waitUntil = Time.time + 3
+    while Time.time < waitUntil do
+        coroutine.yield(0)
+    end
+
+    local deckPos = deck.getPosition()
+    local colorToPos = {}
+    for i, color in ipairs(Player.getColors()) do
+        local row = math.floor(i / 2)
+        local col = i % 2
+        colorToPos[color] = {
+            x = deckPos.x + col * 3 - 8,
+            y = deckPos.y,
+            z = deckPos.z + row * 3
+        }
+    end
+
+    for i, entry in ipairs(deck.getObjects()) do
+        local color = string.match(entry.name, '^.* %((.*)%)$')
+        assert(color, 'no color in ' .. entry.name)
+        local p = {
+            x = colorToPos[color].x,
+            y = colorToPos[color].y + 1 + i / 10,
+            z = colorToPos[color].z
+        }
+        if not deck.remainder then
+            deck.takeObject({
+                guid = entry.guid,
+                position = p
+            })
+        else
+            deck.remainder.setPosition(p)
+        end
+    end
+
+    local waitUntil = Time.time + 3
+    while Time.time < waitUntil do
+        coroutine.yield(0)
+    end
+
+    for color, pos in pairs(colorToPos) do
+        local hits = Physics.cast({
+            origin = pos,
+            direction = { x = 0, y = -1, z = 0 },
+            type = 3, -- box
+            size = { 0.1, 10, 0.1 }
+        })
+        local thisDeck = false
+        for _, hit in ipairs(hits) do
+            if hit.hit_object.tag == 'Deck' then
+                thisDeck = hit.hit_object
+                break
+            end
+        end
+        if thisDeck then
+            thisDeck.setName('Notes (' .. color .. ')')
+        end
+    end
+
+    print('done!')
+    return 1
+end
+
+-------------------------------------------------------------------------------
+
+function buildTechDeck()
+    startLuaCoroutine(self, 'buildTechDeckCoroutine')
+end
+
+function buildTechDeckCoroutine()
+    local cards = getCards('Technology Cards', 'A', false, 'E')
+    local back = '/tmp/t.decks/Promissory_Note_Back.jpg'
+    buildDeck('Promissory', cards, back)
+    print('done!')
+    return 1
+end
 
 -------------------------------------------------------------------------------
 

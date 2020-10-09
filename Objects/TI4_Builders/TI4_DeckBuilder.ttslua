@@ -60,6 +60,9 @@ local function getCards(sheet, namesCol, descriptionCol, imagesCol)
             img = images[i]
         })
     end
+
+    table.sort(result, function(a, b) return a.name < b.name end)
+
     return result
 end
 

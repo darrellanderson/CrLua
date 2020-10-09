@@ -39,6 +39,9 @@ class FontData:
         (w, _) = self._font.getsize(text)
         return w
 
+    def getColor(self):
+        return self._color
+
     def draw(self, text, imageDraw, x, y, lineH):
         imageDraw.text((x, y + self._dy), text, font=self._font, fill=self._color)
 
@@ -307,3 +310,31 @@ class TextBlock:
                 y += self._lineH
 
         return y, h
+
+    def drawGradient(self, image, fromColor, toColor):
+        (l, t, r, b) = self._bounds
+
+        # Get just the text on a transparent background.
+        w, h = image.size
+        sample = Image.new('RGBA', (w, h))
+        draw = ImageDraw.Draw(sample)
+        self.draw(draw)
+        sample = sample.crop((l, t, r, b))
+        w, h = sample.size
+
+        # Create a gradient from black to white.  Image.linear_gradient not available on AppEngine. :(
+        #gradient = Image.linear_gradient('L')
+        gradient = Image.new('L', (100, 1))
+        data = []
+        for i in range(100):
+            data.append(i * 255 / 100)
+        gradient.putdata(data)
+        gradient = gradient.resize((w, h))
+
+        # Use it to make one from color to color.
+        solid = Image.new('RGBA', (w, h), toColor)
+        gradient2 = Image.new('RGBA', (w, h), fromColor)
+        gradient2.paste(solid, (0, 0), gradient)
+
+        # Paste transparent to white over the text.
+        image.paste(gradient2, (l, t), sample)

@@ -190,6 +190,7 @@ def secretObjectiveCard(title, type, body, footer, cardImage, titlesize, fontsiz
     textBlock.setCenterV(True)
     textBlock.setText(title)
     textBlock.draw(draw)
+    #textBlock.drawGradient(img, font.getColor(), (255, 255, 255, 255))
 
     # TYPE
     items = type.split('|')
@@ -644,8 +645,12 @@ class CardHandler(webapp2.RequestHandler):
 class BackHandler(webapp2.RequestHandler):
     def get(self):
         card = self.request.get('card', 'action').lower()
-        cardOptions = CARD_OPTIONS[card]
-        backImage = cardOptions['back']
+        generates = self.request.get('generates', '').lower()
+        backImage = False
+        if card in CARD_OPTIONS:
+            backImage = CARD_OPTIONS[card]['back']
+        if card == 'tech':
+            backImage = 'Tech_Back_' + generates.capitalize() + '.jpg'
         key = backImage
         jpg = memcache.get(key=key)
         #jpg = None
@@ -948,7 +953,7 @@ class Proxy(webapp2.RequestHandler):
 app = webapp2.WSGIApplication([
     ('/img', CardHandler),
     ('/back', BackHandler),
-    #('/tech', TechHandler),
+    ('/tech', TechHandler),
     #('/getaction', getActionHandler),
     #('/getagenda', getAgendaHandler),
     #('/testaction', TestActionHandler),

@@ -213,7 +213,7 @@ function _getUnitAttributes(unitType)
     -- Apply unit modifiers.
     unitAttrs = _unitHelper.applyUnitModifiers({
         unitAttrs = assert(unitAttrs),
-        myColor = color,
+        myColor = color or 'Grey',
         myUnitModifiers = unitModifiers,
         myUnitTypeToCount = {},
         opponentColor = false,

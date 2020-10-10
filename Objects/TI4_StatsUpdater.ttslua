@@ -497,7 +497,7 @@ function updateNotesCoroutine()
     elseif _noteBody and tab then
         -- Check if modified.
         if tab.body ~= _noteBody then
-            print('TI4 Stats: ' .. tab.title .. ' edited, resetting')
+            --print('TI4 Stats: ' .. tab.title .. ' edited, resetting')
             tab.body = _noteBody
             Notes.editNotebookTab(tab)
         end

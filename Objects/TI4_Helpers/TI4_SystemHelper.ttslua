@@ -1041,12 +1041,12 @@ end
 
 -------------------------------------------------------------------------------
 
-function diplomacySystem(clickerColor, systemObject)
-    local system = _systems[systemObject.getGUID()]
-    printToAll(clickerColor .. ' applying Diplomacy to ' .. system.string)
+function _moveTokenFromReinforcements(systemObject, colors)
+    assert(type(systemObject) == 'userdata' and type(colors) == 'table')
     local bagNameSet = {}
-    for _, faction in pairs(_factionHelper.allFactions()) do
-        if faction.color ~= clickerColor then
+    for _, color in ipairs(colors) do
+        local faction = _factionHelper.fromColor(color)
+        if faction then
             bagNameSet[faction.tokenName .. ' Command Tokens Bag'] = true
         end
     end
@@ -1056,16 +1056,17 @@ function diplomacySystem(clickerColor, systemObject)
             table.insert(bags, object)
         end
     end
-    local p = systemObject.getPosition()
     local r = 1
+    local p0 = systemObject.getPosition()
+    local success = true
     for i, bag in ipairs(bags) do
         local phi = math.rad(360 * i / #bags)
         if bag.getQuantity() > 0 then
             bag.takeObject({
                 position = {
-                    x = p.x + math.cos(phi) * r,
-                    y = 3 + i * 0.2,
-                    z= p.z + math.sin(phi) * r,
+                    x = p0.x + math.cos(phi) * r,
+                    y = p0.y + 3 + i * 0.2,
+                    z= p0.z + math.sin(phi) * r,
                 },
                 rotation = {
                     x = 0,
@@ -1075,15 +1076,143 @@ function diplomacySystem(clickerColor, systemObject)
                 smooth = true,
             })
         else
-            printToAll('Diplomacy ' .. system.string .. ': ' .. bag.getName() .. ' empty, please assign token')
+            printToAll(bag.getName() .. ' empty, please assign token manually', 'Red')
+            success = false
         end
     end
+    return success
+end
+
+function _moveTokenFromCommandSheet(systemObject, color, section)
+    assert(type(systemObject) == 'userdata' and type(color) == 'string' and type(section) == 'string')
+    local faction = _factionHelper.fromColor(color)
+    local commandSheet = faction and getObjectFromGUID(faction.commandSheetGuid)
+    local commandTokenName = faction and faction.tokenName .. ' Command Token'
+    local function isToken(commandToken)
+        local p = commandSheet.positionToLocal(commandToken.getPosition())
+        local dSq = p.x * p.x + p.z * p.z
+        if dSq > 15 then
+            return false
+        end
+        local degrees = (math.deg(math.atan2(p.z, p.x)) + 360) % 360
+        if section == 'tactics' and 300 > degrees and degrees > 240 then
+            return true
+        elseif section == 'fleet' and 240 > degrees and degrees > 180 then
+            return true
+        elseif section == 'strategy' and 180 > degrees and degrees > 120 then
+            return true
+        end
+    end
+    local commandToken = false
+    if commandSheet and commandTokenName then
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == commandTokenName and isToken(object) then
+                commandToken = object
+                break
+            end
+        end
+    end
+    local success = true
+    if commandToken then
+        local p0 = systemObject.getPosition()
+        local position = {
+            x = p0.x,
+            y = p0.y + 3,
+            z = p0.z
+        }
+        local collide = false
+        local fast = false
+        commandToken.setPositionSmooth(position, collide, fast)
+    else
+        printToAll(color .. ' ' .. section .. ' pool is empty', 'Red')
+        success = false
+    end
+    return success
+end
+
+function _moveOwnerToken(systemObject, color)
+    assert(type(systemObject) == 'userdata' and type(color) == 'string')
+    local faction = _factionHelper.fromColor(color)
+    local ownerTokensBagName = faction and faction.tokenName .. ' Owner Tokens Bag'
+    local ownerTokensBag = false
+    if ownerTokensBagName then
+        for _, object in ipairs(getAllObjects()) do
+            if object.tag == 'Infinite' and object.getName() == ownerTokensBagName then
+                ownerTokensBag = object
+                break
+            end
+        end
+    end
+    if ownerTokensBag then
+        local p0 = systemObject.getPosition()
+        ownerTokensBag.takeObject({
+            position = {
+                x = p0.x,
+                y = p0.y + 3,
+                z = p0.z
+            },
+            smooth = true
+        })
+    end
+end
+
+function onClickDiplomacySystem(clickerColor, systemObject)
+    assert(type(clickerColor) == 'string' and type(systemObject) == 'userdata')
+    local system = _systems[systemObject.getGUID()]
+    printToAll(clickerColor .. ' applying Diplomacy to ' .. system.string)
+    local colors = {}
+    for _, faction in pairs(_factionHelper.allFactions()) do
+        if faction.color ~= clickerColor then
+            table.insert(colors, faction.color)
+        end
+    end
+    _moveTokenFromReinforcements(systemObject, colors)
+end
+
+function onClickActivateSystem(clickerColor, systemObject)
+    assert(type(clickerColor) == 'string' and type(systemObject) == 'userdata')
+    local system = _systems[systemObject.getGUID()]
+    -- No need to announce, activateSystem will do that.
+    if (not Turns.enable) or Turns.turn_color ~= clickerColor then
+        printToColor('Activate system: ' .. clickerColor .. ' is not the active player, ignoring', clickerColor, 'Red')
+        return
+    end
+    if _moveTokenFromCommandSheet(systemObject, clickerColor, 'tactics') then
+        activateSystem(clickerColor, system)
+    end
+end
+
+function onClickStrategyToken(clickerColor, systemObject)
+    assert(type(clickerColor) == 'string' and type(systemObject) == 'userdata')
+    local system = _systems[systemObject.getGUID()]
+    if _moveTokenFromCommandSheet(systemObject, clickerColor, 'strategy') then
+        printToAll(clickerColor .. ' placing command token from strategy in ' .. system.string)
+    end
+end
+
+function onClickReinforcementsToken(clickerColor, systemObject)
+    assert(type(clickerColor) == 'string' and type(systemObject) == 'userdata')
+    local system = _systems[systemObject.getGUID()]
+    if _moveTokenFromReinforcements(systemObject, { clickerColor }) then
+        printToAll(clickerColor .. ' placing command token from reinforcements in ' .. system.string)
+    end
+end
+
+function onClickOwnerToken(clickerColor, systemObject)
+    assert(type(clickerColor) == 'string' and type(systemObject) == 'userdata')
+    local system = _systems[systemObject.getGUID()]
+    _moveOwnerToken(systemObject, clickerColor)
+    printToAll(clickerColor .. ' placing owner token in ' .. system.string)
 end
 
 function _addContextMenuItems(systemObject)
     assert(type(systemObject) == 'userdata')
     assert(_systems[systemObject.getGUID()])
-    systemObject.addContextMenuItem('Diplomacy System', function(clickerColor) diplomacySystem(clickerColor, systemObject) end, false)
+    systemObject.addContextMenuItem('Diplomacy System', function(clickerColor) onClickDiplomacySystem(clickerColor, systemObject) end, false)
+    systemObject.addContextMenuItem('Activate System', function(clickerColor) onClickActivateSystem(clickerColor, systemObject) end, false)
+    systemObject.addContextMenuItem('Strategy Token', function(clickerColor) onClickStrategyToken(clickerColor, systemObject) end, false)
+    systemObject.addContextMenuItem('Reinforcemts Token', function(clickerColor) onClickReinforcementsToken(clickerColor, systemObject) end, false)
+    systemObject.addContextMenuItem('Owner Token', function(clickerColor) onClickOwnerToken(clickerColor, systemObject) end, false)
 end
 
 function onObjectLeaveContainer(container, leaveObject)
@@ -1148,8 +1277,16 @@ function onObjectDrop(playerColor, object)
         return
     end
 
+    activateSystem(playerColor, system)
+end
+
+function activateSystem(playerColor, system)
+    assert(type(playerColor) == 'string' and type(system) == 'table')
+
     _activatedSystem = system
     _lastActivatedSystem = system
+
+    local faction = _factionHelper.fromColor(playerColor)
     local factionName = (faction and faction.name) or playerColor
     broadcastToAll(factionName .. ' activated ' .. system.string, playerColor)
     local systemObject = getObjectFromGUID(system.guid)

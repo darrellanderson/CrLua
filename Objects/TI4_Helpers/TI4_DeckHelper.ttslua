@@ -799,14 +799,15 @@ end
 function _dealHack(deck, count, playerColor)
     assert((deck.tag == 'Deck' or deck.tag == 'Card') and type(count) == 'number' and type(playerColor) == 'string')
 
-    local p = deck.getPosition()
-    local height = deck.getBounds().size.y
+    -- Move cards to player zones before clone swap.
+    local zoneAttrs = _zoneHelper.zoneAttributes(playerColor)
+    local p = zoneAttrs and zoneAttrs.center or { x = 0, y = 1, z = 0 }
     local nextPositionIndex = 0
     local function nextPosition()
         nextPositionIndex = nextPositionIndex + 1
         return {
             x = p.x,
-            y = p.y + height + 0.3 + nextPositionIndex * 0.1,
+            y = p.y + 3 + nextPositionIndex * 0.2,
             z = p.z
         }
     end
@@ -822,7 +823,7 @@ function _dealHack(deck, count, playerColor)
 
             -- Wait to delete the original until after the spawn is ready
             -- (to make sure it does not reuse the guid).
-            card.setLock(card.getGUID())
+            card.setLock(true)
             if deletedItems then
                 deletedItems.call('ignoreGuid', card.getGUID())
             end
@@ -849,13 +850,20 @@ function _dealHack(deck, count, playerColor)
     for _ = 1, count do
         local card = deck.tag == 'Card' and deck
         if card then
+            local collide = false
+            local fast = true
+            card.setPositionSmooth(nextPosition(), collide, fast)
+            coroutine.yield(0)
+            while card.isSmoothMoving() do
+                coroutine.yield(0)
+            end
             cloneAndDeal(card)
         else
             card = deck.takeObject({
                 position          = nextPosition(),
                 rotation          = deck.getRotation(),
                 callback_function = cloneAndDeal,
-                smooth            = false,
+                smooth            = true,
                 top               = true
             })
             deck = deck.remainder or deck

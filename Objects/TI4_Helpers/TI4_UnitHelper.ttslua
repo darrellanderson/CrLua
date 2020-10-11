@@ -143,7 +143,7 @@ local _unitOverrides = {
 
     -- Faction unit overrides and upgrades.
     ['Advanced Carrier I'] = { override = 'Carrier', capacity = 6 },
-    ['Advanced Carrier II'] = { upgrade = 'Carrier', sustainDamage = true, capacity = 8 },
+    ['Advanced Carrier II'] = { upgrade = 'Carrier', sustainDamage = true, move = 2, capacity = 8 },
     ['Exotrireme I'] = { override = 'Dreadnought', bombardment = { dice = 2, hit = 4 } },
     ['Exotrireme II'] = { upgrade = 'Dreadnought', bombardment = { dice = 2, hit = 4 }, move = 2 },
     ['Floating Factory I'] = { override = 'Space Dock', production = 5, move = 1, capacity = 4 },
@@ -157,7 +157,7 @@ local _unitOverrides = {
     ['Spec Ops I'] = { override = 'Infantry', groundCombat = { hit = 7 } },
     ['Spec Ops II'] = { upgrade = 'Infantry', groundCombat = { hit = 6 } },
     ['Super-Dreadnought I'] = { override = 'Dreadnought', capacity = 2 },
-    ['Super-Dreadnought II'] = { upgrade = 'Dreadnought', bombardment = { dice = 1, hit = 4 }, move = 2, capacity = 2 },
+    ['Super-Dreadnought II'] = { upgrade = 'Dreadnought', bombardment = { dice = 1, hit = 4 }, spaceCombat = { hit = 4 }, move = 2, capacity = 2 },
 
     -- Flagships.
     ['Arc Secundus'] = { override = 'Flagship', disablePlanetaryShield = true, bombardment = { dice = 3, hit = 5, extraDice = 0 }, spaceCombat = { dice = 2, hit = 5 } },

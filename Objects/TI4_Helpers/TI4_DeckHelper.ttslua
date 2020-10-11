@@ -311,6 +311,7 @@ local _waitForDestroy = {}
 local _dealQueue = {}
 local _dealCoroutineIsActive = false
 local _dealCoroutineHeartbeat = false
+local _deletedItemsBagGuid = false
 
 local function _getParent(parentName)
     local guid = _parentNameToGuid[parentName]
@@ -727,7 +728,8 @@ function dealCoroutine()
                 dealCount = 1
             end
             params.count = params.count - dealCount
-            deck.deal(dealCount, params.color)
+            --deck.deal(dealCount, params.color)
+            _dealHack(deck, dealCount, params.color)
             _dealCoroutineHeartbeat = Time.time
             coroutine.yield(0)
 
@@ -784,6 +786,95 @@ function dealCoroutine()
     _dealCoroutineIsActive = false
     _dealCoroutineHeartbeat = false
     return 1
+end
+
+--- Possible workaround for a TTS deal bug.  Rare, but TTS can steal a card
+-- from another player's hand instead of from the deck, presumably because it
+-- still thinks that card is in the deck(?).  This workaround replaces normal
+-- dealing with cloning a card, dealing the clone, and deleting the original.
+-- This way if TTS still has a reference to the original it no longer exists.
+-- In that case, if/when the bug arises it might (1) throw an error, (2) do
+-- nothing and not deal a card or (3) realize the card is missing and deal
+-- again, potentially doing the right thing.
+function _dealHack(deck, count, playerColor)
+    assert((deck.tag == 'Deck' or deck.tag == 'Card') and type(count) == 'number' and type(playerColor) == 'string')
+
+    local p = deck.getPosition()
+    local height = deck.getBounds().size.y
+    local nextPositionIndex = 0
+    local function nextPosition()
+        nextPositionIndex = nextPositionIndex + 1
+        return {
+            x = p.x,
+            y = p.y + height + 0.3 + nextPositionIndex * 0.1,
+            z = p.z
+        }
+    end
+
+    local deletedItems = _getDeletedItemsBag()
+    local function cloneAndDeal(card)
+        assert(card.tag == 'Card')
+        -- Grab json and spawn a new one.  Clone is simpler but makes a sound.
+        local cardJson = card.getJSON()
+
+        local function spawnCallback(object)
+            object.deal(1, playerColor)
+
+            -- Wait to delete the original until after the spawn is ready
+            -- (to make sure it does not reuse the guid).
+            card.setLock(card.getGUID())
+            if deletedItems then
+                deletedItems.call('ignoreGuid', card.getGUID())
+            end
+            destroyObject(card)
+        end
+
+        local clone = spawnObjectJSON({
+            json              = cardJson,
+            position          = nextPosition(),
+            rotation          = card.getRotation(),
+            scale             = card.getScale(),
+            callback_function = spawnCallback,
+            sound             = false,
+            params            = nil,
+            snap_to_grid      = false
+        })
+
+        -- Lock the card for the moment to prevent falling, will be deleted
+        -- when spawn finishes.
+        card.setLock(true)
+    end
+
+    -- This is called from a coroutine so it allowed to yield(0).
+    for _ = 1, count do
+        local card = deck.tag == 'Card' and deck
+        if card then
+            cloneAndDeal(card)
+        else
+            card = deck.takeObject({
+                position          = nextPosition(),
+                rotation          = deck.getRotation(),
+                callback_function = cloneAndDeal,
+                smooth            = false,
+                top               = true
+            })
+            deck = deck.remainder or deck
+        end
+        coroutine.yield(0)
+    end
+end
+
+function _getDeletedItemsBag()
+    local bag = _deletedItemsBagGuid and getObjectFromGUID(_deletedItemsBagGuid)
+    if bag then
+        return bag
+    end
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Bag' and object.getName() == 'TI4 Deleted Items' then
+            _deletedItemsBagGuid = object.getGUID()
+            return object
+        end
+    end
 end
 
 -------------------------------------------------------------------------------

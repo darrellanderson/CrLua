@@ -45,7 +45,8 @@ local PRINT_DEBUG_LOG_MESSAGES = false
 local SetupGeneric = {
     NAME_TO_PLAYER_ZONE_OFFSET = {
         ['^Technology Cards$'] = { x = 10, z = 2 },
-        ['^TI4 Unpacker$'] = { x = -10, z = 2 },
+        --['^TI4 Unpacker$'] = { x = -10, z = 2 },
+        ['Faction Selector'] = { x = 5.3, z = 11, lock = true },
         ['^Here/AFK$'] = { x = 1, z = 2 },
 
         ['^TI4 MultiRoller'] = { x = 0, z = 42, lock = true },
@@ -998,7 +999,7 @@ end
 -------------------------------------------------------------------------------
 
 --- Find "pick a faction to play" or other token.
-function SetupFaction.getFactionAndTokenObject(zoneColor)
+function SetupFaction.getFactionAndTokenObjects(zoneColor)
     assert(type(zoneColor) == 'string')
     debugLog('SetupFaction.getFactionTokenObject: ' .. zoneColor)
 
@@ -1011,13 +1012,19 @@ function SetupFaction.getFactionAndTokenObject(zoneColor)
         return _zoneHelper.zoneFromPosition(object.getPosition()) == zoneColor
     end
 
+    local factionAndTokenObjects = false
     for _, object in ipairs(getAllObjects()) do
         local faction = _factionHelper.fromTokenName(object.getName())
         if faction and isCandidate(object) then
-            debugLog('SetupFaction.getFactionTokenObject: found ' .. object.getName())
-            return faction, object
+            factionAndTokenObjects = factionAndTokenObjects or {}
+            table.insert(factionAndTokenObjects, {
+                faction = faction,
+                object = object
+            })
         end
     end
+
+    return factionAndTokenObjects
 end
 
 --- Pack faction box into the container where it was found.
@@ -1489,12 +1496,21 @@ function unpackFactionCoroutine()
     local faction, tokenObject
     if params.factionTokenName then
         faction = _factionHelper.fromTokenName(params.factionTokenName)
+        if not faction then
+            printToAll('Unpack Faction: unknown faction "' .. params.factionTokenName .. '" for ' .. color .. '.', 'Red')
+            return 1
+        end
     else
-        faction, tokenObject = SetupFaction.getFactionAndTokenObject(color)
-    end
-    if not faction then
-        printToAll('Unpack Faction: no faction token for ' .. color .. '.  Please pick one from the green "Pick a Faction to Play" bag and place it in the ' .. color .. ' play area.', 'Red')
-        return 1
+        local factionAndTokenObjects = SetupFaction.getFactionAndTokenObjects(color)
+        if not factionAndTokenObjects then
+            printToAll('Unpack Faction: no faction token for ' .. color .. '.  Please pick one from the green "Pick a Faction to Play" bag and place it in the ' .. color .. ' play area.', 'Red')
+            return 1
+        elseif #factionAndTokenObjects > 1 then
+            printToAll('Unpack Faction: multiple faction tokens for ' .. color .. '.  Please have only one in the play area to unpack it.', 'Red')
+            return 1
+        end
+        faction = assert(factionAndTokenObjects[1].faction)
+        tokenObject = assert(factionAndTokenObjects[1].object)
     end
     coroutine.yield(0)
 

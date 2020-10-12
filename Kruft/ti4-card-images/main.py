@@ -200,7 +200,7 @@ def secretObjectiveCard(title, type, body, footer, cardImage, titlesize, fontsiz
     textBlock = TextBlock()
     textBlock.setFont(font)
     textBlock.setCenterH(True)
-    textBlock.setBounds(125, 130, 375, 160)
+    textBlock.setBounds(0, 130, CARD_W, 160)
     textBlock.setLineHeight(31)
     textBlock.setText(type)
     textBlock.draw(draw)
@@ -215,7 +215,7 @@ def secretObjectiveCard(title, type, body, footer, cardImage, titlesize, fontsiz
     textBlock.setOverride(FONT_3_WORDS, overrideFont)
     textBlock.setCenterH(True)
     textBlock.setCenterV(True)
-    textBlock.setBounds(25, 206, CARD_W - 25, 560)
+    textBlock.setBounds(42, 206, CARD_W - 42, 560)
     textBlock.setLineHeight(47 + fontsize)
     textBlock.setNewlineScale(PARAGRAPH_LINE_HEIGHT_SCALE)
     textBlock.setText(body)
@@ -229,7 +229,7 @@ def secretObjectiveCard(title, type, body, footer, cardImage, titlesize, fontsiz
     textBlock = TextBlock()
     textBlock.setFont(font)
     textBlock.setCenterH(True)
-    textBlock.setBounds(125, 705, 375, 740)
+    textBlock.setBounds(50, 705, 450, 740)
     textBlock.setLineHeight(30)
     textBlock.setText(footer)
     y, h = textBlock.draw(draw)
@@ -274,7 +274,7 @@ def publicObjectiveCard(level, title, type, body, footer, cardImage, titlesize, 
     textBlock = TextBlock()
     textBlock.setFont(font)
     textBlock.setCenterH(True)
-    textBlock.setBounds(125, 130, 375, 160)
+    textBlock.setBounds(0, 130, CARD_W, 160)
     textBlock.setLineHeight(31)
     textBlock.setText(type)
     textBlock.draw(draw)
@@ -303,7 +303,7 @@ def publicObjectiveCard(level, title, type, body, footer, cardImage, titlesize, 
     textBlock = TextBlock()
     textBlock.setFont(font)
     textBlock.setCenterH(True)
-    textBlock.setBounds(100, 705, 400, 740)
+    textBlock.setBounds(0, 705, CARD_W, 740)
     textBlock.setLineHeight(32)
     textBlock.setText(footer)
     y, h = textBlock.draw(draw)
@@ -340,7 +340,7 @@ def agendaCard(title, type, body, cardImage, titlesize, fontsize):
     textBlock = TextBlock()
     textBlock.setFont(font)
     textBlock.setCenterH(True)
-    textBlock.setBounds(150, 160, 350, 190)
+    textBlock.setBounds(0, 160, CARD_W, 190)
     textBlock.setLineHeight(31)
     textBlock.setText(type)
     textBlock.draw(draw)
@@ -372,7 +372,7 @@ def agendaCard(title, type, body, cardImage, titlesize, fontsize):
 
     electFr = unicode('Élisez ', 'utf-8')
     if ('Elect ' in body) or (electFr in body):
-        boldFont = FontData('MyriadProSemibold.otf', 28 + fontsize, (0, 0, 0, 255))
+        boldFont = FontData('MyriadProBold.ttf', 28 + fontsize, (0, 0, 0, 255))
         for line in filter(None, body.split('\n')):
             textBlock = TextBlock()
             textBlock.setCenterH(True)
@@ -464,7 +464,7 @@ def nobilityCard(color, title, type, body, footer, points, titlesize, fontsize):
     textBlock = TextBlock()
     textBlock.setFont(font)
     textBlock.setCenterH(True)
-    textBlock.setBounds(125, 130, 375, 160)
+    textBlock.setBounds(50, 130, 450, 160)
     textBlock.setLineHeight(31)
     textBlock.setText(type)
     textBlock.draw(draw)
@@ -606,7 +606,7 @@ class CardHandler(webapp2.RequestHandler):
         hash.update(points.encode('utf-8'))
         hash.update(titlesize.encode('utf-8'))
         hash.update(fontsize.encode('utf-8'))
-        hash.update('version9')
+        hash.update('version14')
         key = hash.hexdigest().lower()
 
         cardOptions = CARD_OPTIONS[card]
@@ -694,11 +694,12 @@ class getAgendaHandler(webapp2.RequestHandler):
 
         body = ''
         if len(elect) > 1:
-            body += 'Elect '
-            body += elect + '\n'
             if len(againstText) > 1:
+                body = elect + '\n'
                 body += 'For: ' + forText + '\nAgainst: ' + againstText
             else:
+                body += 'Elect '
+                body += elect + '\n'
                 body += forText
         else:
             if len(againstText) > 1:
@@ -950,12 +951,37 @@ class Proxy(webapp2.RequestHandler):
         self.response.headers['Content-Type'] = 'image/jpeg'
         self.response.out.write(jpg)
 
+class RecolorPromissory(webapp2.RequestHandler):
+    def get(self):
+        # Pink: ff69b4
+        # Orange: ff5e13
+        # Brown: 663300
+        color = self.request.get('color', 'ffffff')
+        color = ImageColor.getrgb('#' + color)
+        img = getImage('Promissory_White.jpg')
+        w, h = img.size
+        pixels = img.load()
+        for x in range(0, w):
+            for y in range(0, h):
+                (r, g, b) = pixels[x, y]
+                u = float(r + g + b) / (255 * 3)
+                if u > 0.08 and u < 0.5:
+                    u = u * 2.5
+                    r = min(int(color[0] * u), 255)
+                    g = min(int(color[1] * u), 255)
+                    b = min(int(color[2] * u), 255)
+                pixels[x, y] = (r, g, b)
+        jpg = imageToJPEG(img)
+        self.response.headers['Content-Type'] = 'image/jpeg'
+        self.response.out.write(jpg)
+
 app = webapp2.WSGIApplication([
     ('/img', CardHandler),
     ('/back', BackHandler),
     ('/tech', TechHandler),
-    #('/getaction', getActionHandler),
-    #('/getagenda', getAgendaHandler),
+    ('/getaction', getActionHandler),
+    ('/getagenda', getAgendaHandler),
+    #('/getpromissory', getPromissoryHandler),
     #('/testaction', TestActionHandler),
     #('/testsecret', TestSecretHandler),
     #('/testpublic', TestPublicHandler),
@@ -965,7 +991,8 @@ app = webapp2.WSGIApplication([
     #('/mutatefaction', MutateFactionTokens),
     #('/radialdither', RadialDither),
     #('/4k', FourK),
-    #('/cardsheet', CardSheet),
-    #('/proxy', Proxy),
+    ('/cardsheet', CardSheet),
+    ('/proxy', Proxy),
+    ('/recolorPromissory', RecolorPromissory),
 
 ], debug=False)

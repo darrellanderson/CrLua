@@ -67,6 +67,8 @@ class WordData:
         return self._width
 
     def draw(self, imageDraw, x, y, lineH):
+        #word = self._word.encode('utf-8')
+        #print('TEXT_LAYOUT: ADDING "' + word + '", width=' + str(self._width) + ' at x=' + str(x))
         if not self._word.isspace():
             self._fontData.draw(self._word, imageDraw, x, y, lineH)
 
@@ -98,9 +100,25 @@ class LineData:
 
     def draw(self, imageDraw, x, y, lineH):
         x += self._indent
+        prevWord = False
+        gather = ''
         for word in self._words:
-            word.draw(imageDraw, x, y, lineH)
-            x += word.width()
+            if word._word == '\n':
+                prevWord._fontData.draw(gather, imageDraw, x, y, lineH)
+                x += prevWord._fontData.width(gather)
+                prevWord = False
+                gather = ''
+            elif (not prevWord) or (word._fontData == prevWord._fontData):
+                prevWord = word
+                gather += word._word
+            else:
+                prevWord._fontData.draw(gather, imageDraw, x, y, lineH)
+                x += prevWord._fontData.width(gather)
+                prevWord = word
+                gather = word._word
+        if prevWord:
+            prevWord._fontData.draw(gather, imageDraw, x, y, lineH)
+            x += prevWord._fontData.width(gather)
 
     def addWord(self, wordData):
         assert wordData._type == 'WordData'
@@ -179,22 +197,43 @@ class Format:
         assert(lineData._type == 'LineData')
         currentLine = LineData(0)
         result = [ currentLine ]
+
+        # Make groups to prevent wrapping between word and punctuation.
+        currentGroup = []
+        wordDataGroups = [ currentGroup ]
         for wordData in lineData.getWords():
+            text = wordData.getWord()
+            if text.isspace() or text == '\n':
+                wordDataGroups.append([ wordData ])
+                currentGroup = []
+                wordDataGroups.append(currentGroup)
+            else:
+                currentGroup.append(wordData)
+
+        for wordDataGroup in wordDataGroups:
+            width = 0
+            isNewline = False
+            for wordData in wordDataGroup:
+                width += wordData.width()
+                isNewline = isNewline or wordData.getWord() == '\n'
+
             # Always add the first word, even if it exceeds max width.
-            overflow = currentLine.width() + wordData.width() > maxWidth
-            isNewline = wordData.getWord() == '\n'
+            overflow = currentLine.width() + width > maxWidth
             if isNewline:
                 # Add to current, THEN start a new line.
-                currentLine.addWord(wordData)
+                for wordData in wordDataGroup:
+                    currentLine.addWord(wordData)
                 currentLine = LineData(indent)
                 result.append(currentLine)
             elif overflow and not currentLine.isEmpty():
                 # Start a new line, add to next line.
                 currentLine = LineData(indent)
                 result.append(currentLine)
-                currentLine.addWord(wordData)
+                for wordData in wordDataGroup:
+                    currentLine.addWord(wordData)
             else:
-                currentLine.addWord(wordData)
+                for wordData in wordDataGroup:
+                    currentLine.addWord(wordData)
 
         # Remove spaces at the start or end of lines.
         for line in result:

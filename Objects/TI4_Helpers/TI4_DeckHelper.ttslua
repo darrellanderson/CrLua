@@ -823,7 +823,7 @@ function _dealHack(deck, count, playerColor)
 
             -- Wait to delete the original until after the spawn is ready
             -- (to make sure it does not reuse the guid).
-            card.setLock(true)
+            card.setLock(false)
             if deletedItems then
                 deletedItems.call('ignoreGuid', card.getGUID())
             end

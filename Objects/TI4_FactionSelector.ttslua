@@ -1,0 +1,182 @@
+-- @author Milty
+
+local _factionChosen = false
+
+-- Display factions in list order.
+local factionIdAndTokenNames = {
+    { id = 'Arborec', tokenName = 'Arborec' },
+    { id = 'Letnev', tokenName = 'Barony of Letnev' },
+    { id = 'Saar', tokenName = 'Clan of Saar' },
+    { id = 'Muaat', tokenName = 'Embers of Muaat' },
+    { id = 'Hacan', tokenName = 'Emirates of Hacan' },
+    { id = 'Sol', tokenName = 'Federation of Sol' },
+    { id = 'Creuss', tokenName = 'Ghosts of Creuss' },
+    { id = 'L1Z1X', tokenName = 'L1Z1X Mindnet' },
+    { id = 'Mentak', tokenName = 'Mentak Coalition' },
+    { id = 'Naalu', tokenName = 'Naalu Collective' },
+    { id = 'Nekro', tokenName = 'Nekro Virus' },
+    { id = 'Sardakk', tokenName = "Sardakk N'orr", },
+    { id = 'JolNar', tokenName = 'Universities of Jol-Nar' },
+    { id = 'Winnu', tokenName = 'Winnu' },
+    { id = 'Xxcha', tokenName = 'Xxcha Kingdom' },
+    { id = 'Yin', tokenName = 'Yin Brotherhood' },
+    { id = 'Yssaril', tokenName = 'Yssaril Tribes' },
+}
+
+local factionSelectXml = [[
+    <Panel width="340" height="250" position="0 0 -21" rotation="0 0 180">
+        <VerticalLayout padding="0 0 12 0">
+            <Text alignment="MiddleCenter" fontSize="14" offsetXY="0 0" color="#FFFFFF">Choose a Faction to Unpack</Text>
+            <GridLayout padding="0 0 -4 0" spacing="1 1"  height="380" cellsize="50 40" childAlignment="UpperCenter">
+                __BUTTONS_XML__
+            </GridLayout>
+        </VerticalLayout>
+    </Panel>
+]]
+
+local factionSelectButton = [[
+    <Button class="factionButton" onClick="onFactionButtonClick" id="__ID__">
+        <Image class="factionImage" image="__ID__Button"></Image>
+    </Button>
+]]
+
+local factionXml = [[
+    <Panel width="320" height="190" position="0 0 -21" rotation="0 0 180" padding="0 0 0 0">
+        <VerticalLayout padding="0 0 0 0">
+            <Image image="__ID__BaseInfo" flexibleHeight="1"></Image>
+            <HorizontalLayout padding="0 0 0 0" minHeight="20" flexibleHeight="0">
+                <Button onClick="showMainInfo" id="main" colors="#00FFFF|Grey|#C8C8C8|rgba(0.78,0.78,0.78,0.5)">Faction Abilities</Button>
+                <Button onClick="showExtraInfo" id="extra">More Info</Button>
+            </HorizontalLayout>
+]]
+
+local extraFactionXml = [[
+    <Panel width="320" height="190" position="0 0 -21" rotation="0 0 180" padding="0 0 0 0">
+        <VerticalLayout padding="0 0 0 0">
+            <Image image="__ID__ExtraInfo" flexibleHeight="1"></Image>
+            <HorizontalLayout padding="0 0 0 0" minHeight="20" flexibleHeight="0">
+                <Button onClick="showMainInfo" id="main">Faction Abilities</Button>
+                <Button onClick="showExtraInfo" id="extra" colors="#00FFFF|Grey|#C8C8C8|rgba(0.78,0.78,0.78,0.5)">More Info</Button>
+            </HorizontalLayout>
+]]
+
+local factionFooterXml = [[
+            <HorizontalLayout padding="0 0 0 0" minHeight="20" flexibleHeight="0">
+                <Button onClick="onButtonClick" id="back">Back</Button>
+                <Button onClick="onButtonClick" id="unpack">Unpack</Button>
+            </HorizontalLayout>
+        </VerticalLayout>
+    </Panel>
+]]
+
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
+        return function(parameters) return helperObject.call(functionName, parameters) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+
+local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
+local _setupHelper = getHelperClient('TI4_SETUP_HELPER')
+local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
+
+-------------------------------------------------------------------------------
+
+function onLoad()
+    Wait.frames(showFactionSelection, 2)
+end
+
+-------------------------------------------------------------------------------
+
+function showFactionSelection()
+    local buttonsXml = {}
+    for _, factionIdAndTokenName in ipairs(factionIdAndTokenNames) do
+        local id = assert(factionIdAndTokenName.id)
+        local xml, _ = string.gsub(factionSelectButton, '__ID__', id)
+        table.insert(buttonsXml, xml)
+    end
+    buttonsXml = table.concat(buttonsXml, '')
+    local xml = string.gsub(factionSelectXml, '__BUTTONS_XML__', buttonsXml)
+    self.UI.setXml(xml)
+end
+
+function showMainInfo()
+    local id = _factionChosen
+    local xml = string.gsub(factionXml, '__ID__', id) .. factionFooterXml
+    self.UI.setXml(xml)
+end
+
+function showExtraInfo()
+    local id = _factionChosen
+    local xml = string.gsub(extraFactionXml, '__ID__', id) .. factionFooterXml
+    self.UI.setXml(xml)
+end
+
+-------------------------------------------------------------------------------
+
+function onFactionButtonClick(player, inputType, id)
+    _factionChosen = id
+    local xml = string.gsub(factionXml, '__ID__', id) .. factionFooterXml
+    self.UI.setXml(xml)
+end
+
+function onButtonClick(player, inputType, id)
+    if id == 'unpack' then
+        local color = _zoneHelper.zoneFromPosition(self.getPosition())
+        local factionTokenName = false
+        for _, idAndTokenName in ipairs(factionIdAndTokenNames) do
+            if idAndTokenName.id == _factionChosen then
+                factionTokenName = idAndTokenName.tokenName
+                break
+            end
+        end
+        if color and factionTokenName then
+            doUnpack(color, factionTokenName)
+        end
+    elseif id == 'back' then
+        showFactionSelection()
+    else
+        error(TAG .. ': unknown button "' .. id .. '"')
+    end
+end
+
+function doUnpack(color, factionTokenName)
+    local faction = _factionHelper.fromTokenName(factionTokenName)
+    if faction.color then
+        printToAll(faction.color .. ' has already unpacked ' .. factionTokenName .. ', please pick another.', color)
+        return
+    end
+
+    if _factionHelper.isFrankenEnabled() then
+        _setupHelper.unpackFranken({
+            color = color,
+            unpackButtonGuid = self.getGUID()  -- setup will delete this object
+        })
+    else
+        _setupHelper.unpackFaction({
+            color = color,
+            factionTokenName = factionTokenName,
+            unpackButtonGuid = self.getGUID()  -- setup will delete this object
+        })
+    end
+end
+
+-------------------------------------------------------------------------------
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

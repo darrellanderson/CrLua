@@ -1,0 +1,15 @@
+function onLoad(save_state)
+    self.addContextMenuItem('DO IT', doIt)
+end
+
+function doIt()
+    local dir = 'file:////Users/darrell/Downloads/FactionInfo/'
+    local assets = UI.getCustomAssets()
+    for _, asset in ipairs(assets) do
+        local infoName = string.match(asset.name, '^(.*Info)$')
+        if infoName then
+            asset.url = dir .. infoName .. '.png'
+        end
+    end
+    UI.setCustomAssets(assets)
+end

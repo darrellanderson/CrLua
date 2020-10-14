@@ -1,0 +1,84 @@
+FACTIONS = {
+    'Hacan',
+    'Jol Nar',
+    'Letnev',
+    'Sardakk',
+    'Sol',
+    'Xxcha',
+}
+
+TOKENS = {
+    '__FACTION__',
+    'Carrier 1',
+    'Carrier 2',
+    'Cruiser 1',
+    'Cruiser 2',
+    'Cruiser 3',
+    'Cruiser 5',
+    'Dreadnought 1',
+    'Dreadnought 2',
+    'Fighter 1',
+    'Fighter 2',
+    'Fighter 3',
+    'Fighter 4',
+    'Fighter 5',
+    'Ground Force 1',
+    'Ground Force 2',
+    'Ground Force 3',
+    'Ground Force 5',
+    'PDS 1',
+    'PDS 2',
+    'PDS 3',
+    'Spacedock',
+}
+
+DIR = '/tmp/Faction Tokens/'
+TOKEN_SUFFIX = '.jpg'
+
+function onLoad(save_state)
+    self.addContextMenuItem('Generate Tokens', generateTokens)
+end
+
+function generateTokens()
+    startLuaCoroutine(self, 'generateTokensCoroutine')
+end
+
+function generateTokensCoroutine()
+    for i, faction in ipairs(FACTIONS) do
+        for j, token in ipairs(TOKENS) do
+            local position = {
+                x = -29 + j * 2.5,
+                y = 2,
+                z = -16 + i * 2.5,
+            }
+            token = string.gsub(token, '__FACTION__', faction)
+            generateToken(faction, token, position)
+            coroutine.yield(0)
+            coroutine.yield(0)
+            coroutine.yield(0)
+        end
+    end
+    return 1
+end
+
+function generateToken(faction, token, position)
+    local params = {
+        image = 'http://localhost:8080/proxy?file=' .. DIR .. faction .. '/' .. token .. TOKEN_SUFFIX,
+        type = 0,  -- square/rectangle
+        image_bottom = nil,  -- use top image
+        thickness = 0.1,
+        stackable = true,
+    }
+
+    local object = spawnObject({
+        type              = 'Custom_Tile',
+        position          = position,
+        rotation          = { x = 0, y = 180, z = 0 },
+        scale             = { x = 1, y = 1, z = 1 },
+        callback_function = nil,
+        sound             = false,
+        params            = params,
+        snap_to_grid      = false,
+    })
+    object.setCustomObject(params)
+end

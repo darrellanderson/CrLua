@@ -77,6 +77,8 @@ FONT_3_WORDS = {
     'SUSTAIN',
     'DAMAGE',
     'ANTI-FIGHTER',
+    'ANTI',
+    'FIGHTER',
     'BARRAGE',
     'PLANETARY',
     'SHIELD',
@@ -87,6 +89,8 @@ FONT_3_WORDS = {
     unicode('ENCAISSÉS', 'utf-8'),
     unicode('BARRAGE', 'utf-8'),
     unicode('ANTI-CHASSEUR', 'utf-8'),
+    unicode('ANTI', 'utf-8'),
+    unicode('CHASSEUR', 'utf-8'),
     unicode('BOMBARDEMENT', 'utf-8'),
     unicode('BOUCLIER', 'utf-8'),
     unicode('PLANÉTAIRE', 'utf-8'),
@@ -181,7 +185,7 @@ def secretObjectiveCard(title, type, body, footer, cardImage, titlesize, fontsiz
     draw.rectangle([(x, y), (x+w, y+h)], color)
 
     # TITLE
-    font = FontData('HandelGothicDBold.otf', 39 + titlesize, (254, 196, 173, 255))
+    font = FontData('HandelGothicDBold.otf', 39 + titlesize, ImageColor.getrgb('#ff6666'))
     textBlock = TextBlock()
     textBlock.setFont(font)
     textBlock.setCenterH(True)
@@ -190,7 +194,7 @@ def secretObjectiveCard(title, type, body, footer, cardImage, titlesize, fontsiz
     textBlock.setCenterV(True)
     textBlock.setText(title)
     textBlock.draw(draw)
-    #textBlock.drawGradient(img, font.getColor(), (255, 255, 255, 255))
+    textBlock.drawGradient(img, font.getColor(), (255, 255, 255, 255))
 
     # TYPE
     items = type.split('|')
@@ -225,7 +229,7 @@ def secretObjectiveCard(title, type, body, footer, cardImage, titlesize, fontsiz
     items = footer.split('|')
     footer = items[0]
     color = ImageColor.getrgb('#' + items[1])
-    font = FontData('HandelGothicDBold.otf', 30, (255, 255, 255, 255))
+    font = FontData('HandelGothicDBold.otf', 30, ImageColor.getrgb('#ff6666'))
     textBlock = TextBlock()
     textBlock.setFont(font)
     textBlock.setCenterH(True)
@@ -233,6 +237,7 @@ def secretObjectiveCard(title, type, body, footer, cardImage, titlesize, fontsiz
     textBlock.setLineHeight(30)
     textBlock.setText(footer)
     y, h = textBlock.draw(draw)
+    textBlock.drawGradient(img, font.getColor(), (255, 255, 255, 255))
 
     return imageToJPEG(img)
 
@@ -255,7 +260,7 @@ def publicObjectiveCard(level, title, type, body, footer, cardImage, titlesize, 
     draw.rectangle([(x, y), (x+w, y+h)], color)
 
     # TITLE
-    color = (249, 249, 169, 255) if level == 1 else (173, 239, 254, 255)
+    color = ImageColor.getrgb('#ffb732') if level == 1 else ImageColor.getrgb('#9999ff')
     font = FontData('HandelGothicDBold.otf', 43 + titlesize, color)
     textBlock = TextBlock()
     textBlock.setFont(font)
@@ -265,6 +270,7 @@ def publicObjectiveCard(level, title, type, body, footer, cardImage, titlesize, 
     textBlock.setCenterV(True)
     textBlock.setText(title)
     textBlock.draw(draw)
+    textBlock.drawGradient(img, font.getColor(), (255, 255, 255, 255))
 
     # TYPE
     items = type.split('|')
@@ -298,8 +304,8 @@ def publicObjectiveCard(level, title, type, body, footer, cardImage, titlesize, 
     # FOOTER
     items = footer.split('|')
     footer = items[0]
-    color = ImageColor.getrgb('#' + items[1])
-    font = FontData('HandelGothicDBold.otf', 32, (255, 255, 255, 255))
+    color = ImageColor.getrgb('#ffb732') if level == 1 else ImageColor.getrgb('#9999ff')
+    font = FontData('HandelGothicDBold.otf', 32, color)
     textBlock = TextBlock()
     textBlock.setFont(font)
     textBlock.setCenterH(True)
@@ -307,6 +313,7 @@ def publicObjectiveCard(level, title, type, body, footer, cardImage, titlesize, 
     textBlock.setLineHeight(32)
     textBlock.setText(footer)
     y, h = textBlock.draw(draw)
+    textBlock.drawGradient(img, font.getColor(), (255, 255, 255, 255))
 
     return imageToJPEG(img)
 

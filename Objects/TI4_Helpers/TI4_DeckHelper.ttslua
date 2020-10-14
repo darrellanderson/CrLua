@@ -978,9 +978,9 @@ local function _applyContextMenuItems(card)
     end
 end
 
-function onObjectLeaveContainer(container, leaveObject)
-    if leaveObject.tag == 'Card' then
-        _applyContextMenuItems(leaveObject)
+function onObjectSpawn(object)
+    if object.tag == 'Card' then
+        _applyContextMenuItems(object)
     end
 end
 

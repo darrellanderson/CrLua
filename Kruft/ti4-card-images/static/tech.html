@@ -66,6 +66,34 @@
                     </select>
                 </li>
 
+                <li id="factionBlock">
+                    <label>Faction</label>
+                    <select name="faction" id="faction" class="field-select">
+                        <option value="">None</option>
+                        <option value="Arborec.png">Arborec</option>
+                        <option value="Creuss.png">Creuss</option>
+                        <option value="Hacan.png">Hacan</option>
+                        <option value="JolNar.png">JolNar</option>
+                        <option value="L1Z1X.png">L1Z1X</option>
+                        <option value="Letnev.png">Letnev</option>
+                        <option value="Mentak.png">Mentak</option>
+                        <option value="Muaat.png">Muaat</option>
+                        <option value="Naalu.png">Naalu</option>
+                        <option value="Nekro.png">Nekro</option>
+                        <option value="Saar.png">Saar</option>
+                        <option value="Sardakk.png">Sardakk</option>
+                        <option value="Sol.png">Sol</option>
+                        <option value="Winnu.png">Winnu</option>
+                        <option value="Xxcha.png">Xxcha</option>
+                        <option value="Yin.png">Yin</option>
+                        <option value="Yssaril.png">Yssaril</option>
+                        <option value="">------------------</option>
+                        <option value="Blank">[Blank Space]</option>
+                        <option value="Axis.png">Axis</option>
+                    </select>
+                </li>
+
+
                 <li id="titleSizeBlock">
                     <label>Title Size</label>
                     <select name="titlesize" id="titlesize" class="field-select">
@@ -130,6 +158,7 @@
         function updateCardImage() {
             var title = encodeURIComponent(document.getElementById("title").value)
             var body = encodeURIComponent(document.getElementById("body").value)
+            var faction = encodeURIComponent(document.getElementById("faction").value)
 
             var prereqBlue = encodeURIComponent(document.getElementById("prereqBlue").value)
             var prereqGreen = encodeURIComponent(document.getElementById("prereqGreen").value)
@@ -142,6 +171,7 @@
             var url = "/tech"
             url = url + "?title=" + title
             url = url + "&body=" + body
+            url = url + "&faction=" + faction
             url = url + "&prereqGreen=" + prereqGreen
             url = url + "&prereqBlue=" + prereqBlue
             url = url + "&prereqYellow=" + prereqYellow

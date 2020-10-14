@@ -42,7 +42,7 @@ PARAGRAPH_LINE_HEIGHT_SCALE = 1.5
 
 #------------------------------------------------------------------------------
 
-def techCard(title, body, preG, preB, preY, preR, generates, titlesize, fontsize):
+def techCard(faction, title, body, preG, preB, preY, preR, generates, titlesize, fontsize):
     cardName = 'Tech_0_blank.jpg'
     count = preG + preB + preY + preR
     if count == 1:
@@ -55,6 +55,22 @@ def techCard(title, body, preG, preB, preY, preR, generates, titlesize, fontsize
     img = getImage(cardName)
     img = img.convert('RGBA')
     draw = ImageDraw.Draw(img)
+
+    titleLeft = 60
+
+    # FACTION
+    if faction != '':
+        titleLeft = 120
+        x = 0
+        y = 0
+        w = 120
+        h = 120
+        color = (12, 12, 14, 255)
+        #draw.rectangle([(x, y), (x+w, y+h)], color)
+        if faction != 'Blank':
+            factionImg = getImage('faction_icons/' + faction)
+            factionImg = factionImg.resize((200, 200))
+            img.paste(factionImg, (-40, -45), factionImg)
 
     color = (255, 255, 255, 255)
 
@@ -71,18 +87,19 @@ def techCard(title, body, preG, preB, preY, preR, generates, titlesize, fontsize
     font = FontData('HandelGothicDBold.otf', 39 + titlesize, color)
     textBlock = TextBlock()
     textBlock.setFont(font)
-    textBlock.setBounds(60, 0, CARD_W - 60, 70)
+    textBlock.setBounds(titleLeft, 0, CARD_W - 60, 70)
     textBlock.setLineHeight(39 + titlesize)
     textBlock.setCenterV(True)
     textBlock.setText(title)
-    #textBlock.draw(draw)
+    textBlock.draw(draw)
     textBlock.drawGradient(img, color, (255, 255, 255, 255))
 
     # BODY
+    top = 100 if faction == '' else 100
     font = FontData('MyriadProSemibold.otf', 31 + fontsize, (255, 255, 255, 255))
     textBlock = TextBlock()
     textBlock.setFont(font)
-    textBlock.setBounds(110, 100, CARD_W - 50, CARD_H - 25)
+    textBlock.setBounds(110, top, CARD_W - 50, CARD_H - 25)
     textBlock.setLineHeight(37 + fontsize)
     textBlock.setNewlineScale(PARAGRAPH_LINE_HEIGHT_SCALE)
     textBlock.setText(body)
@@ -131,6 +148,7 @@ def techCard(title, body, preG, preB, preY, preR, generates, titlesize, fontsize
 
 class TechHandler(webapp2.RequestHandler):
     def get(self):
+        faction = self.request.get('faction', '')
         title = self.request.get('title', 'title').upper()
         body = self.request.get('body', 'body')
         prereqGreen = self.request.get('prereqGreen', '0')
@@ -142,6 +160,7 @@ class TechHandler(webapp2.RequestHandler):
         fontsize = self.request.get('fontsize', '0')
 
         hash = hashlib.sha256()
+        hash.update(faction.encode('utf-8'))
         hash.update(title.encode('utf-8'))
         hash.update(body.encode('utf-8'))
         hash.update(prereqGreen.encode('utf-8'))
@@ -165,7 +184,7 @@ class TechHandler(webapp2.RequestHandler):
         jpg = memcache.get(key=key)
         #jpg = None
         if jpg is None:
-            jpg = techCard(title, body, g, b, y, r, generates, titlesize, fontsize)
+            jpg = techCard(faction, title, body, g, b, y, r, generates, titlesize, fontsize)
             memcache.add(key, jpg, 3600)
         self.response.headers['Content-Type'] = 'image/jpeg'
         self.response.out.write(jpg)

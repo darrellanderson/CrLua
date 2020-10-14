@@ -146,7 +146,7 @@ local SetupFaction = {
         ['$TOKEN_NAME Owner Tokens Bag'] = { x = -5, z = 4.5, lock = true },
         ['$TOKEN_NAME Tech Bag'] = { x = 10, y = 3, z = 2, unpack = true },
         ['$TOKEN_NAME Promissory Bag'] = { x = 7, y = 3, z = 2, unpack = true },
-        ['$TOKEN_NAME Planets Bag'] = { x = 6, y = 3, z = -6, unpack = true, dx = 2.5 },
+        ['$TOKEN_NAME Planets Bag'] = { x = 6, y = 3, z = -6, unpack = true, dx = 2.5, snap = true },
     },
     COMMAND_TOKENS_XZ_AND_FLIP = {
         -- In command sheet local space
@@ -1089,11 +1089,14 @@ function SetupFaction.unpack(faction, factionBox, zone)
         local p = offsetPosition(zone.center, offset)
         for _, entry in ipairs(bag.getObjects()) do
             debugLog('nestedUnpack ' .. bag.getName() .. ' -> ' .. entry.name)
-            bag.takeObject({
+            local object = bag.takeObject({
                 position          = p,
                 rotation          = bag.getRotation(),
                 smooth            = false,
             })
+            if offset.snap then
+                object.use_snap_points = true
+            end
             p.x = p.x + (offset.dx or 0) * (p.z > 1 and -1 or 1)
             p.z = p.z + (offset.dz or 0)
         end

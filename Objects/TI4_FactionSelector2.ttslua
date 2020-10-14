@@ -1,3 +1,4 @@
+-- @author Volverbot initial concept and design 
 -- @author Milty
 -- @author Darrell switch to decals so images are visible with alt-zoom.
 --                 (XML UI is so much cleaner code, but not visible at zoom.)
@@ -112,13 +113,6 @@ function _addFactionButton(id, index, maxIndex)
     local x = (-SIZE.x / 2) + ((col + 0.5) * w)
     local z = (-SIZE.z / 2) + ((row + 0.5) * h) + reserved
 
-    local box = {
-        left = col * w,
-        top = row * h,
-        right = (col + 1) * w,
-        bottom = (row * 1) * h
-    }
-
     self.createButton({
         click_function = 'selectFaction_' .. id,
         function_owner = self,
@@ -133,21 +127,20 @@ function _addFactionButton(id, index, maxIndex)
         tooltip        = id
     })
 
+    local buttonScale = 0.95
     local attrs = IMAGE_TYPE_ATTRIBUTES['Button']
-    local scale = {
-        x = (attrs.w / 100) / w * 0.95,
-        y = (attrs.h / 100) / h * 0.95,
+    local decalSize = {
+        x = w * buttonScale,  -- should probably be respecting the aspect ratio here, but looks good
+        y = h * buttonScale,
         z = 1
     }
-    scale.x = scale.y * (w/h)
-    --scale.y = scale.x / 0.625
 
     self.addDecal({
         name             = id,
         url              = _getUrl(id, 'Button'),
         position         = { x = -x, y = y, z = z },
         rotation         = { 90, 0, 180 },
-        scale            = scale,
+        scale            = decalSize,  -- "scale" is size here
     })
 end
 
@@ -184,18 +177,18 @@ function _addInfoDecal(factionId, imageType)
     -- Decal stretches to object aspect ratio.  Need to adjust it.
     -- DECAL SCALE Z IS STORED IN Y!
     local attrs = IMAGE_TYPE_ATTRIBUTES[imageType]
-    local scale = {
-        y = (attrs.h / 10) / fitZ * 0.95,
-        z = 1
+    local size = {
+        x = fitZ * (attrs.w / attrs.h),
+        y = fitZ,
+        z = 1,
     }
-    scale.x = scale.y * (attrs.w / attrs.h)
 
     self.addDecal({
         name             = factionId,
         url              = url,
         position         = { 0, y, z },
         rotation         = { 90, 0, 180 },
-        scale            = scale
+        scale            = size -- "scale" is size here
     })
 end
 

@@ -128,7 +128,11 @@ class LineData:
         return self._words
 
     def isEmpty(self):
-        return len(self._words) == 0
+        if len(self._words) == 0:
+            return True
+        if len(self._words) == 1 and self._words[0].getWord() == '\n':
+            return True
+        return False
 
 # -----------------------------------------------------------------------------
 
@@ -137,12 +141,12 @@ class Parse:
     def parseWordsAndPunctuation(line):
         r = re.compile(r'[\w]+|[^\s\w]', re.UNICODE)
         result = []
-        for line in filter(None, line.split('\n')):  # split by and restore newlines
+        for line in line.split('\n'):  # split by and restore newlines
             for word in line.split():
                 for item in r.findall(word):
                     result.append(item)  # words and punctuation as separate items
                 result.append(' ')
-            if len(result) > 0:
+            if len(result) > 0 and result[-1] == ' ':
                 result.pop()  # remove last space
             result.append('\n')
         if len(result) > 0:
@@ -334,18 +338,15 @@ class TextBlock:
             y = ((t + b) / 2) - (h / 2)
         elif self._alignBottom:
             y = b - h
+
         for line in lineDataList:
             if line.isEmpty():
-                y += self._lineH + self._newlineScale
-                continue
-            x = l
-            if self._centerH:
-                x = ((l + r) / 2) - (line.width() / 2)
-            line.draw(imageDraw, x, y, self._lineH)
-            words = line.getWords()
-            if len(words) >0 and words[-1].getWord() == '\n':
-                y += self._lineH * self._newlineScale
+                y += self._lineH * (self._newlineScale - 1)
             else:
+                x = l
+                if self._centerH:
+                    x = ((l + r) / 2) - (line.width() / 2)
+                line.draw(imageDraw, x, y, self._lineH)
                 y += self._lineH
 
         return y, h

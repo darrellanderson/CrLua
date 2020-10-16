@@ -508,6 +508,15 @@ end
 
 function clickUpdate(clickObject, clickerColor, altClick)
     updateUnitValues()
+
+    local modifiers = {}
+    for _, modifier in ipairs(_unitAttrs._flagshipModifiers) do
+        table.insert(modifiers, modifier.name .. ' (' .. modifier.description .. ')')
+    end
+    for _, modifier in ipairs(_unitAttrs._unitModifiers) do
+        table.insert(modifiers, modifier.name .. ' (' .. modifier.description .. ')')
+    end
+    printToColor('Roll Modifiers detected: ' .. ((#modifiers > 0) and table.concat(modifiers, ', ') or 'none'), clickerColor, clickerColor)
 end
 
 function clickAFB(clickObject, clickerColor, altClick)

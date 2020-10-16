@@ -832,7 +832,21 @@ function getColorToUnitModifiers()
     for _, object in ipairs(getAllObjects()) do
         local name, unitModifier = getUnitModifier(object)
         if unitModifier then
-            if _unitModifiers[name].owner == OWNER.ANY then
+
+            -- Tekklar Legion buffs non-Sardakk and penalizes Sardakk, BUT
+            -- players expect Sardakk to be able to have it face up on the
+            -- table with a "for sale" sign.  Only add when not in Sarakk zone.
+            if name == 'Tekklar Legion' then
+                local color = _zoneHelper.zoneFromPosition(object.getPosition())
+                local faction = color and _factionHelper.fromColor(color)
+                if faction and faction.name ~= "The Sardakk N'orr" then
+                    addModifier(color, name)
+                    local sardakk = _factionHelper.fromTokenName("Sardakk N'orr")
+                    if sardakk and sardakk.color then
+                        addModifier(sardakk.color, name)
+                    end
+                end
+            elseif _unitModifiers[name].owner == OWNER.ANY then
                 for _, color in ipairs(_zoneHelper.zones()) do
                     addModifier(color, name)
                 end

@@ -1474,6 +1474,37 @@ function SetupFaction.placeScoreCounters(ownerTokensBag, zone, zoneIndex, color)
     end
 end
 
+function SetupFaction.addFactionSheetUnitUpgradeSnapPoints(factionSheet)
+    assert(type(factionSheet) == 'userdata')
+
+    local x0 = 1.09
+    local dx = (-1.09 * 2) / 3
+    local z0 = -0.74
+    local dz = (0.74 * 2) / 3
+
+    local snapPoints = {}
+    for col = 0, 3 do
+        for row = 0, 3 do
+            if col <= row then
+                table.insert(snapPoints, {
+                    position = {
+                        x = x0 + col * dx,
+                        y = 0,
+                        z = z0 + row * dz
+                    },
+                    rotation = {
+                        x = 0,
+                        y = 0,
+                        z = 0
+                    },
+                    rotation_snap = true
+                })
+            end
+        end
+    end
+    factionSheet.setSnapPoints(snapPoints)
+end
+
 local _unpackFactionQueue = {}
 
 --- Entry point for faction unpack.
@@ -1551,11 +1582,17 @@ function unpackFactionCoroutine()
     local nameToObject = SetupFaction.unpack(faction, factionBox, zoneAttributes)
     local commandTokensBag = nameToObject[faction.tokenName .. ' Command Tokens Bag']
     local ownerTokensBag = nameToObject[faction.tokenName .. ' Owner Tokens Bag']
+    local factionSheet = nameToObject[faction.name .. ' Sheet']
     nameToObject = nil
     while commandTokensBag.spawning or ownerTokensBag.spawning do
         coroutine.yield(0)
     end
     coroutine.yield(0)
+
+    if factionSheet then
+        SetupFaction.addFactionSheetUnitUpgradeSnapPoints(factionSheet)
+        coroutine.yield(0)
+    end
 
     -- Make sure the faction helper knows about the faction before unpacking tokens.
     _factionHelper.updateFactions()

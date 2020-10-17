@@ -732,7 +732,7 @@ function getColorToUnitOverrides()
     -- Faction overrides (only get overrides, not upgrades!)
     for color, faction in pairs(_factionHelper.allFactions()) do
         if faction then
-            if faction.flagship then
+            if faction.flagship and faction.flagship ~= '?' then
                 addOverride(color, faction.flagship)
             end
             for _, unit in ipairs(faction.units or {}) do

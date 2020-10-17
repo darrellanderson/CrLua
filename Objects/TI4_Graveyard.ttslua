@@ -161,10 +161,23 @@ function _processLimbo()
         return
     end
     assert(bag.tag == 'Bag' or bag.tag == 'Infinite')
+    _guidToLimbo[guid] = nil
+
+    -- Make sure it is still valid.
+    local function haveGuid(guid)
+        for _, entry in ipairs(self.getObjects()) do
+            if entry.guid == guid then
+                return true
+            end
+        end
+    end
+    if not haveGuid(guid) then
+        Wait.frames(_processLimbo, 1)
+        return  -- got removed somehow
+    end
 
     -- Mark it as in-progress, put into final bag when take finishes.
     -- That put will trigger a future onObjectDestroy, furthers the cycle.
-    _guidToLimbo[guid] = nil
     _guidToFinal[guid] = bag
 
     local p = self.getPosition()
@@ -199,6 +212,14 @@ function onObjectEnterContainer(container, enterObject)
                 reportTrashed(enterObject)
             end
         end
+    end
+end
+
+function onObjectLeaveContainer(container, leaveObject)
+    if container == self then
+        -- Not normally needed, but just in case an object moves by non-self means.
+        _guidToPending[leaveObject.getGUID()] = nil
+        _guidToLimbo[leaveObject.getGUID()] = nil
     end
 end
 

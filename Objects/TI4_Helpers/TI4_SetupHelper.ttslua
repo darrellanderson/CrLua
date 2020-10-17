@@ -141,9 +141,9 @@ local SetupColor = {
 local SetupFaction = {
     NAME_TO_PLAYER_ZONE_OFFSET = {
         --['$FACTION_NAME Sheet'] = { x = 4.86, z = 10.6, lock = true },
-        ['$FACTION_NAME Sheet'] = { x = 5.3, z = 11, lock = true },
-        ['$TOKEN_NAME Command Tokens Bag'] = { x = -8, z = 11, lock = true },
-        ['$TOKEN_NAME Owner Tokens Bag'] = { x = -5, z = 4.5, lock = true },
+        ['$FACTION_NAME Sheet'] = { x = 5.3, z = 11, lock = true, franken = true },
+        ['$TOKEN_NAME Command Tokens Bag'] = { x = -8, z = 11, lock = true, franken = true },
+        ['$TOKEN_NAME Owner Tokens Bag'] = { x = -5, z = 4.5, lock = true, franken = true },
         ['$TOKEN_NAME Tech Bag'] = { x = 10, y = 3, z = 2, unpack = true },
         ['$TOKEN_NAME Promissory Bag'] = { x = 7, y = 3, z = 2, unpack = true },
         ['$TOKEN_NAME Planets Bag'] = { x = 6, y = 3, z = -6, unpack = true, dx = 2.5, snap = true },
@@ -1080,7 +1080,7 @@ function SetupFaction.unpackFactionBox(faction, zone)
     end
 end
 
-function SetupFaction.unpack(faction, factionBox, zone)
+function SetupFaction.unpack(faction, factionBox, zone, isFranken)
     assert(type(faction) == 'table' and factionBox.tag == 'Bag' and type(zone) == 'table')
     debugLog('SetupFaction.unpack ' .. faction.name)
 
@@ -1105,29 +1105,31 @@ function SetupFaction.unpack(faction, factionBox, zone)
 
     local nameToObject = {}
     for namePattern, offset in pairs(SetupFaction.NAME_TO_PLAYER_ZONE_OFFSET) do
-        namePattern = string.gsub(namePattern, '$FACTION_NAME', faction.name)
-        namePattern = string.gsub(namePattern, '$TOKEN_NAME', faction.tokenName)
-        namePattern = namePattern:gsub('-', '%%-')
-        local guid = assert(getEntryGuid(factionBox, namePattern), 'missing ' .. namePattern)
-        local function takeCallback(object)
-            if offset.unpack then
-                nameToObject[object.getName()] = nil
-                nestedUnpack(object, offset)
-            else
-                -- Do not lock too soon, infinite bag may still be getting set up.
-                if offset.lock then
-                    Wait.time(function() object.setLock(true) end, 3)
+        if (not isFranken) or offset.franken then
+            namePattern = string.gsub(namePattern, '$FACTION_NAME', faction.name)
+            namePattern = string.gsub(namePattern, '$TOKEN_NAME', faction.tokenName)
+            namePattern = namePattern:gsub('-', '%%-')
+            local guid = assert(getEntryGuid(factionBox, namePattern), 'missing ' .. namePattern)
+            local function takeCallback(object)
+                if offset.unpack then
+                    nameToObject[object.getName()] = nil
+                    nestedUnpack(object, offset)
+                else
+                    -- Do not lock too soon, infinite bag may still be getting set up.
+                    if offset.lock then
+                        Wait.time(function() object.setLock(true) end, 3)
+                    end
                 end
             end
+            local object = factionBox.takeObject({
+                guid              = guid,
+                position          = offsetPosition(zone.center, offset),
+                rotation          = zoneRotation(zone, offset),
+                callback_function = takeCallback,
+                smooth            = false,
+            })
+            nameToObject[object.getName()] = object
         end
-        local object = factionBox.takeObject({
-            guid              = guid,
-            position          = offsetPosition(zone.center, offset),
-            rotation          = zoneRotation(zone, offset),
-            callback_function = takeCallback,
-            smooth            = false,
-        })
-        nameToObject[object.getName()] = object
     end
     return nameToObject
 end
@@ -1760,6 +1762,7 @@ local _unpackFrankenQueue = {}
 function unpackFranken(params)
     assert(type(params) == 'table')
     assert(not params.unpackButtonGuid or type(params.unpackButtonGuid) == 'string')
+    assert(not params.factionTokenName or type(params.factionTokenName) == 'string')
     assert(type(params.color) == 'string')
     table.insert(_unpackFrankenQueue, params)
     startLuaCoroutine(self, 'unpackFrankenCoroutine')
@@ -1769,6 +1772,40 @@ function unpackFrankenCoroutine()
     local params = table.remove(_unpackFrankenQueue)
     local color = params.color
     local zoneAttributes = _zoneHelper.zoneAttributes(color)
+
+    if params.factionTokenName then
+        local faction = _factionHelper.fromTokenName(params.factionTokenName)
+        local factionBox, factionBoxSrc = SetupFaction.unpackFactionBox(faction, zoneAttributes)
+        if not factionBox then
+            error('unpack franken: unable to find faction box for "' .. faction.name .. '"')
+            return 1
+        end
+        while factionBox.spawning do
+            coroutine.yield(0)
+        end
+        coroutine.yield(0)
+
+        local nameToObject = SetupFaction.unpack(faction, factionBox, zoneAttributes)
+        local commandTokensBag = nameToObject[faction.tokenName .. ' Command Tokens Bag']
+        local ownerTokensBag = nameToObject[faction.tokenName .. ' Owner Tokens Bag']
+        local factionSheet = nameToObject[faction.name .. ' Sheet']
+        nameToObject = nil
+        while commandTokensBag.spawning or ownerTokensBag.spawning do
+            coroutine.yield(0)
+        end
+        coroutine.yield(0)
+
+        if factionSheet then
+            SetupFaction.addFactionSheetUnitUpgradeSnapPoints(factionSheet)
+            coroutine.yield(0)
+        end
+
+        if factionBoxSrc then
+            factionBoxSrc.putObject(factionBox)
+            coroutine.yield(0)
+        end
+        factionBox = nil
+    end
 
     local commandTokensBag = false
     local ownerTokensBag = false

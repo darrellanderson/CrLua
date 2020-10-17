@@ -298,6 +298,10 @@ function showFactionSelection()
         local id = idAndTokenName.id
         _addFactionButton(id, i, 24)
     end
+
+    if _factionHelper.isFrankenEnabled() then
+        self.setColorTint({ r = 49/255, g = 179/255, b = 43/255 })
+    end
 end
 
 function showBaseInfo(factionId)
@@ -331,7 +335,6 @@ function onLoad()
 end
 
 function onFrankenEnabled()
-    self.setColorTint({ r = 49/255, g = 179/255, b = 43/255 })
     showFactionSelection()
 end
 -------------------------------------------------------------------------------

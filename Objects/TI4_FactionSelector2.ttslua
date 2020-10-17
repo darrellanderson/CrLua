@@ -1,4 +1,4 @@
--- @author Volverbot initial concept and design 
+-- @author Volverbot initial concept and design
 -- @author Milty
 -- @author Darrell switch to decals so images are visible with alt-zoom.
 --                 (XML UI is so much cleaner code, but not visible at zoom.)
@@ -72,6 +72,9 @@ local SIZE = {
 local MARGIN = 20
 local BUTTON_HEIGHT = 100
 
+local FRANKEN_UNPACK_LABEL = 'FRANKEN'
+local FRANKEN_UNPACK_TOOLTIP = 'Unpack the given faction sheet and tokens, unpack starting tech and units and rename flagship based on Franken tiles in the player area.'
+
 local _customNameToUrl = false
 local _chosenFactionId = false
 
@@ -81,10 +84,14 @@ function _addTitle()
     local y = SIZE.y + 0.01
     local z = -SIZE.z / 2 + 0.8
 
+    local labelNormal = 'Choose a Faction to Unpack'
+    local labelFranken = 'FRANKEN UNPACKER'
+    local label = _factionHelper.isFrankenEnabled() and labelFranken or labelNormal
+
     self.createButton({
         click_function = 'doNothing',
         function_owner = self,
-        label          = 'Choose a Faction to Unpack',
+        label          = label,
         position       = { x = 0, y = y, z = z },
         rotation       = { x = 0, y = 0, z = 0 },
         scale          = { x = 1, y = 1, z = 1 },
@@ -266,7 +273,7 @@ function _createNavButtons(currentPanelImageType)
     self.createButton({
         click_function = 'onClickUnpack',
         function_owner = self,
-        label          = 'Unpack',
+        label          = _factionHelper.isFrankenEnabled() and FRANKEN_UNPACK_LABEL or 'Unpack',
         position       = { x = x2, y = y, z = z2 },
         rotation       = { x = 0, y = 0, z = 0 },
         scale          = { x = 1 / scaleUpScaleDown, y = 1, z = 1 / scaleUpScaleDown },
@@ -277,7 +284,7 @@ function _createNavButtons(currentPanelImageType)
         font_color     = nil,
         hover_color    = nil,
         press_color    = nil,
-        tooltip        = 'Unpack this faction',
+        tooltip        = _factionHelper.isFrankenEnabled() and FRANKEN_UNPACK_TOOLTIP or 'Unpack this faction',
     })
 end
 
@@ -323,6 +330,10 @@ function onLoad()
     Wait.frames(showFactionSelection, 2)
 end
 
+function onFrankenEnabled()
+    self.setColorTint({ r = 49/255, g = 179/255, b = 43/255 })
+    showFactionSelection()
+end
 -------------------------------------------------------------------------------
 
 function onClickBaseInfo(clickObject, clickerColor, altClick)
@@ -369,6 +380,7 @@ function doUnpack(color, factionTokenName)
     if _factionHelper.isFrankenEnabled() then
         _setupHelper.unpackFranken({
             color = color,
+            factionTokenName = factionTokenName,
             unpackButtonGuid = self.getGUID()  -- setup will delete this object
         })
     else

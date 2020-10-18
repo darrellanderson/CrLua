@@ -366,19 +366,42 @@ function onClickUnpack(clickObject, clickerColor, altClick)
             break
         end
     end
-    if color and factionTokenName then
-        doUnpack(color, factionTokenName)
-    end
+    doUnpack(color, factionTokenName)
 end
 
 -------------------------------------------------------------------------------
 
 function doUnpack(color, factionTokenName)
+    -- Abort if setup pending.  Cannot rearrange table after faction unpack.
+    local function setupPending()
+        for _, object in ipairs(getAllObjects()) do
+            if object.tag == 'Tile' and object.getName() == 'Game Setup Options' then
+                return true
+            end
+        end
+    end
+    if setupPending() then
+        printToAll('Faction unpack: please click "Setup" on "Game Setup Options" to commit to a player count and map size before unpacking.', 'Yellow')
+        return
+    end
+
+    -- Abort if not in a player area.
+    if not color then
+        printToAll('Faction unpack: unpacker not in a player area, aborting.', 'Yellow')
+        return
+    end
+
+    -- Abort if missing faction, or if that faction is already in use.
     local faction = _factionHelper.fromTokenName(factionTokenName)
+    if not faction then
+        printToAll('Faction unpack: unknown faction, aborting.', 'Yellow')
+        return
+    end
     if faction.color then
         printToAll(faction.color .. ' has already unpacked ' .. factionTokenName .. ', please pick another.', color)
         return
     end
+    printToAll(color .. ' unpacking ' .. factionTokenName .. '.', color)
 
     if _factionHelper.isFrankenEnabled() then
         _setupHelper.unpackFranken({

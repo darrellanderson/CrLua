@@ -393,7 +393,7 @@ local _unitModifiers = {
     ['Morale Boost (4)'] = { alias = 'Morale Boost' },
 
     ['Nebula Defence'] = {
-        description = '+1 to all COMBAT rolls (defender)',
+        description = '+1 to SPACE COMBAT rolls (defender)',
         tag = 'Generic',  -- most are cards, not this one
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
@@ -401,9 +401,6 @@ local _unitModifiers = {
             for unitType, attr in pairs(unitAttrs) do
                 if attr.spaceCombat then
                     attr.spaceCombat.hit = attr.spaceCombat.hit - 1
-                end
-                if attr.groundCombat then
-                    attr.groundCombat.hit = attr.groundCombat.hit - 1
                 end
             end
         end

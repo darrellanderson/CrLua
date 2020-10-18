@@ -928,7 +928,10 @@ local function _putAgendaBottom(playerColor, card)
 end
 local function _scoreObjective(playerColor, card)
     local inHandGuidSet = _zoneHelper.inHand()
-    if card.is_face_down or inHandGuidSet[card.getGUID()] then
+    if inHandGuidSet[card.getGUID()] then
+        return
+    end
+    if card.tag == 'Card' and card.is_face_down then
         return
     end
     printToAll(playerColor .. ' scoring ' .. card.getName(), playerColor)
@@ -955,6 +958,18 @@ local function _scoreObjective(playerColor, card)
         z = 0
     }
 
+    -- Custodians is not card shaped, use a random position inside it.
+    if card.tag == 'Tile' and card.getName() == 'Custodians' then
+        local p0 = card.getPosition()
+        local phi = math.rad(math.random(0, 360))
+        local r = 1
+        position = {
+            x = p0.x + math.sin(phi) * r,
+            y = p0.y + 2,
+            z = p0.z + math.cos(phi) * r
+        }
+    end
+
     local name = faction.tokenName .. ' Owner Tokens Bag'
     for _, object in ipairs(getAllObjects()) do
         if object.tag == 'Infinite' and object.getName() == name then
@@ -968,18 +983,49 @@ local function _scoreObjective(playerColor, card)
     end
 end
 
+local _scoreDeckSet = false
+local _scoreCardSet = false
+local function _isScoreObjective(card)
+    -- Non-card object.
+    if card.tag == 'Tile' and card.getName() == 'Custodians' then
+        return true
+    end
+
+    -- Cards.
+    if not _scoreDeckSet then
+        _scoreDeckSet = {
+            ['Public Objectives I'] = true,
+            ['Public Objectives II'] = true,
+            ['Secret Objectives'] = true,
+        }
+        _scoreCardSet = {
+            ['Shard of the Throne'] = true,
+            ['Holy Planet of Ixth'] = true,
+        }
+        for _, color in ipairs(Player.getColors()) do
+            _scoreCardSet['Support for the Throne (' .. color .. ')'] = true
+        end
+    end
+    local cardName = card.tag == 'Card' and card.getName()
+    local deckName = cardName and getDeckName(cardName)
+    return _scoreDeckSet[deckName] or _scoreCardSet[cardName]
+end
+
 local function _applyContextMenuItems(card)
     local deckName = card.tag == 'Card' and getDeckName(card.getName())
     if deckName == 'Agenda' then
         card.addContextMenuItem('Place Agenda Top', function(playerColor) _putAgendaTop(playerColor, card) end, false)
         card.addContextMenuItem('Place Agenda Bottom', function(playerColor) _putAgendaBottom(playerColor, card) end, false)
-    elseif deckName == 'Public Objectives I' or deckName == 'Public Objectives II' or deckName == 'Secret Objectives' then
+    end
+    if _isScoreObjective(card) then
         card.addContextMenuItem('Score Objective', function(playerColor) _scoreObjective(playerColor, card) end, false)
     end
 end
 
 function onObjectSpawn(object)
     if object.tag == 'Card' then
+        _applyContextMenuItems(object)
+    elseif object.tag == 'Tile' and object.getName() == 'Custodians' then
         _applyContextMenuItems(object)
     end
 end
@@ -1124,6 +1170,8 @@ function onLoad(saveState)
     local function delayedApplyContextMenuItems()
         for _, object in ipairs(getAllObjects()) do
             if object.tag == 'Card' then
+                _applyContextMenuItems(object)
+            elseif object.tag == 'Tile' and object.getName() == 'Custodians' then
                 _applyContextMenuItems(object)
             end
         end

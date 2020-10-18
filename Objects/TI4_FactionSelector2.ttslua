@@ -69,8 +69,7 @@ local SIZE = {
     z = 10
 }
 
-local MARGIN = 20
-local BUTTON_HEIGHT = 100
+local MARGIN = 200
 
 local FRANKEN_UNPACK_LABEL = 'FRANKEN'
 local FRANKEN_UNPACK_TOOLTIP = 'Unpack the given faction sheet and tokens, unpack starting tech and units and rename flagship based on Franken tiles in the player area.'
@@ -179,7 +178,7 @@ function _addInfoDecal(factionId, imageType)
 
     local reservedForButtons = 2
     local z = -reservedForButtons / 2
-    local fitZ = SIZE.z - (MARGIN / 100) * 2 - reservedForButtons
+    local fitZ = SIZE.z - (MARGIN / 1000) * 2 - reservedForButtons
 
     -- Decal stretches to object aspect ratio.  Need to adjust it.
     -- DECAL SCALE Z IS STORED IN Y!
@@ -205,60 +204,27 @@ function _createNavButtons(currentPanelImageType)
 
     local y = SIZE.y + 0.01
 
-    -- button size are in x100 scale.  width is the left/right value, so
+    -- button size are in x1000 scale.  width is the left/right value, so
     -- actual width is x2 width.
-    local w = SIZE.x * 450 / 2
-    local h = 400
-    local fontSize = 200
+    local w = ((SIZE.x * 1000) - (MARGIN * 5)) / 8
+    local h = 800
+    local fontSize = 300
     local scaleUpScaleDown = 1
     local activeColor = { r = 0, g = 1, b = 1 }
 
-    local quarterX = SIZE.x / 4
-    local x1 = -quarterX + (MARGIN / 200)
-    local x2 = -x1
+    local x0 = -(SIZE.x / 2) + (MARGIN + w) / 1000
+    local dx = (MARGIN + w * 2) / 1000
 
-    local zBottom = SIZE.z / 2
-    local z2 = zBottom
-    z2 = z2 - (h * 2 / 1000)
-    local z1 = z2 - (MARGIN / 100) - (h * 2 / 1000)
+    local z0 = (SIZE.z / 2) - (h + MARGIN) / 1000
 
-    self.createButton({
-        click_function = 'onClickBaseInfo',
-        function_owner = self,
-        label          = 'Faction Abilities',
-        position       = { x = x1, y = y, z = z1 },
-        rotation       = { x = 0, y = 0, z = 0 },
-        scale          = { x = 1 / scaleUpScaleDown, y = 1, z = 1 / scaleUpScaleDown },
-        width          = w * scaleUpScaleDown,
-        height         = h * scaleUpScaleDown,
-        font_size      = fontSize * scaleUpScaleDown,
-        color          = currentPanelImageType == 'BaseInfo' and activeColor or nil,
-        font_color     = nil,
-        hover_color    = nil,
-        press_color    = nil,
-        tooltip        = 'Display faction base information',
-    })
-    self.createButton({
-        click_function = 'onClickExtraInfo',
-        function_owner = self,
-        label          = 'More Info',
-        position       = { x = x2, y = y, z = z1 },
-        rotation       = { x = 0, y = 0, z = 0 },
-        scale          = { x = 1 / scaleUpScaleDown, y = 1, z = 1 / scaleUpScaleDown },
-        width          = w * scaleUpScaleDown,
-        height         = h * scaleUpScaleDown,
-        font_size      = fontSize * scaleUpScaleDown,
-        color          = currentPanelImageType == 'ExtraInfo' and activeColor or nil,
-        font_color     = nil,
-        hover_color    = nil,
-        press_color    = nil,
-        tooltip        = 'Display additional faction information',
-    })
+    local x = x0
+    local z = z0
+
     self.createButton({
         click_function = 'onClickBack',
         function_owner = self,
         label          = 'Back',
-        position       = { x = x1, y = y, z = z2 },
+        position       = { x = x, y = y, z = z },
         rotation       = { x = 0, y = 0, z = 0 },
         scale          = { x = 1 / scaleUpScaleDown, y = 1, z = 1 / scaleUpScaleDown },
         width          = w * scaleUpScaleDown,
@@ -270,11 +236,46 @@ function _createNavButtons(currentPanelImageType)
         press_color    = nil,
         tooltip        = 'Return to faction selection',
     })
+    x = x + dx
+    self.createButton({
+        click_function = 'onClickBaseInfo',
+        function_owner = self,
+        label          = 'Faction\nAbilities',
+        position       = { x = x, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1 / scaleUpScaleDown, y = 1, z = 1 / scaleUpScaleDown },
+        width          = w * scaleUpScaleDown,
+        height         = h * scaleUpScaleDown,
+        font_size      = fontSize * scaleUpScaleDown,
+        color          = currentPanelImageType == 'BaseInfo' and activeColor or nil,
+        font_color     = nil,
+        hover_color    = nil,
+        press_color    = nil,
+        tooltip        = 'Display faction base information',
+    })
+    x = x + dx
+    self.createButton({
+        click_function = 'onClickExtraInfo',
+        function_owner = self,
+        label          = 'More\nInfo',
+        position       = { x = x, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1 / scaleUpScaleDown, y = 1, z = 1 / scaleUpScaleDown },
+        width          = w * scaleUpScaleDown,
+        height         = h * scaleUpScaleDown,
+        font_size      = fontSize * scaleUpScaleDown,
+        color          = currentPanelImageType == 'ExtraInfo' and activeColor or nil,
+        font_color     = nil,
+        hover_color    = nil,
+        press_color    = nil,
+        tooltip        = 'Display additional faction information',
+    })
+    x = x + dx
     self.createButton({
         click_function = 'onClickUnpack',
         function_owner = self,
         label          = _factionHelper.isFrankenEnabled() and FRANKEN_UNPACK_LABEL or 'Unpack',
-        position       = { x = x2, y = y, z = z2 },
+        position       = { x = x, y = y, z = z },
         rotation       = { x = 0, y = 0, z = 0 },
         scale          = { x = 1 / scaleUpScaleDown, y = 1, z = 1 / scaleUpScaleDown },
         width          = w * scaleUpScaleDown,

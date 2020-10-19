@@ -35,6 +35,7 @@ local _rollInProgress = false
 local _dice = {}
 
 local _injectExtraModifiers = false
+local _updateWarnings = false
 
 -------------------------------------------------------------------------------
 
@@ -517,15 +518,7 @@ end
 
 function clickUpdate(clickObject, clickerColor, altClick)
     updateUnitValues()
-
-    local modifiers = {}
-    for _, modifier in ipairs(_unitAttrs._flagshipModifiers) do
-        table.insert(modifiers, modifier.name .. ' (' .. modifier.description .. ')')
-    end
-    for _, modifier in ipairs(_unitAttrs._unitModifiers) do
-        table.insert(modifiers, modifier.name .. ' (' .. modifier.description .. ')')
-    end
-    printToColor('Roll Modifiers detected: ' .. ((#modifiers > 0) and table.concat(modifiers, ', ') or 'none'), clickerColor, clickerColor)
+    printUnitModifiers(clickerColor)
 end
 
 function clickAFB(clickObject, clickerColor, altClick)
@@ -587,12 +580,13 @@ function updateUnitValues(force)
         return
     end
     _lastUpdateFrame = Time.frame_count
+    _updateWarnings = false
 
     local color = myColor()
 
     local unitTypeToCount = {}
     for _, unitData in ipairs(UNIT_DATA) do
-        unitTypeToCount[unitData.unitType] = _unitTypeToFields[unitData.unitType].count
+        unitTypeToCount[unitData.unitType] = getCount(unitData.unitType)
     end
 
     local unitOverrides = _unitHelper.getColorToUnitOverrides()[color] or {}
@@ -608,11 +602,17 @@ function updateUnitValues(force)
             end
         end
         if not found then
+            -- Plasma scoring not detected, but is enabled.
+            _updateWarnings = _updateWarnings or {}
+            table.insert(_updateWarnings, 'PS enabled but missing Plasma Scoring technology')
             table.insert(unitModifiers, 'Plasma Scoring')
         end
     else
         for i = #unitModifiers, 1, -1 do
             if unitModifiers[i] == 'Plasma Scoring' then
+                -- Plasma scoring detected, but disabled.
+                _updateWarnings = _updateWarnings or {}
+                table.insert(_updateWarnings, 'PS disabled but have Plasma Scoring technology')
                 table.remove(unitModifiers, i)
             end
         end
@@ -675,6 +675,26 @@ function updateUnitValues(force)
     end
 end
 
+function printUnitModifiers(dstColor)
+    local modifiers = {}
+    for _, modifier in ipairs(_unitAttrs._flagshipModifiers) do
+        table.insert(modifiers, modifier.name .. ' (' .. modifier.description .. ')')
+    end
+    for _, modifier in ipairs(_unitAttrs._unitModifiers) do
+        table.insert(modifiers, modifier.name .. ' (' .. modifier.description .. ')')
+    end
+    local msg = 'Roll Modifiers detected: ' .. ((#modifiers > 0) and table.concat(modifiers, ', ') or 'none')
+    for _, warning in ipairs(_updateWarnings or {}) do
+        msg = msg .. '\n' .. 'WARNING: ' .. warning
+    end
+    local msgColor = assert(myColor())
+    if dstColor then
+        printToColor(msg, dstColor, msgColor)
+    else
+        printToAll(msg, msgColor)
+    end
+end
+
 function deleteDice()
     while #_dice > 0 do
         local die = table.remove(_dice)
@@ -694,19 +714,10 @@ function roll(clickerColor, rollLabel, rollTypes)
     end
 
     updateUnitValues()
+    printUnitModifiers()
 
     local color = assert(myColor())
     local name = assert(getName(color))
-
-    local modifiers = {}
-    for _, modifier in ipairs(_unitAttrs._flagshipModifiers) do
-        table.insert(modifiers, modifier.name .. ' (' .. modifier.description .. ')')
-    end
-    for _, modifier in ipairs(_unitAttrs._unitModifiers) do
-        table.insert(modifiers, modifier.name .. ' (' .. modifier.description .. ')')
-    end
-
-    printToAll('Roll Modifiers detected: ' .. ((#modifiers > 0) and table.concat(modifiers, ', ') or 'none'), color)
     printToAll(name .. ' rolling for ' .. rollLabel, color)
 
     local unitTypeToHitDiceAndCount = false

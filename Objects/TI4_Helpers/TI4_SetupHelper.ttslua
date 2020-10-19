@@ -1785,7 +1785,7 @@ function unpackFrankenCoroutine()
         end
         coroutine.yield(0)
 
-        local nameToObject = SetupFaction.unpack(faction, factionBox, zoneAttributes)
+        local nameToObject = SetupFaction.unpack(faction, factionBox, zoneAttributes, true)
         local commandTokensBag = nameToObject[faction.tokenName .. ' Command Tokens Bag']
         local ownerTokensBag = nameToObject[faction.tokenName .. ' Owner Tokens Bag']
         local factionSheet = nameToObject[faction.name .. ' Sheet']

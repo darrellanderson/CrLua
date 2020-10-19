@@ -116,6 +116,16 @@ function onPlayerTurnStart(playerColorStart, playerColorPrevious)
     end
 end
 
+function onPlayerChangeColor(player_color)
+    if _config.updateBetweenTurns then
+        if (not _lastUpdateBetweenTurnsTime) or (Time.time - _lastUpdateBetweenTurnsTime > 1) then
+            _lastUpdateBetweenTurnsTime = Time.time
+            _config.enabled = true
+            updateCacheDrawAndPolygons()
+        end
+    end
+end
+
 function updateCacheDrawAndPolygons()
     startLuaCoroutine(self, 'updateCacheDrawAndPolygonsCoroutine')
 end

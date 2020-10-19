@@ -376,7 +376,7 @@ function doUnpack(color, factionTokenName)
     -- Abort if setup pending.  Cannot rearrange table after faction unpack.
     local function setupPending()
         for _, object in ipairs(getAllObjects()) do
-            if object.tag == 'Tile' and object.getName() == 'Game Setup Options' then
+            if object.tag == 'Generic' and object.getName() == 'Game Setup Options' then
                 return true
             end
         end

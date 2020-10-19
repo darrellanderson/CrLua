@@ -155,7 +155,7 @@ function placeTradeGoodsAndSetTurns(obj, playerClickerColor, altClick)
             return bag
         end
         for _, object in ipairs(getAllObjects()) do
-            if object.tag == 'Infinite' and string.find(object.getName(), 'Tradegoods x1 Bag') then
+            if object.tag == 'Infinite' and object.getName() == 'x1 Commodities/Tradegoods Bag' then
                 _tradeGoodBagGuid = object.getGUID()
                 return object
             end

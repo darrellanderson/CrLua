@@ -113,7 +113,7 @@ local _systems = {
         { name = 'Arretze', resources = 2, influence = 0 },
         { name = 'Kamdorn', resources = 0, influence = 1 },
     }},
-    ['c56a8a'] = { tile = 17, wormholes = { 'delta' } },
+    ['c56a8a'] = { tile = 17, home = true, wormholes = { 'delta' } }, -- not precisely a home, but tied to faction
     ['04df02'] = { tile = 18, planets = {
         { name = 'Mecatol Rex', resources = 1, influence = 6, radius = 1.7 },
     }},

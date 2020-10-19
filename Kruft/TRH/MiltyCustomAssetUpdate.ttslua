@@ -3,12 +3,16 @@ function onLoad(save_state)
 end
 
 function doIt()
-    local dir = 'file:////Users/darrell/Downloads/FactionInfo/'
+    local dir = 'file:////Users/darrell/Downloads/FactionSelectionImages/'
     local assets = UI.getCustomAssets()
     for _, asset in ipairs(assets) do
         local infoName = string.match(asset.name, '^(.*Info)$')
         if infoName then
-            asset.url = dir .. infoName .. '.png'
+            asset.url = dir .. 'FactionInfoSheets/' .. infoName .. '.jpg'
+        end
+        local buttonName = string.match(asset.name, '^(.*Button)$')
+        if buttonName then
+            asset.url = dir .. 'Faction Picker Buttons/' .. buttonName .. '.jpg'
         end
     end
     UI.setCustomAssets(assets)

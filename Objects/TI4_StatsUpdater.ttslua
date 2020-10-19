@@ -313,7 +313,7 @@ end
 function getCommoditiesAndTradeGoods()
     local result = {}
     for _, object in ipairs(getAllObjects()) do
-        if string.match(object.getName(), '^Commodities/Tradegoods x([13])$') then
+        if string.match(object.getName(), '^x([13]) Commodities/Tradegoods$') then
             table.insert(result, object)
         end
     end
@@ -325,7 +325,7 @@ function sumTradeGoodsValue(tradeGoods)
 
     local result = 0
     for _, object in ipairs(tradeGoods) do
-        local value = string.match(object.getName(), '^Commodities/Tradegoods x([13])$')
+        local value = string.match(object.getName(), '^x([13]) Commodities/Tradegoods$')
         result = result + tonumber(value)
     end
     return result

@@ -810,12 +810,27 @@ function autoFillCoroutine()
         psAlreadyUsed = true
     end
 
+    -- Does enemy have AMD?
     local antimassDeflectors = false
     for _, modifier in ipairs(colorToUnitModifiers[enemyColor] or {}) do
         if modifier == 'Antimass Deflectors' then
             antimassDeflectors = true
             break
         end
+    end
+
+    -- Nebula Defence?
+    local extraUnitModifiers = false
+    local function isNebula()
+        for _, anomaly in ipairs(system.anomalies or {}) do
+            if anomaly == 'nebula' then
+                return true
+            end
+        end
+    end
+    if isNebula() and selfColor ~= activatingColor then
+        extraUnitModifiers = extraUnitModifiers or {}
+        table.insert(extraUnitModifiers, 'Nebula Defence')
     end
 
     CrLua.Log.d(TAG, 'autoFillCoroutine: assembling message')
@@ -884,7 +899,8 @@ function autoFillCoroutine()
         unitTypeToCount = fillUnitTypeToCount,
         plasmaScoring = psUnitType and true or false,
         antimassDeflectors = antimassDeflectors and true or false,
-        rollType = doClick and autofillTypeAttributes.rollType or false
+        rollType = doClick and autofillTypeAttributes.rollType or false,
+        extraModifiers = extraUnitModifiers or false,
     })
     if not doClick then
         printToAll('AutoFill: left click to fill and roll.', params.clickerColor)

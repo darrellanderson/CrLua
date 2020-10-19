@@ -25,16 +25,6 @@ function getHelperClient(helperObjectName)
 end
 local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 
--- Token bags use inconsistent name to bag, hard code for simplicity.
-local TOKEN_BAGS = {
-    ['x1 Fighter Token'] = 'x1 Fighters Tokens Bag',
-    ['x3 Fighter Token'] = 'x3 Fighters Tokens Bag',
-    ['x1 Infantry'] = 'x1 Infantry Token Bag',
-    ['x3 Infantry'] = 'x3 Infantry Token Bag',
-    ['Commodities/Tradegoods x1'] = 'Commodities/Tradegoods x1 Bag',
-    ['Commodities/Tradegoods x3'] = 'Commodities/Tradegoods x3 Bag'
-}
-
 -- Bag with faction tokens.
 local PICK_FACTION_BAG = 'Pick a Faction to Play'
 
@@ -71,8 +61,8 @@ local function getNonCardDestination(objectTag, objectName)
     -- Do not store "nacks" for objects with no bag, it could be unpacked!
     local acceptBag = {
         [objectName] = true,
+        [objectName .. ' Bag'] = true,
         [objectName .. 's Bag'] = true,
-        [TOKEN_BAGS[objectName] or false] = true
     }
     if string.match(objectName, ' Faction Token$') then
         acceptBag[PICK_FACTION_BAG] = true

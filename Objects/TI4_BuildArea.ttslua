@@ -7,11 +7,11 @@ local BASE_PRODUCTION = 2
 
 local OBJECT_EFFECTS = {
     -- Tokens
-    ['Commodities/Tradegoods x1'] = {
+    ['x1 Commodities/Tradegoods'] = {
         tradegoods = true,
         resources = 1,
     },
-    ['Commodities/Tradegoods x3'] = {
+    ['x3 Commodities/Tradegoods'] = {
         tradegoods = true,
         resources = 3,
     },
@@ -26,10 +26,10 @@ local OBJECT_EFFECTS = {
         anywhereInPlayerZone = true,
         requireFaceUp = true,
         objectEffectsOverrides = {
-            ['Commodities/Tradegoods x1'] = {
+            ['x1 Commodities/Tradegoods'] = {
                 resources = 2,
             },
-            ['Commodities/Tradegoods x3'] = {
+            ['x3 Commodities/Tradegoods'] = {
                 resources = 6,
             },
         },
@@ -331,7 +331,7 @@ function trashTradeGoods()
 
     local tradeGoods = {}
     for object, _ in pairs(_data.inside) do
-        if string.match(object.getName(), 'Commodities/Tradegoods x[13]') then
+        if string.match(object.getName(), 'x[13] Commodities/Tradegoods') then
             table.insert(tradeGoods, object)
         end
     end

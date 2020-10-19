@@ -34,6 +34,8 @@ local _rollQueue = {}
 local _rollInProgress = false
 local _dice = {}
 
+local _injectExtraModifiers = false
+
 -------------------------------------------------------------------------------
 
 --- Let outsiders ("auto-fill multiroller") set values and optionally roll.
@@ -44,6 +46,10 @@ function inject(params)
     assert(type(params.plasmaScoring) == 'boolean')
     assert(type(params.antimassDeflectors) == 'boolean')
     assert((not params.rollType) or type(params.rollType) == 'string')
+    assert((not params.extraModifiers) or type(params.extraModifiers) == 'table')
+
+    -- Add these when gathering unit modifiers.
+    _injectExtraModifiers = params.extraModifiers or false
 
     clickReset()
 
@@ -79,6 +85,9 @@ function inject(params)
     elseif params.rollType then
         error('unknown roll type ' .. params.rollType)
     end
+
+    -- Require click handling absorb these this frame, otherwise lost.
+    _injectExtraModifiers = false
 end
 
 -------------------------------------------------------------------------------
@@ -605,6 +614,19 @@ function updateUnitValues(force)
         for i = #unitModifiers, 1, -1 do
             if unitModifiers[i] == 'Plasma Scoring' then
                 table.remove(unitModifiers, i)
+            end
+        end
+    end
+
+    -- Auto-fill may know about modifiers.
+    if _injectExtraModifiers then
+        local unitModifiersSet = {}
+        for _, unitModifier in ipairs(unitModifiers) do
+            unitModifiersSet[unitModifier] = true
+        end
+        for _, unitModifier in ipairs(_injectExtraModifiers) do
+            if not unitModifiersSet[unitModifier] then
+                table.insert(unitModifiers, unitModifier)
             end
         end
     end

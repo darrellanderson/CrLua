@@ -2,8 +2,11 @@
 
 import sys
 
-MAT_W = 16
-MAT_H = 10
+# Faction Selector is 16 x 10 x 0.2
+# Setup Tile is 12 x 20 x 0.2
+
+MAT_W = 12
+MAT_H = 20
 MAT_D = 0.2
 
 CORNERS0 = [

@@ -21,6 +21,12 @@ CARD_H = 3
 ROWS = 5
 COLS = 8
 
+# Support for the Throne mat:
+CARD_W = 2
+CARD_H = 3
+ROWS = 1
+COLS = 8
+
 MAT_W = (CARD_W * COLS) + (0.5 * (COLS + 1))
 MAT_H = (CARD_H * ROWS) + (0.5 * (ROWS + 1))
 MAT_D = 0.4

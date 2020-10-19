@@ -488,11 +488,15 @@ function clearTilesCoroutine()
             _systemHelper.removeHomebrewSystems({ guid })
             _safeDestroyObject(object)
         elseif not system.home then
-            local hasPlanets = system.planets and #system.planets > 0
-            local bag = hasPlanets and blueBag or redBag
-            object.setLock(false)
-            object.use_hands = true
-            bag.putObject(object)
+            local p = object.getPosition()
+            local d = math.abs(p.x + p.z)
+            if (not system.tile == 18) or d > 1 then
+                local hasPlanets = system.planets and #system.planets > 0
+                local bag = hasPlanets and blueBag or redBag
+                object.setLock(false)
+                object.use_hands = true
+                bag.putObject(object)
+            end
         end
         coroutine.yield(0)
     end

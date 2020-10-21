@@ -1,0 +1,91 @@
+--- Add/remove hyperlanes
+-- @author Darrell
+
+local _hyperlanes = {
+    ['b41a78'] = {},
+    ['1ffd34'] = {},
+    ['bb11c7'] = {},
+    ['613593'] = {},
+    ['a35ea3'] = {},
+    ['34cbfd'] = {},
+    ['1000e9'] = {},
+    ['c131ce'] = {},
+    ['2c5e05'] = {},
+    ['35b72d'] = {},
+    ['bdf753'] = {},
+    ['b74682'] = {},
+    ['507cb6'] = {},
+    ['903187'] = {},
+    ['3830ca'] = {},
+    ['5dbaf9'] = {},
+    ['902424'] = {},
+    ['e604ce'] = {},
+}
+
+function onLoad(saveState)
+    self.addContextMenuItem('Add 5p hyperlanes', add5pHyperlanes)
+    self.addContextMenuItem('Clear hyperlanes', clearHyperlanes)
+end
+
+function add5pHyperlanes()
+    local guidToTransform = {
+        ['a35ea3'] = {
+            position = {0.00, 1.20, 18.19},
+            rotation = {0.00, 60.00, 0.00}
+        },
+        ['613593'] = {
+            position = {5.24, 1.20, 15.17},
+            rotation = {0.00, 240.00, 0.00}
+        },
+        ['1ffd34'] = {
+            position = {5.27, 1.20, 9.08},
+            rotation = {0.00, 60.00, 0.00}
+        },
+        ['b41a78'] = {
+            position = {0.03, 1.20, 6.08},
+            rotation = {0.00, 60.00, 0.00}
+        },
+        ['bb11c7'] = {
+            position = {-5.23, 1.20, 9.10},
+            rotation = {0.00, 180.00, 0.00}
+        },
+        ['c131ce'] = {
+            position = {-5.25, 1.20, 15.16},
+            rotation = {0.00, 180.03, 0.00}
+        },
+    }
+
+    -- Do not assume tiles exist, only place if inside self.
+    for _, entry in ipairs(self.getObjects()) do
+        local transform = guidToTransform[entry.guid]
+        if transform then
+            self.takeObject({
+                guid              = entry.guid,
+                position          = transform.position,
+                rotation          = transform.rotation,
+                callback_function = function(object) object.setLock(true) end,
+                smooth            = true,
+            })
+        end
+    end
+end
+
+function clearHyperlanes()
+    for _, object in ipairs(getAllObjects()) do
+        if _hyperlanes[object.getGUID()] then
+            object.setLock(false)
+            self.putObject(object)
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

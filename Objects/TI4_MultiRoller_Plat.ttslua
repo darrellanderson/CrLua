@@ -92,12 +92,18 @@ function createUi()
         table.insert(_injectExtraModifiers, 'Blitz')
         table.insert(_injectExtraModifiers, 'Experimental Battlestation')
         _allPossibleUnitAttrs = getUnitData(true)
+
         _allPossibleUnitAttrs['Flagship']['antiFighterBarrage'] = {}
         _allPossibleUnitAttrs['Flagship']['bombardment'] = {}
         _allPossibleUnitAttrs['Flagship']['spaceCannon'] = {}
         _allPossibleUnitAttrs['Flagship']['spaceCombat'] = {}
         _allPossibleUnitAttrs['Flagship']['sustainDamage'] = true
         _allPossibleUnitAttrs['Flagship']['disablePlanetaryShield'] = true
+
+        _allPossibleUnitAttrs['Carrier']['sustainDamage'] = true  -- sol
+        _allPossibleUnitAttrs['Infantry']['spaceCombat'] = {}  -- nekro flagship
+        _allPossibleUnitAttrs['Fighter']['spaceCombat'] = {}  -- naulo flagship
+        
         _getUnitDataLastRefreshFrame = false  -- make sure not cached!
         _injectExtraUnitUpgrades = false
         _injectExtraModifiers = false

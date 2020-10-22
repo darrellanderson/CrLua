@@ -62,9 +62,11 @@ local _unitTypeToCount = {}
 local _antiMassDeflectors = false
 local _plasmaScoring = false
 
+local _allPossibleUnitAttrs = false
 local _unitAttrs = false
 local _getUnitDataLastRefreshFrame = false
 
+local _injectExtraUnitUpgrades = false
 local _injectExtraModifiers = false
 local _updateWarnings = false
 
@@ -73,19 +75,78 @@ function onLoad()
         _unitTypeToCount[unitType] = 0
     end
     math.randomseed(tonumber(self.getGUID(), 16))
-    Wait.time(updateUi, math.random() * 0.5 + 0.1)
+    Wait.time(createUi, math.random() * 0.5 + 0.1)
 end
 
 function onPlayerConnect(player_id)
     -- XML UI is sometimes missing if player connects after created, recreate.
-    Wait.time(updateUi, math.random() * 0.5 + 0.1)
+    Wait.time(createUi, math.random() * 0.5 + 0.1)
 end
 
-function updateUi()
-    local unitData = getUnitData()
-    local xml = generateRollerXmlTable(unitData)
+function createUi()
+    -- Use all modifiers that add abilities.  Show/hide them as needed.
+    if not _allPossibleUnitAttrs then
+        _injectExtraUnitUpgrades = {}
+        _injectExtraModifiers = {}
+        table.insert(_injectExtraUnitUpgrades, 'War Sun')
+        table.insert(_injectExtraModifiers, 'Blitz')
+        table.insert(_injectExtraModifiers, 'Experimental Battlestation')
+        _allPossibleUnitAttrs = getUnitData(true)
+        _allPossibleUnitAttrs['Flagship']['antiFighterBarrage'] = {}
+        _allPossibleUnitAttrs['Flagship']['bombardment'] = {}
+        _allPossibleUnitAttrs['Flagship']['spaceCannon'] = {}
+        _allPossibleUnitAttrs['Flagship']['spaceCombat'] = {}
+        _allPossibleUnitAttrs['Flagship']['sustainDamage'] = true
+        _allPossibleUnitAttrs['Flagship']['disablePlanetaryShield'] = true
+        _getUnitDataLastRefreshFrame = false  -- make sure not cached!
+        _injectExtraUnitUpgrades = false
+        _injectExtraModifiers = false
+    end
+
+    local xml = generateRollerXmlTable(_allPossibleUnitAttrs)
     self.UI.setXmlTable(xml)
-    -- Do not attempt to update count here, need a frame before able to access.
+
+    -- Do not attempt to use the XML on the same frame it is set OR THE NEXT!
+    -- It takes TTS a moment to register everything.
+    local function delayedUpdate()
+        for _, unitType in ipairs(UNIT_TYPES) do
+            setUnitCount(unitType, 0)
+        end
+        for unitType, count in pairs(_unitTypeToCount) do
+            setUnitCount(unitType, count)
+        end
+        setPlasmaScoring(_plasmaScoring)
+        setAntiMassDeflectors(_antiMassDeflectors)
+        updateAbilities()
+    end
+    Wait.frames(delayedUpdate, 3) -- 2 is enough, do 3 to be safe
+end
+
+function updateAbilities()
+    local unitData = getUnitData()
+    for _, unitType in ipairs(UNIT_TYPES) do
+        local unitAttrs = unitData[unitType] or {}
+        setUnitName(unitType, unitAttrs.name)
+        for ability, _ in pairs(ABILITIES) do
+            local abilityAttrs = unitAttrs[ability]
+            if abilityAttrs then
+                if type(abilityAttrs) == 'table' then
+                    local value = abilityAttrs.hit
+                    if abilityAttrs.dice and abilityAttrs.dice > 1 then
+                        value = value .. ' (\u{00D7}' .. abilityAttrs.dice .. ')'
+                    end
+                    if abilityAttrs.extraDice and abilityAttrs.extraDice > 0 then
+                        value = value .. ' (PS)'
+                    end
+                    setAbilityValue(unitType, ability, value)
+                else
+                    setAbilityValue(unitType, ability, '')
+                end
+            elseif _allPossibleUnitAttrs[unitType][ability] then
+                removeAbility(unitType, ability)
+            end
+        end
+    end
 end
 
 -------------------------------------------------------------------------------
@@ -360,6 +421,7 @@ function generateUnitXmlTable(unit_id, unit_stats, color)
                                 tag = "Text",
                                 value = "MissingUnitName!",
                                 attributes = {
+                                    id = "unitName",
                                     class = "unitNameplate",
                                     offsetXY = "0 12",
                                     width = "500",
@@ -440,6 +502,7 @@ function generateUnitXmlTable(unit_id, unit_stats, color)
     -- Add unit color or fall back to White
     unitXmlTable["children"][1]["children"][1]["attributes"]["color"] = color or "White"
     -- Set unit nameplate to its name
+    unitXmlTable["children"][1]["children"][1]["children"][1]["attributes"]["id"] = unit_id .. ".unitName"
     unitXmlTable["children"][1]["children"][1]["children"][1]["value"] = unit_stats["name"]
     -- Set unit count to 0
     unitXmlTable["children"][1]["children"][1]["children"][2]["value"] = _unitTypeToCount[unit_id] or 0
@@ -462,69 +525,82 @@ function generateUnitXmlTable(unit_id, unit_stats, color)
 end
 
 function generateUnitAbilitiesXmlTable(unit_id, unit_stats)
-    local function generateUnitAbility(ability_id, ability_details)
-        local unitAbilityXml = {
-            tag = "Button",
-            attributes = {class = "UILayoutHeavyBackground"},
-            children = {
-                {
-                    tag = "Panel",
-                    attributes = {
-                        childAlignment = "MiddleLeft"
+    local unitAbilitiesXmlTable = {}
+    for ability_id, ability_details in pairs(unit_stats) do
+        table.insert(unitAbilitiesXmlTable, generateUnitAbility(unit_id, ability_id, ability_details))
+    end
+
+    return unitAbilitiesXmlTable
+end
+
+function generateUnitAbility(unit_id, ability_id, ability_details)
+    local unitAbilityXml = {
+        tag = "Button",
+        attributes = {class = "UILayoutHeavyBackground"},
+        children = {
+            {
+                tag = "Panel",
+                attributes = {
+                    childAlignment = "MiddleLeft"
+                },
+                children = {
+                    {
+                        tag = "Text",
+                        value = "MissingUnitAbility!",
+                        attributes = {
+                            class = "unitAbilities",
+                            alignment = "MiddleLeft",
+                            ignoreLayout = "true",
+                            offsetXY = "-72 0"
+                        }
                     },
-                    children = {
-                        {
-                            tag = "Text",
-                            value = "MissingUnitAbility!",
-                            attributes = {
-                                class = "unitAbilities",
-                                alignment = "MiddleLeft",
-                                ignoreLayout = "true",
-                                offsetXY = "-72 0"
-                            }
-                        },
-                        {
-                            tag = "Text",
-                            value = "",
-                            attributes = {
-                                class = "unitAbilities",
-                                ignoreLayout = "true",
-                                alignment = "MiddleRight",
-                                offsetXY = "72 0"
-                            }
+                    {
+                        tag = "Text",
+                        value = "",
+                        attributes = {
+                            class = "unitAbilities",
+                            ignoreLayout = "true",
+                            alignment = "MiddleRight",
+                            offsetXY = "72 0"
                         }
                     }
                 }
             }
         }
-        if ABILITIES[ability_id] ~= nil then
-            if type(ability_details) == "table" then
-                unitAbilityXml["attributes"]["onClick"] = "rollDiceForAbility(" .. string.sub(ability_id, 1, -1) .. ")"
-                unitAbilityXml["children"][1]["children"][1]["value"] = ABILITIES[ability_id]
-                unitAbilityXml["children"][1]["children"][2]["value"] = ability_details.hit
-                if ability_details.dice > 1 then
-                    unitAbilityXml["children"][1]["children"][2]["value"] =
-                        unitAbilityXml["children"][1]["children"][2]["value"] .. " (\u{00D7}" .. ability_details.dice .. ")"
-                end
-                if ability_details.extraDice and ability_details.extraDice > 0 then
-                    unitAbilityXml["children"][1]["children"][2]["value"] =
-                        unitAbilityXml["children"][1]["children"][2]["value"] .. " (PS)"
-                end
-            elseif type(ability_details) == "boolean" then
-                unitAbilityXml["children"][1]["children"][1]["value"] = ABILITIES[ability_id]
-            end
-        else
-            return
+    }
+    -- Check if ability exists
+    if ABILITIES[ability_id] ~= nil then
+        -- Add an ID for the main button for showing/hiding
+        unitAbilityXml["attributes"]["id"] = unit_id .. ".ability." .. ability_id
+        if type(ability_details) == "table" then
+            -- Attach function for rolling on the ability
+            unitAbilityXml["attributes"]["onClick"] = "rollDiceForAbility(" .. string.sub(ability_id, 1, -1) .. ")"
+            -- Set first part of the text to ability name
+            unitAbilityXml["children"][1]["children"][1]["value"] = ABILITIES[ability_id]
+            -- Set second part of the text to ability value, add its ID for modification
+            unitAbilityXml["children"][1]["children"][2]["attributes"]["id"] = unit_id .. ".ability." .. ability_id .. ".value"
+        elseif type(ability_details) == "boolean" then
+            -- Make the ability unclickable
+            unitAbilityXml["tag"] = "Panel"
+            unitAbilityXml["children"][1]["children"][1]["value"] = ABILITIES[ability_id]
         end
-        return unitAbilityXml
+    else
+        return
     end
+    return unitAbilityXml
+end
 
-    local unitAbilitiesXmlTable = {}
-    for ability_id, ability_details in pairs(unit_stats) do
-        table.insert(unitAbilitiesXmlTable, generateUnitAbility(ability_id, ability_details))
-    end
+function setUnitName(unit_id, value)
+    self.UI.setValue(unit_id .. ".unitName", value)
+end
 
-    return unitAbilitiesXmlTable
+function setAbilityValue(unit_id, ability_id, value)
+    self.UI.show(unit_id .. ".ability." .. ability_id)
+    self.UI.setValue(unit_id .. ".ability." .. ability_id .. ".value", value)
+end
+
+function removeAbility(unit_id, ability_id)
+    self.UI.hide(unit_id .. ".ability." .. ability_id)
 end
 
 function changeUnitCountXml(player, value, id)
@@ -550,7 +626,7 @@ function changeUnitCountXml(player, value, id)
 
     -- If changing between zero and one, reset UI (in case plasma scoring moves).
     if oldValue + newValue == 1 then
-        updateUi()
+        updateAbilities()
     end
 end
 
@@ -609,12 +685,12 @@ end
 
 function toggleAntiMassDeflectors()
     setAntiMassDeflectors(not getAntiMassDeflectors())
-    updateUi()
+    updateAbilities()
 end
 
 function togglePlasmaScoring()
     setPlasmaScoring(not getPlasmaScoring())
-    updateUi()
+    updateAbilities()
 end
 
 function getAntiMassDeflectors()
@@ -628,7 +704,7 @@ function getPlasmaScoring()
 end
 
 function updateRoller()
-    updateUi()
+    updateAbilities()
 
     local unitData = getUnitData()
     printUnitModifiers(unitData)
@@ -640,7 +716,7 @@ function resetRoller()
         setUnitCount(unit, 0)
         setHitCount(unit, "")
     end
-    updateUi()
+    updateAbilities()
 end
 
 -------------------------------------------------------------------------------
@@ -695,6 +771,11 @@ end
 function Roller.roll(playerColor, rollLabel)
     assert(type(playerColor) == "string", "bad playerColor")
     assert(type(rollLabel) == "string", "bad rollLabel")
+
+    if #Roller._dice == 0 then
+        printToAll('No valid units for ' .. rollLabel, playerColor)
+        return
+    end
 
     local playerName = Player[playerColor] and Player[playerColor].steam_name or playerColor
     table.insert(
@@ -942,10 +1023,12 @@ function myColor()
 end
 
 function getUnitData(force)
-    if force or (not _getUnitDataLastRefreshFrame) or (_getUnitDataLastRefreshFrame ~= Time.frame_count) then
-        _getUnitDataLastRefreshFrame = Time.frame_count
+    if _unitAttrs and (not force) and _getUnitDataLastRefreshFrame == Time.frame_count then
+        return _unitAttrs
     end
+    _getUnitDataLastRefreshFrame = Time.frame_count
 
+    _updateWarnings = false
     local color = myColor()
 
     local unitTypeToCount = {}
@@ -982,7 +1065,18 @@ function getUnitData(force)
         end
     end
 
-    -- Auto-fill may know about modifiers.
+    -- Let others add unit overrides and modifiers.
+    if _injectExtraUnitUpgrades then
+        local unitOverridesSet = {}
+        for _, unitOverride in ipairs(unitOverrides) do
+            unitOverridesSet[unitOverride] = true
+        end
+        for _, unitOverride in ipairs(_injectExtraUnitUpgrades) do
+            if not unitOverridesSet[unitOverride] then
+                table.insert(unitOverrides, unitOverride)
+            end
+        end
+    end
     if _injectExtraModifiers then
         local unitModifiersSet = {}
         for _, unitModifier in ipairs(unitModifiers) do
@@ -1050,7 +1144,7 @@ function inject(params)
     setPlasmaScoring(params.plasmaScoring and true or false)
     setAntiMassDeflectors(params.antimassDeflectors and true or false)
 
-    updateUi()
+    updateAbilities()
 
     rollDiceForAbility(false, params.rollType)
 

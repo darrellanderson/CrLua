@@ -281,6 +281,22 @@ function generateRollerXmlTable(unit_data)
                             {
                                 tag = "Button",
                                 attributes = {
+                                    onClick = "updateRoller",
+                                    class = "UILayoutHeavyBackground"
+                                },
+                                children = {
+                                    {
+                                        tag = "Text",
+                                        value = "Update",
+                                        attributes = {
+                                            class = "userButtonText"
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                tag = "Button",
+                                attributes = {
                                     onClick = "resetRoller",
                                     class = "UILayoutHeavyBackground"
                                 },
@@ -609,6 +625,13 @@ end
 function getPlasmaScoring()
     --return self.UI.getAttribute("togglePlasmaScoring", "isOn")
     return _plasmaScoring
+end
+
+function updateRoller()
+    updateUi()
+
+    local unitData = getUnitData()
+    printUnitModifiers(unitData)
 end
 
 function resetRoller()
@@ -996,7 +1019,7 @@ function getUnitData(force)
     for unitType, unitAttrs in pairs(_unitAttrs) do
         unitAttrs.name = unitAttrs.name or unitType
         unitAttrs.image = unitAttrs.image or unitType
-        unitAttrs.image = 'MuaatButton'
+        --unitAttrs.image = 'MuaatButton'
     end
 
     return _unitAttrs

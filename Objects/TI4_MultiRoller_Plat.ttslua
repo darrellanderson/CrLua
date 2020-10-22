@@ -1,0 +1,1047 @@
+--- Swank UI MultiRoller
+-- @author Plat251
+-- @author MrStump for dice rolling functions
+
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
+        return function(parameters) return helperObject.call(functionName, parameters) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+local _unitHelper = getHelperClient('TI4_UNIT_HELPER')
+local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
+
+local UNIT_TYPES = {
+    'Carrier',
+    'Cruiser',
+    'Destroyer',
+    'Dreadnought',
+    'Fighter',
+    'Flagship',
+    'Infantry',
+    'PDS',
+    'Space Dock',
+    'War Sun',
+}
+
+local ABILITIES = {
+    antiFighterBarrage = "Anti-Fighter",
+    bombardment = "Bombardment",
+    groundCombat = "Ground Combat",
+    spaceCannon = "Space Cannon",
+    spaceCombat = "Space Combat",
+    sustainDamage = "Sustain Damage",
+    planetaryShield = "Planetary Shield",
+    disablePlanetaryShield = "Disables Planetary Shield"
+}
+
+local DICE_COLOR = {
+    ["Dreadnought"] = "Purple",
+    ["Flagship"] = "Black",
+    ["Destroyer"] = "Red",
+    ["War Sun"] = "Orange",
+    ["Carrier"] = "Blue",
+    ["Fighter"] = "Teal",
+    ["Infantry"] = "Green",
+    ["Cruiser"] = "Brown",
+    ["PDS"] = "Orange",
+    ["Space Dock"] = "Yellow",
+    ["Mech"] = "Pink"
+}
+
+local _unitTypeToCount = {}
+local _antiMassDeflectors = false
+local _plasmaScoring = false
+
+local _unitAttrs = false
+local _getUnitDataLastRefreshFrame = false
+
+local _injectExtraModifiers = false
+local _updateWarnings = false
+
+function onLoad()
+    for _, unitType in ipairs(UNIT_TYPES) do
+        _unitTypeToCount[unitType] = 0
+    end
+    math.randomseed(tonumber(self.getGUID(), 16))
+    Wait.time(updateUi, math.random() * 0.5 + 0.1)
+end
+
+function onPlayerConnect(player_id)
+    -- XML UI is sometimes missing if player connects after created, recreate.
+    Wait.time(updateUi, math.random() * 0.5 + 0.1)
+end
+
+function updateUi()
+    local unitData = getUnitData()
+    local xml = generateRollerXmlTable(unitData)
+    self.UI.setXmlTable(xml)
+    -- Do not attempt to update count here, need a frame before able to access.
+end
+
+-------------------------------------------------------------------------------
+
+function generateRollerXmlTable(unit_data)
+    local defaultsXmlTable = {
+        tag = "Defaults",
+        attributes = {},
+        children = {
+            {
+                tag = "Text",
+                attributes = {
+                    class = "unitNameplate",
+                    scale = "0.2 0.2 0.2",
+                    resizeTextForBestFit = "true",
+                    resizeTextMaxSize = "100",
+                    color = "#FFFFFF",
+                    fontStyle = "Bold",
+                    outline = "#000000",
+                    outlineSize = "8 -8"
+                }
+            },
+            {
+                tag = "Text",
+                attributes = {
+                    class = "unitAbilities",
+                    scale = "0.1 0.1 0.1",
+                    fontSize = "160",
+                    color = "#FFFFFFFF",
+                    horizontalOverflow = "Overflow",
+                    verticalOverflow = "Overflow"
+                }
+            },
+            {
+                tag = "Text",
+                attributes = {
+                    class = "unitCount",
+                    scale = "0.25 0.25 0.25",
+                    fontSize = "160",
+                    color = "#FFFFFFFF",
+                    fontStyle = "Bold",
+                    horizontalOverflow = "Overflow",
+                    outline = "#000000",
+                    outlineSize = "4 -4"
+                }
+            },
+            {
+                tag = "Text",
+                attributes = {
+                    class = "hitsCount",
+                    height = "2000",
+                    width = "2000",
+                    scale = "0.25 0.25 0.25",
+                    fontSize = "720",
+                    fontStyle = "Bold",
+                    color = "#FFFF00",
+                    outline = "#000000",
+                    outlineSize = "4 -4"
+                }
+            },
+            {
+                tag = "Text",
+                attributes = {
+                    class = "userButtonText",
+                    scale = "0.1 0.1 0.1",
+                    fontSize = "40",
+                    color = "#FFFFFFFF"
+                }
+            },
+            {
+                tag = "Button",
+                attributes = {
+                    class = "changeCount",
+                    width = "180",
+                    height = "180",
+                    scale = "0.2 0.2 0.2",
+                    fontSize = "160",
+                    fontStyle = "Bold",
+                    color = "#00000000",
+                    textColor = "#FFFFFF"
+                }
+            },
+            {
+                tag = "Button",
+                attributes = {
+                    class = "UILayoutLightBackground",
+                    color = "#00000050"
+                }
+            },
+            {
+                tag = "Panel",
+                attributes = {
+                    class = "UILayoutLightBackground",
+                    color = "#00000050"
+                }
+            },
+            {
+                tag = "Panel",
+                attributes = {
+                    class = "UILayoutMediumBackground",
+                    color = "#222222"
+                }
+            },
+            {
+                tag = "Panel",
+                attributes = {
+                    class = "UILayoutHeavyBackground",
+                    color = "#111111"
+                }
+            },
+            {
+                tag = "Button",
+                attributes = {
+                    class = "UILayoutHeavyBackground",
+                    colors = "#111111|#000000|#222222|#222222"
+                }
+            },
+            {
+                tag = "ToggleButton",
+                attributes = {
+                    class = "UILayoutHeavyBackground",
+                    color = "#222222",
+                    colors = "#000000|#000000|#000000|#000000"
+                }
+            }
+        }
+    }
+    local containerLayoutXmlTable = {
+        tag = "HorizontalLayout",
+        attributes = {
+            width = "1260",
+            height = "610",
+            spacing = "10 10",
+            childAlignment = "MiddleCenter",
+            position = "0 0 10",
+            rotation = "180 0 0"
+        },
+        children = {
+            {
+                tag = "GridLayout",
+                attributes = {
+                    cellSize = "200 300",
+                    spacing = "10 10"
+                },
+                children = {}
+            },
+            {
+                tag = "Panel",
+                attributes = {
+                    class = "UILayoutLightBackground"
+                },
+                children = {
+                    {
+                        tag = "VerticalLayout",
+                        attributes = {padding = "5 5 5 5", spacing = "5 5"},
+                        children = {
+                            {
+                                tag = "ToggleButton",
+                                attributes = {
+                                    id = "toggleAntiMassDeflectors",
+                                    onValueChanged = "toggleAntiMassDeflectors",
+                                    class = "UILayoutHeavyBackground",
+                                    isOn = "false"
+                                },
+                                children = {
+                                    {
+                                        tag = "Text",
+                                        value = "Anti-Mass Deflectors",
+                                        attributes = {
+                                            class = "userButtonText"
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                tag = "ToggleButton",
+                                attributes = {
+                                    id = "togglePlasmaScoring",
+                                    onValueChanged = "togglePlasmaScoring",
+                                    class = "UILayoutHeavyBackground",
+                                    isOn = "false"
+                                },
+                                children = {
+                                    {
+                                        tag = "Text",
+                                        value = "Plasma Scoring",
+                                        attributes = {
+                                            class = "userButtonText"
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                tag = "Button",
+                                attributes = {
+                                    onClick = "resetRoller",
+                                    class = "UILayoutHeavyBackground"
+                                },
+                                children = {
+                                    {
+                                        tag = "Text",
+                                        value = "Reset",
+                                        attributes = {
+                                            class = "userButtonText"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    local xmlTable = {}
+    table.insert(xmlTable, table.unpack({defaultsXmlTable}))
+    table.insert(xmlTable, table.unpack({containerLayoutXmlTable}))
+
+    -- Layout in UNIT_TYPES list order.
+    for _, unit_id in ipairs(UNIT_TYPES) do
+        local unit_stats = unit_data[unit_id] or {}
+        table.insert(xmlTable[2]["children"][1]["children"], generateUnitXmlTable(unit_id, unit_stats))
+    end
+    return xmlTable
+end
+
+function generateUnitXmlTable(unit_id, unit_stats, color)
+    local unitXmlTemplate = {
+        tag = "Button",
+        attributes = {
+            id = "unitMainButton",
+            class = "UILayoutLightBackground",
+            onClick = "changeUnitCountXml",
+            onMouseEnter = "showChangeCountButtonsXml",
+            onMouseExit = "hideChangeCountButtonsXml",
+            width = "200",
+            height = "300"
+        },
+        children = {
+            {
+                tag = "VerticalLayout",
+                attributes = {},
+                children = {
+                    {
+                        tag = "Image",
+                        attributes = {
+                            image = "MissingImage!",
+                            preferredWidth = "200",
+                            preferredHeight = "200",
+                            preserveAspect = "true",
+                            color = "White"
+                        },
+                        children = {
+                            {
+                                tag = "Text",
+                                value = "MissingUnitName!",
+                                attributes = {
+                                    class = "unitNameplate",
+                                    offsetXY = "0 12",
+                                    width = "500",
+                                    height = "180",
+                                    rectAlignment = "LowerCenter"
+                                }
+                            },
+                            {
+                                tag = "Text",
+                                value = "?",
+                                attributes = {
+                                    id = "unitCount",
+                                    class = "unitCount",
+                                    offsetXY = "-16 -16",
+                                    rectAlignment = "UpperRight"
+                                }
+                            },
+                            {
+                                tag = "Button",
+                                value = "-",
+                                attributes = {
+                                    id = "unitCountDecrement",
+                                    active = "false",
+                                    onClick = "changeUnitCountXml(-1)",
+                                    class = "changeCount",
+                                    offsetXY = "16 14",
+                                    rectAlignment = "LowerLeft",
+                                    showAnimation = "FadeIn",
+                                    hideAnimation = "FadeOut"
+                                }
+                            },
+                            {
+                                tag = "Button",
+                                value = "+",
+                                attributes = {
+                                    id = "unitCountIncrement",
+                                    active = "false",
+                                    onClick = "changeUnitCountXml(1)",
+                                    class = "changeCount",
+                                    offsetXY = "-16 12",
+                                    rectAlignment = "LowerRight",
+                                    showAnimation = "FadeIn",
+                                    hideAnimation = "FadeOut"
+                                }
+                            },
+                            {
+                                tag = "Text",
+                                value = "",
+                                attributes = {
+                                    id = "hitsCount",
+                                    class = "hitsCount"
+                                },
+                                children = {}
+                            }
+                        }
+                    },
+                    {
+                        tag = "Panel",
+                        attributes = {class = "UILayoutMediumBackground", preferredHeight = "100"},
+                        children = {
+                            {
+                                tag = "VerticalLayout",
+                                attributes = {padding = "4 4 4 4", spacing = "4"},
+                                children = {}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    local unitXmlTable = unitXmlTemplate
+    -- Prepend unit ID to unitMainButton
+    unitXmlTable["attributes"]["id"] = unit_id .. "." .. unitXmlTable["attributes"]["id"]
+    -- Add unit image
+    unitXmlTable["children"][1]["children"][1]["attributes"]["image"] = unit_stats["image"]
+    -- Add unit color or fall back to White
+    unitXmlTable["children"][1]["children"][1]["attributes"]["color"] = color or "White"
+    -- Set unit nameplate to its name
+    unitXmlTable["children"][1]["children"][1]["children"][1]["value"] = unit_stats["name"]
+    -- Set unit count to 0
+    unitXmlTable["children"][1]["children"][1]["children"][2]["value"] = _unitTypeToCount[unit_id] or 0
+    -- Prepend unit ID to unit count XML id
+    unitXmlTable["children"][1]["children"][1]["children"][2]["attributes"]["id"] =
+        unit_id .. "." .. unitXmlTable["children"][1]["children"][1]["children"][2]["attributes"]["id"]
+    -- Prepend unit ID to minus counter XML id
+    unitXmlTable["children"][1]["children"][1]["children"][3]["attributes"]["id"] =
+        unit_id .. "." .. unitXmlTable["children"][1]["children"][1]["children"][3]["attributes"]["id"]
+    -- Prepend unit ID to plus counter XML id
+    unitXmlTable["children"][1]["children"][1]["children"][4]["attributes"]["id"] =
+        unit_id .. "." .. unitXmlTable["children"][1]["children"][1]["children"][4]["attributes"]["id"]
+    -- Prepend unit ID to hits counter XML id
+    unitXmlTable["children"][1]["children"][1]["children"][5]["attributes"]["id"] =
+        unit_id .. "." .. unitXmlTable["children"][1]["children"][1]["children"][5]["attributes"]["id"]
+    -- Generate unit
+    unitXmlTable["children"][1]["children"][2]["children"][1]["children"] =
+        generateUnitAbilitiesXmlTable(unit_id, unit_stats)
+    return unitXmlTable
+end
+
+function generateUnitAbilitiesXmlTable(unit_id, unit_stats)
+    local function generateUnitAbility(ability_id, ability_details)
+        local unitAbilityXml = {
+            tag = "Button",
+            attributes = {class = "UILayoutHeavyBackground"},
+            children = {
+                {
+                    tag = "Panel",
+                    attributes = {
+                        childAlignment = "MiddleLeft"
+                    },
+                    children = {
+                        {
+                            tag = "Text",
+                            value = "MissingUnitAbility!",
+                            attributes = {
+                                class = "unitAbilities",
+                                alignment = "MiddleLeft",
+                                ignoreLayout = "true",
+                                offsetXY = "-72 0"
+                            }
+                        },
+                        {
+                            tag = "Text",
+                            value = "",
+                            attributes = {
+                                class = "unitAbilities",
+                                ignoreLayout = "true",
+                                alignment = "MiddleRight",
+                                offsetXY = "72 0"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if ABILITIES[ability_id] ~= nil then
+            if type(ability_details) == "table" then
+                unitAbilityXml["attributes"]["onClick"] = "rollDiceForAbility(" .. string.sub(ability_id, 1, -1) .. ")"
+                unitAbilityXml["children"][1]["children"][1]["value"] = ABILITIES[ability_id]
+                unitAbilityXml["children"][1]["children"][2]["value"] = ability_details.hit
+                if ability_details.dice > 1 then
+                    unitAbilityXml["children"][1]["children"][2]["value"] =
+                        unitAbilityXml["children"][1]["children"][2]["value"] .. " (\u{00D7}" .. ability_details.dice .. ")"
+                end
+                if ability_details.extraDice and ability_details.extraDice > 0 then
+                    unitAbilityXml["children"][1]["children"][2]["value"] =
+                        unitAbilityXml["children"][1]["children"][2]["value"] .. " (PS)"
+                end
+            elseif type(ability_details) == "boolean" then
+                unitAbilityXml["children"][1]["children"][1]["value"] = ABILITIES[ability_id]
+            end
+        else
+            return
+        end
+        return unitAbilityXml
+    end
+
+    local unitAbilitiesXmlTable = {}
+    for ability_id, ability_details in pairs(unit_stats) do
+        table.insert(unitAbilitiesXmlTable, generateUnitAbility(ability_id, ability_details))
+    end
+
+    return unitAbilitiesXmlTable
+end
+
+function changeUnitCountXml(player, value, id)
+    if id == string.match(id, ".+%.") .. "unitMainButton" then
+        if value == "-1" then
+            value = "1"
+        elseif value == "-2" then
+            value = "-1"
+        else
+            value = 0
+        end
+    end
+
+    local unitType = string.match(id, "^(.+)%.")
+    local oldValue = getUnitCount(unitType)
+    local newValue = oldValue + value
+
+    -- Clamp.
+    newValue = math.max(0, newValue)
+    newValue = math.min(99, newValue)
+
+    setUnitCount(unitType, newValue)
+
+    -- If changing between zero and one, reset UI (in case plasma scoring moves).
+    if oldValue + newValue == 1 then
+        updateUi()
+    end
+end
+
+function showChangeCountButtonsXml(player, value, id)
+    local unitIncrementId = string.match(id, ".+%.") .. "unitCountIncrement"
+    local unitDecrementId = string.match(id, ".+%.") .. "unitCountDecrement"
+    self.UI.show(unitIncrementId)
+    self.UI.show(unitDecrementId)
+end
+
+function hideChangeCountButtonsXml(player, value, id)
+    local unitIncrementId = string.match(id, ".+%.") .. "unitCountIncrement"
+    local unitDecrementId = string.match(id, ".+%.") .. "unitCountDecrement"
+    self.UI.hide(unitIncrementId)
+    self.UI.hide(unitDecrementId)
+end
+
+-------------------------------------------------------------------------------
+
+function to_boolean(string)
+    if string:lower() == "true" then
+        return true
+    elseif string:lower() == "false" then
+        return false
+    else
+        return
+    end
+end
+
+function setUnitCount(unit, count)
+    assert(type(unit) == 'string' and type(count) == 'number')
+    self.UI.setValue(unit .. ".unitCount", count)
+    _unitTypeToCount[unit] = count
+end
+
+function getUnitCount(unit)
+    assert(type(unit) == 'string')
+    -- If the UI was (re)generated this frame it might not be safe to read.
+    --return tonumber(self.UI.getValue(unit .. ".unitCount"))
+    return _unitTypeToCount[unit]
+end
+
+function setHitCount(unit, hits)
+    self.UI.setValue(unit .. ".hitsCount", hits)
+end
+
+function setAntiMassDeflectors(value)
+    self.UI.setAttribute("toggleAntiMassDeflectors", "isOn", value)
+    _antiMassDeflectors = value
+end
+
+function setPlasmaScoring(value)
+    self.UI.setAttribute("togglePlasmaScoring", "isOn", value)
+    _plasmaScoring = value
+end
+
+function toggleAntiMassDeflectors()
+    setAntiMassDeflectors(not getAntiMassDeflectors())
+    updateUi()
+end
+
+function togglePlasmaScoring()
+    setPlasmaScoring(not getPlasmaScoring())
+    updateUi()
+end
+
+function getAntiMassDeflectors()
+    --return self.UI.getAttribute("toggleAntiMassDeflectors", "isOn")
+    return _antiMassDeflectors
+end
+
+function getPlasmaScoring()
+    --return self.UI.getAttribute("togglePlasmaScoring", "isOn")
+    return _plasmaScoring
+end
+
+function resetRoller()
+    Roller.reset()
+    for unit, _ in pairs(getUnitData()) do
+        setUnitCount(unit, 0)
+        setHitCount(unit, "")
+    end
+    updateUi()
+end
+
+-------------------------------------------------------------------------------
+
+-- Split out dice rolling into this self-contained "class".
+Roller = {
+    DICE_POSITION_RADIUS = 8,
+    DICE_POSITION_HEIGHT = 4,
+    _dice = {},
+    _rollInProgress = false,
+    _rollQueue = {}
+}
+
+function Roller.isRollInProgress()
+    return Roller._rollInProgress
+end
+
+function Roller.reset()
+    Roller._removeDice()
+    Roller._dice = {}
+end
+
+function Roller._removeDice()
+    for _, dice in ipairs(Roller._dice) do
+        for _, guid in ipairs(dice._guids or {}) do
+            local object = getObjectFromGUID(guid)
+            if object then
+                destroyObject(object)
+            end
+        end
+        dice._guids = nil
+    end
+end
+
+function Roller.addDice(params)
+    assert(type(params.diceColor) == "string", "bad diceColor")
+    assert(type(params.diceCount) == "number", "bad diceCount")
+    assert(type(params.unitName) == "string", "bad unitName")
+    assert(type(params.unitId) == "string", "bad unitId")
+    assert(type(params.hitValue) == "number", "bad hitValue")
+    assert((not params.critValue) or type(params.critValue) == "number", "bad critValue")
+    assert((not params.critCount) or type(params.critCount) == "number", "bad critCount")
+
+    -- Make a copy in case original gets mutated somehow.
+    local copy = {}
+    for k, v in pairs(params) do
+        copy[k] = v
+    end
+    table.insert(Roller._dice, copy)
+end
+
+function Roller.roll(playerColor, rollLabel)
+    assert(type(playerColor) == "string", "bad playerColor")
+    assert(type(rollLabel) == "string", "bad rollLabel")
+
+    local playerName = Player[playerColor] and Player[playerColor].steam_name or playerColor
+    table.insert(
+        Roller._rollQueue,
+        {
+            playerColor = playerColor,
+            playerName = playerName,
+            rollLabel = rollLabel
+        }
+    )
+    startLuaCoroutine(self, "Roller_RollDiceCoroutine")
+end
+
+function Roller._randomRotation()
+    --Credit for this function goes to Revinor (forums)
+    --Get 3 random numbers
+    local u1 = math.random()
+    local u2 = math.random()
+    local u3 = math.random()
+    --Convert them into quats to avoid gimbal lock
+    local u1sqrt = math.sqrt(u1)
+    local u1m1sqrt = math.sqrt(1 - u1)
+    local qx = u1m1sqrt * math.sin(2 * math.pi * u2)
+    local qy = u1m1sqrt * math.cos(2 * math.pi * u2)
+    local qz = u1sqrt * math.sin(2 * math.pi * u3)
+    local qw = u1sqrt * math.cos(2 * math.pi * u3)
+    --Apply rotation
+    local ysqr = qy * qy
+    local t0 = -2.0 * (ysqr + qz * qz) + 1.0
+    local t1 = 2.0 * (qx * qy - qw * qz)
+    local t2 = -2.0 * (qx * qz + qw * qy)
+    local t3 = 2.0 * (qy * qz - qw * qx)
+    local t4 = -2.0 * (qx * qx + ysqr) + 1.0
+    --Correct
+    if t2 > 1.0 then
+        t2 = 1.0
+    end
+    if t2 < -1.0 then
+        ts = -1.0
+    end
+    --Convert back to X/Y/Z
+    local xr = math.asin(t2)
+    local yr = math.atan2(t3, t4)
+    local zr = math.atan2(t1, t0)
+    --Return result
+    return {math.deg(xr), math.deg(yr), math.deg(zr)}
+end
+
+function Roller_RollDiceCoroutine()
+    local params = table.remove(Roller._rollQueue)
+    if not params then
+        return 1
+    end
+    local playerColor = params.playerColor
+    local playerName = params.playerName
+    local rollLabel = params.rollLabel
+
+    printToAll(playerName .. " rolling for " .. rollLabel, playerColor)
+    Roller._rollInProgress = true
+
+    math.randomseed(os.time())
+
+    -- Remove any existing dice.
+    Roller._removeDice()
+
+    -- Create dice, with random initial rotations.
+    local totalDiceCount = 0
+    for _, dice in ipairs(Roller._dice) do
+        totalDiceCount = totalDiceCount + dice.diceCount
+    end
+    local nextDieIndex = 1
+    for _, dice in ipairs(Roller._dice) do
+        dice._objects = {}
+        for _ = 1, dice.diceCount do
+            local pos = self.getPosition()
+            local phi = math.rad(nextDieIndex * 360 / totalDiceCount)
+            nextDieIndex = nextDieIndex + 1
+            local die =
+                spawnObject(
+                {
+                    type = "Die_10",
+                    position = {
+                        x = pos.x + Roller.DICE_POSITION_RADIUS * math.cos(phi),
+                        y = pos.y + Roller.DICE_POSITION_HEIGHT,
+                        z = pos.z + Roller.DICE_POSITION_RADIUS * math.sin(phi)
+                    },
+                    rotation = Roller._randomRotation()
+                }
+            )
+            die.setName(dice.unitName)
+            die.setColorTint(Color.fromString(dice.diceColor))
+            table.insert(dice._objects, die)
+        end
+    end
+    for _, dice in ipairs(Roller._dice) do
+        dice._guids = {} -- not safe to read immediately after spawn, can change
+        for _, die in pairs(dice._objects) do
+            while die.spawning do
+                coroutine.yield(0)
+            end
+            table.insert(dice._guids, die.getGUID())
+        end
+        dice._objects = nil
+    end
+    coroutine.yield(0)
+
+    -- Roll!
+    for _, dice in ipairs(Roller._dice) do
+        for _, guid in ipairs(dice._guids) do
+            local die = getObjectFromGUID(guid)
+            die.interactable = false
+            die.roll()
+        end
+    end
+    coroutine.yield(0)
+
+    -- Wait for dice, extract roll values.
+    local timeout = Time.time + 3
+    for _, dice in ipairs(Roller._dice) do
+        dice._rollValues = {}
+        for _, guid in ipairs(dice._guids) do
+            local die = false
+            while true do
+                die = getObjectFromGUID(guid) -- re-get every time, can be deleted
+                if die and (not die.resting) and Time.time < timeout then
+                    coroutine.yield(0)
+                else
+                    break
+                end
+            end
+            if die then
+                table.insert(dice._rollValues, die.getValue() or 0)
+                die.interactable = true
+            end
+        end
+    end
+    coroutine.yield(0)
+
+    -- Generate report.
+    local message = {}
+    local hits = 0
+    for _, dice in ipairs(Roller._dice) do
+        local item = "[HIT:" .. dice.hitValue
+        if dice.critCount and dice.critValue then
+            item = item .. ", CRIT(x" .. (dice.critCount + 1) .. "):" .. dice.critValue
+        end
+        item = item .. "]: "
+
+        local rollValues = {}
+        local unitHits = 0
+        for _, rollValue in ipairs(dice._rollValues) do
+            local suffix = ""
+            if rollValue >= dice.hitValue then
+                hits = hits + 1
+                unitHits = unitHits + 1
+                suffix = "#"
+            end
+            if dice.critCount and dice.critValue and rollValue >= dice.critValue then
+                hits = hits + dice.critCount
+                unitHits = unitHits + dice.critCount
+                for _ = 1, dice.critCount do
+                    suffix = suffix .. "#"
+                end
+            end
+            table.insert(rollValues, rollValue .. suffix)
+        end
+        setHitCount(dice.unitId, unitHits)
+        table.insert(message, dice.unitName .. " " .. item .. table.concat(rollValues, ", "))
+    end
+    broadcastToAll(playerName .. " rolled: [ffffff]" .. table.concat(message, ", "), playerColor)
+    broadcastToAll(playerName .. " landed " .. hits .. " hit" .. (hits == 1 and "" or "s") .. ".", playerColor)
+
+    Roller._rollInProgress = false
+    return 1
+end
+
+function rollDiceForAbility(player, ability)
+    local clickerColor = player and player.color or myColor()
+    local playerZoneColor = myColor() or clickerColor
+
+    if Roller.isRollInProgress() then
+        broadcastToColor("Dice are already being rolled.", clickerColor, {0.8, 0.2, 0.2})
+        return
+    end
+
+    local unitData = getUnitData()
+    printUnitModifiers(unitData)
+
+    for unit, _ in pairs(unitData) do
+        setHitCount(unit, "")
+    end
+    Roller.reset()
+
+    for unit_id, unit_stats in pairs(unitData) do
+        local unit_count = getUnitCount(unit_id) or 0
+        if unit_count > 0 and unit_stats[ability] then
+            local params = {
+                diceColor = DICE_COLOR[unit_id],
+                diceCount = unit_stats[ability].dice * unit_count + (unit_stats[ability].extraDice or 0),
+                hitValue = unit_stats[ability].hit,
+                unitName = unit_stats.name,
+                unitId = unit_id
+            }
+            Roller.addDice(params)
+        end
+    end
+    Roller.roll(playerZoneColor, ABILITIES[ability])
+end
+
+function printUnitModifiers(unitAttrs, dstColor)
+    local modifiers = {}
+    for _, modifier in ipairs(unitAttrs._flagshipModifiers) do
+        table.insert(modifiers, modifier.name .. ' (' .. modifier.description .. ')')
+    end
+    for _, modifier in ipairs(unitAttrs._unitModifiers) do
+        table.insert(modifiers, modifier.name .. ' (' .. modifier.description .. ')')
+    end
+    local msg = 'Roll Modifiers detected: ' .. ((#modifiers > 0) and table.concat(modifiers, ', ') or 'none')
+    for _, warning in ipairs(_updateWarnings or {}) do
+        msg = msg .. '\n' .. 'WARNING: ' .. warning
+    end
+    local msgColor = assert(myColor())
+    if dstColor then
+        printToColor(msg, dstColor, msgColor)
+    else
+        printToAll(msg, msgColor)
+    end
+end
+
+-------------------------------------------------------------------------------
+
+function myColor()
+    local p0 = self.getPosition()
+    local best = false
+    local bestDistanceSq = false
+    for _, attrs in ipairs(_zoneHelper.zonesAttributes()) do
+        local p1 = attrs.center
+        local dSq = (p0.x - p1.x) ^ 2 + (p0.z - p1.z) ^ 2
+        if (not best) or dSq < bestDistanceSq then
+            best = attrs.color
+            bestDistanceSq = dSq
+        end
+    end
+    return best
+end
+
+function getUnitData(force)
+    if force or (not _getUnitDataLastRefreshFrame) or (_getUnitDataLastRefreshFrame ~= Time.frame_count) then
+        _getUnitDataLastRefreshFrame = Time.frame_count
+    end
+
+    local color = myColor()
+
+    local unitTypeToCount = {}
+    for _, unitType in ipairs(UNIT_TYPES) do
+        unitTypeToCount[unitType] = getUnitCount(unitType)
+    end
+
+    local unitOverrides = _unitHelper.getColorToUnitOverrides()[color] or {}
+    local unitModifiers = _unitHelper.getColorToUnitModifiers()[color] or {}
+
+    -- Remove PS if not selected.
+    if getPlasmaScoring() then
+        local found = false
+        for _, modifier in ipairs(unitModifiers) do
+            if modifier == 'Plasma Scoring' then
+                found = true
+                break
+            end
+        end
+        if not found then
+            -- Plasma scoring not detected, but is enabled.
+            _updateWarnings = _updateWarnings or {}
+            table.insert(_updateWarnings, 'PS enabled but missing Plasma Scoring technology')
+            table.insert(unitModifiers, 'Plasma Scoring')
+        end
+    else
+        for i = #unitModifiers, 1, -1 do
+            if unitModifiers[i] == 'Plasma Scoring' then
+                -- Plasma scoring detected, but disabled.
+                _updateWarnings = _updateWarnings or {}
+                table.insert(_updateWarnings, 'PS disabled but have Plasma Scoring technology')
+                table.remove(unitModifiers, i)
+            end
+        end
+    end
+
+    -- Auto-fill may know about modifiers.
+    if _injectExtraModifiers then
+        local unitModifiersSet = {}
+        for _, unitModifier in ipairs(unitModifiers) do
+            unitModifiersSet[unitModifier] = true
+        end
+        for _, unitModifier in ipairs(_injectExtraModifiers) do
+            if not unitModifiersSet[unitModifier] then
+                table.insert(unitModifiers, unitModifier)
+            end
+        end
+    end
+
+    _unitAttrs = _unitHelper.getUnitAttributes(unitOverrides)
+
+    -- Apply flagships.
+    _unitAttrs = _unitHelper.applyFlagshipModifiers({
+        unitAttrs = assert(_unitAttrs),
+        myUnitTypeToCount = unitTypeToCount,
+        opponentUnitTypeToCount = false
+    })
+
+    -- Apply unit modifiers.
+    _unitAttrs = _unitHelper.applyUnitModifiers({
+        unitAttrs = assert(_unitAttrs),
+        myColor = color,
+        myUnitModifiers = unitModifiers,
+        myUnitTypeToCount = unitTypeToCount,
+        opponentColor = false,
+        opponentUnitModifiers = getAntiMassDeflectors() and { 'Antimass Deflectors' },
+        opponentUnitTypeToCount = false
+    })
+
+    -- Make sure all units have a name and image.
+    for unitType, unitAttrs in pairs(_unitAttrs) do
+        unitAttrs.name = unitAttrs.name or unitType
+        unitAttrs.image = unitAttrs.image or unitType
+        unitAttrs.image = 'MuaatButton'
+    end
+
+    return _unitAttrs
+end
+
+-------------------------------------------------------------------------------
+
+--- Let outsiders ("auto-fill multiroller") set values and optionally roll.
+function inject(params)
+    assert(type(params) == 'table')
+    assert(type(params.clickerColor) == 'string')
+    assert(type(params.unitTypeToCount) == 'table')
+    assert(type(params.plasmaScoring) == 'boolean')
+    assert(type(params.antimassDeflectors) == 'boolean')
+    assert((not params.rollType) or type(params.rollType) == 'string')
+    assert((not params.extraModifiers) or type(params.extraModifiers) == 'table')
+
+    -- Add these when gathering unit modifiers.
+    _injectExtraModifiers = params.extraModifiers or false
+
+    for _, unitType in ipairs(UNIT_TYPES) do
+        setUnitCount(unitType, 0)
+    end
+    for unitType, count in pairs(params.unitTypeToCount) do
+        setUnitCount(unitType, count)
+    end
+
+    setPlasmaScoring(params.plasmaScoring and true or false)
+    setAntiMassDeflectors(params.antimassDeflectors and true or false)
+
+    updateUi()
+
+    rollDiceForAbility(false, params.rollType)
+
+    -- Require click handling absorb these this frame, otherwise lost.
+    _injectExtraModifiers = false
+end
+
+-------------------------------------------------------------------------------
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

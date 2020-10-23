@@ -19,7 +19,6 @@ function getHelperClient(helperObjectName)
     end
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
-local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 local _unitHelper = getHelperClient('TI4_UNIT_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
@@ -30,9 +29,6 @@ local _ps = {}
 local _lastUpdateFrame = false
 local _unitAttrs = false
 local _rollQueue = {}
-
-local _rollInProgress = false
-local _dice = {}
 
 local _injectExtraModifiers = false
 local _updateWarnings = false
@@ -72,6 +68,9 @@ function inject(params)
 
     updateUnitValues(true)
 
+    -- Require click handling absorb these this frame, otherwise lost.
+    _injectExtraModifiers = false
+
     local clickObject = self
     local clickerColor = params.clickerColor
     local altClick = false
@@ -86,18 +85,9 @@ function inject(params)
     elseif params.rollType then
         error('unknown roll type ' .. params.rollType)
     end
-
-    -- Require click handling absorb these this frame, otherwise lost.
-    _injectExtraModifiers = false
 end
 
 -------------------------------------------------------------------------------
-
--- Initial dice position relative to tool.
-local DICE = {
-    radius = 5,
-    height = 4
-}
 
 local UNIT_DATA = {
     {
@@ -513,7 +503,7 @@ function clickReset(clickObject, clickerColor, altClick)
     if _amd.active then
         clickAMD()
     end
-    deleteDice()
+    Roller.reset()
 end
 
 function clickUpdate(clickObject, clickerColor, altClick)
@@ -695,180 +685,111 @@ function printUnitModifiers(dstColor)
     end
 end
 
-function deleteDice()
-    while #_dice > 0 do
-        local die = table.remove(_dice)
-        local object = getObjectFromGUID(die.guid)
-        if object then
-            destroyObject(object)
-        end
-    end
-end
-
 function roll(clickerColor, rollLabel, rollTypes)
     assert(type(clickerColor) == 'string' and type(rollLabel) == 'string' and type(rollTypes) == 'table')
 
-    if _rollInProgress then
+    if Roller.isRollInProgress() then
         broadcastToColor('Dice are already being rolled.', clickerColor, {0.8,0.2,0.2})
         return
     end
+    Roller.reset()
 
     updateUnitValues()
     printUnitModifiers()
 
-    local color = assert(myColor())
-    local name = assert(getName(color))
-    printToAll(name .. ' rolling for ' .. rollLabel, color)
-
-    local unitTypeToHitDiceAndCount = false
+    assert(#Roller._dice == 0)
+    local foundUnits = false
     for _, unitData in ipairs(UNIT_DATA) do
         local unitType = unitData.unitType
+        local unitName = _unitAttrs[unitType].name or unitType
         for _, rollType in ipairs(rollTypes) do
             local hitAndDice = _unitAttrs[unitType][rollType]
-            local count = getCount(unitType)
-            if hitAndDice and count > 0 then
-                unitTypeToHitDiceAndCount = unitTypeToHitDiceAndCount or {}
-                unitTypeToHitDiceAndCount[unitType] = {
-                    hitAndDice = hitAndDice,
-                    count = count
-                }
-                break
+            local unitCount = getCount(unitType)
+            if hitAndDice and unitCount > 0 then
+                foundUnits = true
+                Roller.addDice({
+                    unitName = unitName,
+                    diceColor = DICE_COLOR[unitType],
+                    diceCount = unitCount * hitAndDice.dice + (hitAndDice.extraDice or 0),
+                    hitValue = hitAndDice.hit,
+                    critValue = hitAndDice.extraHitsOn and hitAndDice.extraHitsOn.value,
+                    critCount = hitAndDice.extraHitsOn and hitAndDice.extraHitsOn.count,
+                })
             end
         end
     end
 
-    if not unitTypeToHitDiceAndCount then
-        printToAll('No valid units for ' .. rollLabel, color)
+    local playerColor = myColor()
+    if not foundUnits then
+        printToAll('No valid units for ' .. rollLabel, playerColor)
     else
-        _rollInProgress = true
-        table.insert(_rollQueue, {
-            name = name,
-            color = color,
-            unitTypeToHitDiceAndCount = unitTypeToHitDiceAndCount
-        })
-        startLuaCoroutine(self, 'rollCoroutine')
+        Roller.roll(playerColor, rollLabel)
     end
 end
 
-function rollCoroutine()
-    local params = table.remove(_rollQueue)
-    if not params then
-        return
-    end
-    local name = assert(params.name)
-    local color = assert(params.color)
-    local unitTypeToHitDiceAndCount = assert(params.unitTypeToHitDiceAndCount)
+-------------------------------------------------------------------------------
 
-    deleteDice()
-    math.randomseed(os.time())
+-- Split out dice rolling into this self-contained "class".
+Roller = {
+    DICE_POSITION_RADIUS = 5,
+    DICE_POSITION_HEIGHT = 4,
 
-    -- Gather dice information (wait until we know count to spawn dice).
-    for unitType, hitDiceAndCount in pairs(unitTypeToHitDiceAndCount) do
-        local hitAndDice = hitDiceAndCount.hitAndDice
-        for _ = 1, hitDiceAndCount.count * hitAndDice.dice + (hitAndDice.extraDice or 0) do
-            table.insert(_dice, {
-                unitType = unitType,
-                unitName = _unitAttrs[unitType].name or unitType,
-                hit = hitDiceAndCount.hitAndDice.hit,
-                crit = hitDiceAndCount.hitAndDice.extraHitsOn,
-            })
-        end
-    end
+    _dice = {},
+    _rollInProgress = false,
+    _rollQueue = {}
+}
 
-    for i, die in ipairs(_dice) do
-        local pos = self.getPosition()
-        local phi = math.rad(i * 360 / #_dice)
-        die.object = spawnObject({
-            type = 'Die_10',
-            position = {
-                x = pos.x + DICE.radius * math.cos(phi),
-                y = pos.y + DICE.height,
-                z = pos.z + DICE.radius * math.sin(phi),
-            },
-            rotation = randomRotation(),
-        })
-        die.object.setName(die.unitName)
-        die.object.setColorTint(Color.fromString(DICE_COLOR[die.unitType]))
-    end
-    for _, die in ipairs(_dice) do
-        while die.object and die.object.spawning do
-            coroutine.yield(0)
-        end
-        die.guid = die.object.getGUID()
-        die.object = nil  -- reset deletes dice
-    end
-    coroutine.yield(0)
-
-    for _, die in ipairs(_dice) do
-        local object = getObjectFromGUID(die.guid)
-        if object then
-            object.interactable = false
-            object.roll()
-        end
-    end
-    coroutine.yield(0)
-
-    local timeout = Time.time + 3
-    for _, die in ipairs(_dice) do
-        local object = getObjectFromGUID(die.guid)
-        while object and (not object.resting) and Time.time < timeout do
-            coroutine.yield(0)
-        end
-    end
-    for _, die in ipairs(_dice) do
-        local object = getObjectFromGUID(die.guid)
-        if object then
-            object.interactable = true
-        end
-    end
-    coroutine.yield(0)
-
-    local message = {}
-    local hits = 0
-    for unitType, _ in pairs(unitTypeToHitDiceAndCount) do
-        local unitDice = {}
-        for _, die in ipairs(_dice) do
-            if die.unitType == unitType then
-                table.insert(unitDice, die)
-            end
-        end
-        if #unitDice > 0 then
-            local die = unitDice[1]
-            local item = '[HIT:' .. die.hit
-            if die.crit then
-                item = item .. ', CRIT(x' .. (die.crit.count + 1) .. '):' .. die.crit.value
-            end
-            item = item .. ']: '
-
-            local values = {}
-            for _, die in ipairs(unitDice) do
-                local object = getObjectFromGUID(die.guid)
-                local value = object and object.getValue() or 0
-                local suffix = ''
-                if value >= die.hit then
-                    hits = hits + 1
-                    suffix = '#'
-                end
-                if die.crit and value >= die.crit.value then
-                    hits = hits + die.crit.count
-                    for _ = 1, die.crit.count do
-                        suffix = suffix .. '#'
-                    end
-                end
-                table.insert(values, value .. suffix)
-            end
-            table.insert(message, die.unitName .. ' ' .. item .. table.concat(values, ', '))
-        end
-    end
-
-    broadcastToAll(name .. ' rolled: [ffffff]' .. table.concat(message, ', '), color)
-    broadcastToAll(name .. ' landed ' .. hits .. ' hit' .. (hits == 1 and '' or 's') .. '.', color)
-
-    _rollInProgress = false
-    return 1
+function Roller.isRollInProgress()
+    return Roller._rollInProgress
 end
 
-function randomRotation()
+function Roller.reset()
+    Roller._removeDice()
+    Roller._dice = {}
+end
+
+function Roller._removeDice()
+    for _, dice in ipairs(Roller._dice) do
+        for _, guid in ipairs(dice._guids or {}) do
+            local object = getObjectFromGUID(guid)
+            if object then
+                destroyObject(object)
+            end
+        end
+        dice._guids = nil
+    end
+end
+
+function Roller.addDice(params)
+    assert(type(params.diceColor) == 'string', 'bad diceColor')
+    assert(type(params.diceCount) == 'number', 'bad diceCount')
+    assert(type(params.unitName) == 'string', 'bad unitName')
+    assert(type(params.hitValue) == 'number', 'bad hitValue')
+    assert((not params.critValue) or type(params.critValue) == 'number', 'bad critValue')
+    assert((not params.critCount) or type(params.critCount) == 'number', 'bad critCount')
+
+    -- Make a copy in case original gets mutated somehow.
+    local copy = {}
+    for k, v in pairs(params) do
+        copy[k] = v
+    end
+    table.insert(Roller._dice, copy)
+end
+
+function Roller.roll(playerColor, rollLabel)
+    assert(type(playerColor) == 'string', 'bad playerColor')
+    assert(type(rollLabel) == 'string', 'bad rollLabel')
+
+    local playerName = Player[playerColor] and Player[playerColor].steam_name or playerColor
+    table.insert(Roller._rollQueue, {
+        playerColor = playerColor,
+        playerName = playerName,
+        rollLabel = rollLabel
+    })
+    startLuaCoroutine(self, 'Roller_RollDiceCoroutine')
+end
+
+function Roller._randomRotation()
     --Credit for this function goes to Revinor (forums)
     --Get 3 random numbers
     local u1 = math.random()
@@ -899,7 +820,129 @@ function randomRotation()
     return {math.deg(xr),math.deg(yr),math.deg(zr)}
 end
 
+function Roller_RollDiceCoroutine()
+    local params = table.remove(Roller._rollQueue)
+    if not params then
+        return 1
+    end
+    local playerColor = params.playerColor
+    local playerName = params.playerName
+    local rollLabel = params.rollLabel
+
+    printToAll(playerName .. ' rolling for ' .. rollLabel, playerColor)
+    Roller._rollInProgress = true
+
+    math.randomseed(os.time())
+
+    -- Remove any existing dice.
+    Roller._removeDice()
+
+    -- Create dice, with random initial rotations.
+    local totalDiceCount = 0
+    for _, dice in ipairs(Roller._dice) do
+        totalDiceCount = totalDiceCount + dice.diceCount
+    end
+    local nextDieIndex = 1
+    for _, dice in ipairs(Roller._dice) do
+        dice._objects = {}
+        for _ = 1, dice.diceCount do
+            local pos = self.getPosition()
+            local phi = math.rad(nextDieIndex * 360 / totalDiceCount)
+            nextDieIndex = nextDieIndex + 1
+            local die = spawnObject({
+                type = 'Die_10',
+                position = {
+                    x = pos.x + Roller.DICE_POSITION_RADIUS * math.cos(phi),
+                    y = pos.y + Roller.DICE_POSITION_HEIGHT,
+                    z = pos.z + Roller.DICE_POSITION_RADIUS * math.sin(phi),
+                },
+                rotation = Roller._randomRotation(),
+            })
+            die.setName(dice.unitName)
+            die.setColorTint(Color.fromString(dice.diceColor))
+            table.insert(dice._objects, die)
+        end
+    end
+    for _, dice in ipairs(Roller._dice) do
+        dice._guids = {}  -- not safe to read immediately after spawn, can change
+        for _, die in pairs(dice._objects) do
+            while die.spawning do
+                coroutine.yield(0)
+            end
+            table.insert(dice._guids, die.getGUID())
+        end
+        dice._objects = nil
+    end
+    coroutine.yield(0)
+
+    -- Roll!
+    for _, dice in ipairs(Roller._dice) do
+        for _, guid in ipairs(dice._guids) do
+            local die = getObjectFromGUID(guid)
+            die.interactable = false
+            die.roll()
+        end
+    end
+    coroutine.yield(0)
+
+    -- Wait for dice, extract roll values.
+    local timeout = Time.time + 3
+    for _, dice in ipairs(Roller._dice) do
+        dice._rollValues = {}
+        for _, guid in ipairs(dice._guids) do
+            local die = false
+            while true do
+                die = getObjectFromGUID(guid)  -- re-get every time, can be deleted
+                if die and (not die.resting) and Time.time < timeout then
+                    coroutine.yield(0)
+                else
+                    break
+                end
+            end
+            if die then
+                table.insert(dice._rollValues, die.getValue() or 0)
+                die.interactable = true
+            end
+        end
+    end
+    coroutine.yield(0)
+
+    -- Generate report.
+    local message = {}
+    local hits = 0
+    for _, dice in ipairs(Roller._dice) do
+        local item = '[HIT:' .. dice.hitValue
+        if dice.critCount and dice.critValue then
+            item = item .. ', CRIT(x' .. (dice.critCount + 1) .. '):' .. dice.critValue
+        end
+        item = item .. ']: '
+
+        local rollValues = {}
+        for _, rollValue in ipairs(dice._rollValues) do
+            local suffix = ''
+            if rollValue >= dice.hitValue then
+                hits = hits + 1
+                suffix = '#'
+            end
+            if dice.critCount and dice.critValue and rollValue >= dice.critValue then
+                hits = hits + dice.critCount
+                for _ = 1, dice.critCount do
+                    suffix = suffix .. '#'
+                end
+            end
+            table.insert(rollValues, rollValue .. suffix)
+        end
+        table.insert(message, dice.unitName .. ' ' .. item .. table.concat(rollValues, ', '))
+    end
+    broadcastToAll(playerName .. ' rolled: [ffffff]' .. table.concat(message, ', '), playerColor)
+    broadcastToAll(playerName .. ' landed ' .. hits .. ' hit' .. (hits == 1 and '' or 's') .. '.', playerColor)
+
+    Roller._rollInProgress = false
+    return 1
+end
+
 -------------------------------------------------------------------------------
+
 -- Index is only called when the key does not already exist.
 local _lockGlobalsMetaTable = {}
 function _lockGlobalsMetaTable.__index(table, key)

@@ -733,6 +733,8 @@ function resetRoller()
         setUnitCount(unit, 0)
         setHitCount(unit, "")
     end
+    setAntiMassDeflectors(false)
+    setPlasmaScoring(false)
     updateAbilities()
 end
 

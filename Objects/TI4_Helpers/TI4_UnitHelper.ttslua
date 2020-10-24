@@ -185,7 +185,7 @@ local _unitOverrides = {
     ['Battlecruiser I'] = { override = 'Cruiser', },
     ['Battlecruiser II'] = { upgrade = 'Cruiser', spaceCombat = { hit = 6 } },
     ['Lancer Dreadnought I'] = { override = 'Dreadnought', spaceCannon = { dice = 1, hit = 6, range = 0 } },
-    ['Lancer Dreadnought II'] = { upgrade = 'Dreadnought' },
+    ['Lancer Dreadnought II'] = { upgrade = 'Dreadnought', spaceCannon = { hit = 5 }, move = 2 },
     ['Wraith Corvette I'] = { override = 'Destroyer', antiFighterBarrage = { dice = 3 }, spaceCombat = { hit = 8 } },
     ['Wraith Corvette II'] = { upgrade = 'Destroyer', antiFighterBarrage = { dice = 4, hit = 6 }, spaceCombat = { hit = 7 } },
     ['Raid Shuttle I'] = { override = 'Carrier', },

@@ -575,12 +575,15 @@ function onLoad(save_state)
 end
 
 function onPlayerTurnStart(player_color_start, player_color_previous)
-    -- ALWAYS update player notes, even if not enabled.
-    if _waitId then
-        Wait.stop(_waitId)
-    end
+    -- Record the next "start of turn" upate in the notebook.
     _logNext = true
-    _waitId = Wait.time(_periodicUpdateNotes, 1)
+
+    -- ALWAYS update player notes, even if not enabled?
+    -- No, if players want notes require them be enabled.
+    -- if _waitId then
+    --     Wait.stop(_waitId)
+    -- end
+    -- _waitId = Wait.time(_periodicUpdateNotes, 1)
 end
 
 -------------------------------------------------------------------------------

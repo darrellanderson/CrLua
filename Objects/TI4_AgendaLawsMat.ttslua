@@ -43,8 +43,6 @@ local _scriptingZone = false
 local _attachedGuidToName = {}
 local _laws = {}
 
-local _temporaryIgnoreSet = {}
-
 -------------------------------------------------------------------------------
 
 function recomputeLaws()
@@ -204,15 +202,13 @@ end
 
 function onObjectEnterContainer(container, enterObject)
     local name = enterObject.getName()
-    if enterObject.tag == 'Card' and _laws['Anti-Intellectual Revolution'] and not _temporaryIgnoreSet[name] then
+    if enterObject.tag == 'Card' and _laws['Anti-Intellectual Revolution'] then
         local triggerSet = {
             ['Focused Research'] = true,
             ['Technology Rider'] = true,
             ['Ixthian Artifact'] = true,
         }
-        if triggerSet[name] then
-            _temporaryIgnoreSet[name] = true
-            Wait.time(function() _temporaryIgnoreSet[name] = nil end, 10)
+        if triggerSet[name] and _deckHelper.isDiscard(enterObject.getGUID()) then
             _antiIntellecualRevolution(name .. ' discarded')
         end
     end

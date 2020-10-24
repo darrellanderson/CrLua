@@ -792,12 +792,14 @@ function Roller.addDice(params)
     table.insert(Roller._dice, copy)
 end
 
-function Roller.roll(playerColor, rollLabel)
+function Roller.roll(clickerColor, playerColor, rollLabel)
+    assert(type(clickerColor) == 'string', 'bad clickerColor')
     assert(type(playerColor) == 'string', 'bad playerColor')
     assert(type(rollLabel) == 'string', 'bad rollLabel')
 
     local playerName = Player[playerColor] and Player[playerColor].steam_name or playerColor
     table.insert(Roller._rollQueue, {
+        clickerColor = clickerColor,
         playerColor = playerColor,
         playerName = playerName,
         rollLabel = rollLabel
@@ -876,13 +878,18 @@ function Roller_RollDiceCoroutine()
     if not params then
         return 1
     end
+    local clickerColor = params.clickerColor
     local playerColor = params.playerColor
     local playerName = params.playerName
     local rollLabel = params.rollLabel
 
     if Roller.isRollInProgress() then
-        printToColor('Dice are already being rolled.', playerColor, {0.8,0.2,0.2})
-        return
+        printToColor('Dice are already being rolled.', clickerColor, {0.8,0.2,0.2})
+        return 1
+    end
+    if #Roller._dice == 0 then
+        printToColor('No valid units for ' .. rollLabel, clickerColor, {0.8,0.2,0.2})
+        return 1
     end
     Roller._setRollInProgress(true)
     printToAll(playerName .. ' rolling for ' .. rollLabel, playerColor)
@@ -969,19 +976,23 @@ function Roller_RollDiceCoroutine()
         item = item .. ']: '
 
         local rollValues = {}
+        local unitHitCount = 0
         for _, rollValue in ipairs(dice._rollValues) do
             local suffix = ''
             if rollValue >= dice.hitValue then
                 hits = hits + 1
+                unitHitCount = unitHitCount + 1
                 suffix = '#'
             end
             if dice.critCount and dice.critValue and rollValue >= dice.critValue then
                 hits = hits + dice.critCount
+                unitHitCount = unitHitCount + dice.critCount
                 for _ = 1, dice.critCount do
                     suffix = suffix .. '#'
                 end
             end
             table.insert(rollValues, rollValue .. suffix)
+            setHitCount(dice.unitName, unitHitCount)
         end
         table.insert(message, dice.unitName .. ' ' .. item .. table.concat(rollValues, ', '))
     end
@@ -1024,7 +1035,7 @@ function rollDiceForAbility(player, ability)
             Roller.addDice(params)
         end
     end
-    Roller.roll(playerZoneColor, ABILITIES[ability])
+    Roller.roll(clickerColor, playerZoneColor, ABILITIES[ability])
 end
 
 function printUnitModifiers(unitAttrs, dstColor)

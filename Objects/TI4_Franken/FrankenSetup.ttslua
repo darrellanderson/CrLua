@@ -131,7 +131,8 @@ local function takeToAbove(container, name)
     local pos = container.getPosition()
     local object = self.takeObject({
         position = { pos.x, pos.y + 5, pos.z },
-        guid = guid
+        guid = guid,
+        smooth = false
     })
     assert(object)
     return object
@@ -144,6 +145,21 @@ local function packFactions()
             break
         end
     end
+end
+
+local function createPackBagsHiddenZone()
+    local hiddenZone = spawnObject({
+        type              = 'FogOfWarTrigger',
+        position          = { x = 0, y = 10, z = 0 },
+        rotation          = { x = 0, y = 0, z = 0 },
+        scale             = { x = 20, y = 20, z = 20 },
+        callback_fucntion = nil,
+        sound             = false,
+        params            = {},
+        snap_to_grid      = false,
+    })
+    hiddenZone.setValue('Teal')
+    return hiddenZone
 end
 
 local function createHiddenZones()
@@ -324,7 +340,7 @@ local function unpackToBags(bags)
 
         for _, bag in ipairs(bags) do
             for i = 1, count do
-                local pos = external.getPosition()
+                local pos = bag.getPosition()
                 local object = external.takeObject({
                     position = { x = pos.x, y = pos.y + 5 + i, z = pos.z },
                     smooth = false,
@@ -350,6 +366,8 @@ function doSetupCoroutine()
     local bags = createBags()
     coroutine.yield(0)
 
+    local bagsZone = createPackBagsHiddenZone()
+    coroutine.yield(0)
     unpackToBags(bags)
     coroutine.yield(0)
 
@@ -382,6 +400,10 @@ function doSetupCoroutine()
         end
         Wait.frames(delayedInform, i)
     end
+
+    -- Unpack should have finished packing the center bags by now.
+    destroyObject(bagsZone)
+    coroutine.yield(0)
 
     return 1
 end

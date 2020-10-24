@@ -700,6 +700,15 @@ function autoFillCoroutine()
     end
     coroutine.yield(0)
 
+    -- Apply any per-unit limits (Experimental Battlestation).
+    local function applyUnitLimit(unitLimit, inHex, adjHex)
+        local avail = unitLimit
+        inHex = math.min(inHex, avail)
+        avail = avail - inHex
+        adjHex = math.min(adjHex, avail)
+        return inHex, adjHex
+    end
+
     -- Now get just the units that matter for the combat type.
     CrLua.Log.d(TAG, 'autoFillCoroutine: getting fill units')
     local fillUnitTypeToCount = {}
@@ -712,6 +721,11 @@ function autoFillCoroutine()
                 if attrs.spaceCannon.range and attrs.spaceCannon.range > 0 then
                     fillUnitTypeToCount[unitType] = fillUnitTypeToCount[unitType] + (selfAdjUnitTypeToCount[unitType] or 0)
                     adjacentUnitTypeToCount[unitType] = (adjacentUnitTypeToCount[unitType] or 0) + (selfAdjUnitTypeToCount[unitType] or 0)
+                end
+                if attrs.spaceCannon.unitLimit then
+                    local a, b = applyUnitLimit(attrs.spaceCannon.unitLimit, fillUnitTypeToCount[unitType], adjacentUnitTypeToCount[unitType])
+                    fillUnitTypeToCount[unitType] = a
+                    adjacentUnitTypeToCount[unitType] = b
                 end
             end
         end
@@ -752,6 +766,9 @@ function autoFillCoroutine()
         for unitType, attrs in pairs(unitTypeToAttrs) do
             if attrs.spaceCannon then
                 fillUnitTypeToCount[unitType] = selfUnitTypeToCount[unitType] or 0
+                if unitType == 'Space Dock' then
+                    fillUnitTypeToCount[unitType] = 0  -- Experimental Battlestation does not apply 
+                end
             end
         end
 
@@ -786,17 +803,17 @@ function autoFillCoroutine()
     local fillUnitTypeToAttrs = getUnitAttrs(fillUnits, selfColor, enemyColor)
     for unitType, attrs in pairs(fillUnitTypeToAttrs) do
         if autofillTypeAttributes == AUTOFILL_TYPE.SPACE_CANNON_OFFENSE then
-            if attrs.spaceCannon and attrs.spaceCannon.extraDice > 0 then
+            if attrs.spaceCannon and (attrs.spaceCannon.extraDice or 0) > 0 then
                 psUnitType = unitType
                 break
             end
         elseif autofillTypeAttributes == AUTOFILL_TYPE.BOMBARDMENT then
-            if attrs.bombardment and attrs.bombardment.extraDice > 0 then
+            if attrs.bombardment and (attrs.bombardment.extraDice or 0) > 0 then
                 psUnitType = unitType
                 break
             end
         elseif autofillTypeAttributes == AUTOFILL_TYPE.SPACE_CANNON_DEFENSE then
-            if attrs.spaceCannon and attrs.spaceCannon.extraDice > 0 then
+            if attrs.spaceCannon and (attrs.spaceCannon.extraDice or 0) > 0 then
                 psUnitType = unitType
                 break
             end

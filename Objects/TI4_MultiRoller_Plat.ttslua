@@ -2,6 +2,14 @@
 -- @author Plat251
 -- @author MrStump for dice rolling functions
 
+--[[
+Set unit counts by left/right click (or +/- buttons). Winnu flagship number of enemy non-fighter ships instead.
+
+Play unit modifier cards in your play area (laws anywhere on the table). Toggle PS to use plasma scoring on best unit. Toggle AMD to use anti-mass deflectors.
+
+Click roll type in any unit's attributes.
+]]
+
 function getHelperClient(helperObjectName)
     local function getHelperObject()
         for _, object in ipairs(getAllObjects()) do
@@ -74,8 +82,11 @@ function onLoad()
     for _, unitType in ipairs(UNIT_TYPES) do
         _unitTypeToCount[unitType] = 0
     end
-    math.randomseed(tonumber(self.getGUID(), 16))
-    Wait.time(createUi, math.random() * 0.5 + 0.1)
+    local function delayedCreateUi()
+        math.randomseed(tonumber(self.getGUID(), 16)) -- guid may change after spawn
+        createUi()
+    end
+    Wait.time(delayedCreateUi, 0.5)
 end
 
 function onPlayerConnect(player_id)
@@ -103,7 +114,7 @@ function createUi()
         _allPossibleUnitAttrs['Carrier']['sustainDamage'] = true  -- sol
         _allPossibleUnitAttrs['Infantry']['spaceCombat'] = {}  -- nekro flagship
         _allPossibleUnitAttrs['Fighter']['spaceCombat'] = {}  -- naulo flagship
-        
+
         _getUnitDataLastRefreshFrame = false  -- make sure not cached!
         _injectExtraUnitUpgrades = false
         _injectExtraModifiers = false
@@ -287,8 +298,8 @@ function generateRollerXmlTable(unit_data)
             height = "610",
             spacing = "10 10",
             childAlignment = "MiddleCenter",
-            position = "0 0 10",
-            rotation = "180 0 0"
+            position = "0 0 -0.5",
+            rotation = "180 180 0"
         },
         children = {
             {
@@ -729,15 +740,23 @@ end
 
 -- Split out dice rolling into this self-contained "class".
 Roller = {
-    DICE_POSITION_RADIUS = 8,
+    DICE_POSITION_RADIUS_X = 8,
+    DICE_POSITION_RADIUS_Z = 4,
     DICE_POSITION_HEIGHT = 4,
+
     _dice = {},
-    _rollInProgress = false,
+    _rollInProgressTimestamp = false,
     _rollQueue = {}
 }
 
 function Roller.isRollInProgress()
-    return Roller._rollInProgress
+    local timeout = Roller._rollInProgressTimestamp and (Roller._rollInProgressTimestamp + 10)
+    return timeout and (timeout > Time.time)
+end
+
+function Roller._setRollInProgress(isActive)
+    assert(type(isActive) == 'boolean')
+    Roller._rollInProgressTimestamp = isActive and Time.time or false
 end
 
 function Roller.reset()
@@ -758,13 +777,12 @@ function Roller._removeDice()
 end
 
 function Roller.addDice(params)
-    assert(type(params.diceColor) == "string", "bad diceColor")
-    assert(type(params.diceCount) == "number", "bad diceCount")
-    assert(type(params.unitName) == "string", "bad unitName")
-    assert(type(params.unitId) == "string", "bad unitId")
-    assert(type(params.hitValue) == "number", "bad hitValue")
-    assert((not params.critValue) or type(params.critValue) == "number", "bad critValue")
-    assert((not params.critCount) or type(params.critCount) == "number", "bad critCount")
+    assert(type(params.diceColor) == 'string', 'bad diceColor')
+    assert(type(params.diceCount) == 'number', 'bad diceCount')
+    assert(type(params.unitName) == 'string', 'bad unitName')
+    assert(type(params.hitValue) == 'number', 'bad hitValue')
+    assert((not params.critValue) or type(params.critValue) == 'number', 'bad critValue')
+    assert((not params.critCount) or type(params.critCount) == 'number', 'bad critCount')
 
     -- Make a copy in case original gets mutated somehow.
     local copy = {}
@@ -775,24 +793,51 @@ function Roller.addDice(params)
 end
 
 function Roller.roll(playerColor, rollLabel)
-    assert(type(playerColor) == "string", "bad playerColor")
-    assert(type(rollLabel) == "string", "bad rollLabel")
-
-    if #Roller._dice == 0 then
-        printToAll('No valid units for ' .. rollLabel, playerColor)
-        return
-    end
+    assert(type(playerColor) == 'string', 'bad playerColor')
+    assert(type(rollLabel) == 'string', 'bad rollLabel')
 
     local playerName = Player[playerColor] and Player[playerColor].steam_name or playerColor
-    table.insert(
-        Roller._rollQueue,
-        {
-            playerColor = playerColor,
-            playerName = playerName,
-            rollLabel = rollLabel
+    table.insert(Roller._rollQueue, {
+        playerColor = playerColor,
+        playerName = playerName,
+        rollLabel = rollLabel
+    })
+    startLuaCoroutine(self, 'Roller_RollDiceCoroutine')
+end
+
+function Roller._getDieSpawnPosition(phi)
+    local bounds = self.getBounds()
+    local bb = {
+        min = {
+            x = bounds.center.x - bounds.size.x / 2,
+            z = bounds.center.z - bounds.size.z / 2,
+        },
+        max = {
+            x = bounds.center.x + bounds.size.x / 2,
+            z = bounds.center.z + bounds.size.z / 2,
         }
-    )
-    startLuaCoroutine(self, "Roller_RollDiceCoroutine")
+    }
+    local function contains(position)
+        local gteMin = position.x >= bb.min.x and position.z >= bb.min.z
+        local lteMax = position.x <= bb.max.x and position.z <= bb.max.z
+        return gteMin and lteMax
+    end
+
+    local rx = Roller.DICE_POSITION_RADIUS_X
+    local rz = Roller.DICE_POSITION_RADIUS_Z
+    while true do
+        local position = self.positionToWorld({
+            x = rx * math.cos(phi),
+            y = 0,
+            z = rz * math.sin(phi),
+        })
+        position.y = position.y + Roller.DICE_POSITION_HEIGHT
+        if not contains(position) then
+            return position
+        end
+        rx = rx + 0.5
+        rz = rz + 0.5
+    end
 end
 
 function Roller._randomRotation()
@@ -803,11 +848,11 @@ function Roller._randomRotation()
     local u3 = math.random()
     --Convert them into quats to avoid gimbal lock
     local u1sqrt = math.sqrt(u1)
-    local u1m1sqrt = math.sqrt(1 - u1)
-    local qx = u1m1sqrt * math.sin(2 * math.pi * u2)
-    local qy = u1m1sqrt * math.cos(2 * math.pi * u2)
-    local qz = u1sqrt * math.sin(2 * math.pi * u3)
-    local qw = u1sqrt * math.cos(2 * math.pi * u3)
+    local u1m1sqrt = math.sqrt(1-u1)
+    local qx = u1m1sqrt *math.sin(2*math.pi*u2)
+    local qy = u1m1sqrt *math.cos(2*math.pi*u2)
+    local qz = u1sqrt *math.sin(2*math.pi*u3)
+    local qw = u1sqrt *math.cos(2*math.pi*u3)
     --Apply rotation
     local ysqr = qy * qy
     local t0 = -2.0 * (ysqr + qz * qz) + 1.0
@@ -816,18 +861,14 @@ function Roller._randomRotation()
     local t3 = 2.0 * (qy * qz - qw * qx)
     local t4 = -2.0 * (qx * qx + ysqr) + 1.0
     --Correct
-    if t2 > 1.0 then
-        t2 = 1.0
-    end
-    if t2 < -1.0 then
-        ts = -1.0
-    end
+    if t2 > 1.0 then t2 = 1.0 end
+    if t2 < -1.0 then ts = -1.0 end
     --Convert back to X/Y/Z
     local xr = math.asin(t2)
     local yr = math.atan2(t3, t4)
     local zr = math.atan2(t1, t0)
     --Return result
-    return {math.deg(xr), math.deg(yr), math.deg(zr)}
+    return {math.deg(xr),math.deg(yr),math.deg(zr)}
 end
 
 function Roller_RollDiceCoroutine()
@@ -839,8 +880,12 @@ function Roller_RollDiceCoroutine()
     local playerName = params.playerName
     local rollLabel = params.rollLabel
 
-    printToAll(playerName .. " rolling for " .. rollLabel, playerColor)
-    Roller._rollInProgress = true
+    if Roller.isRollInProgress() then
+        printToColor('Dice are already being rolled.', playerColor, {0.8,0.2,0.2})
+        return
+    end
+    Roller._setRollInProgress(true)
+    printToAll(playerName .. ' rolling for ' .. rollLabel, playerColor)
 
     math.randomseed(os.time())
 
@@ -852,32 +897,25 @@ function Roller_RollDiceCoroutine()
     for _, dice in ipairs(Roller._dice) do
         totalDiceCount = totalDiceCount + dice.diceCount
     end
+    local phi0 = math.rad(math.random(360))
     local nextDieIndex = 1
     for _, dice in ipairs(Roller._dice) do
         dice._objects = {}
         for _ = 1, dice.diceCount do
-            local pos = self.getPosition()
-            local phi = math.rad(nextDieIndex * 360 / totalDiceCount)
+            local phi = phi0 + math.rad(nextDieIndex * 360 / totalDiceCount)
             nextDieIndex = nextDieIndex + 1
-            local die =
-                spawnObject(
-                {
-                    type = "Die_10",
-                    position = {
-                        x = pos.x + Roller.DICE_POSITION_RADIUS * math.cos(phi),
-                        y = pos.y + Roller.DICE_POSITION_HEIGHT,
-                        z = pos.z + Roller.DICE_POSITION_RADIUS * math.sin(phi)
-                    },
-                    rotation = Roller._randomRotation()
-                }
-            )
+            local die = spawnObject({
+                type = 'Die_10',
+                position = Roller._getDieSpawnPosition(phi),
+                rotation = Roller._randomRotation(),
+            })
             die.setName(dice.unitName)
             die.setColorTint(Color.fromString(dice.diceColor))
             table.insert(dice._objects, die)
         end
     end
     for _, dice in ipairs(Roller._dice) do
-        dice._guids = {} -- not safe to read immediately after spawn, can change
+        dice._guids = {}  -- not safe to read immediately after spawn, can change
         for _, die in pairs(dice._objects) do
             while die.spawning do
                 coroutine.yield(0)
@@ -905,7 +943,7 @@ function Roller_RollDiceCoroutine()
         for _, guid in ipairs(dice._guids) do
             local die = false
             while true do
-                die = getObjectFromGUID(guid) -- re-get every time, can be deleted
+                die = getObjectFromGUID(guid)  -- re-get every time, can be deleted
                 if die and (not die.resting) and Time.time < timeout then
                     coroutine.yield(0)
                 else
@@ -924,39 +962,37 @@ function Roller_RollDiceCoroutine()
     local message = {}
     local hits = 0
     for _, dice in ipairs(Roller._dice) do
-        local item = "[HIT:" .. dice.hitValue
+        local item = '[HIT:' .. dice.hitValue
         if dice.critCount and dice.critValue then
-            item = item .. ", CRIT(x" .. (dice.critCount + 1) .. "):" .. dice.critValue
+            item = item .. ', CRIT(x' .. (dice.critCount + 1) .. '):' .. dice.critValue
         end
-        item = item .. "]: "
+        item = item .. ']: '
 
         local rollValues = {}
-        local unitHits = 0
         for _, rollValue in ipairs(dice._rollValues) do
-            local suffix = ""
+            local suffix = ''
             if rollValue >= dice.hitValue then
                 hits = hits + 1
-                unitHits = unitHits + 1
-                suffix = "#"
+                suffix = '#'
             end
             if dice.critCount and dice.critValue and rollValue >= dice.critValue then
                 hits = hits + dice.critCount
-                unitHits = unitHits + dice.critCount
                 for _ = 1, dice.critCount do
-                    suffix = suffix .. "#"
+                    suffix = suffix .. '#'
                 end
             end
             table.insert(rollValues, rollValue .. suffix)
         end
-        setHitCount(dice.unitId, unitHits)
-        table.insert(message, dice.unitName .. " " .. item .. table.concat(rollValues, ", "))
+        table.insert(message, dice.unitName .. ' ' .. item .. table.concat(rollValues, ', '))
     end
-    broadcastToAll(playerName .. " rolled: [ffffff]" .. table.concat(message, ", "), playerColor)
-    broadcastToAll(playerName .. " landed " .. hits .. " hit" .. (hits == 1 and "" or "s") .. ".", playerColor)
+    broadcastToAll(playerName .. ' rolled: [ffffff]' .. table.concat(message, ', '), playerColor)
+    broadcastToAll(playerName .. ' landed ' .. hits .. ' hit' .. (hits == 1 and '' or 's') .. '.', playerColor)
 
-    Roller._rollInProgress = false
+    Roller._setRollInProgress(false)
     return 1
 end
+
+-------------------------------------------------------------------------------
 
 function rollDiceForAbility(player, ability)
     local clickerColor = player and player.color or myColor()
@@ -1025,7 +1061,7 @@ function myColor()
             bestDistanceSq = dSq
         end
     end
-    return best
+    return best or 'Grey'
 end
 
 function getUnitData(force)

@@ -1076,7 +1076,7 @@ function _moveTokenFromReinforcements(systemObject, colors)
                 smooth = true,
             })
         else
-            printToAll(bag.getName() .. ' empty, please assign token manually', 'Red')
+            broadcastToAll(bag.getName() .. ' empty, please assign token manually', 'Red')
             success = false
         end
     end
@@ -1124,7 +1124,7 @@ function _moveTokenFromCommandSheet(systemObject, color, section)
         local fast = false
         commandToken.setPositionSmooth(position, collide, fast)
     else
-        printToAll(color .. ' ' .. section .. ' pool is empty', 'Red')
+        broadcastToAll(string, Table)(color .. ' ' .. section .. ' pool is empty', 'Red')
         success = false
     end
     return success

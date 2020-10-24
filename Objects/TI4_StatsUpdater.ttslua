@@ -40,8 +40,6 @@ local _waitId = false
 local _logNext = false
 local _periodicUpdates = false
 
-local _noteBody = false
-
 -------------------------------------------------------------------------------
 
 function getHelperClient(helperObjectName)
@@ -487,18 +485,12 @@ function updateNotesCoroutine()
             return tab
         end
     end
-    local tab = getTab()
 
-    if _logNext and tab then
+    if _logNext then
         _logNext = false
-        _noteBody = tabMessage
-        tab.body = tabMessage
-        Notes.editNotebookTab(tab)
-    elseif _noteBody and tab then
-        -- Check if modified.
-        if tab.body ~= _noteBody then
-            --print('TI4 Stats: ' .. tab.title .. ' edited, resetting')
-            tab.body = _noteBody
+        local tab = getTab()
+        if tab then
+            tab.body = tabMessage
             Notes.editNotebookTab(tab)
         end
     end

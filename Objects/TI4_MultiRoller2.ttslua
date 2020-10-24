@@ -735,12 +735,18 @@ Roller = {
     DICE_POSITION_HEIGHT = 4,
 
     _dice = {},
-    _rollInProgress = false,
+    _rollInProgressTimestamp = false,
     _rollQueue = {}
 }
 
 function Roller.isRollInProgress()
-    return Roller._rollInProgress
+    local timeout = Roller._rollInProgressTimestamp and (Roller._rollInProgressTimestamp + 10)
+    return timeout and (timeout > Time.time)
+end
+
+function Roller._setRollInProgress(isActive)
+    assert(type(isActive) == 'boolean')
+    Roller._rollInProgressTimestamp = isActive and Time.time or false
 end
 
 function Roller.reset()
@@ -829,8 +835,12 @@ function Roller_RollDiceCoroutine()
     local playerName = params.playerName
     local rollLabel = params.rollLabel
 
+    if Roller.isRollInProgress() then
+        printToColor('Dice are already being rolled.', playerColor, {0.8,0.2,0.2})
+        return
+    end
+    Roller._setRollInProgress(true)
     printToAll(playerName .. ' rolling for ' .. rollLabel, playerColor)
-    Roller._rollInProgress = true
 
     math.randomseed(os.time())
 
@@ -937,7 +947,7 @@ function Roller_RollDiceCoroutine()
     broadcastToAll(playerName .. ' rolled: [ffffff]' .. table.concat(message, ', '), playerColor)
     broadcastToAll(playerName .. ' landed ' .. hits .. ' hit' .. (hits == 1 and '' or 's') .. '.', playerColor)
 
-    Roller._rollInProgress = false
+    Roller._setRollInProgress(false)
     return 1
 end
 

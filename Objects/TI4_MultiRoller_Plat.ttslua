@@ -94,6 +94,15 @@ function onPlayerConnect(player_id)
     Wait.time(createUi, math.random() * 0.5 + 0.1)
 end
 
+-- Update if a player moves it.
+function onDrop()
+    updateColor()
+end
+
+function onSetupHelperPlayerCountChanged()
+    updateColor()
+end
+
 function createUi()
     -- Use all modifiers that add abilities.  Show/hide them as needed.
     if not _allPossibleUnitAttrs then
@@ -135,6 +144,7 @@ function createUi()
         setPlasmaScoring(_plasmaScoring)
         setAntiMassDeflectors(_antiMassDeflectors)
         updateAbilities()
+        updateColor()
     end
     Wait.frames(delayedUpdate, 3) -- 2 is enough, do 3 to be safe
 end
@@ -166,6 +176,12 @@ function updateAbilities()
     end
 end
 
+function updateColor()
+    for _, unitType in ipairs(UNIT_TYPES) do
+        self.UI.setAttribute(unitType .. '.unitImage', 'color', myColor())
+    end
+end
+
 -------------------------------------------------------------------------------
 
 function generateRollerXmlTable(unit_data)
@@ -177,20 +193,18 @@ function generateRollerXmlTable(unit_data)
                 tag = "Text",
                 attributes = {
                     class = "unitNameplate",
-                    scale = "0.2 0.2 0.2",
                     resizeTextForBestFit = "true",
-                    resizeTextMaxSize = "100",
+                    resizeTextMaxSize = "250",
                     color = "#FFFFFF",
                     fontStyle = "Bold",
                     outline = "#000000",
-                    outlineSize = "8 -8"
+                    outlineSize = "16 -16"
                 }
             },
             {
                 tag = "Text",
                 attributes = {
                     class = "unitAbilities",
-                    scale = "0.1 0.1 0.1",
                     fontSize = "160",
                     color = "#FFFFFFFF",
                     horizontalOverflow = "Overflow",
@@ -201,8 +215,7 @@ function generateRollerXmlTable(unit_data)
                 tag = "Text",
                 attributes = {
                     class = "unitCount",
-                    scale = "0.25 0.25 0.25",
-                    fontSize = "160",
+                    fontSize = "640",
                     color = "#FFFFFFFF",
                     fontStyle = "Bold",
                     horizontalOverflow = "Overflow",
@@ -214,22 +227,21 @@ function generateRollerXmlTable(unit_data)
                 tag = "Text",
                 attributes = {
                     class = "hitsCount",
-                    height = "2000",
-                    width = "2000",
-                    scale = "0.25 0.25 0.25",
-                    fontSize = "720",
+                    height = "800",
+                    width = "800",
+                    scale = "2 2 2",
+                    fontSize = "800",
                     fontStyle = "Bold",
-                    color = "#FFFF00",
+                    color = "#FF0000",
                     outline = "#000000",
-                    outlineSize = "4 -4"
+                    outlineSize = "16 -16"
                 }
             },
             {
                 tag = "Text",
                 attributes = {
                     class = "userButtonText",
-                    scale = "0.1 0.1 0.1",
-                    fontSize = "40",
+                    fontSize = "400",
                     color = "#FFFFFFFF"
                 }
             },
@@ -237,10 +249,9 @@ function generateRollerXmlTable(unit_data)
                 tag = "Button",
                 attributes = {
                     class = "changeCount",
-                    width = "180",
-                    height = "180",
-                    scale = "0.2 0.2 0.2",
-                    fontSize = "160",
+                    width = "360",
+                    height = "360",
+                    fontSize = "320",
                     fontStyle = "Bold",
                     color = "#00000000",
                     textColor = "#FFFFFF"
@@ -294,19 +305,20 @@ function generateRollerXmlTable(unit_data)
     local containerLayoutXmlTable = {
         tag = "HorizontalLayout",
         attributes = {
-            width = "1260",
-            height = "610",
-            spacing = "10 10",
+            width = "12600",
+            height = "6100",
+            spacing = "100 100",
             childAlignment = "MiddleCenter",
             position = "0 0 -0.5",
-            rotation = "180 180 0"
+            rotation = "180 180 0",
+            scale = "0.098 0.096 1"
         },
         children = {
             {
                 tag = "GridLayout",
                 attributes = {
-                    cellSize = "200 300",
-                    spacing = "10 10"
+                    cellSize = "2000 3000",
+                    spacing = "100 100"
                 },
                 children = {}
             },
@@ -318,7 +330,7 @@ function generateRollerXmlTable(unit_data)
                 children = {
                     {
                         tag = "VerticalLayout",
-                        attributes = {padding = "5 5 5 5", spacing = "5 5"},
+                        attributes = {padding = "50 50 50 50", spacing = "50"},
                         children = {
                             {
                                 tag = "ToggleButton",
@@ -416,8 +428,8 @@ function generateUnitXmlTable(unit_id, unit_stats, color)
             onClick = "changeUnitCountXml",
             onMouseEnter = "showChangeCountButtonsXml",
             onMouseExit = "hideChangeCountButtonsXml",
-            width = "200",
-            height = "300"
+            width = "2000",
+            height = "3000"
         },
         children = {
             {
@@ -427,11 +439,12 @@ function generateUnitXmlTable(unit_id, unit_stats, color)
                     {
                         tag = "Image",
                         attributes = {
+                            id = unit_id .. ".UnitImage",
                             image = "MissingImage!",
-                            preferredWidth = "200",
-                            preferredHeight = "200",
+                            preferredWidth = "2000",
+                            preferredHeight = "2000",
                             preserveAspect = "true",
-                            color = "White"
+                            color = myColor()
                         },
                         children = {
                             {
@@ -440,9 +453,7 @@ function generateUnitXmlTable(unit_id, unit_stats, color)
                                 attributes = {
                                     id = "unitName",
                                     class = "unitNameplate",
-                                    offsetXY = "0 12",
-                                    width = "500",
-                                    height = "180",
+                                    offsetXY = "0 -550",
                                     rectAlignment = "LowerCenter"
                                 }
                             },
@@ -452,7 +463,7 @@ function generateUnitXmlTable(unit_id, unit_stats, color)
                                 attributes = {
                                     id = "unitCount",
                                     class = "unitCount",
-                                    offsetXY = "-16 -16",
+                                    offsetXY = "720 640",
                                     rectAlignment = "UpperRight"
                                 }
                             },
@@ -464,7 +475,7 @@ function generateUnitXmlTable(unit_id, unit_stats, color)
                                     active = "false",
                                     onClick = "changeUnitCountXml(-1)",
                                     class = "changeCount",
-                                    offsetXY = "16 14",
+                                    offsetXY = "1600 200",
                                     rectAlignment = "LowerLeft",
                                     showAnimation = "FadeIn",
                                     hideAnimation = "FadeOut"
@@ -478,7 +489,7 @@ function generateUnitXmlTable(unit_id, unit_stats, color)
                                     active = "false",
                                     onClick = "changeUnitCountXml(1)",
                                     class = "changeCount",
-                                    offsetXY = "-16 12",
+                                    offsetXY = "-1600 200",
                                     rectAlignment = "LowerRight",
                                     showAnimation = "FadeIn",
                                     hideAnimation = "FadeOut"
@@ -497,11 +508,11 @@ function generateUnitXmlTable(unit_id, unit_stats, color)
                     },
                     {
                         tag = "Panel",
-                        attributes = {class = "UILayoutMediumBackground", preferredHeight = "100"},
+                        attributes = {class = "UILayoutMediumBackground", preferredHeight = "1400"},
                         children = {
                             {
                                 tag = "VerticalLayout",
-                                attributes = {padding = "4 4 4 4", spacing = "4"},
+                                attributes = {padding = "40 40 40 40", spacing = "40"},
                                 children = {}
                             }
                         }
@@ -516,8 +527,6 @@ function generateUnitXmlTable(unit_id, unit_stats, color)
     unitXmlTable["attributes"]["id"] = unit_id .. "." .. unitXmlTable["attributes"]["id"]
     -- Add unit image
     unitXmlTable["children"][1]["children"][1]["attributes"]["image"] = unit_stats["image"]
-    -- Add unit color or fall back to White
-    unitXmlTable["children"][1]["children"][1]["attributes"]["color"] = color or "White"
     -- Set unit nameplate to its name
     unitXmlTable["children"][1]["children"][1]["children"][1]["attributes"]["id"] = unit_id .. ".unitName"
     unitXmlTable["children"][1]["children"][1]["children"][1]["value"] = unit_stats["name"]
@@ -568,7 +577,7 @@ function generateUnitAbility(unit_id, ability_id, ability_details)
                             class = "unitAbilities",
                             alignment = "MiddleLeft",
                             ignoreLayout = "true",
-                            offsetXY = "-72 0"
+                            offsetXY = "96 0"
                         }
                     },
                     {
@@ -578,7 +587,7 @@ function generateUnitAbility(unit_id, ability_id, ability_details)
                             class = "unitAbilities",
                             ignoreLayout = "true",
                             alignment = "MiddleRight",
-                            offsetXY = "72 0"
+                            offsetXY = "-96 0"
                         }
                     }
                 }
@@ -736,6 +745,7 @@ function resetRoller()
     setAntiMassDeflectors(false)
     setPlasmaScoring(false)
     updateAbilities()
+    updateColor()
 end
 
 -------------------------------------------------------------------------------

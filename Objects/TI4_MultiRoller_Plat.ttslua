@@ -99,12 +99,16 @@ function onDrop()
     updateColor()
 end
 
-function onSetupHelperPlayerCountChanged()
-    updateColor()
+function onPlayerChangeColor(player_color)
+    Wait.time(updateColor, 3 + math.random()) -- give it some time in case changing tints
 end
 
-function onPlayerChangeColor(player_color)
-    Wait.time(updateColor, 3) -- give it some time in case changing tints
+function onSetupHelperPlayerCountChanged()
+    Wait.time(updateColor, math.random())
+end
+
+function onSetupHelperFactionUnpacked()
+    Wait.time(updateAbilities, math.random())
 end
 
 function createUi()
@@ -167,7 +171,7 @@ function updateAbilities()
                         value = value .. ' (\u{00D7}' .. abilityAttrs.dice .. ')'
                     end
                     if abilityAttrs.extraDice and abilityAttrs.extraDice > 0 then
-                        value = value .. ' (PS)'
+                        value = value .. '*'
                     end
                     setAbilityValue(unitType, ability, value)
                 else

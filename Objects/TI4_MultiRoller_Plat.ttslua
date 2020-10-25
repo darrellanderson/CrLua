@@ -494,7 +494,7 @@ function generateUnitXmlTable(unit_id, unit_stats, color)
                                     active = "false",
                                     onClick = "changeUnitCountXml(-1)",
                                     class = "changeCount",
-                                    offsetXY = "-1600 200",
+                                    offsetXY = "1600 200",
                                     rectAlignment = "LowerRight",
                                     showAnimation = "FadeIn",
                                     hideAnimation = "FadeOut"
@@ -508,7 +508,7 @@ function generateUnitXmlTable(unit_id, unit_stats, color)
                                     active = "false",
                                     onClick = "changeUnitCountXml(1)",
                                     class = "changeCount",
-                                    offsetXY = "1600 200",
+                                    offsetXY = "-1600 200",
                                     rectAlignment = "LowerLeft",
                                     showAnimation = "FadeIn",
                                     hideAnimation = "FadeOut"

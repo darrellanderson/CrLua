@@ -103,6 +103,10 @@ function onSetupHelperPlayerCountChanged()
     updateColor()
 end
 
+function onPlayerChangeColor(player_color)
+    Wait.time(updateColor, 3) -- give it some time in case changing tints
+end
+
 function createUi()
     -- Use all modifiers that add abilities.  Show/hide them as needed.
     if not _allPossibleUnitAttrs then
@@ -609,6 +613,9 @@ function removeAbility(unit_id, ability_id)
 end
 
 function changeUnitCountXml(player, value, id)
+    if (not player.seated) or player.color == 'Grey' then
+        return
+    end
     if id == string.match(id, ".+%.") .. "unitMainButton" then
         if value == "-1" then
             value = "1"
@@ -1000,6 +1007,9 @@ end
 -------------------------------------------------------------------------------
 
 function rollDiceForAbility(player, ability)
+    if (not player.seated) or player.color == 'Grey' then
+        return
+    end
     local clickerColor = player and player.color or myColor()
     local playerZoneColor = myColor() or clickerColor
 

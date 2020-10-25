@@ -177,8 +177,18 @@ function updateAbilities()
 end
 
 function updateColor()
+    local color = myColor()
+    local tint = false
+    for _, object in ipairs(getAllObjects()) do
+        if object.getName() == color .. ' War Sun' then
+            tint = object.getColorTint()
+            break
+        end
+    end
+    tint = tint and ('#' .. Color.new(tint.r, tint.g, tint.b):toHex(false)) or color
+
     for _, unitType in ipairs(UNIT_TYPES) do
-        self.UI.setAttribute(unitType .. '.unitImage', 'color', myColor())
+        self.UI.setAttribute(unitType .. '.unitImage', 'color', tint)
     end
 end
 
@@ -412,18 +422,19 @@ function generateRollerXmlTable(unit_data)
     table.insert(xmlTable, table.unpack({containerLayoutXmlTable}))
 
     -- Layout in UNIT_TYPES list order.
+    local color = myColor()
     for _, unit_id in ipairs(UNIT_TYPES) do
         local unit_stats = unit_data[unit_id] or {}
-        table.insert(xmlTable[2]["children"][1]["children"], generateUnitXmlTable(unit_id, unit_stats))
+        table.insert(xmlTable[2]["children"][1]["children"], generateUnitXmlTable(unit_id, unit_stats, color))
     end
     return xmlTable
 end
 
 function generateUnitXmlTable(unit_id, unit_stats, color)
-    local unitXmlTemplate = {
+    return {
         tag = "Button",
         attributes = {
-            id = "unitMainButton",
+            id = unit_id .. ".unitMainButton",
             class = "UILayoutLightBackground",
             onClick = "changeUnitCountXml",
             onMouseEnter = "showChangeCountButtonsXml",
@@ -440,18 +451,18 @@ function generateUnitXmlTable(unit_id, unit_stats, color)
                         tag = "Image",
                         attributes = {
                             id = unit_id .. ".UnitImage",
-                            image = "MissingImage!",
+                            image = unit_stats["image"] or "MissingImage!",
                             preferredWidth = "2000",
                             preferredHeight = "2000",
                             preserveAspect = "true",
-                            color = myColor()
+                            color = color or myColor()
                         },
                         children = {
                             {
                                 tag = "Text",
-                                value = "MissingUnitName!",
+                                value = unit_stats["name"] or "MissingUnitName!",
                                 attributes = {
-                                    id = "unitName",
+                                    id = unit_id .. ".unitName",
                                     class = "unitNameplate",
                                     offsetXY = "0 -550",
                                     rectAlignment = "LowerCenter"
@@ -459,9 +470,9 @@ function generateUnitXmlTable(unit_id, unit_stats, color)
                             },
                             {
                                 tag = "Text",
-                                value = "?",
+                                value = _unitTypeToCount[unit_id] or 0,
                                 attributes = {
-                                    id = "unitCount",
+                                    id = unit_id .. ".unitCount",
                                     class = "unitCount",
                                     offsetXY = "720 640",
                                     rectAlignment = "UpperRight"
@@ -471,23 +482,9 @@ function generateUnitXmlTable(unit_id, unit_stats, color)
                                 tag = "Button",
                                 value = "-",
                                 attributes = {
-                                    id = "unitCountDecrement",
+                                    id = unit_id .. ".unitCountDecrement",
                                     active = "false",
                                     onClick = "changeUnitCountXml(-1)",
-                                    class = "changeCount",
-                                    offsetXY = "1600 200",
-                                    rectAlignment = "LowerLeft",
-                                    showAnimation = "FadeIn",
-                                    hideAnimation = "FadeOut"
-                                }
-                            },
-                            {
-                                tag = "Button",
-                                value = "+",
-                                attributes = {
-                                    id = "unitCountIncrement",
-                                    active = "false",
-                                    onClick = "changeUnitCountXml(1)",
                                     class = "changeCount",
                                     offsetXY = "-1600 200",
                                     rectAlignment = "LowerRight",
@@ -496,10 +493,24 @@ function generateUnitXmlTable(unit_id, unit_stats, color)
                                 }
                             },
                             {
+                                tag = "Button",
+                                value = "+",
+                                attributes = {
+                                    id = unit_id .. ".unitCountIncrement",
+                                    active = "false",
+                                    onClick = "changeUnitCountXml(1)",
+                                    class = "changeCount",
+                                    offsetXY = "1600 200",
+                                    rectAlignment = "LowerLeft",
+                                    showAnimation = "FadeIn",
+                                    hideAnimation = "FadeOut"
+                                }
+                            },
+                            {
                                 tag = "Text",
                                 value = "",
                                 attributes = {
-                                    id = "hitsCount",
+                                    id = unit_id .. ".hitsCount",
                                     class = "hitsCount"
                                 },
                                 children = {}
@@ -513,7 +524,7 @@ function generateUnitXmlTable(unit_id, unit_stats, color)
                             {
                                 tag = "VerticalLayout",
                                 attributes = {padding = "40 40 40 40", spacing = "40"},
-                                children = {}
+                                children = generateUnitAbilitiesXmlTable(unit_id, unit_stats)
                             }
                         }
                     }
@@ -521,48 +532,32 @@ function generateUnitXmlTable(unit_id, unit_stats, color)
             }
         }
     }
-
-    local unitXmlTable = unitXmlTemplate
-    -- Prepend unit ID to unitMainButton
-    unitXmlTable["attributes"]["id"] = unit_id .. "." .. unitXmlTable["attributes"]["id"]
-    -- Add unit image
-    unitXmlTable["children"][1]["children"][1]["attributes"]["image"] = unit_stats["image"]
-    -- Set unit nameplate to its name
-    unitXmlTable["children"][1]["children"][1]["children"][1]["attributes"]["id"] = unit_id .. ".unitName"
-    unitXmlTable["children"][1]["children"][1]["children"][1]["value"] = unit_stats["name"]
-    -- Set unit count to 0
-    unitXmlTable["children"][1]["children"][1]["children"][2]["value"] = _unitTypeToCount[unit_id] or 0
-    -- Prepend unit ID to unit count XML id
-    unitXmlTable["children"][1]["children"][1]["children"][2]["attributes"]["id"] =
-        unit_id .. "." .. unitXmlTable["children"][1]["children"][1]["children"][2]["attributes"]["id"]
-    -- Prepend unit ID to minus counter XML id
-    unitXmlTable["children"][1]["children"][1]["children"][3]["attributes"]["id"] =
-        unit_id .. "." .. unitXmlTable["children"][1]["children"][1]["children"][3]["attributes"]["id"]
-    -- Prepend unit ID to plus counter XML id
-    unitXmlTable["children"][1]["children"][1]["children"][4]["attributes"]["id"] =
-        unit_id .. "." .. unitXmlTable["children"][1]["children"][1]["children"][4]["attributes"]["id"]
-    -- Prepend unit ID to hits counter XML id
-    unitXmlTable["children"][1]["children"][1]["children"][5]["attributes"]["id"] =
-        unit_id .. "." .. unitXmlTable["children"][1]["children"][1]["children"][5]["attributes"]["id"]
-    -- Generate unit
-    unitXmlTable["children"][1]["children"][2]["children"][1]["children"] =
-        generateUnitAbilitiesXmlTable(unit_id, unit_stats)
-    return unitXmlTable
 end
 
 function generateUnitAbilitiesXmlTable(unit_id, unit_stats)
     local unitAbilitiesXmlTable = {}
     for ability_id, ability_details in pairs(unit_stats) do
-        table.insert(unitAbilitiesXmlTable, generateUnitAbility(unit_id, ability_id, ability_details))
+        if ABILITIES[ability_id] then
+            table.insert(unitAbilitiesXmlTable, generateUnitAbility(unit_id, ability_id, ability_details))
+        end
     end
-
     return unitAbilitiesXmlTable
 end
 
 function generateUnitAbility(unit_id, ability_id, ability_details)
-    local unitAbilityXml = {
+    local onClickValue
+    if type(ability_details) == 'table' then
+        onClickValue = "rollDiceForAbility(" .. string.sub(ability_id, 1, -1) .. ")"
+    else
+        onClickValue = "doNothing"
+    end
+    return {
         tag = "Button",
-        attributes = {class = "UILayoutHeavyBackground"},
+        attributes = {
+            id = unit_id .. ".ability." .. ability_id,
+            class = "UILayoutHeavyBackground",
+            onClick = onClickValue
+        },
         children = {
             {
                 tag = "Panel",
@@ -572,7 +567,7 @@ function generateUnitAbility(unit_id, ability_id, ability_details)
                 children = {
                     {
                         tag = "Text",
-                        value = "MissingUnitAbility!",
+                        value = ABILITIES[ability_id] or "MissingUnitAbility!",
                         attributes = {
                             class = "unitAbilities",
                             alignment = "MiddleLeft",
@@ -584,6 +579,7 @@ function generateUnitAbility(unit_id, ability_id, ability_details)
                         tag = "Text",
                         value = "",
                         attributes = {
+                            id = unit_id .. ".ability." .. ability_id .. ".value",
                             class = "unitAbilities",
                             ignoreLayout = "true",
                             alignment = "MiddleRight",
@@ -594,26 +590,9 @@ function generateUnitAbility(unit_id, ability_id, ability_details)
             }
         }
     }
-    -- Check if ability exists
-    if ABILITIES[ability_id] ~= nil then
-        -- Add an ID for the main button for showing/hiding
-        unitAbilityXml["attributes"]["id"] = unit_id .. ".ability." .. ability_id
-        if type(ability_details) == "table" then
-            -- Attach function for rolling on the ability
-            unitAbilityXml["attributes"]["onClick"] = "rollDiceForAbility(" .. string.sub(ability_id, 1, -1) .. ")"
-            -- Set first part of the text to ability name
-            unitAbilityXml["children"][1]["children"][1]["value"] = ABILITIES[ability_id]
-            -- Set second part of the text to ability value, add its ID for modification
-            unitAbilityXml["children"][1]["children"][2]["attributes"]["id"] = unit_id .. ".ability." .. ability_id .. ".value"
-        elseif type(ability_details) == "boolean" then
-            -- Make the ability unclickable
-            unitAbilityXml["tag"] = "Panel"
-            unitAbilityXml["children"][1]["children"][1]["value"] = ABILITIES[ability_id]
-        end
-    else
-        return
-    end
-    return unitAbilityXml
+end
+
+function doNothing()
 end
 
 function setUnitName(unit_id, value)
@@ -657,15 +636,15 @@ function changeUnitCountXml(player, value, id)
 end
 
 function showChangeCountButtonsXml(player, value, id)
-    local unitIncrementId = string.match(id, ".+%.") .. "unitCountIncrement"
-    local unitDecrementId = string.match(id, ".+%.") .. "unitCountDecrement"
+    local unitIncrementId = string.match(id, "(.+)%.") .. ".unitCountIncrement"
+    local unitDecrementId = string.match(id, "(.+)%.") .. ".unitCountDecrement"
     self.UI.show(unitIncrementId)
     self.UI.show(unitDecrementId)
 end
 
 function hideChangeCountButtonsXml(player, value, id)
-    local unitIncrementId = string.match(id, ".+%.") .. "unitCountIncrement"
-    local unitDecrementId = string.match(id, ".+%.") .. "unitCountDecrement"
+    local unitIncrementId = string.match(id, "(.+)%.") .. ".unitCountIncrement"
+    local unitDecrementId = string.match(id, "(.+)%.") .. ".unitCountDecrement"
     self.UI.hide(unitIncrementId)
     self.UI.hide(unitDecrementId)
 end
@@ -930,6 +909,9 @@ function Roller_RollDiceCoroutine()
             })
             die.setName(dice.unitName)
             die.setColorTint(Color.fromString(dice.diceColor))
+            die.use_grid = false
+            die.use_snap_points = false
+            die.use_hands = false
             table.insert(dice._objects, die)
         end
     end
@@ -1004,7 +986,7 @@ function Roller_RollDiceCoroutine()
                 end
             end
             table.insert(rollValues, rollValue .. suffix)
-            setHitCount(dice.unitName, unitHitCount)
+            setHitCount(dice.unitId, unitHitCount)
         end
         table.insert(message, dice.unitName .. ' ' .. item .. table.concat(rollValues, ', '))
     end

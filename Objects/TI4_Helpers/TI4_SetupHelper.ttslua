@@ -957,10 +957,14 @@ function setupCoroutine()
         coroutine.yield(0)
 
         -- Tell any other listeners about the change.
-        for i, object in ipairs(getAllObjects()) do
+        local listeners = {}
+        for _, object in ipairs(getAllObjects()) do
             if object.getVar('onSetupHelperPlayerCountChanged') then
-                Wait.frames(function() object.call('onSetupHelperPlayerCountChanged') end, i)
+                table.insert(listeners, object)
             end
+        end
+        for i, listener in ipairs(listeners) do
+            Wait.frames(function() listener.call('onSetupHelperPlayerCountChanged') end, i)
         end
         coroutine.yield(0)
     end
@@ -1652,6 +1656,18 @@ function unpackFactionCoroutine()
         _safeBroadcastToColor(faction.tokenName .. ': ' .. faction.startMessage, color, color)
     end
 
+    -- Tell any other listeners about the change.
+    local listeners = {}
+    for _, object in ipairs(getAllObjects()) do
+        if object.getVar('onSetupHelperFactionUnpacked') then
+            table.insert(listeners, object)
+        end
+    end
+    for i, listener in ipairs(listeners) do
+        Wait.frames(function() listener.call('onSetupHelperFactionUnpacked') end, i)
+    end
+    coroutine.yield(0)
+
     print('Unpack faction "' .. faction.name .. '" finished')
     return 1
 end
@@ -1862,6 +1878,18 @@ function unpackFrankenCoroutine()
     coroutine.yield(0)
 
     SetupFranken.unpackStartingUnits(color)
+    coroutine.yield(0)
+
+    -- Tell any other listeners about the change.
+    local listeners = {}
+    for _, object in ipairs(getAllObjects()) do
+        if object.getVar('onSetupHelperFactionUnpacked') then
+            table.insert(listeners, object)
+        end
+    end
+    for i, listener in ipairs(listeners) do
+        Wait.frames(function() listener.call('onSetupHelperFactionUnpacked') end, i)
+    end
     coroutine.yield(0)
 
     print('Unpack Franken for ' .. color .. ' finished')

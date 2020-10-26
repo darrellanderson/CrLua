@@ -29,16 +29,16 @@ local _unitHelper = getHelperClient('TI4_UNIT_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 local UNIT_TYPES = {
-    'Carrier',
+    'Flagship',
+    'War Sun',
+    'Dreadnought',
     'Cruiser',
     'Destroyer',
-    'Dreadnought',
+    'Carrier',
     'Fighter',
-    'Flagship',
     'Infantry',
     'PDS',
     'Space Dock',
-    'War Sun',
 }
 
 local ABILITIES = {

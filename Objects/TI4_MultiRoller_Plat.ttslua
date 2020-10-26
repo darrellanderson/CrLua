@@ -500,18 +500,50 @@ function generateUnitXmlTable(unit_id, unit_stats, color)
                                     hideAnimation = "FadeOut"
                                 }
                             },
+                                    onClick = "changeUnitCountXml(-1)",
+                                    height = "25%",
+                                    width = "25%",
+                                    color = "#00000000",
+                                    offsetXY = "0 200",
+                                    rectAlignment = "LowerLeft"
+                                },
+                                children = {
+                                    {
+                                        tag = "Text",
+                                        value = "-",
+                                        attributes = {
+                                            id = unit_id .. ".unitCountDecrementText",
+                                            class = "changeCount",
+                                            active = "false",
+                                            showAnimation = "FadeIn",
+                                            hideAnimation = "FadeOut"
+                                        }
+                                    }
+                                }
+                            },
                             {
                                 tag = "Button",
-                                value = "+",
                                 attributes = {
                                     id = unit_id .. ".unitCountIncrement",
-                                    active = "false",
                                     onClick = "changeUnitCountXml(1)",
-                                    class = "changeCount",
-                                    offsetXY = "1600 200",
-                                    rectAlignment = "LowerLeft",
-                                    showAnimation = "FadeIn",
-                                    hideAnimation = "FadeOut"
+                                    height = "25%",
+                                    width = "25%",
+                                    color = "#00000000",
+                                    offsetXY = "0 200",
+                                    rectAlignment = "LowerRight"
+                                },
+                                children = {
+                                    {
+                                        tag = "Text",
+                                        value = "+",
+                                        attributes = {
+                                            id = unit_id .. ".unitCountIncrementText",
+                                            class = "changeCount",
+                                            active = "false",
+                                            showAnimation = "FadeIn",
+                                            hideAnimation = "FadeOut"
+                                        }
+                                    }
                                 }
                             },
                             {
@@ -647,15 +679,15 @@ function changeUnitCountXml(player, value, id)
 end
 
 function showChangeCountButtonsXml(player, value, id)
-    local unitIncrementId = string.match(id, "(.+)%.") .. ".unitCountIncrement"
-    local unitDecrementId = string.match(id, "(.+)%.") .. ".unitCountDecrement"
+    local unitIncrementId = string.match(id, "(.+)%.") .. ".unitCountIncrementText"
+    local unitDecrementId = string.match(id, "(.+)%.") .. ".unitCountDecrementText"
     self.UI.show(unitIncrementId)
     self.UI.show(unitDecrementId)
 end
 
 function hideChangeCountButtonsXml(player, value, id)
-    local unitIncrementId = string.match(id, "(.+)%.") .. ".unitCountIncrement"
-    local unitDecrementId = string.match(id, "(.+)%.") .. ".unitCountDecrement"
+    local unitIncrementId = string.match(id, "(.+)%.") .. ".unitCountIncrementText"
+    local unitDecrementId = string.match(id, "(.+)%.") .. ".unitCountDecrementText"
     self.UI.hide(unitIncrementId)
     self.UI.hide(unitDecrementId)
 end

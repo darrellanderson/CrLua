@@ -809,39 +809,23 @@ function Roller.roll(clickerColor, playerColor, rollLabel)
     startLuaCoroutine(self, 'Roller_RollDiceCoroutine')
 end
 
-function Roller._getDieSpawnPosition(phi)
+function Roller._getDieSpawnPosition(unitIndex, dieCount, dieIndex)
+    assert(type(unitIndex) == 'number' and type(dieCount) == 'number' and type(dieIndex) == 'number')
     local bounds = self.getBounds()
-    local bb = {
-        min = {
-            x = bounds.center.x - bounds.size.x / 2,
-            z = bounds.center.z - bounds.size.z / 2,
-        },
-        max = {
-            x = bounds.center.x + bounds.size.x / 2,
-            z = bounds.center.z + bounds.size.z / 2,
-        }
+    local d = 5
+    local dScale = {
+        x = d * 1,
+        z = d * self.getPosition().z > 0 and 1 or -1
     }
-    local function contains(position)
-        local gteMin = position.x >= bb.min.x and position.z >= bb.min.z
-        local lteMax = position.x <= bb.max.x and position.z <= bb.max.z
-        return gteMin and lteMax
-    end
-
-    local rx = Roller.DICE_POSITION_RADIUS_X
-    local rz = Roller.DICE_POSITION_RADIUS_Z
-    while true do
-        local position = self.positionToWorld({
-            x = rx * math.cos(phi),
-            y = 0,
-            z = rz * math.sin(phi),
-        })
-        position.y = position.y + Roller.DICE_POSITION_HEIGHT
-        if not contains(position) then
-            return position
-        end
-        rx = rx + 0.5
-        rz = rz + 0.5
-    end
+    local bottomCenterBottom = {
+        x = bounds.center.x * dScale.x,
+        z = bounds.center.z + dScale.z * (bounds.size.z / 2)
+    }
+    return {
+        x = bottomCenterBottom.x - (dieCount * dScale.x / 2) + ((dieIndex - 0.5) * dScale.x),
+        y = self.getPosition().y + Roller.DICE_POSITION_HEIGHT,
+        z = bottomCenterBottom.z + (dScale.z / 2) + (unitIndex * dScale.z)
+    }
 end
 
 function Roller._randomRotation()
@@ -906,16 +890,12 @@ function Roller_RollDiceCoroutine()
     for _, dice in ipairs(Roller._dice) do
         totalDiceCount = totalDiceCount + dice.diceCount
     end
-    local phi0 = math.rad(math.random(360))
-    local nextDieIndex = 1
-    for _, dice in ipairs(Roller._dice) do
+    for unitIndex, dice in ipairs(Roller._dice) do
         dice._objects = {}
-        for _ = 1, dice.diceCount do
-            local phi = phi0 + math.rad(nextDieIndex * 360 / totalDiceCount)
-            nextDieIndex = nextDieIndex + 1
+        for dieIndex = 1, dice.diceCount do
             local die = spawnObject({
                 type = 'Die_10',
-                position = Roller._getDieSpawnPosition(phi),
+                position = Roller._getDieSpawnPosition(unitIndex, dice.diceCount, dieIndex),
                 rotation = Roller._randomRotation(),
             })
             die.setName(dice.unitName)
@@ -1191,6 +1171,10 @@ function inject(params)
     assert(type(params.antimassDeflectors) == 'boolean')
     assert((not params.rollType) or type(params.rollType) == 'string')
     assert((not params.extraModifiers) or type(params.extraModifiers) == 'table')
+
+    if params.clickerColor == 'Grey' then
+        return
+    end
 
     -- Add these when gathering unit modifiers.
     _injectExtraModifiers = params.extraModifiers or false

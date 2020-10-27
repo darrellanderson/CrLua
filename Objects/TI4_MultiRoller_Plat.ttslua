@@ -439,19 +439,30 @@ function generateRollerXmlTable(unit_data)
 end
 
 function generateUnitXmlTable(unit_id, unit_stats, color)
+    -- XML layout is a pain.  Instead of sizing elements just make two panels
+    -- (one for the button, one for attributes) and size those, let XML layout
+    -- adjust the contents.
+    local buttonHeightPercent = 60
     return {
-        tag = "VerticalLayout",
-        attributes = {
-            class = "UILayoutMediumBackground",
-            --preferredHeight = "1400"
-            --childForceExpandHeight = "False"
-        },
+        tag = "Panel",
         children = {
-            generateUnitXmlButton(unit_id, unit_stats, color),
+            {
+                tag = "Panel",
+                attributes = {
+                    --class = "UILayoutLightBackground",
+                    height = buttonHeightPercent .. "%",
+                    rectAlignment = "UpperCenter"
+                },
+                children = {
+                    generateUnitXmlButton(unit_id, unit_stats, color),
+                }
+            },
             {
                 tag = "Panel",
                 attributes = {
                     class = "UILayoutMediumBackground",
+                    height = (100 - buttonHeightPercent) .. "%",
+                    rectAlignment = "LowerCenter"
                 },
                 children = {
                     {
@@ -484,8 +495,8 @@ function generateUnitXmlButton(unit_id, unit_stats, color)
                 attributes = {
                     id = unit_id .. ".unitImage",
                     image = unit_stats["image"] or "MissingImage!",
-                    --preferredWidth = "2000",
-                    --preferredHeight = "1000",
+                    preferredWidth = "2000",
+                    preferredHeight = "2000",
                     preserveAspect = "true",
                     color = color or myColor()
                 },

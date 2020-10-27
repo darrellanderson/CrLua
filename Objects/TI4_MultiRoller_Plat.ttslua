@@ -803,22 +803,22 @@ function Roller.roll(clickerColor, playerColor, rollLabel)
     startLuaCoroutine(self, 'Roller_RollDiceCoroutine')
 end
 
-function Roller._getDieSpawnPosition(unitIndex, dieCount, dieIndex)
+function Roller._getDieSpawnPosition(unitIndex, dieCount, dieIndex, locationObject)
     assert(type(unitIndex) == 'number' and type(dieCount) == 'number' and type(dieIndex) == 'number')
-    local bounds = self.getBounds()
-    local d = 5
+    assert(type(locationObject) == 'userdata')
+    local bounds = locationObject.getBounds()
     local dScale = {
-        x = d * 1,
-        z = d * self.getPosition().z > 0 and 1 or -1
+        x = 2,
+        z = 2 * ((locationObject.getPosition().z > 0) and 1 or -1)
     }
     local bottomCenterBottom = {
-        x = bounds.center.x * dScale.x,
-        z = bounds.center.z + dScale.z * (bounds.size.z / 2)
+        x = bounds.center.x,
+        z = bounds.center.z + (bounds.size.z / 2) * ((locationObject.getPosition().z > 0) and 1 or -1)
     }
     return {
-        x = bottomCenterBottom.x - (dieCount * dScale.x / 2) + ((dieIndex - 0.5) * dScale.x),
-        y = self.getPosition().y + Roller.DICE_POSITION_HEIGHT,
-        z = bottomCenterBottom.z + (dScale.z / 2) + (unitIndex * dScale.z)
+        x = bottomCenterBottom.x - ((-dieCount / 2) + dieIndex) * dScale.x,
+        y = locationObject.getPosition().y + Roller.DICE_POSITION_HEIGHT,
+        z = bottomCenterBottom.z + unitIndex * dScale.z
     }
 end
 
@@ -884,15 +884,16 @@ function Roller_RollDiceCoroutine()
     for _, dice in ipairs(Roller._dice) do
         totalDiceCount = totalDiceCount + dice.diceCount
     end
+    local locationObject = self
     for unitIndex, dice in ipairs(Roller._dice) do
         dice._objects = {}
         for dieIndex = 1, dice.diceCount do
             local die = spawnObject({
                 type = 'Die_10',
-                position = Roller._getDieSpawnPosition(unitIndex, dice.diceCount, dieIndex),
+                position = Roller._getDieSpawnPosition(unitIndex, dice.diceCount, dieIndex, locationObject),
                 rotation = Roller._randomRotation(),
             })
-            die.setName(dice.unitName)
+            die.setName(dice.unitName .. ' hits on ' .. dice.hitValue)
             die.setColorTint(Color.fromString(dice.diceColor))
             die.use_grid = false
             die.use_snap_points = false

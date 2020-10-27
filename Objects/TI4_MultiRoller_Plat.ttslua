@@ -278,7 +278,7 @@ function generateRollerXmlTable(unit_data)
             {
                 tag = "Button",
                 attributes = {
-                    class = "UILayoutLightBackground",
+                    class = "UIButtonLightBackground",
                     color = "#00000050"
                 }
             },
@@ -306,14 +306,14 @@ function generateRollerXmlTable(unit_data)
             {
                 tag = "Button",
                 attributes = {
-                    class = "UILayoutHeavyBackground",
+                    class = "UIButtonHeavyBackground",
                     colors = "#111111|#000000|#222222|#222222"
                 }
             },
             {
                 tag = "ToggleButton",
                 attributes = {
-                    class = "UILayoutHeavyBackground",
+                    class = "UIToggleHeavyBackground",
                     color = "#222222",
                     colors = "#000000|#000000|#000000|#000000"
                 }
@@ -355,7 +355,7 @@ function generateRollerXmlTable(unit_data)
                                 attributes = {
                                     id = "toggleAntiMassDeflectors",
                                     onValueChanged = "toggleAntiMassDeflectors",
-                                    class = "UILayoutHeavyBackground",
+                                    class = "UIToggleHeavyBackground",
                                     isOn = "false"
                                 },
                                 children = {
@@ -373,7 +373,7 @@ function generateRollerXmlTable(unit_data)
                                 attributes = {
                                     id = "togglePlasmaScoring",
                                     onValueChanged = "togglePlasmaScoring",
-                                    class = "UILayoutHeavyBackground",
+                                    class = "UIToggleHeavyBackground",
                                     isOn = "false"
                                 },
                                 children = {
@@ -390,7 +390,7 @@ function generateRollerXmlTable(unit_data)
                                 tag = "Button",
                                 attributes = {
                                     onClick = "updateRoller",
-                                    class = "UILayoutHeavyBackground"
+                                    class = "UIButtonHeavyBackground"
                                 },
                                 children = {
                                     {
@@ -406,7 +406,7 @@ function generateRollerXmlTable(unit_data)
                                 tag = "Button",
                                 attributes = {
                                     onClick = "resetRoller",
-                                    class = "UILayoutHeavyBackground"
+                                    class = "UIButtonHeavyBackground"
                                 },
                                 children = {
                                     {
@@ -440,136 +440,89 @@ end
 
 function generateUnitXmlTable(unit_id, unit_stats, color)
     return {
-        tag = "Button",
+        tag = "VerticalLayout",
         attributes = {
-            id = unit_id .. ".unitMainButton",
-            class = "UILayoutLightBackground",
-            onClick = "changeUnitCountXml",
-            onMouseEnter = "showChangeCountButtonsXml",
-            onMouseExit = "hideChangeCountButtonsXml",
-            width = "2000",
-            height = "3000"
+            class = "UILayoutMediumBackground",
+            --preferredHeight = "1400"
+            --childForceExpandHeight = "False"
         },
         children = {
+            generateUnitXmlButton(unit_id, unit_stats, color),
             {
-                tag = "VerticalLayout",
-                attributes = {},
+                tag = "Panel",
+                attributes = {
+                    class = "UILayoutMediumBackground",
+                },
                 children = {
                     {
-                        tag = "Image",
+                        tag = "VerticalLayout",
                         attributes = {
-                            id = unit_id .. ".UnitImage",
-                            image = unit_stats["image"] or "MissingImage!",
-                            preferredWidth = "2000",
-                            preferredHeight = "2000",
-                            preserveAspect = "true",
-                            color = color or myColor()
+                            padding = "0 0 0 40",
+                            spacing = "40"
                         },
-                        children = {
-                            {
-                                tag = "Text",
-                                value = unit_stats["name"] or "MissingUnitName!",
-                                attributes = {
-                                    id = unit_id .. ".unitName",
-                                    class = "unitNameplate",
-                                    offsetXY = "0 -550",
-                                    rectAlignment = "LowerCenter"
-                                }
-                            },
-                            {
-                                tag = "Text",
-                                value = _unitTypeToCount[unit_id] or 0,
-                                attributes = {
-                                    id = unit_id .. ".unitCount",
-                                    class = "unitCount",
-                                    offsetXY = "720 640",
-                                    rectAlignment = "UpperRight"
-                                }
-                            },
-                            {
-                                tag = "Button",
-                                value = "-",
-                                attributes = {
-                                    id = unit_id .. ".unitCountDecrement",
-                                    active = "false",
-                                    onClick = "changeUnitCountXml(-1)",
-                                    class = "changeCount",
-                                    offsetXY = "-1600 200",
-                                    rectAlignment = "LowerRight",
-                                    showAnimation = "FadeIn",
-                                    hideAnimation = "FadeOut"
-                                }
-                            },
-                                    onClick = "changeUnitCountXml(-1)",
-                                    height = "25%",
-                                    width = "25%",
-                                    color = "#00000000",
-                                    offsetXY = "0 200",
-                                    rectAlignment = "LowerLeft"
-                                },
-                                children = {
-                                    {
-                                        tag = "Text",
-                                        value = "-",
-                                        attributes = {
-                                            id = unit_id .. ".unitCountDecrementText",
-                                            class = "changeCount",
-                                            active = "false",
-                                            showAnimation = "FadeIn",
-                                            hideAnimation = "FadeOut"
-                                        }
-                                    }
-                                }
-                            },
-                            {
-                                tag = "Button",
-                                attributes = {
-                                    id = unit_id .. ".unitCountIncrement",
-                                    onClick = "changeUnitCountXml(1)",
-                                    height = "25%",
-                                    width = "25%",
-                                    color = "#00000000",
-                                    offsetXY = "0 200",
-                                    rectAlignment = "LowerRight"
-                                },
-                                children = {
-                                    {
-                                        tag = "Text",
-                                        value = "+",
-                                        attributes = {
-                                            id = unit_id .. ".unitCountIncrementText",
-                                            class = "changeCount",
-                                            active = "false",
-                                            showAnimation = "FadeIn",
-                                            hideAnimation = "FadeOut"
-                                        }
-                                    }
-                                }
-                            },
-                            {
-                                tag = "Text",
-                                value = "",
-                                attributes = {
-                                    id = unit_id .. ".hitsCount",
-                                    class = "hitsCount"
-                                },
-                                children = {}
-                            }
-                        }
-                    },
-                    {
-                        tag = "Panel",
-                        attributes = {class = "UILayoutMediumBackground", preferredHeight = "1400"},
-                        children = {
-                            {
-                                tag = "VerticalLayout",
-                                attributes = {padding = "40 40 40 40", spacing = "40"},
-                                children = generateUnitAbilitiesXmlTable(unit_id, unit_stats)
-                            }
-                        }
+                        children = generateUnitAbilitiesXmlTable(unit_id, unit_stats)
                     }
                 }
             }
+        }
+    }
+end
+
+function generateUnitXmlButton(unit_id, unit_stats, color)
+    return {
+        tag = "Button",
+        attributes = {
+            id = unit_id .. ".unitMainButton",
+            class = "UIButtonLightBackground",
+            onClick = "changeUnitCountXml",
+            onMouseEnter = "showChangeCountButtonsXml",
+            onMouseExit = "hideChangeCountButtonsXml",
+        },
+        children = {
+            {
+                tag = "Image",
+                attributes = {
+                    id = unit_id .. ".unitImage",
+                    image = unit_stats["image"] or "MissingImage!",
+                    --preferredWidth = "2000",
+                    --preferredHeight = "1000",
+                    preserveAspect = "true",
+                    color = color or myColor()
+                },
+                children = {
+                    {
+                        tag = "Text",
+                        value = unit_stats["name"] or "MissingUnitName!",
+                        attributes = {
+                            id = unit_id .. ".unitName",
+                            class = "unitNameplate",
+                            offsetXY = "0 -550",
+                            rectAlignment = "LowerCenter"
+                        }
+                    },
+                    {
+                        tag = "Text",
+                        value = _unitTypeToCount[unit_id] or 0,
+                        attributes = {
+                            id = unit_id .. ".unitCount",
+                            class = "unitCount",
+                            offsetXY = "720 640",
+                            rectAlignment = "UpperRight"
+                        }
+                    },
+                    {
+                        tag = "Text",
+                        value = "",
+                        attributes = {
+                            id = unit_id .. ".hitsCount",
+                            class = "hitsCount"
+                        },
+                        children = {}
+                    }
+                }
+            }
+        }
+    }
 end
 
 function generateUnitAbilitiesXmlTable(unit_id, unit_stats)
@@ -593,7 +546,7 @@ function generateUnitAbility(unit_id, ability_id, ability_details)
         tag = "Button",
         attributes = {
             id = unit_id .. ".ability." .. ability_id,
-            class = "UILayoutHeavyBackground",
+            class = "UIButtonHeavyBackground",
             onClick = onClickValue
         },
         children = {

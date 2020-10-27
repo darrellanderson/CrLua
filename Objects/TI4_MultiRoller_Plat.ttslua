@@ -117,10 +117,15 @@ function onLoad()
     end
     Wait.time(delayedCreateUi, 0.5)
 
+    local helpMessage = {
+        'Left click to add units, right click to subtract.',
+        'Click a combat type to roll for ALL units.',
+        'Right click toggle non-roll attributes.'
+    }
     self.createButton({
         click_function = 'doNothing',
         function_owner = self,
-        label          = 'Left click to add units, right click to subtract.\n\nClick a combat type to roll for ALL units.',
+        label          = table.concat(helpMessage, '\n\n'),
         position       = { x = 0, y = 0, z = 4.5 },
         rotation       = { x = 0, y = 0, z = 0 },
         width          = 0,
@@ -1029,7 +1034,7 @@ end
 -------------------------------------------------------------------------------
 
 function rollDiceForAbility(player, ability)
-    if (not player.seated) or player.color == 'Grey' then
+    if player and ((not player.seated) or player.color == 'Grey') then
         return
     end
     local clickerColor = player and player.color or myColor()

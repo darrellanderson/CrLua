@@ -111,11 +111,13 @@ local _unitHelper = getHelperClient('TI4_UNIT_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 local _bombardmentPlasmaScoringOnPlanet = false
+local _rollOnSelf = false
 
 -------------------------------------------------------------------------------
 
 function onLoad(save_state)
     CrLua.Log.d(TAG, 'onLoad')
+    self.addContextMenuItem('Toggle roll nearby', function() _rollOnSelf = not _rollOnSelf end)
     Wait.frames(updateUi, 2)
 end
 
@@ -767,7 +769,7 @@ function autoFillCoroutine()
             if attrs.spaceCannon then
                 fillUnitTypeToCount[unitType] = selfUnitTypeToCount[unitType] or 0
                 if unitType == 'Space Dock' then
-                    fillUnitTypeToCount[unitType] = 0  -- Experimental Battlestation does not apply 
+                    fillUnitTypeToCount[unitType] = 0  -- Experimental Battlestation does not apply
                 end
             end
         end
@@ -827,8 +829,15 @@ function autoFillCoroutine()
         psAlreadyUsed = true
     end
 
-    -- Does enemy have AMD?
+    -- Does enemy have PS/AMD?
+    local plasmaScoring = false
     local antimassDeflectors = false
+    for _, modifier in ipairs(colorToUnitModifiers[selfColor] or {}) do
+        if modifier == 'Plasma Scoring' then
+            plasmaScoring = true
+            break
+        end
+    end
     for _, modifier in ipairs(colorToUnitModifiers[enemyColor] or {}) do
         if modifier == 'Antimass Deflectors' then
             antimassDeflectors = true
@@ -914,10 +923,11 @@ function autoFillCoroutine()
     multiRoller.call('inject', {
         clickerColor = params.clickerColor,
         unitTypeToCount = fillUnitTypeToCount,
-        plasmaScoring = psUnitType and true or false,
+        plasmaScoring = plasmaScoring and true or false,
         antimassDeflectors = antimassDeflectors and true or false,
         rollType = doClick and autofillTypeAttributes.rollType or false,
         extraModifiers = extraUnitModifiers or false,
+        rollObjectGuid = _rollOnSelf and self.getGUID(),
     })
     if not doClick then
         printToAll('AutoFill: left click to fill and roll.', params.clickerColor)

@@ -1091,12 +1091,14 @@ function injectUnitModifier(unitModifier)
         unitAttrs._params = params
         local result = applyObject.call(applyFunctionName, unitAttrs)
         if result then
-            result = _copy(result)
-            result._params = nil
-        else
-            result = unitAttrs
+            for k, v in pairs(unitAttrs) do
+                unitAttrs[k] = nil
+            end
+            for k, v in pairs(_copy(result)) do
+                unitAttrs[k] = v
+            end
+            unitAttrs._params = nil
         end
-        return result
     end
     unitModifier = _copy(unitModifier)
     unitModifier.apply = apply

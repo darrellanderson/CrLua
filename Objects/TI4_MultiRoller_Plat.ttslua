@@ -42,14 +42,33 @@ local UNIT_TYPES = {
 }
 
 local ABILITIES = {
-    antiFighterBarrage = "Anti-Fighter",
-    bombardment = "Bombardment",
-    groundCombat = "Ground Combat",
-    spaceCannon = "Space Cannon",
-    spaceCombat = "Space Combat",
-    sustainDamage = "Sustain Damage",
-    planetaryShield = "Planetary Shield",
-    disablePlanetaryShield = "Disables Planetary Shield"
+    antiFighterBarrage = {
+        name = "Anti-Fighter",
+    },
+    bombardment = {
+        name = "Bombardment",
+    },
+    groundCombat = {
+        name = "Ground Combat",
+    },
+    spaceCannon = {
+        name = "Space Cannon",
+    },
+    spaceCombat = {
+        name = "Space Combat",
+    },
+    sustainDamage = {
+        name = "Sustain Damage",
+        inert = true
+    },
+    planetaryShield = {
+        name = "Planetary Shield",
+        inert = true
+    },
+    disablePlanetaryShield = {
+        name = "Disables Planetary Shield",
+        inert = true
+    },
 }
 
 local DICE_COLOR = {
@@ -78,15 +97,37 @@ local _injectExtraUnitUpgrades = false
 local _injectExtraModifiers = false
 local _updateWarnings = false
 
+local _rollObjectOverride = false
+local _showInert = false
+
 function onLoad()
     for _, unitType in ipairs(UNIT_TYPES) do
         _unitTypeToCount[unitType] = 0
     end
+
+    local function toggleInert()
+        _showInert = not _showInert
+        updateAbilities()
+    end
+    self.addContextMenuItem("Toggle non-roll attrs", toggleInert)
+
     local function delayedCreateUi()
         math.randomseed(tonumber(self.getGUID(), 16)) -- guid may change after spawn
         createUi()
     end
     Wait.time(delayedCreateUi, 0.5)
+
+    self.createButton({
+        click_function = 'doNothing',
+        function_owner = self,
+        label          = 'Left click to add units, right click to subtract.\n\nClick a combat type to roll for ALL units.',
+        position       = { x = 0, y = 0, z = 4.5 },
+        rotation       = { x = 0, y = 0, z = 0 },
+        width          = 0,
+        height         = 0,
+        font_size      = 200,
+        font_color     = 'White'
+    })
 end
 
 function onPlayerConnect(player_id)
@@ -162,9 +203,9 @@ function updateAbilities()
     for _, unitType in ipairs(UNIT_TYPES) do
         local unitAttrs = unitData[unitType] or {}
         setUnitName(unitType, unitAttrs.name)
-        for ability, _ in pairs(ABILITIES) do
+        for ability, inert in pairs(ABILITIES) do
             local abilityAttrs = unitAttrs[ability]
-            if abilityAttrs then
+            if abilityAttrs and (not inert.inert or _showInert) then
                 if type(abilityAttrs) == 'table' then
                     local value = abilityAttrs.hit
                     if abilityAttrs.dice and abilityAttrs.dice > 1 then
@@ -569,7 +610,7 @@ function generateUnitAbility(unit_id, ability_id, ability_details)
                 children = {
                     {
                         tag = "Text",
-                        value = ABILITIES[ability_id] or "MissingUnitAbility!",
+                        value = ABILITIES[ability_id] and ABILITIES[ability_id].name or "MissingUnitAbility!",
                         attributes = {
                             class = "unitAbilities",
                             alignment = "MiddleLeft",
@@ -730,6 +771,8 @@ function resetRoller()
     setPlasmaScoring(false)
     updateAbilities()
     updateColor()
+
+    self.clearButtons()
 end
 
 -------------------------------------------------------------------------------
@@ -884,7 +927,7 @@ function Roller_RollDiceCoroutine()
     for _, dice in ipairs(Roller._dice) do
         totalDiceCount = totalDiceCount + dice.diceCount
     end
-    local locationObject = self
+    local locationObject = _rollObjectOverride or self
     for unitIndex, dice in ipairs(Roller._dice) do
         dice._objects = {}
         for dieIndex = 1, dice.diceCount do
@@ -1005,6 +1048,7 @@ function rollDiceForAbility(player, ability)
     end
     Roller.reset()
 
+    local haveDice = false
     for unit_id, unit_stats in pairs(unitData) do
         local unit_count = getUnitCount(unit_id) or 0
         if unit_count > 0 and unit_stats[ability] then
@@ -1016,9 +1060,18 @@ function rollDiceForAbility(player, ability)
                 unitId = unit_id
             }
             Roller.addDice(params)
+            haveDice = true
         end
     end
-    Roller.roll(clickerColor, playerZoneColor, ABILITIES[ability])
+
+    local rollLabel = ABILITIES[ability].name
+    if not haveDice then
+        broadcastToColor('No valid units for ' .. rollLabel, clickerColor, {0.8, 0.2, 0.2})
+        return
+    end
+
+    self.clearButtons()
+    Roller.roll(clickerColor, playerZoneColor, rollLabel)
 end
 
 function printUnitModifiers(unitAttrs, dstColor)
@@ -1173,6 +1226,7 @@ function inject(params)
 
     -- Add these when gathering unit modifiers.
     _injectExtraModifiers = params.extraModifiers or false
+    _rollObjectOverride = params.rollObjectGuid and getObjectFromGUID(params.rollObjectGuid)
 
     for _, unitType in ipairs(UNIT_TYPES) do
         setUnitCount(unitType, 0)
@@ -1190,6 +1244,7 @@ function inject(params)
 
     -- Require click handling absorb these this frame, otherwise lost.
     _injectExtraModifiers = false
+    _rollObjectOverride = false
 end
 
 -------------------------------------------------------------------------------

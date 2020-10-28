@@ -109,11 +109,11 @@ local DEFAULT_ZONES = {
             [3] = {-5.25, 15.16},
             [4] = {15.75, 3.03},
         },
-        homeSystemPositions_cornersDoNotUse = {  -- home system in 6p slots without top/bottom
-            [1] = {15.75, -9.09},
-            [2] = {-15.75, -9.09},
-            [3] = {-15.75, 9.09},
-            [4] = {15.75, 9.09},
+        homeSystemPositions_alt = {  -- "narrow 4p map"
+            [1] = {10.50, -12.12},
+            [2] = {-10.50, -12.12},
+            [3] = {-10.5, 12.12},
+            [4] = {10.50, 12.12},
         },
         ghostHomePositions = {
             [1] = {15.75, -21.22},
@@ -292,6 +292,7 @@ local _zones = {}
 local _table = {}
 local _lastUpdateZoneColorTime = false
 local _extraRings = 0
+local _altHomeSystemPositions = false
 
 -------------------------------------------------------------------------------
 
@@ -324,6 +325,10 @@ function setPlayerCount(params)
     local zoneAttributes = assert(DEFAULT_ZONES[params.playerCount], 'invalid player count')
     _extraRings = params.extraRings or zoneAttributes.extraRings or 0
     _zones = {}
+    local homeSystemPositionsXZ = zoneAttributes.homeSystemPositions
+    if _altHomeSystemPositions and zoneAttributes.homeSystemPositions_alt then
+        homeSystemPositionsXZ = zoneAttributes.homeSystemPositions_alt
+    end
     for i = 1, params.playerCount do
         local polygon = assert(zoneAttributes.zones[i])
         if _extraRings then
@@ -337,7 +342,7 @@ function setPlayerCount(params)
             polygon = mutated
         end
         local bb = _boundingBox(polygon)
-        local homeXZ = assert(zoneAttributes.homeSystemPositions[i])
+        local homeXZ = assert(homeSystemPositionsXZ[i])
         local ghostXZ = assert(zoneAttributes.ghostHomePositions[i])
         table.insert(_zones, {
             index = i,
@@ -374,6 +379,9 @@ function getHomeSystemPositions(playerCount)
         playerCount = #_zones
     end
     local positionsXZ = DEFAULT_ZONES[playerCount].homeSystemPositions
+    if _altHomeSystemPositions and DEFAULT_ZONES[playerCount].homeSystemPositions_alt then
+        positionsXZ = DEFAULT_ZONES[playerCount].homeSystemPositions_alt
+    end
     local result = {}
     for _, positionXZ in ipairs(positionsXZ) do
         table.insert(result, {
@@ -383,6 +391,14 @@ function getHomeSystemPositions(playerCount)
         })
     end
     return result
+end
+
+function toggleAltHomeSystemsPositions()
+    _altHomeSystemPositions = not _altHomeSystemPositions
+    setPlayerCount({
+        playerCount = getPlayerCount(),
+        extraRings = getExtraRings(),
+    })
 end
 
 -------------------------------------------------------------------------------
@@ -956,13 +972,15 @@ function onLoad(saveState)
             playerCount = json.playerCount,
             extraRings = json.extraRings
         })
+        _altHomeSystemPositions = json.altHomeSystemPositions
     end
 end
 
 function onSave()
     return JSON.encode({
         playerCount = getPlayerCount(),
-        extraRings = getExtraRings()
+        extraRings = getExtraRings(),
+        altHomeSystemPositions = _altHomeSystemPositions,
     })
 end
 

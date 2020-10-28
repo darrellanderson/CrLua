@@ -47,12 +47,16 @@ local STRATEGY_CARD_INITIATIVE = {
     ['Diplomacy (Revised)'] = 2,
     ['Politics'] = 3,
     ['Construction'] = 4,
-    ['Industry'] = 4.5,
+    ['Industry'] = 5,
     ['Trade'] = 5,
     ['Warfare'] = 6,
-    ['Logistics'] = 6.5,
+    ['Trade (6)'] = 6,
     ['Technology'] = 7,
-    ['Imperial'] = 8
+    ['Warfare (7)'] = 7,
+    ['Imperial'] = 8,
+    ['Logistics'] = 8,
+    ['Technology (9)'] = 9,
+    ['Imperial (10)'] = 10,
 }
 
 local STRATEGY_CARD_SHEET_NAME = 'Strategy Card Mat'
@@ -60,21 +64,39 @@ local STRATEGY_CARD_SHEET_NAME = 'Strategy Card Mat'
 local x0, dx = 5.62, -3.77
 local z0, dz = -0.73, 4.57
 
+-- Used to adjust Industry and Imperial (10) so they aren't tilted on the strategy
+-- card mat
+local nudgeAmount = -0.3
+
 local STRATEGY_CARD_RETURN_POSITION = {
+    -- First Row
     ['Leadership'] = { x = x0, y = 0, z = z0, snap = true },
+
     ['Diplomacy'] = { x = x0 + dx, y = 0, z = z0, snap = true },
     ['Diplomacy (Revised)'] = { x = x0 + dx, y = 0, z = z0, snap = true },
+
     ['Politics'] = { x = x0 + dx * 2, y = 0, z = z0, snap = true },
+
     ['Construction'] = { x = x0 + dx * 3, y = 0, z = z0, snap = true },
 
-    ['Trade'] = { x = x0, y = 0, z = z0 + dz, snap = true },
-    ['Warfare'] = { x = x0 + dx, y = 0, z = z0 + dz, snap = true },
-    ['Technology'] = { x = x0 + dx * 2, y = 0, z = z0 + dz, snap = true },
-    ['Imperial'] = { x = x0 + dx * 3, y = 0, z = z0 + dz, snap = true },
+    ['Industry'] = { x = x0 + dx * 4 + nudgeAmount, y = 0, z = z0, snap = false },
 
-    ['Industry'] = { x = x0 + dx * 4, y = 0, z = z0, snap = false },
-    ['Logistics'] = { x = x0 + dx * 4, y = 0, z = z0 + dz, snap = false },
+    -- Second Row
+    ['Trade'] = { x = x0, y = 0, z = z0 + dz, snap = true },
+    ['Trade (6)'] = { x = x0, y = 0, z = z0 + dz, snap = true },
+
+    ['Warfare'] = { x = x0 + dx, y = 0, z = z0 + dz, snap = true },
+    ['Warfare (7)'] = { x = x0 + dx, y = 0, z = z0 + dz, snap = true },
+
+    ['Technology'] = { x = x0 + dx * 2, y = 0, z = z0 + dz, snap = true },
+    ['Logistics'] = { x = x0 + dx * 2, y = 0, z = z0 + dz, snap = true },
+
+    ['Imperial'] = { x = x0 + dx * 3, y = 0, z = z0 + dz, snap = true },
+    ['Technology (9)'] = { x = x0 + dx * 3, y = 0, z = z0 + dz, snap = true },
+
+    ['Imperial (10)'] = { x = x0 + dx * 4 + nudgeAmount, y = 0, z = z0 + dz, snap = false },
 }
+
 
 local _lowerNameToInfluence = false
 local _guidToParameters = {}  -- strategy cards

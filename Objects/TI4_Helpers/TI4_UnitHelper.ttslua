@@ -1067,7 +1067,9 @@ function injectUnitModifier(unitModifier)
     local name = assert(unitModifier.name, 'missing unitModifier.name')
     assert(string.len(name) > 0, 'empty unitModifier.name')
     _validateUnitModifier(name, unitModifier)
-    assert(not _unitModifiers[name], 'already have unitOverride.name "' .. name .. '"')
+    if _unitModifiers[name] then
+        print('already have unitOverride.name "' .. name .. '", replacing with new version')
+    end
 
     -- Add an apply function.
     assert(not unitModifier.apply, 'cannot declare ' .. name .. '.apply')

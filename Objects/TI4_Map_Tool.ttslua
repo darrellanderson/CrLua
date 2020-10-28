@@ -111,6 +111,8 @@ end
 
 function onLoad(saveState)
     createInputs()
+
+    self.addContextMenuItem('Toggle Alt HS Pos', toggleAltHomeSystemPositions)
     self.addContextMenuItem('Add Clone To Tiles', addCloneMenuOptionToSystemTiles)
 
     -- If any clones are still on the table, add them to the systems table.
@@ -158,6 +160,11 @@ function addCloneMenuOptionToSystemTiles()
             _hasCloneMenuGuidSet[guid] = true
         end
     end
+end
+
+function toggleAltHomeSystemPositions()
+    _zoneHelper.toggleAltHomeSystemsPositions()
+    _zoneHelper.drawBordersVectorLines({})
 end
 
 -------------------------------------------------------------------------------

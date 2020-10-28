@@ -97,7 +97,6 @@ local STRATEGY_CARD_RETURN_POSITION = {
     ['Imperial (10)'] = { x = x0 + dx * 4 + nudgeAmount, y = 0, z = z0 + dz, snap = false },
 }
 
-
 local _lowerNameToInfluence = false
 local _guidToParameters = {}  -- strategy cards
 local _strategyCardSheetGuid = false
@@ -881,6 +880,9 @@ function onObjectPickUp(playerColor, pickedUpObject)
 
     -- Merely picking up an allocated token clears "unassigned".
     _clearUnallocatedCommandToken(pickedUpObject)
+
+    -- Rotate strategy cards being picked up outside a player zone?
+    -- NO, "rotate" make the object drop and "setRotation[Smooth]" fails.
 end
 
 function onObjectDestroy(dyingObject)

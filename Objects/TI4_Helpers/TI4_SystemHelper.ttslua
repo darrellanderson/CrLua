@@ -1208,11 +1208,11 @@ end
 function _addContextMenuItems(systemObject)
     assert(type(systemObject) == 'userdata')
     assert(_systems[systemObject.getGUID()])
-    systemObject.addContextMenuItem('Diplomacy System', function(clickerColor) onClickDiplomacySystem(clickerColor, systemObject) end, false)
     systemObject.addContextMenuItem('Activate System', function(clickerColor) onClickActivateSystem(clickerColor, systemObject) end, false)
-    systemObject.addContextMenuItem('Strategy Token', function(clickerColor) onClickStrategyToken(clickerColor, systemObject) end, false)
-    systemObject.addContextMenuItem('Reinforcemts Token', function(clickerColor) onClickReinforcementsToken(clickerColor, systemObject) end, false)
     systemObject.addContextMenuItem('Owner Token', function(clickerColor) onClickOwnerToken(clickerColor, systemObject) end, false)
+    systemObject.addContextMenuItem('Strategy Token', function(clickerColor) onClickStrategyToken(clickerColor, systemObject) end, false)
+    systemObject.addContextMenuItem('Reinforcements Tkn', function(clickerColor) onClickReinforcementsToken(clickerColor, systemObject) end, false)
+    systemObject.addContextMenuItem('Diplomacy System', function(clickerColor) onClickDiplomacySystem(clickerColor, systemObject) end, false)
 end
 
 function onObjectLeaveContainer(container, leaveObject)

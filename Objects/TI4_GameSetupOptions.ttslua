@@ -164,7 +164,7 @@ function _createUI()
                 tag = 'GridLayout',
                 attributes = {
                     spacing = '10 10',
-                    cellSize = '86 40'
+                    cellSize = '62 40' -- 86 40 for three columns
                 },
             },
             {
@@ -237,7 +237,7 @@ function _createUI()
                     text('title', 'TI4 Game Setup Options'),
 
                     text('heading', 'Player count'),
-                    toggleGroup('playerCount', { 3, 4, 5, 6, 7, 8 }),
+                    toggleGroup('playerCount', { 2, 3, 4, 5, 6, 7, 8 }),
 
                     text('heading', 'Extra map rings'),
                     toggleGroup('extraRings', { 0, 1, 2 }),

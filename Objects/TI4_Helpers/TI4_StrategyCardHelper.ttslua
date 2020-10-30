@@ -61,42 +61,6 @@ local STRATEGY_CARD_INITIATIVE = {
 
 local STRATEGY_CARD_SHEET_NAME = 'Strategy Card Mat'
 
-local x0, dx = 5.62, -3.77
-local z0, dz = -0.73, 4.57
-
--- Used to adjust Industry and Imperial (10) so they aren't tilted on the strategy
--- card mat
-local nudgeAmount = -0.3
-
-local STRATEGY_CARD_RETURN_POSITION = {
-    -- First Row
-    ['Leadership'] = { x = x0, y = 0, z = z0, snap = true },
-
-    ['Diplomacy'] = { x = x0 + dx, y = 0, z = z0, snap = true },
-    ['Diplomacy (Revised)'] = { x = x0 + dx, y = 0, z = z0, snap = true },
-
-    ['Politics'] = { x = x0 + dx * 2, y = 0, z = z0, snap = true },
-
-    ['Construction'] = { x = x0 + dx * 3, y = 0, z = z0, snap = true },
-
-    ['Industry'] = { x = x0 + dx * 4 + nudgeAmount, y = 0, z = z0, snap = false },
-
-    -- Second Row
-    ['Trade'] = { x = x0, y = 0, z = z0 + dz, snap = true },
-    ['Trade (6)'] = { x = x0, y = 0, z = z0 + dz, snap = true },
-
-    ['Warfare'] = { x = x0 + dx, y = 0, z = z0 + dz, snap = true },
-    ['Warfare (7)'] = { x = x0 + dx, y = 0, z = z0 + dz, snap = true },
-
-    ['Technology'] = { x = x0 + dx * 2, y = 0, z = z0 + dz, snap = true },
-    ['Logistics'] = { x = x0 + dx * 2, y = 0, z = z0 + dz, snap = true },
-
-    ['Imperial'] = { x = x0 + dx * 3, y = 0, z = z0 + dz, snap = true },
-    ['Technology (9)'] = { x = x0 + dx * 3, y = 0, z = z0 + dz, snap = true },
-
-    ['Imperial (10)'] = { x = x0 + dx * 4 + nudgeAmount, y = 0, z = z0 + dz, snap = false },
-}
-
 local _lowerNameToInfluence = false
 local _guidToParameters = {}  -- strategy cards
 local _strategyCardSheetGuid = false
@@ -137,23 +101,6 @@ function _getStrategyCardSheet()
         end
     end
     return result
-end
-
-function _setSnapPoints()
-    local sheet = assert(_getStrategyCardSheet())
-    local snapPoints = {}
-    local rotation = sheet.getRotation()
-    rotation.y = rotation.y + 90
-    for _, position in pairs(STRATEGY_CARD_RETURN_POSITION) do
-        if position.snap then
-            table.insert(snapPoints, {
-                position = position,
-                rotation = rotation,
-                rotation_snap = true
-            })
-        end
-    end
-    sheet.setSnapPoints(snapPoints)
 end
 
 --- Called by strategy cards to register for return.
@@ -713,12 +660,14 @@ end
 
 function _returnStrategyCards()
     local politicalStabilityColor = false
+    local foundGuids = {}
     local guidToPosition = {}
 
     local inHandGuidSet = _zoneHelper.inHand()
     for _, object in ipairs(getAllObjects()) do
         local guid = object.getGUID()
         if _guidToParameters[guid] then
+            table.insert(foundGuids, guid)
             guidToPosition[guid] = object.getPosition()
         end
         if object.getName() == 'Political Stability' and not object.is_face_down and not inHandGuidSet[guid] then
@@ -727,21 +676,26 @@ function _returnStrategyCards()
     end
     coroutine.yield(0)
 
-    local guidToColor = _zoneHelper.zonesFromPositions(guidToPosition)
-
     local sheet = assert(_getStrategyCardSheet())
-    for guid, color in pairs(guidToColor) do
+    local guidToColor = _zoneHelper.zonesFromPositions(guidToPosition)
+    for _, guid in ipairs(foundGuids) do
         local strategyCard = getObjectFromGUID(guid)
         local name = strategyCard.getName()
-        if color == politicalStabilityColor then
+        local color = guidToColor[guid]
+        if color and color == politicalStabilityColor then
             broadcastToAll(color .. ' has Political Stability, not returning ' .. name .. ' strategy card', {0.1,0.5,0.1})
         else
-            local offset = assert(STRATEGY_CARD_RETURN_POSITION[name])
-            local position = sheet.positionToWorld(offset)
-            local rotation = sheet.getRotation()
-            if _guidToParameters[guid].flip then
-                rotation.z = (rotation.z + 180) % 360
+            local index = assert(STRATEGY_CARD_INITIATIVE[name])
+            if #foundGuids > 8 and sheet.getStateId() ~= 2 then
+                index = index - 1
             end
+            local snapPoint = sheet.call('getSnapPoint', index)
+            local position = sheet.positionToWorld(snapPoint.position)
+            local rotation = {
+                x = 0,
+                y = sheet.getRotation().y + snapPoint.rotation.y,
+                z = 0
+            }
 
             local dx = strategyCard.getPosition().x - position.x
             local dz = strategyCard.getPosition().z - position.z
@@ -750,7 +704,7 @@ function _returnStrategyCards()
             if d > 1 then
                 local collide = false
                 local fast = true
-                local abovePos = { x = position.x, y = position.y + 1, z = position.z}
+                local abovePos = { x = position.x, y = position.y + 1, z = position.z }
                 strategyCard.setLock(false)  -- paranoia
                 strategyCard.setPositionSmooth(abovePos, collide, fast)
                 strategyCard.setRotationSmooth(rotation, collide, fast)
@@ -870,9 +824,6 @@ function onLoad(saveState)
         end
     end
     self.setInvisibleTo(invisibleTo)
-
-    -- Place snap points where strategy cards live.
-    _setSnapPoints()
 end
 
 function onObjectPickUp(playerColor, pickedUpObject)

@@ -46,6 +46,18 @@ function onLoad(saveState)
 
     Wait.frames(createUI, 3)
     Wait.frames(updateUI, 5)  -- wait for UI to exist before updating
+
+    local header = 'Make a copy of each sheet and get share URLs where anyone with the URL has editor permission.'
+    local score = 'https://docs.google.com/spreadsheets/d/1aIZZlwt8ePYxCVbxjNXjB5lMdl0kbyiTYU1Al8RUa4A/edit?usp=sharing'
+    local tech = 'https://docs.google.com/spreadsheets/d/1EsxsOkX1_rR2ip4PMB6LXScm4TDWEcXIgbl8D6zc-0s/edit?usp=sharing'
+
+    self.setDescription(table.concat({
+        header,
+        '',
+        'Score sheet: ' .. score,
+        '',
+        'Tech sheet: ' .. tech
+    }, '\n'))
 end
 
 function onSave()
@@ -65,15 +77,52 @@ function onSave()
 end
 
 function onPlayerTurnStart(playerColorStart, playerColorPrevious)
-    -- Always update state to preserve order.
-    updateTechState()
-    updateScoreState()
+    maybeAsyncUpdate(_data.updateBetweenTurns)
+end
 
-    -- Optionally also push to sheet.
-    if _data.updateBetweenTurns then
-        updateSpreadsheetTech()
-        updateSpreadsheetScore()
+-------------------------------------------------------------------------------
+
+local _asyncUpdateQueue = {}
+local _lastAsyncUpdateTime = false
+
+function maybeAsyncUpdate(alsoUpdateSheet)
+    assert(type(alsoUpdateSheet) == 'boolean')
+    if _lastAsyncUpdateTime then
+        local nextAsyncUpdateTime = _lastAsyncUpdateTime + 3
+        if Time.time < nextAsyncUpdateTime then
+            return
+        end
     end
+    asyncUpdate(alsoUpdateSheet)
+end
+
+function asyncUpdate(alsoUpdateSheet)
+    assert(type(alsoUpdateSheet) == 'boolean')
+    _lastAsyncUpdateTime = Time.time
+    table.insert(_asyncUpdateQueue, alsoUpdateSheet)
+    startLuaCoroutine(self, 'asyncUpdateCoroutine')
+end
+
+function asyncUpdateCoroutine()
+    local alsoUpdateSheet = table.remove(_asyncUpdateQueue)
+    if not alsoUpdateSheet then
+        return 1
+    end
+    assert(type(alsoUpdateSheet) == 'boolean')
+
+    updateTechState()
+    coroutine.yield(0)
+
+    updateSpreadsheetTech()
+    coroutine.yield(0)
+
+    updateScoreState()
+    coroutine.yield(0)
+
+    updateSpreadsheetScore()
+    coroutine.yield(0)
+
+    return 1
 end
 
 -------------------------------------------------------------------------------
@@ -81,27 +130,38 @@ end
 function updateTechState()
     -- Update the local table to preserve order.  Does not push to sheet.
     _data.playerColorToTechs = CrLua.TI4.PlayerTech.updateAllPlayersToTech(_data.playerColorToTechs)
-
 end
 
 function updateScoreState()
     local nameToScoreObjects = CrLua.TI4.PlayerScore.getNameToScoreObjects()
+    coroutine.yield(0)
     local nameToOwnerTokens = CrLua.TI4.PlayerScore.nameToOwnerTokens(nameToScoreObjects)
+    coroutine.yield(0)
     _data.playerScores = CrLua.TI4.PlayerScore.colorToScore(nameToScoreObjects, nameToOwnerTokens)
+    coroutine.yield(0)
     _data.stageOneObjectives = CrLua.TI4.PlayerScore.updatePublicOneObjectives(_data.stageOneObjectives, nameToScoreObjects)
+    coroutine.yield(0)
     _data.StageOneMap = CrLua.TI4.PlayerScore.mapStageOne(nameToOwnerTokens)
+    coroutine.yield(0)
     _data.stageTwoObjectives = CrLua.TI4.PlayerScore.updatePublicTwoObjectives(_data.stageTwoObjectives, nameToScoreObjects)
+    coroutine.yield(0)
     _data.StageTwoMap = CrLua.TI4.PlayerScore.mapStageTwo(nameToOwnerTokens)
+    coroutine.yield(0)
 
     -- Lua does not let one update two fields this way, but locals then move to fields separately works.
     local secretsOrder, playerSecrets = CrLua.TI4.PlayerScore.updateSecrets(_data.secretsOrder, _data.playerSecrets, nameToOwnerTokens)
     _data.secretsOrder = assert(secretsOrder)
     _data.playerSecrets = assert(playerSecrets)
+    coroutine.yield(0)
 
     _data.playerColorToStrategy = CrLua.TI4.PlayerScore.updateStrategy()
+    coroutine.yield(0)
     _data.supportMap = CrLua.TI4.PlayerScore.mapSupports(nameToOwnerTokens)
+    coroutine.yield(0)
     _data.mecatolPoints = CrLua.TI4.PlayerScore.getMecatolPoints(_data.mecatolPoints, nameToOwnerTokens)
+    coroutine.yield(0)
     _data.otherPoints = CrLua.TI4.PlayerScore.mapOtherPoints(_data.otherPoints, nameToOwnerTokens)
+    coroutine.yield(0)
 end
 
 -------------------------------------------------------------------------------
@@ -127,39 +187,52 @@ end
 function updateSpreadsheetTech()
     local sheetId = _sheetId(_data.sheetIdTech)
     local sheetName = _data.sheetNameTech
-    local cells = CrLua.TI4.PlayerTech.getCells(_data.playerColorToTechs)
 
-    if sheetId then
-        CrLua.Log.d(TAG, 'updating tech spreadsheet')
-        CrLua.TTS.Spreadsheet.update('tech', sheetId, sheetName, cells)
-    else
+    if not sheetId then
         CrLua.Log.d(TAG, 'no tech spreadsheet, not updating tech')
+        return
     end
+
+    local cells = CrLua.TI4.PlayerTech.getCells(_data.playerColorToTechs)
+    coroutine.yield(0)
+
+    CrLua.Log.d(TAG, 'updating tech spreadsheet')
+    CrLua.TTS.Spreadsheet.update('tech', sheetId, sheetName, cells)
 end
 
 function updateSpreadsheetScore()
     local sheetId = _sheetId(_data.sheetIdScore)
     local sheetName = _data.sheetNameScore
 
+    if not sheetId then
+        CrLua.Log.d(TAG, 'no score spreadsheet, not updating score')
+        return
+    end
+
     local cells = {}
     CrLua.TI4.PlayerScore.setCellsFactions(cells)
+    coroutine.yield(0)
     CrLua.TI4.PlayerScore.setCellsPlayerNames(cells)
+    coroutine.yield(0)
     CrLua.TI4.PlayerScore.setCellsStrategyCards(cells, _data.playerColorToStrategy)
+    coroutine.yield(0)
     CrLua.TI4.PlayerScore.setCellsScores(cells, _data.playerScores)
+    coroutine.yield(0)
     CrLua.TI4.PlayerScore.setCellsPublicObjectivesAndRound(cells, _data.stageOneObjectives, _data.stageTwoObjectives, _data.StageOneMap, _data.StageTwoMap)
+    coroutine.yield(0)
     CrLua.TI4.PlayerScore.setCellsSecretObjectives(cells, _data.secretsOrder, _data.playerSecrets)
+    coroutine.yield(0)
     CrLua.TI4.PlayerScore.setCellsSupport(cells, _data.supportMap)
+    coroutine.yield(0)
     CrLua.TI4.PlayerScore.setCellsMecatol(cells, _data.mecatolPoints)
+    coroutine.yield(0)
     CrLua.TI4.PlayerScore.setCellsOther(cells, _data.otherPoints)
+    coroutine.yield(0)
 
     --for k, v in pairs(cells) do print('(' .. k .. ') = "' .. v .. '"') end
 
-    if sheetId then
-        CrLua.Log.d(TAG, 'updating score spreadsheet')
-        CrLua.TTS.Spreadsheet.update('score', sheetId, sheetName, cells)
-    else
-        CrLua.Log.d(TAG, 'no score spreadsheet, not updating score')
-    end
+    CrLua.Log.d(TAG, 'updating score spreadsheet')
+    CrLua.TTS.Spreadsheet.update('score', sheetId, sheetName, cells)
 end
 -------------------------------------------------------------------------------
 
@@ -178,7 +251,7 @@ function createUI()
                 tag = 'Button',
                 attributes = {
                     onClick = 'onButtonClick',
-                    fontSize = 18,
+                    fontSize = 24,
                 }
             },
             {
@@ -215,7 +288,7 @@ function createUI()
             rotation = '0 180 90',
             width = 200,
             height = 280,
-            padding = '10 10 10 10',
+            padding = '10 10 0 0',
             spacing = 10,
         },
         children = {
@@ -224,29 +297,14 @@ function createUI()
                 attributes = {
                     class = 'title'
                 },
-                value = 'TI4 Spreadsheet Update'
+                value = 'Spreadsheet'
             },
             {
                 tag = 'Button',
                 attributes = {
-                    id = 'updateTech',
+                    id = 'update',
                 },
-                value = 'Update Tech'
-            },
-            {
-                tag = 'Button',
-                attributes = {
-                    id = 'updateScore',
-                },
-                value = 'Update Score'
-            },
-            {
-                tag = 'Toggle',
-                attributes = {
-                    id = 'updateBetweenTurns',
-                    fontSize = 14,
-                },
-                value = 'Update between turns'
+                value = 'Update'
             },
             {
                 tag = 'Text',
@@ -286,6 +344,14 @@ function createUI()
             {
                 tag = 'Toggle',
                 attributes = {
+                    id = 'updateBetweenTurns',
+                    fontSize = 14,
+                },
+                value = 'Update between turns'
+            },
+            {
+                tag = 'Toggle',
+                attributes = {
                     id = 'saveIds',
                     fontSize = 14,
                 },
@@ -310,18 +376,8 @@ function updateUI()
 end
 
 function onButtonClick(player, value, id)
-    if id == 'updateTech' then
-        if not _data.sheetIdTech or string.len(_data.sheetIdTech) == 0 then
-            printToColor('Spreadsheet Update: Enter the tech sheet id or URL on the back side of this object', player.color, 'Red')
-        end
-        updateTechState()
-        updateSpreadsheetTech()
-    elseif id == 'updateScore' then
-        if not _data.sheetIdScore or string.len(_data.sheetIdScore) == 0 then
-            printToColor('Spreadsheet Update: Enter the score sheet id or URL on the back side of this object', player.color, 'Red')
-        end
-        updateScoreState()
-        updateSpreadsheetScore()
+    if id == 'update' then
+        asyncUpdate(true)
     else
         error('unknown button id "' .. id .. '"')
     end

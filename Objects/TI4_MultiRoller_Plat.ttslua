@@ -1012,7 +1012,7 @@ function Roller_RollDiceCoroutine()
                 unitHitCount = unitHitCount + 1
                 suffix = '#'
             end
-            if dice.critCount and dice.critValue and rollValue >= dice.critValue then
+            if dice.critCount and dice.critValue and (rollValue >= dice.critValue) then
                 hits = hits + dice.critCount
                 unitHitCount = unitHitCount + dice.critCount
                 for _ = 1, dice.critCount do
@@ -1057,14 +1057,16 @@ function rollDiceForAbility(player, ability)
     for unit_id, unit_stats in pairs(unitData) do
         local unit_count = getUnitCount(unit_id) or 0
         if unit_count > 0 and unit_stats[ability] then
-            local params = {
+            local abilityAttrs = unit_stats[ability]
+            Roller.addDice({
                 diceColor = DICE_COLOR[unit_id],
-                diceCount = unit_stats[ability].dice * unit_count + (unit_stats[ability].extraDice or 0),
-                hitValue = unit_stats[ability].hit,
+                diceCount = abilityAttrs.dice * unit_count + (abilityAttrs.extraDice or 0),
+                hitValue = abilityAttrs.hit,
+                critCount = abilityAttrs.extraHitsOn and abilityAttrs.extraHitsOn.count,
+                critValue = abilityAttrs.extraHitsOn and abilityAttrs.extraHitsOn.value,
                 unitName = unit_stats.name,
                 unitId = unit_id
-            }
-            Roller.addDice(params)
+            })
             haveDice = true
         end
     end

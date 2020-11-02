@@ -1,5 +1,6 @@
 --- Shared deck locations, etc.
 -- @author Darrell
+-- #include <~/CrLua/Objects/TI4_Helpers/TI4_DeckHelper>
 
 -- Users should copy this getHelperClient function, and use via:
 --
@@ -937,21 +938,33 @@ local function _scoreObjective(playerColor, card)
     printToAll(playerColor .. ' scoring ' .. card.getName(), playerColor)
 
     local faction = _factionHelper.fromColor(playerColor)
-    local zoneAttrs = _zoneHelper.zoneAttributes(playerColor)
+    local zoneAttributes = _zoneHelper.zoneAttributes(playerColor)
     local playerCount = _zoneHelper.getPlayerCount()
-    if (not faction) or (not zoneAttrs) then
+    if (not faction) or (not zoneAttributes) then
         return
     end
 
-    local halfPlayerCount = math.ceil(playerCount / 2)
-    local x0 = 0.8
-    local dx = -1.6 / (halfPlayerCount - 1)
-    local position = card.positionToWorld({
-        x = x0 + dx * ((zoneAttrs.index - 1) % halfPlayerCount),
-        y = 0,
-        z = 1 * ((zoneAttrs.index <= halfPlayerCount) and -1 or 1)
-    })
-    position.y = position.y + 2
+    -- Preserve table layout on card.
+    local bb = { min = { x = 0, z = 0 }, max = { x = 0, z = 0 } }
+    for _, za in ipairs(_zoneHelper.zonesAttributes()) do
+        bb.min.x = math.min(bb.min.x, za.center.x)
+        bb.max.x = math.max(bb.max.x, za.center.x)
+        bb.min.z = math.min(bb.min.z, za.center.z)
+        bb.max.z = math.max(bb.max.z, za.center.z)
+    end
+    local uv = {
+        x = (zoneAttributes.center.x - bb.min.x) / math.max(bb.max.x - bb.min.x, 1),
+        z = (zoneAttributes.center.z - bb.min.z) / math.max(bb.max.z - bb.min.z, 1),
+    }
+    local p0 = card.getPosition()
+    local size = card.getBounds().size
+    size.x = size.x - 0.5  -- inset so owner token is inside card bounds
+    size.z = size.z - 0.5
+    local position = {
+        x = p0.x + (size.x / 2) * ((uv.x - 0.5) * 2),
+        y = p0.y + 3,
+        z = p0.z + (size.z / 2) * ((uv.z - 0.5) * 2)
+    }
     local rotation = {
         x = 0,
         y = card.getRotation().y + 90,

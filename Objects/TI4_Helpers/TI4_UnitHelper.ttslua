@@ -681,18 +681,23 @@ function applyUnitModifiers(params)
         ownerSet[OWNER.ANY][name] = true
     end
 
+    -- Apply MUTATE first to add/remove attributes.
     for name, unitModifier in pairs(_unitModifiers) do
         if unitModifier.type == TYPE.MUTATE and ownerSet[unitModifier.owner][name] then
             table.insert(modifiers, name)
             unitModifier.apply(unitAttrs, params)
         end
     end
+
+    -- Apply ADJUST to update (but not add/remove) attribute values.
     for name, unitModifier in pairs(_unitModifiers) do
         if unitModifier.type == TYPE.ADJUST and ownerSet[unitModifier.owner][name] then
             table.insert(modifiers, name)
             unitModifier.apply(unitAttrs, params)
         end
     end
+
+    -- Apply CHOOSE to select units based on attributes.
     for name, unitModifier in pairs(_unitModifiers) do
         if unitModifier.type == TYPE.CHOOSE and ownerSet[unitModifier.owner][name] then
             table.insert(modifiers, name)
@@ -700,7 +705,7 @@ function applyUnitModifiers(params)
         end
     end
 
-    -- Respect single return value limitation for cross-object call.
+    -- Record active modifiers for reporting.
     unitAttrs._unitModifiers = {}
     for _, modifier in ipairs(modifiers) do
         table.insert(unitAttrs._unitModifiers, {

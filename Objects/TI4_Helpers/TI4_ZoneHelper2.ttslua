@@ -25,7 +25,16 @@ function getHelperClient(helperObjectName)
 end
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 
-local DEFAULT_VECTOR_LINE_THICKNESS = 0.15
+-- ZONE ATTRIBUTES (for functions that return per-zone attributes).
+-- - index (number) starts at 1, winds clockwise from white seat.
+-- - color (string).
+-- - polygon (table) list of {xz} points in clockwise winding order about the zone.
+-- - boundingBox (table) min.{xz}, max.{xz} bounding box.
+-- - center (table) {xyz} position.
+-- - rotation (table) {xyz} rotation.
+-- - homeSystemPosition (table) {xyz} position.
+-- - ghostHomePosition (table) {xyz} position.
+-- - commandSheetGuid (string) command sheet defining zone color.
 
 -- Map from player count to zone attributes.
 local DEFAULT_ZONES = {
@@ -285,6 +294,7 @@ local DEFAULT_ZONES = {
     },
 }
 
+local DEFAULT_VECTOR_LINE_THICKNESS = 0.15
 local DEFAULT_TABLE_Y = 1
 
 -- Current zones.
@@ -374,6 +384,9 @@ function setPlayerCount(params)
     updateZoneColors()
 end
 
+--- Get home system positions, possibly alt positions if set.
+-- @param playerCount (number): home system positions for given player count.
+-- @return (table): list of {xyz} tables.
 function getHomeSystemPositions(playerCount)
     if not playerCount then
         playerCount = #_zones
@@ -393,6 +406,8 @@ function getHomeSystemPositions(playerCount)
     return result
 end
 
+--- If a player count has alternate home system positions switch between
+-- that and the default (e.g., 4p).
 function toggleAltHomeSystemsPositions()
     _altHomeSystemPositions = not _altHomeSystemPositions
     setPlayerCount({
@@ -419,6 +434,7 @@ function updateZoneColors()
                         broadcastToAll('Warning: more than one command sheet in zone ("' .. object.getName() .. '")')
                     end
                     zone.color = color
+                    zone.commandSheetGuid = object.getGUID()
                 end
             end
         end
@@ -441,6 +457,7 @@ function zonesAttributes()
 end
 
 --- Get a single zone's attributes.
+-- @see zoneAttributes for a list of attributes.
 -- @param color string : command sheet color.
 -- @return table : zone attributes.
 function zoneAttributes(color)
@@ -702,7 +719,7 @@ end
 -- @see https://love2d.org/wiki/PointWithinShape
 --
 -- @param polygonXZ table : list of 2d points, each point is a list of two numbers.
--- @param point table : list of 2 numbers.
+-- @param position table : {xz} table (y too problably, not used).
 -- @return boolean : true if point is inside polygon.
 function _polygonContains(polygonXZ, position)
     assert(type(polygonXZ) == 'table' and type(position) == 'table' and position.x)

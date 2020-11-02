@@ -32,6 +32,10 @@ function getHelperClient(helperObjectName)
 end
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
+-- Per-faction attributes.  This helper will also add the following fields:
+-- - color (string) or nil if not in use.
+-- - commandSheetGuid (string) or nil if not in use.
+-- - factionSheetGuid (string) or nil if not in use.
 local _factionAttributes = {
 
     ['The Arborec'] = {

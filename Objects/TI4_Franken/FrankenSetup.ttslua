@@ -80,9 +80,10 @@ local UNPACK_TO_BAGS_BLU = {
     ['Faction Techs'] = 4
 }
 
+-- Index by player count (1 not allowed).  Based on setup instruction counts.
 local EXTERNAL_TO_BAGS = {
-    ['Blue Planet Tiles'] = 3,
-    ['Red Anomaly Tiles'] = 2
+    ['Blue Planet Tiles'] = { -1, 7, 6, 5, 4, 3, 2, 2 },
+    ['Red Anomaly Tiles'] = { -1, 2, 2, 3, 2, 2, 1, 1 },
 }
 
 local CLONE_TO_HIDDEN = {
@@ -323,7 +324,9 @@ local function unpackToBags(bags)
         self.putObject(container)
     end
 
-    for name, count in pairs(EXTERNAL_TO_BAGS) do
+    local numPlayers = _zoneHelper.getPlayerCount()
+    for name, perPlayerCounts in pairs(EXTERNAL_TO_BAGS) do
+        local count = perPlayerCounts[numPlayers]
         local function getExternal()
             for _, object in ipairs(getAllObjects()) do
                 if object.getName() == name then

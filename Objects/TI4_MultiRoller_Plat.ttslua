@@ -100,7 +100,7 @@ local _updateWarnings = false
 local _rollObjectOverride = false
 local _showInert = false
 
-function onLoad()
+function onLoad(saveState)
     for _, unitType in ipairs(UNIT_TYPES) do
         _unitTypeToCount[unitType] = 0
     end
@@ -132,6 +132,19 @@ function onLoad()
         height         = 0,
         font_size      = 200,
         font_color     = 'White'
+    })
+
+    local saveState = saveState and string.len(saveState) > 0 and JSON.decode(saveState)
+    if saveState then
+        if saveState.roller then
+            Roller.load(saveState.roller)
+        end
+    end
+end
+
+function onSave()
+    return JSON.encode({
+        roller = Roller.save()
     })
 end
 
@@ -702,16 +715,6 @@ end
 
 -------------------------------------------------------------------------------
 
-function to_boolean(string)
-    if string:lower() == "true" then
-        return true
-    elseif string:lower() == "false" then
-        return false
-    else
-        return
-    end
-end
-
 function setUnitCount(unit, count)
     assert(type(unit) == 'string' and type(count) == 'number')
     self.UI.setValue(unit .. ".unitCount", count)
@@ -792,6 +795,28 @@ Roller = {
     _rollInProgressTimestamp = false,
     _rollQueue = {}
 }
+
+function Roller.load(state)
+    -- Remove any stale dice.
+    local diceGuids = state and state.diceGuids
+    if diceGuids then
+        for _, guid in ipairs(diceGuids) do
+            destroyObject(getObjectFromGUID(guid))
+        end
+    end
+end
+
+function Roller.save(state)
+    local diceGuids = {}
+    for _, dice in ipairs(Roller._dice) do
+        for _, guid in ipairs(dice._guids or {}) do
+            table.insert(diceGuids, guid)
+        end
+    end
+    return {
+        diceGuids = diceGuids
+    }
+end
 
 function Roller.isRollInProgress()
     local timeout = Roller._rollInProgressTimestamp and (Roller._rollInProgressTimestamp + 10)

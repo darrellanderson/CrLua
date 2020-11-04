@@ -1,5 +1,6 @@
 --- Shared unit logic.
 -- @author Darrell
+-- #include <~/CrLua/Objects/TI4_Helpers/TI4_UnitHelper>
 
 -- Users should copy this getHelperClient function, and use via:
 --
@@ -1115,15 +1116,134 @@ end
 
 -------------------------------------------------------------------------------
 
-function _copy(t)
-    if t and type(t) == 'table' then
-        local copy = {}
-        for k, v in pairs(t) do
-            copy[k] = type(v) == 'table' and _copy(v) or v
-        end
-        t = copy
+local _showUnitUpgrades = false
+local _showUnitUpgradesWaitId = false
+
+function _highlightUnitUpgradesCoroutine()
+    local colorToUnitOverrides = getColorToUnitOverrides()
+    coroutine.yield(0)
+
+    local colorToUnitAttributes = {}
+    for color, unitOverrides in pairs(colorToUnitOverrides) do
+        colorToUnitAttributes[color] = getUnitAttributes(unitOverrides)
     end
-    return t
+    coroutine.yield(0)
+
+    -- Map from unit bag name to {upgrade, color} values.
+    local unitBagNameToUpgradeAndColor = {}
+    for color, unitAttributes in pairs(colorToUnitAttributes) do
+        for unitType, attrs in pairs(unitAttributes) do
+            unitBagNameToUpgradeAndColor[color .. ' ' .. unitType] = {
+                upgrade = attrs.upgrade,
+                color = color,
+            }
+        end
+        -- Copy flagship value to specific name.
+        local faction = _factionHelper.fromColor(color)
+        if faction and faction.flagship then
+            unitBagNameToUpgradeAndColor[faction.flagship] = unitBagNameToUpgradeAndColor[color .. ' Flagship']
+        end
+    end
+    coroutine.yield(0)
+
+    -- Find directionalisers and all unit bags in one pass.
+    local directionaliserNameToColor = {}
+    for color, _ in pairs(colorToUnitOverrides) do
+        directionaliserNameToColor['Directionaliser (' .. color .. ')'] = color
+    end
+    local colorToDirectionaliser = {}
+    local unitBagGuidToUpgradeAndColor = {}
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        local directionaliserColor = directionaliserNameToColor[name]
+        if directionaliserColor then
+            colorToDirectionaliser[directionaliserColor] = object.getGUID()
+        end
+        local upgradeAndColor = (object.tag == 'Bag') and unitBagNameToUpgradeAndColor[name]
+        if upgradeAndColor then
+            unitBagGuidToUpgradeAndColor[object.getGUID()] = upgradeAndColor
+        end
+    end
+    coroutine.yield(0)
+
+    -- At this point have directionalisers, unit bags, and upgrade/color.
+    -- Could go in many different directions, in this case get bottom of
+    -- upgraded unit positions in world space.
+    local colorToUpgradedUnitPositions = {}
+    for guid, upgradeAndColor in pairs(unitBagGuidToUpgradeAndColor) do
+        if upgradeAndColor.upgrade and _showUnitUpgrades then
+            local object = getObjectFromGUID(guid)
+            if object then
+                local p = object.getPosition()
+                local bounds = object.getBoundsNormalized()
+                local scale = object.getScale()
+                local entry = colorToUpgradedUnitPositions[upgradeAndColor.color]
+                if not entry then
+                    entry = {}
+                    colorToUpgradedUnitPositions[upgradeAndColor.color] = entry
+                end
+                table.insert(entry, {
+                    x = p.x - bounds.offset.x,
+                    y = p.y - (bounds.size.y / 2) - bounds.offset.y,
+                    z = p.z
+                })
+            end
+        end
+    end
+
+    -- Draw lines on the directionalisers.
+    for color, guid in pairs(colorToDirectionaliser) do
+        local directionaliser = getObjectFromGUID(guid)
+        local unitPositions = colorToUpgradedUnitPositions[color]
+        local lineColor = { r = 1, g = 1, b = 1, a = 0.7 }
+        local thickness = 0.4
+        if directionaliser then
+            local bounds = self.getBoundsNormalized()
+            local topY = directionaliser.getPosition().y + 0.17
+            local midY = directionaliser.getPosition().y - 0.10
+            local topZ = 0.66
+            local midZ = 1.15 - thickness
+            local lines = {}
+            for _, unitPosition in ipairs(unitPositions or {}) do
+                local p0 = unitPosition
+                local points = {
+                    { x = p0.x, y = midY, z = p0.z + midZ - 0.03 },
+                    { x = p0.x, y = midY, z = p0.z + topZ - 0.03 + 0.01 },
+                    { x = p0.x, y = topY, z = p0.z + topZ - 0.03 },
+                    { x = p0.x, y = topY, z = p0.z - topZ },
+                    { x = p0.x, y = midY, z = p0.z - topZ - 0.01 },
+                    { x = p0.x, y = midY, z = p0.z - midZ },
+                }
+                for i, point in ipairs(points) do
+                    points[i] = directionaliser.positionToLocal(point)
+                end
+                table.insert(lines, {
+                    points = points,
+                    thickness = thickness,
+                    color = lineColor,
+                    loop = false,
+                    square = false,
+                })
+            end
+            directionaliser.setVectorLines(lines)
+        end
+    end
+    return 1
+end
+
+-------------------------------------------------------------------------------
+
+function onPlayerTurnStart(player_color_start, player_color_previous)
+    if _showUnitUpgrades then
+        if _showUnitUpgradesWaitId then
+            Wait.stop(_showUnitUpgradesWaitId)
+        end
+        local function wrapper()
+            _showUnitUpgradesWaitId = false
+            startLuaCoroutine(self, '_highlightUnitUpgradesCoroutine')
+        end
+        Wait.time(wrapper, 0.5 + math.random())
+    end
 end
 
 function onLoad(saveState)
@@ -1153,6 +1273,14 @@ function onLoad(saveState)
 
     -- More complicated unit finding initialization.
     _init()
+
+    -- Global context menu.
+    local function onToggleUnitUpgrades()
+        -- For now just redo (testing).
+        _showUnitUpgrades = not _showUnitUpgrades
+        startLuaCoroutine(self, '_highlightUnitUpgradesCoroutine')
+    end
+    addContextMenuItem('Toggle unit upgrates', onToggleUnitUpgrades)
 end
 
 function _verifyTables()
@@ -1363,6 +1491,19 @@ function _validateUnitModifier(name, unitModifier)
         legalTypeSet[value] = true
     end
     assert(legalTypeSet[unitModifier.type], 'bad ' .. name .. '.type')
+end
+
+-------------------------------------------------------------------------------
+
+function _copy(t)
+    if t and type(t) == 'table' then
+        local copy = {}
+        for k, v in pairs(t) do
+            copy[k] = type(v) == 'table' and _copy(v) or v
+        end
+        t = copy
+    end
+    return t
 end
 
 -------------------------------------------------------------------------------

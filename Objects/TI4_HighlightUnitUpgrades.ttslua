@@ -1,0 +1,197 @@
+--- Draw lines on directionalisers (unit stands) to signal unit upgrads.
+-- @author Darrell
+
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    -- Nested tables are considered cross script.  Make a local copy.
+    local function copyTable(t)
+        if t and type(t) == 'table' then
+            local copy = {}
+            for k, v in pairs(t) do
+                copy[k] = type(v) == 'table' and copyTable(v) or v
+            end
+            t = copy
+        end
+        return t
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
+        return function(parameters) return copyTable(helperObject.call(functionName, parameters)) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
+local _unitHelper = getHelperClient('TI4_UNIT_HELPER')
+local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
+
+local _waitId = false
+
+-------------------------------------------------------------------------------
+
+function onLoad()
+    delayedHighlightUnitUpgrades()
+end
+
+function onDestroy()
+    if _waitId then
+        Wait.stop(_waitId)
+        _waitId = false
+    end
+    for _, object in ipairs(getAllObjects()) do
+        if string.match(object.getName(), '^Directionaliser %(.*%)$') then
+            object.setVectorLines({})
+        end
+    end
+end
+
+function onPlayerTurnStart(player_color_start, player_color_previous)
+    delayedHighlightUnitUpgrades()
+end
+
+-------------------------------------------------------------------------------
+
+function delayedHighlightUnitUpgrades()
+    if _waitId then
+        Wait.stop(_waitId)
+        _waitId = false
+    end
+    local function wrapper()
+        _waitId = false
+        startLuaCoroutine(self, '_highlightUnitUpgradesCoroutine')
+    end
+    _waitId = Wait.time(wrapper, 0.75 + math.random())
+end
+
+function _highlightUnitUpgradesCoroutine()
+    local colorToUnitOverrides = _unitHelper.getColorToUnitOverrides()
+    coroutine.yield(0)
+
+    local colorToUnitAttributes = {}
+    for color, unitOverrides in pairs(colorToUnitOverrides) do
+        colorToUnitAttributes[color] = _unitHelper.getUnitAttributes(unitOverrides)
+    end
+    coroutine.yield(0)
+
+    -- Map from unit bag name to {upgrade, color} values.
+    local unitBagNameToUpgradeAndColor = {}
+    for color, unitAttributes in pairs(colorToUnitAttributes) do
+        for unitType, attrs in pairs(unitAttributes) do
+            unitBagNameToUpgradeAndColor[color .. ' ' .. unitType] = {
+                upgrade = attrs.upgrade,
+                color = color,
+            }
+        end
+        -- Copy flagship value to specific name.
+        local faction = _factionHelper.fromColor(color)
+        if faction and faction.flagship then
+            unitBagNameToUpgradeAndColor[faction.flagship] = unitBagNameToUpgradeAndColor[color .. ' Flagship']
+        end
+    end
+    coroutine.yield(0)
+
+    -- Find directionalisers and all unit bags in one pass.
+    local directionaliserNameToColor = {}
+    for color, _ in pairs(colorToUnitOverrides) do
+        directionaliserNameToColor['Directionaliser (' .. color .. ')'] = color
+    end
+    local colorToDirectionaliser = {}
+    local unitBagGuidToUpgradeAndColor = {}
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        local directionaliserColor = directionaliserNameToColor[name]
+        if directionaliserColor then
+            colorToDirectionaliser[directionaliserColor] = object.getGUID()
+        end
+        local upgradeAndColor = (object.tag == 'Bag') and unitBagNameToUpgradeAndColor[name]
+        if upgradeAndColor then
+            unitBagGuidToUpgradeAndColor[object.getGUID()] = upgradeAndColor
+        end
+    end
+    coroutine.yield(0)
+
+    -- At this point have directionalisers, unit bags, and upgrade/color.
+    -- Could go in many different directions, in this case get bottom of
+    -- upgraded unit positions in world space.
+    local colorToUpgradedUnitPositions = {}
+    for guid, upgradeAndColor in pairs(unitBagGuidToUpgradeAndColor) do
+        if upgradeAndColor.upgrade and _showUnitUpgrades then
+            local object = getObjectFromGUID(guid)
+            if object then
+                local p = object.getPosition()
+                local bounds = object.getBoundsNormalized()
+                local scale = object.getScale()
+                local entry = colorToUpgradedUnitPositions[upgradeAndColor.color]
+                if not entry then
+                    entry = {}
+                    colorToUpgradedUnitPositions[upgradeAndColor.color] = entry
+                end
+                table.insert(entry, {
+                    x = p.x - bounds.offset.x,
+                    y = p.y - (bounds.size.y / 2) - bounds.offset.y,
+                    z = p.z
+                })
+            end
+        end
+    end
+
+    -- Draw lines on the directionalisers.
+    for color, guid in pairs(colorToDirectionaliser) do
+        local directionaliser = getObjectFromGUID(guid)
+        local unitPositions = colorToUpgradedUnitPositions[color]
+        local lineColor = { r = 1, g = 1, b = 1, a = 0.7 }
+        local thickness = 0.4
+        if directionaliser then
+            local bounds = self.getBoundsNormalized()
+            local topY = directionaliser.getPosition().y + 0.17
+            local midY = directionaliser.getPosition().y - 0.10
+            local topZ = 0.66
+            local midZ = 1.15 - thickness
+            local lines = {}
+            for _, unitPosition in ipairs(unitPositions or {}) do
+                local p0 = unitPosition
+                local points = {
+                    { x = p0.x, y = midY, z = p0.z + midZ - 0.03 },
+                    { x = p0.x, y = midY, z = p0.z + topZ - 0.03 + 0.01 },
+                    { x = p0.x, y = topY, z = p0.z + topZ - 0.03 },
+                    { x = p0.x, y = topY, z = p0.z - topZ },
+                    { x = p0.x, y = midY, z = p0.z - topZ - 0.01 },
+                    { x = p0.x, y = midY, z = p0.z - midZ },
+                }
+                for i, point in ipairs(points) do
+                    points[i] = directionaliser.positionToLocal(point)
+                end
+                table.insert(lines, {
+                    points = points,
+                    thickness = thickness,
+                    color = lineColor,
+                    loop = false,
+                    square = false,
+                })
+            end
+            directionaliser.setVectorLines(lines)
+        end
+    end
+    return 1
+end
+
+-------------------------------------------------------------------------------
+
+
+
+-------------------------------------------------------------------------------
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

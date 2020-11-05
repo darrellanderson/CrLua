@@ -18,6 +18,9 @@ function getHelperClient(helperObjectName)
 end
 local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 
+local PARTICLE_SYSTEM_COUNT = 20
+local ANIMATION_UPDATE_SECONDS = 0.2
+
 local _burnNameSet = {}
 
 local _burningObjectGuidSet = {}
@@ -89,7 +92,7 @@ end
 
 function updateBurnAnimation()
     -- Remove oldest.
-    while #_burnAnimation > 30 do
+    while #_burnAnimation > PARTICLE_SYSTEM_COUNT do
         table.remove(_burnAnimation, 1)
     end
 
@@ -103,18 +106,18 @@ function updateBurnAnimation()
     -- Add new.
     local position = {
         x = -0.2 + math.random() * 0.4,
-        y = 0,
+        y = -0.2,
         z = -1 + math.random() * 2
     }
     table.insert(_burnAnimation, {
         position = position,
         rotation = {
-            x = math.random() * 20 * (position.z > 0 and 1 or -1),
+            x = math.random() * 30 * (position.z > 0 and 1 or -1),
             y = 0,
-            z = math.random() * 20 * (position.x > 0 and 1 or -1),
+            z = math.random() * 30 * (position.x > 0 and 1 or -1),
         },
         size = 0.3 + math.random() * 0.3,
-        speed = 0.01 + math.random() * 0.04,
+        speed = 0.04 + math.random() * 0.04,
         color = {
             r = 1,
             g = math.random(),
@@ -130,12 +133,12 @@ function updateBurnAnimation()
             table.insert(lines, {
                 points = {
                     {
-                        x = particle.position.x - particle.size / 2,
+                        x = particle.position.x, -- - particle.size / 2,
                         y = particle.position.y,
                         z = particle.position.z
                     },
                     {
-                        x = particle.position.x + particle.size / 2,
+                        x = particle.position.x, -- + particle.size / 2,
                         y = particle.position.y,
                         z = particle.position.z
                     },
@@ -144,7 +147,7 @@ function updateBurnAnimation()
                 thickness = particle.size,
                 color = particle.color,
                 loop = false,
-                square = true
+                square = false
             })
         end
     end
@@ -161,7 +164,7 @@ end
 
 function periodicUpdateBurnAnimation()
     updateBurnAnimation()
-    _burnAnimationWaitId = Wait.time(periodicUpdateBurnAnimation, 0.1)
+    _burnAnimationWaitId = Wait.time(periodicUpdateBurnAnimation, ANIMATION_UPDATE_SECONDS)
 end
 
 -------------------------------------------------------------------------------

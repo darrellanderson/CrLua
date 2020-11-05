@@ -36,6 +36,7 @@ local _waitId = false
 -------------------------------------------------------------------------------
 
 function onLoad()
+    createUi()
     delayedHighlightUnitUpgrades()
 end
 
@@ -57,6 +58,57 @@ end
 
 -------------------------------------------------------------------------------
 
+function createUi()
+    local fontSize = 44
+    local labelFontSize = 90
+    local buttonFontSize = 90
+    local finePrintFontSize = 35
+    local scaleUpDown = 2
+    local y = 0.21
+
+    self.createButton({
+        click_function = 'doNothing',
+        function_owner = self,
+        label          = 'TI4 Highlight\nUnit Upgrades',
+        position       = { x = 0, y = y, z = -0.65 },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+        width          = 0,
+        height         = 0,
+        font_size      = labelFontSize * scaleUpDown,
+        tooltip        = nil,
+    })
+    self.createButton({
+        click_function = 'delayedHighlightUnitUpgrades',
+        function_owner = self,
+        label          = 'Update',
+        position       = { x = 0, y = y, z = 0.1 },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+        width          = 1200,
+        height         = 500,
+        font_size      = buttonFontSize * scaleUpDown,
+        tooltip        = nil,
+    })
+    self.createButton({
+        click_function = 'doNothing',
+        function_owner = self,
+        label          = '(Automatically updates between turns)',
+        position       = { x = 0, y = y, z = 0.85 },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+        width          = 0,
+        height         = 0,
+        font_size      = finePrintFontSize * scaleUpDown,
+        tooltip        = nil,
+    })
+end
+
+function doNothing()
+end
+
+-------------------------------------------------------------------------------
+
 function delayedHighlightUnitUpgrades()
     if _waitId then
         Wait.stop(_waitId)
@@ -66,7 +118,7 @@ function delayedHighlightUnitUpgrades()
         _waitId = false
         startLuaCoroutine(self, '_highlightUnitUpgradesCoroutine')
     end
-    _waitId = Wait.time(wrapper, 0.75 + math.random())
+    _waitId = Wait.time(wrapper, 0.25 + math.random() * 0.25)
 end
 
 function _highlightUnitUpgradesCoroutine()
@@ -98,7 +150,7 @@ function _highlightUnitUpgradesCoroutine()
 
     -- Find directionalisers and all unit bags in one pass.
     local directionaliserNameToColor = {}
-    for color, _ in pairs(colorToUnitOverrides) do
+    for _, color in ipairs(_zoneHelper.zones()) do
         directionaliserNameToColor['Directionaliser (' .. color .. ')'] = color
     end
     local colorToDirectionaliser = {}
@@ -121,7 +173,7 @@ function _highlightUnitUpgradesCoroutine()
     -- upgraded unit positions in world space.
     local colorToUpgradedUnitPositions = {}
     for guid, upgradeAndColor in pairs(unitBagGuidToUpgradeAndColor) do
-        if upgradeAndColor.upgrade and _showUnitUpgrades then
+        if upgradeAndColor.upgrade then
             local object = getObjectFromGUID(guid)
             if object then
                 local p = object.getPosition()
@@ -145,14 +197,22 @@ function _highlightUnitUpgradesCoroutine()
     for color, guid in pairs(colorToDirectionaliser) do
         local directionaliser = getObjectFromGUID(guid)
         local unitPositions = colorToUpgradedUnitPositions[color]
-        local lineColor = { r = 1, g = 1, b = 1, a = 0.7 }
+        local rgb = directionaliser.getColorTint()
+        local hsl = ColorUtil.rgbToHsl(rgb)
+        if hsl.l < 0.8 then
+            hsl.l = hsl.l + 0.2
+        else
+            hsl.l = hsl.l - 0.2
+        end
+        hsl.a = 0.8
+        local lineColor = ColorUtil.hslToRgb(hsl)
         local thickness = 0.4
         if directionaliser then
             local bounds = self.getBoundsNormalized()
             local topY = directionaliser.getPosition().y + 0.17
             local midY = directionaliser.getPosition().y - 0.10
             local topZ = 0.66
-            local midZ = 1.15 - thickness
+            local midZ = 1.15 - (thickness / 2) - 0.1
             local lines = {}
             for _, unitPosition in ipairs(unitPositions or {}) do
                 local p0 = unitPosition
@@ -183,7 +243,77 @@ end
 
 -------------------------------------------------------------------------------
 
+--- https://dev.fandom.com/wiki/Module:Colors
+ColorUtil = {}
 
+function ColorUtil._circle(val, max)
+    if val < 0 then        -- negative; below cycle minimum
+        val = val + max
+    elseif val > max then  -- exceeds cycle maximum
+        val = val - max
+    end
+    return val
+end
+
+function ColorUtil._hueToRgb(p, q, t)
+    t = ColorUtil._circle(t, 1)
+    if t < 1/6 then
+        return p + (q - p) * 6 * t
+    elseif t < 1/2 then
+        return q
+    elseif t < 2/3 then
+        return p + (q - p) * (2/3 - t) * 6
+    else
+        return p
+    end
+end
+
+function ColorUtil.rgbToHsl(rgb)
+    assert(type(rgb) == 'table')
+    assert(type(rgb.r) == 'number' and 0 <= rgb.r and rgb.r <= 1)
+    assert(type(rgb.g) == 'number' and 0 <= rgb.g and rgb.g <= 1)
+    assert(type(rgb.b) == 'number' and 0 <= rgb.b and rgb.b <= 1)
+    local r,g,b = rgb.r, rgb.g, rgb.b
+    local min = math.min(r, g, b)
+    local max = math.max(r, g, b)
+    local d = max - min
+    local h, s, l = 0, 0, ((min + max) / 2)
+    if d > 0 then
+        s = l < 0.5 and d / (max + min) or d / (2 - max - min)
+        h = max == r and (g - b) / d or
+            max == g and 2 + (b - r) / d or
+            max == b and 4 + (r - g) / d
+        h = ColorUtil._circle(h / 6, 1)
+    end
+    local hsl = { h = h * 360, s = s, l = l, a = rgb.a }
+    assert(type(hsl.h) == 'number' and 0 <= hsl.h and hsl.h <= 360)
+    assert(type(hsl.s) == 'number' and 0 <= hsl.s and hsl.s <= 1)
+    assert(type(hsl.l) == 'number' and 0 <= hsl.l and hsl.l <= 1)
+    return hsl
+end
+
+function ColorUtil.hslToRgb(hsl)
+    assert(type(hsl) == 'table')
+    assert(type(hsl.h) == 'number' and 0 <= hsl.h and hsl.h <= 360)
+    assert(type(hsl.s) == 'number' and 0 <= hsl.s and hsl.s <= 1)
+    assert(type(hsl.l) == 'number' and 0 <= hsl.l and hsl.l <= 1)
+    local h, s, l = hsl.h / 360, hsl.s, hsl.l
+    local r, g, b, p, q
+    if s == 0 then
+        r, g, b = l, l, l
+    else
+        q = l < 0.5 and l * (1 + s) or l + s - l * s
+        p = 2 * l - q
+        r = ColorUtil._hueToRgb(p, q, h + 1/3)
+        g = ColorUtil._hueToRgb(p, q, h)
+        b = ColorUtil._hueToRgb(p, q, h - 1/3)
+    end
+    local rgb = { r = r, g = g, b = b, a = hsl.a }
+    assert(type(rgb.r) == 'number' and 0 <= rgb.r and rgb.r <= 1)
+    assert(type(rgb.g) == 'number' and 0 <= rgb.g and rgb.g <= 1)
+    assert(type(rgb.b) == 'number' and 0 <= rgb.b and rgb.b <= 1)
+    return rgb
+end
 
 -------------------------------------------------------------------------------
 -- Index is only called when the key does not already exist.

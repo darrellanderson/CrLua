@@ -18,7 +18,7 @@ function getHelperClient(helperObjectName)
 end
 local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 
-local PARTICLE_SYSTEM_COUNT = 20
+local PARTICLE_SYSTEM_COUNT = 15
 local ANIMATION_UPDATE_SECONDS = 0.2
 
 local _burnNameSet = {}
@@ -28,6 +28,7 @@ local _isBroken = false
 
 local _burnAnimation = {}
 local _burnAnimationWaitId = false
+local _periodicUpdateWaitId = false
 
 -------------------------------------------------------------------------------
 
@@ -100,7 +101,7 @@ function updateBurnAnimation()
     for _, particle in ipairs(_burnAnimation) do
         particle.position.y = particle.position.y - particle.speed
         particle.size = particle.size * 0.95
-        particle.color.a = particle.color.a * 0.99
+        particle.color.a = particle.color.a * 0.9
     end
 
     -- Add new.
@@ -159,7 +160,7 @@ end
 
 function periodicUpdateBurnSet()
     updateBurnSet()
-    Wait.time(periodicUpdateBurnSet, 2 + math.random())
+    _periodicUpdateWaitId = Wait.time(periodicUpdateBurnSet, 2 + math.random())
 end
 
 function periodicUpdateBurnAnimation()
@@ -183,7 +184,7 @@ function onLoad(saveState)
         _burnNameSet[faction.flagship] = true
     end
 
-    Wait.time(periodicUpdateBurnSet, math.random())
+    _periodicUpdateWaitId = Wait.time(periodicUpdateBurnSet, math.random())
 end
 
 function onDestroy()
@@ -192,6 +193,13 @@ function onDestroy()
         if object then
             unburn(object)
         end
+    end
+    _burningObjectGuidSet = {}
+    if _periodicUpdateWaitId then
+        Wait.stop(_periodicUpdateWaitId)
+    end
+    if _burnAnimationWaitId then
+        Wait.stop(_burnAnimationWaitId)
     end
 end
 

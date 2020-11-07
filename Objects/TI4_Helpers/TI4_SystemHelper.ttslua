@@ -1,6 +1,7 @@
 --- Shared system (and generic resource/influence cards) helper object.
 -- @author GarnetBear added the original influence/resource list.
 -- @author Darrell June 2020 more attributes, planet positions.
+-- #include <~/CrLua/Objects/TI4_Helpers/TI4_SystemHelper>
 
 -- Users should copy this getHelperClient function, and use via:
 --
@@ -1114,7 +1115,12 @@ function _moveTokenFromCommandSheet(systemObject, color, section)
     end
     local success = true
     if commandToken then
-        local p0 = systemObject.getPosition()
+        -- Off-center, near the tile number.
+        local p0 = systemObject.positionToWorld({
+            x = 1.8,
+            y = 0,
+            z = 0
+        })
         local position = {
             x = p0.x,
             y = p0.y + 3,
@@ -1124,7 +1130,7 @@ function _moveTokenFromCommandSheet(systemObject, color, section)
         local fast = false
         commandToken.setPositionSmooth(position, collide, fast)
     else
-        broadcastToAll(string, Table)(color .. ' ' .. section .. ' pool is empty', 'Red')
+        broadcastToAll(color .. ' ' .. section .. ' pool is empty', 'Red')
         success = false
     end
     return success
@@ -1144,7 +1150,12 @@ function _moveOwnerToken(systemObject, color)
         end
     end
     if ownerTokensBag then
-        local p0 = systemObject.getPosition()
+        -- Off-center, near the tile number.
+        local p0 = systemObject.positionToWorld({
+            x = 1.8,
+            y = 0,
+            z = 0
+        })
         ownerTokensBag.takeObject({
             position = {
                 x = p0.x,

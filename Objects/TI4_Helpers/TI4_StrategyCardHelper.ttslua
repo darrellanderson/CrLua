@@ -79,6 +79,20 @@ function _uniqueList(order)
     return result
 end
 
+function _restrictToSeated(order)
+    local seatSet = {}
+    for _, color in ipairs(_zoneHelper.zones()) do
+        seatSet[color] = true
+    end
+    local result = {}
+    for _, color in ipairs(order) do
+        if seatSet[color] then
+            table.insert(result, color)
+        end
+    end
+    return result
+end
+
 function _safeBroadcastToColor(message, playerColor, messageColor)
     for _, player in ipairs(Player.getPlayers()) do
         if player.color == playerColor then
@@ -215,8 +229,11 @@ function getInitiativeOrder()
     end
     table.sort(turnOrder, function(a, b) return colorToInitiative[a] < colorToInitiative[b] end)
 
+    turnOrder = _uniqueList(turnOrder)
+    turnOrder = _restrictToSeated(turnOrder)
+
     return {
-        order = _uniqueList(turnOrder),
+        order = turnOrder,
         strategyCardGuidToPlayerColor = strategyCardGuidToPlayerColor
     }
 end
@@ -283,7 +300,10 @@ function dealAllActionCards(dealOrder)
         })
     end
 
-    dealOrder = _uniqueList(dealOrder or _zoneHelper.zones())
+    dealOrder = dealOrder or Turns.order
+    dealOrder = _uniqueList(dealOrder)
+    dealOrder = _restrictToSeated(dealOrder)
+
     for _, color in ipairs(dealOrder) do
         processColor(color)
     end

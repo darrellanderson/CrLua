@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <div class="columns">
+        <div class="form">
+            <form onclick="updateCardImage();" onsubmit="return false;">
+            <ul class="form-style-1">
+                <li>
+                    <label>Title</label>
+                    <textarea name="title" id="title" class="field-long" rows="1"></textarea>
+                    <label>Subtitle</label>
+                    <textarea name="subtitle" id="subtitle" class="field-long" rows="1"></textarea>
+                    <select name="subtitleColor" id="subtitleColor" class="field-select">
+                        <option value="ffffff">White</option>
+                        <option value="b93340">Red</option>
+                        <option value="95caff">Blue</option>
+                        <option value="178414">Green</option>
+                        <option value="e5dc76">Yellow</option>
+                    </select>
+                </li>
+
+                <li id="factionBlock">
+                    <label>Faction Image</label>
+                    <select name="factionImage" id="factionImage" class="field-select">
+                        <option value="">None</option>
+                        <option value="Arborec.png">Arborec</option>
+                        <option value="Creuss.png">Creuss</option>
+                        <option value="Hacan.png">Hacan</option>
+                        <option value="JolNar.png">JolNar</option>
+                        <option value="L1Z1X.png">L1Z1X</option>
+                        <option value="Letnev.png">Letnev</option>
+                        <option value="Mentak.png">Mentak</option>
+                        <option value="Muaat.png">Muaat</option>
+                        <option value="Naalu.png">Naalu</option>
+                        <option value="Nekro.png">Nekro</option>
+                        <option value="Saar.png">Saar</option>
+                        <option value="Sardakk.png">Sardakk</option>
+                        <option value="Sol.png">Sol</option>
+                        <option value="Winnu.png">Winnu</option>
+                        <option value="Xxcha.png">Xxcha</option>
+                        <option value="Yin.png">Yin</option>
+                        <option value="Yssaril.png">Yssaril</option>
+                        <option value="">------------------</option>
+                        <option value="BLANK">[Blank]</option>
+                        <option value="Axis.png">Axis</option>
+                    </select>
+                </li>
+
+                <li id="unitTypeBlock">
+                    <label>Unit Type</label>
+                    <select name="unitImage" id="unitImage" class="field-select">
+                        <option value="">-</option>
+                        <option value="bg_carrier.png">Carrier</option>
+                        <option value="bg_cruiser.png">Cruiser</option>
+                        <option value="bg_destroyer.png">Destroyer</option>
+                        <option value="bg_dreadnought.png">Dreadnought</option>
+                        <option value="bg_fighter.png">Fighter</option>
+                        <option value="bg_infantry.png">Infantry</option>
+                        <option value="bg_mech.png">Mech</option>
+                        <option value="bg_pds.png">PDS</option>
+                        <option value="bg_space_dock.png">Space Dock</option>
+                        <option value="bg_war_sun.png">War Sun</option>
+                    </select>
+                </li>
+
+                <li>
+                    <label>Body</label>
+                    <textarea name="body" id="body" class="field-long field-textarea"></textarea>
+                </li>
+                <li>
+                    <label>Attributes</label>
+                    <textarea name="attributes" id="attributes" class="field-long field-textarea"></textarea>
+                </li>
+
+                <li id="prereqBlock">
+                    <label>Prerequisite Technologies</label>
+                    <select name="prereqGreen" id="prereqGreen" class="field-select">
+                        <option value="0">0 Green</option>
+                        <option value="1">1 Green</option>
+                        <option value="2">2 Green</option>
+                        <option value="3">3 Green</option>
+                    </select>
+                    <select name="prereqBlue" id="prereqBlue" class="field-select">
+                        <option value="0">0 Blue</option>
+                        <option value="1">1 Blue</option>
+                        <option value="2">2 Blue</option>
+                        <option value="3">3 Blue</option>
+                    </select>
+                    <select name="prereqYellow" id="prereqYellow" class="field-select">
+                        <option value="0">0 Yellow</option>
+                        <option value="1">1 Yellow</option>
+                        <option value="2">2 Yellow</option>
+                        <option value="3">3 Yellow</option>
+                    </select>
+                    <select name="prereqRed" id="prereqRed" class="field-select">
+                        <option value="0">0 Red</option>
+                        <option value="1">1 Red</option>
+                        <option value="2">2 Red</option>
+                        <option value="3">3 Red</option>
+                    </select>
+                </li>
+
+                <li id="costBlock">
+                    <label>Cost</label>
+                    <select name="cost" id="cost" class="field-select">
+                        <option value="0">-</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="7">7</option>
+                        <option value="8">8</option>
+                        <option value="9">9</option>
+                        <option value="10">10</option>
+                        <option value="11">11</option>
+                        <option value="12">12</option>
+                    </select>
+                </li>
+                <li id="combatBlock">
+                    <label>Combat</label>
+                    <select name="combat" id="combat" class="field-select">
+                        <option value="0">-</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="7">7</option>
+                        <option value="8">8</option>
+                        <option value="9">9</option>
+                        <option value="10">10</option>
+                    </select>
+                    <select name="combatDice" id="combatDice" class="field-select">
+                        <option value="1">1 Die</option>
+                        <option value="2">2 Dice</option>
+                        <option value="3">3 Dice</option>
+                    </select>
+                </li>
+                <li id="moveBlock">
+                    <label>Move</label>
+                    <select name="move" id="move" class="field-select">
+                        <option value="0">-</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                    </select>
+                </li>
+                <li id="capacityBlock">
+                    <label>Capacity</label>
+                    <select name="capacity" id="capacity" class="field-select">
+                        <option value="0">-</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="7">7</option>
+                        <option value="8">8</option>
+                        <option value="9">9</option>
+                        <option value="10">10</option>
+                        <option value="11">11</option>
+                        <option value="12">12</option>
+                    </select>
+                </li>
+
+
+                <li id="titleSizeBlock">
+                    <label>Title Size</label>
+                    <select name="titlesize" id="titlesize" class="field-select">
+                        <option value="0">Normal</option>
+                        <option value="-1">-1</option>
+                        <option value="-2">-2</option>
+                        <option value="-3">-3</option>
+                        <option value="-4">-4</option>
+                        <option value="-5">-5</option>
+                        <option value="-6">-6</option>
+                        <option value="-7">-7</option>
+                        <option value="-8">-8</option>
+                        <option value="-9">-9</option>
+                        <option value="-10">-10</option>
+                        <option value="-11">-11</option>
+                        <option value="-12">-12</option>
+                        <option value="-13">-13</option>
+                        <option value="-14">-14</option>
+                        <option value="-15">-15</option>
+                    </select>
+                </li>
+                <li id="fontSizeBlock">
+                    <label>Font Size</label>
+                    <select name="fontsize" id="fontsize" class="field-select">
+                        <option value="0">Normal</option>
+                        <option value="-1">-1</option>
+                        <option value="-2">-2</option>
+                        <option value="-3">-3</option>
+                        <option value="-4">-4</option>
+                        <option value="-5">-5</option>
+                        <option value="-6">-6</option>
+                        <option value="-7">-7</option>
+                        <option value="-8">-8</option>
+                        <option value="-9">-9</option>
+                        <option value="-10">-10</option>
+                        <option value="-11">-11</option>
+                        <option value="-12">-12</option>
+                        <option value="-13">-13</option>
+                        <option value="-14">-14</option>
+                        <option value="-15">-15</option>
+                    </select>
+                </li>
+
+                <li>
+                    <input type="submit" value="Update" />
+                </li>
+            </ul>
+            </form>
+            <br/>
+            <br/>
+            <a href="/static/card.html">Card</a>
+            <a href="/static/tech.html">Tech</a>
+            <a href="/static/unit.html">Unit</a>
+        </div>
+        <div class="cardW" id="cardcontainer">
+            <img id="cardimage" />
+        </div>
+        <div class="cardW" id="backcontainer">
+            <img id="backimage" />
+        </div>
+    </div>
+
+    <script>
+        function updateCardImage() {
+            var title = encodeURIComponent(document.getElementById("title").value)
+            var subtitle = encodeURIComponent(document.getElementById("subtitle").value)
+            var subtitleColor = encodeURIComponent(document.getElementById("subtitleColor").value)
+            var factionImage = encodeURIComponent(document.getElementById("factionImage").value)
+            var attributes = encodeURIComponent(document.getElementById("attributes").value)
+            var body = encodeURIComponent(document.getElementById("body").value)
+            var unitImage = encodeURIComponent(document.getElementById("unitImage").value)
+
+            var prereqBlue = encodeURIComponent(document.getElementById("prereqBlue").value)
+            var prereqGreen = encodeURIComponent(document.getElementById("prereqGreen").value)
+            var prereqRed = encodeURIComponent(document.getElementById("prereqRed").value)
+            var prereqYellow = encodeURIComponent(document.getElementById("prereqYellow").value)
+
+            var cost = encodeURIComponent(document.getElementById("cost").value)
+            var combat = encodeURIComponent(document.getElementById("combat").value)
+            var combatDice = encodeURIComponent(document.getElementById("combatDice").value)
+            var move = encodeURIComponent(document.getElementById("move").value)
+            var capacity = encodeURIComponent(document.getElementById("capacity").value)
+
+            var titlesize = encodeURIComponent(document.getElementById("titlesize").value)
+            var fontsize = encodeURIComponent(document.getElementById("fontsize").value)
+
+            var url = "/unit"
+            url = url + "?title=" + title
+            url = url + "&subtitle=" + subtitle
+            url = url + "&subtitleColor=" + subtitleColor
+            url = url + "&factionImage=" + factionImage
+            url = url + "&attributes=" + attributes
+            url = url + "&body=" + body
+            url = url + "&unitImage=" + unitImage
+
+            url = url + "&prereqGreen=" + prereqGreen
+            url = url + "&prereqBlue=" + prereqBlue
+            url = url + "&prereqYellow=" + prereqYellow
+            url = url + "&prereqRed=" + prereqRed
+
+            url = url + "&cost=" + cost
+            url = url + "&combat=" + combat
+            url = url + "&combatDice=" + combatDice
+            url = url + "&move=" + move
+            url = url + "&capacity=" + capacity
+
+            url = url + "&titlesize=" + titlesize
+            url = url + "&fontsize=" + fontsize
+
+            var img = document.getElementById("cardimage")
+            img.src = url
+
+            var url = "/back"
+            url = url + "?card=unit"
+            //url = url + "&generates=" + generates
+            var img = document.getElementById("backimage")
+            img.src = url
+        }
+    </script>
+
+</body>
+</html>

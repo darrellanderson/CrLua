@@ -8,6 +8,7 @@
 """
 
 from tech import TechHandler
+from unit import UnitHandler
 
 from textLayout import FontData
 from textLayout import TextBlock
@@ -658,6 +659,8 @@ class BackHandler(webapp2.RequestHandler):
             backImage = CARD_OPTIONS[card]['back']
         if card == 'tech':
             backImage = 'Tech_Back_' + generates.capitalize() + '.jpg'
+        if card == 'unit':
+            backImage = 'UnitUpgradeBack.jpg'
         key = backImage
         jpg = memcache.get(key=key)
         #jpg = None
@@ -986,6 +989,7 @@ app = webapp2.WSGIApplication([
     ('/img', CardHandler),
     ('/back', BackHandler),
     ('/tech', TechHandler),
+    ('/unit', UnitHandler),
     ('/getaction', getActionHandler),
     ('/getagenda', getAgendaHandler),
     #('/getpromissory', getPromissoryHandler),
@@ -994,7 +998,7 @@ app = webapp2.WSGIApplication([
     #('/testpublic', TestPublicHandler),
     #('/testagenda', TestAgenda1Handler),
     #('/testagenda2', TestAgenda2Handler),
-    #('/mutatesystem', MutateSystemTile),
+    ('/mutatesystem', MutateSystemTile),
     #('/mutatefaction', MutateFactionTokens),
     #('/radialdither', RadialDither),
     #('/4k', FourK),

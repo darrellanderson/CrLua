@@ -20,7 +20,6 @@ end
 local _strategyCardHelper = getHelperClient('TI4_STRATEGY_CARD_HELPER')
 
 local _tradeGoodBagGuid = false
-local _assignedTurnOrder = false
 
 local BUTTONS = {
     {
@@ -241,16 +240,6 @@ function placeTradeGoodsAndSetTurns(obj, playerClickerColor, altClick)
     -- Generate turn order, ONLY INCLUDE PLAYERS WITH INITIATIVE VALUES!
     -- (Skip non-grey "spectators", non-players that can interact with table.)
     local turnOrder = initiativeOrder.order
-    _assignedTurnOrder = turnOrder
-
-    -- If alt (right) click, add clicking color player as new last turn (moderator?).
-    local colorToInitiative = {}
-    for i, color in ipairs(turnOrder) do
-        color = i
-    end
-    if altClick and not colorToInitiative[playerClickerColor] then
-        table.insert(turnOrder, playerClickerColor)
-    end
 
     printToAll('Turn order: ' .. table.concat(turnOrder, ', '), playerClickerColor)
 
@@ -262,7 +251,7 @@ end
 
 function dealActionCards(obj, playerClickerColor, altClick)
     _reset('deal')
-    _strategyCardHelper.dealAllActionCards(_assignedTurnOrder)
+    _strategyCardHelper.dealAllActionCards(Turns.order)
 end
 
 function returnStrategyCardsAndEndStatusPhase(obj, playerClickerColor, altClick)

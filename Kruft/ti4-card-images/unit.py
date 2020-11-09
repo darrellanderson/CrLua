@@ -55,7 +55,7 @@ def unitCard(content, prereqs, stats, titlesize, fontsize):
     unitImage = content['unitImage']
     if unitImage and len(unitImage) > 0:
         overlay = getImage('jaheit_unit_upgrade/' + unitImage)
-        img.paste(solid, (0, 0), overlay)
+        img.paste(overlay, (0, 0), overlay)
 
     # FACTION
     factionImage = content['factionImage']
@@ -76,6 +76,17 @@ def unitCard(content, prereqs, stats, titlesize, fontsize):
     textBlock.setCenterV(True)
     textBlock.setText(title)
     textBlock.draw(draw)
+    generates = stats['generates']
+    if generates and len(generates) > 0:
+        if generates == 'green':
+            color = ImageColor.getrgb('#178414')
+        elif generates == 'blue':
+            color = ImageColor.getrgb('#95caff')
+        elif generates == 'red':
+            color = ImageColor.getrgb('#b93340')
+        elif generates == 'yellow':
+            color = ImageColor.getrgb('#e5dc76')
+        textBlock.drawGradient(img, color, (255, 255, 255, 255))
 
     # SUBTITLE
     subtitle = content['subtitle']
@@ -93,7 +104,7 @@ def unitCard(content, prereqs, stats, titlesize, fontsize):
 
     # BODY
     body = content['body']
-    top = 125 if subtitle == '' else 125
+    top = 135 if subtitle == '' else 135
     font = FontData('MyriadProSemibold.otf', 31 + fontsize, (255, 255, 255, 255))
     textBlock = TextBlock()
     textBlock.setFont(font)
@@ -107,12 +118,16 @@ def unitCard(content, prereqs, stats, titlesize, fontsize):
     attributes = content['attributes']
     top = y + 15
     font = FontData('HandelGothicDBold.otf', 28 + fontsize, (255, 255, 255, 255))
+    overrideFont = FontData('PierreDingbats.ttf', 24 + fontsize, (255, 255, 255, 255))
+    overrideFont.setOffset(4)
     textBlock = TextBlock()
     textBlock.setFont(font)
-    textBlock.setBounds(100, top, CARD_W - 50, CARD_H - 25)
+    textBlock.setBounds(100, top, CARD_W - 50, 325)
     textBlock.setLineHeight(font._fontSize + fontsize)
     textBlock.setNewlineScale(PARAGRAPH_LINE_HEIGHT_SCALE)
-    textBlock.setText(attributes)
+    textBlock.setAlignBottom(True)
+    textBlock.setText(attributes.replace('* ', 'F '))
+    textBlock.setOverride({'F'}, overrideFont)
     textBlock.draw(draw)
 
     # PREREQ FRAME
@@ -122,32 +137,40 @@ def unitCard(content, prereqs, stats, titlesize, fontsize):
         img.paste(frameImg, (0, 0), frameImg)
 
     # PREREQS
-    w, h = 77, 77
-    x = 4
-    y = 500 - h - 12
+    w, h = 55, 77
+    x = 15
+    y = 500 - h - 7
     if prereqs['r'] > 0:
-        preImg = getImage('Tech_Prereq_Red.png')
-        preImg = preImg.resize((w, h))
+        preImg = getImage('jaheit_unit_upgrade/prereq_red.png')
+        ix = x + w / 2
+        iw, ih = preImg.size
         for _ in range(prereqs['r']):
-            img.paste(preImg, (x, y), preImg)
+            iy = y + h / 2
+            img.paste(preImg, (ix - iw / 2, iy - ih / 2), preImg)
             y -= h
     if prereqs['y'] > 0:
-        preImg = getImage('Tech_Prereq_Yellow.png')
-        preImg = preImg.resize((w, h))
+        preImg = getImage('jaheit_unit_upgrade/prereq_yellow.png')
+        ix = x + w / 2
+        iw, ih = preImg.size
         for _ in range(prereqs['y']):
-            img.paste(preImg, (x, y), preImg)
+            iy = y + h / 2
+            img.paste(preImg, (ix - iw / 2, iy - ih / 2), preImg)
             y -= h
     if prereqs['b'] > 0:
-        preImg = getImage('Tech_Prereq_Blue.png')
-        preImg = preImg.resize((w, h))
+        preImg = getImage('jaheit_unit_upgrade/prereq_blue.png')
+        ix = x + w / 2
+        iw, ih = preImg.size
         for _ in range(prereqs['b']):
-            img.paste(preImg, (x, y), preImg)
+            iy = y + h / 2
+            img.paste(preImg, (ix - iw / 2, iy - ih / 2), preImg)
             y -= h
     if prereqs['g'] > 0:
-        preImg = getImage('Tech_Prereq_Green.png')
-        preImg = preImg.resize((w, h))
+        preImg = getImage('jaheit_unit_upgrade/prereq_green.png')
+        ix = x + w / 2
+        iw, ih = preImg.size
         for _ in range(prereqs['g']):
-            img.paste(preImg, (x, y), preImg)
+            iy = y + h / 2
+            img.paste(preImg, (ix - iw / 2, iy - ih / 2), preImg)
             y -= h
 
     # BOTTOM COST
@@ -279,17 +302,23 @@ def unitCard(content, prereqs, stats, titlesize, fontsize):
         textBlock.setText(str(capacity))
         textBlock.draw(draw)
 
-    botSpacer = False
-    if cost == 0 and combat == 0 and move == 0 and capacity == 0:
-        botSpacer = 'jaheit_unit_upgrade/bot_spacer_4.png'
-    elif move == 0 and capacity == 0:
-        botSpacer = 'jaheit_unit_upgrade/bot_spacer_2.png'
-    elif capacity == 0:
-        botSpacer = 'jaheit_unit_upgrade/bot_spacer_1.png'
-    if botSpacer:
-        overlay = getImage(botSpacer)
-        img.paste(solid, (0, 0), overlay)
-        img.paste(solid, (0, 0), overlay)  # again, for better visibility
+    # BOTTOM GENERATES -- OR -- SPACER
+    generates = stats['generates']
+    if generates and len(generates) > 0:
+        overlay = getImage('jaheit_unit_upgrade/generate_' + generates + '.png')
+        img.paste(overlay, (0, 0), overlay)
+    else:
+        botSpacer = False
+        if cost == 0 and combat == 0 and move == 0 and capacity == 0:
+            botSpacer = 'jaheit_unit_upgrade/bot_spacer_4.png'
+        elif move == 0 and capacity == 0:
+            botSpacer = 'jaheit_unit_upgrade/bot_spacer_2.png'
+        elif capacity == 0:
+            botSpacer = 'jaheit_unit_upgrade/bot_spacer_1.png'
+        if botSpacer:
+            overlay = getImage(botSpacer)
+            img.paste(solid, (0, 0), overlay)
+            img.paste(solid, (0, 0), overlay)  # again, for better visibility
 
     img = img.convert('RGB')
     return imageToJPEG(img)
@@ -309,6 +338,7 @@ class UnitHandler(webapp2.RequestHandler):
         prereqBlue = self.request.get('prereqBlue', '0')
         prereqYellow = self.request.get('prereqYellow', '0')
         prereqRed = self.request.get('prereqRed', '0')
+        generates = self.request.get('generates', '0')
         cost = self.request.get('cost', '0')
         combat = self.request.get('combat', '0')
         combatDice = self.request.get('combatDice', '0')
@@ -330,6 +360,7 @@ class UnitHandler(webapp2.RequestHandler):
         hash.update(prereqGreen.encode('utf-8'))
         hash.update(prereqYellow.encode('utf-8'))
         hash.update(prereqRed.encode('utf-8'))
+        hash.update(generates.encode('utf-8'))
         hash.update(cost.encode('utf-8'))
         hash.update(combat.encode('utf-8'))
         hash.update(combatDice.encode('utf-8'))
@@ -360,7 +391,8 @@ class UnitHandler(webapp2.RequestHandler):
             'combat' : int(combat),
             'combatDice' : int(combatDice),
             'move' : int(move),
-            'capacity' : int(capacity)
+            'capacity' : int(capacity),
+            'generates' : generates
         }
         titlesize = int(titlesize)
         fontsize = int(fontsize)

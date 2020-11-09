@@ -72,7 +72,7 @@
                     <textarea name="body" id="body" class="field-long field-textarea"></textarea>
                 </li>
                 <li>
-                    <label>Attributes</label>
+                    <label>Attributes ("* " prefix for diamond)</label>
                     <textarea name="attributes" id="attributes" class="field-long field-textarea"></textarea>
                 </li>
 
@@ -101,6 +101,17 @@
                         <option value="1">1 Red</option>
                         <option value="2">2 Red</option>
                         <option value="3">3 Red</option>
+                    </select>
+                </li>
+
+                <li id="generatesBlock">
+                    <label>Generates Technology</label>
+                    <select name="generates" id="generates" class="field-select">
+                        <option value="">-</option>
+                        <option value="green">Green</option>
+                        <option value="blue">Blue</option>
+                        <option value="yellow">Yellow</option>
+                        <option value="red">Red</option>
                     </select>
                 </li>
 
@@ -249,6 +260,7 @@
             var prereqGreen = encodeURIComponent(document.getElementById("prereqGreen").value)
             var prereqRed = encodeURIComponent(document.getElementById("prereqRed").value)
             var prereqYellow = encodeURIComponent(document.getElementById("prereqYellow").value)
+            var generates = encodeURIComponent(document.getElementById("generates").value)
 
             var cost = encodeURIComponent(document.getElementById("cost").value)
             var combat = encodeURIComponent(document.getElementById("combat").value)
@@ -272,6 +284,7 @@
             url = url + "&prereqBlue=" + prereqBlue
             url = url + "&prereqYellow=" + prereqYellow
             url = url + "&prereqRed=" + prereqRed
+            url = url + "&generates=" + generates
 
             url = url + "&cost=" + cost
             url = url + "&combat=" + combat
@@ -287,7 +300,7 @@
 
             var url = "/back"
             url = url + "?card=unit"
-            //url = url + "&generates=" + generates
+            url = url + "&generates=" + generates
             var img = document.getElementById("backimage")
             img.src = url
         }

@@ -660,7 +660,10 @@ class BackHandler(webapp2.RequestHandler):
         if card == 'tech':
             backImage = 'Tech_Back_' + generates.capitalize() + '.jpg'
         if card == 'unit':
-            backImage = 'UnitUpgradeBack.jpg'
+            if generates and len(generates) > 0:
+                backImage = 'Tech_Back_' + generates.capitalize() + '.jpg'
+            else:
+                backImage = 'UnitUpgradeBack.jpg'
         key = backImage
         jpg = memcache.get(key=key)
         #jpg = None

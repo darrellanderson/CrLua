@@ -5,7 +5,8 @@ local _config = false
 local DEFAULT_CONFIG = {
     playerCount = 6,
     extraRings = 0,
-    useCodexACs = false
+    useCodexACs = false,
+    is14ptGame = false,
 }
 
 local CODEX_AC_LIST = {'Hack Election', 'Harness Energy', 'Blitz', 'Fighter Conscription', 'Forward Supply Base', 'Rally', 'War Machine (1)', 'War Machine (2)', 'War Machine (3)', 'War Machine (4)', 'Master Plan', 'Insider Information', 'Plagiarize', 'Scramble Frequency', 'Solar Flare', 'Reflective Shielding', 'Impersonation', 'Sanction', 'Counterstroke', 'Ghost Squad',}
@@ -242,7 +243,8 @@ function _createUI()
                     text('heading', 'Extra map rings'),
                     toggleGroup('extraRings', { 0, 1, 2 }),
 
-                    toggle('useCodexACs', 'Use Codex Action Cards')
+                    toggle('useCodexACs', 'Use Codex action cards'),
+                    toggle('14ptGame', '14 point game'),
                 }
             },
             {
@@ -294,6 +296,7 @@ end
 
 function updateUiFromConfig()
     self.UI.setAttribute('useCodexACs', 'isOn', _config.useCodexACs)
+    self.UI.setAttribute('14ptGame', 'isOn', _config.is14ptGame)
     for i = 3, 8 do
         self.UI.setAttribute('playerCount' .. i, 'isOn', _config.playerCount == i)
     end
@@ -309,8 +312,7 @@ local RIGHT_CLICK = '-2'
 function onButtonClick(player, inputType, id)
     local isRightClick = inputType == RIGHT_CLICK and true or false
     if id == 'setup' then
-        setupGame(_config.playerCount, _config.extraRings, isRightClick)
-        setupCodexACs(_config.useCodexACs)
+        setupGame(isRightClick)
         if not isRightClick then
             packSelfIntoSetupBag()
         end
@@ -336,6 +338,8 @@ function onToggleValueChanged(player, value, id)
         end
     elseif id == 'useCodexACs' then
         _config.useCodexACs = valueAsBool
+    elseif id == '14ptGame' then
+        _config.is14ptGame = valueAsBool
     else
         error(TAG .. ': unknown toggle "' .. id .. '"')
     end
@@ -348,9 +352,14 @@ end
 
 -------------------------------------------------------------------------------
 
-function setupGame(playerCount, extraRings, isRightClick)
-    assert(type(playerCount) == 'number' and type(extraRings) == 'number' and type(isRightClick) == 'boolean')
+function setupGame(isRightClick)
+    local playerCount = _config.playerCount
+    local extraRings = _config.extraRings
     print('Setting up for ' .. playerCount .. ' players with ' .. extraRings .. ' extra map rings')
+
+    setupCodexACs(_config.useCodexACs)
+    setup14ptGame(_config.is14ptGame)
+
     _setupHelper.setup({
         playerCount = playerCount,
         extraRings = extraRings,
@@ -436,17 +445,31 @@ function setupCodexACs(useCodexACs)
     end
 end
 
-function packSelfIntoSetupBag()
-    local function getSetupBag()
-        for _, object in ipairs(getAllObjects()) do
-            if object.tag == 'Bag' and object.getName() == 'Setup Bag' then
-                return object
-            end
-        end
-        error('missing setup bag')
+function setup14ptGame(is14ptGame)
+    local scoreboard = _getByName('Scoreboard')
+    local expect = is14ptGame and true or false
+    if scoreboard and scoreboard.is_face_down ~= expect then
+        scoreboard.setLock(false)
+        scoreboard.flip()
+        Wait.time(function() scoreboard.setLock(true) end, 5)
     end
-    local setupBag = getSetupBag()
+end
+
+function packSelfIntoSetupBag()
+    local setupBag = _getByName('Setup Bag')
+    local tutorial = _getByName('TI4 TTS Tutorial Series')
+    if tutorial then
+        setupBag.putObject(tutorial)
+    end
     setupBag.putObject(self)
+end
+
+function _getByName(name)
+    for _, object in ipairs(getAllObjects()) do
+        if object.getName() == name then
+            return object
+        end
+    end
 end
 
 -------------------------------------------------------------------------------

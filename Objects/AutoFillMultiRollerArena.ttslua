@@ -111,7 +111,7 @@ function warpIn()
         if isInsideBoundingBox(p, bb) and hex == _systemHelper.hexFromPosition(p) then
             p = self.positionToWorld(systemObject.positionToLocal(p))
             local object = getObjectFromGUID(unit.guid)
-            if object then
+            if object and not object.getLock() then
                 if object.tag == 'Tile' then
                     tokenToPos[unit] = p
                 else
@@ -156,7 +156,7 @@ function warpOut()
             p = systemObject.positionToWorld(self.positionToLocal(p))
             if hex == _systemHelper.hexFromPosition(p) then
                 local object = getObjectFromGUID(unit.guid)
-                if object then
+                if object and not object.getLock() then
                     if object.tag == 'Tile' then
                         tokenToPos[unit] = p
                     else

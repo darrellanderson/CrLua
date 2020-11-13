@@ -1419,12 +1419,12 @@ function SetupFaction.placeScoreCounters(ownerTokensBag, zone, zoneIndex, color)
     coroutine.yield(0)
 
     -- Place token on score zero.
-    local SPACING_X = 0.3
+    local SPACING_X = 0.25
     local SPACING_Z = 0.2
     local dx = ((zoneIndex - 1) % 2) * SPACING_X
     local dz = math.floor((zoneIndex - 1) / 2) * SPACING_Z
     local p = scoreboard.positionToWorld({
-        x = (2.75 + dx) * (scoreboard.is_face_down and -1 or 1),
+        x = (2.9 + dx) * (scoreboard.is_face_down and -1 or 1),
         y = (0.5 + (zoneIndex * 0.2)) * (scoreboard.is_face_down and -1 or 1),
         z = -0.4 + dz
     })

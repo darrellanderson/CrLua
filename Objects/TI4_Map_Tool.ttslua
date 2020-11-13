@@ -492,7 +492,6 @@ function clearTilesCoroutine()
         local guid = object.getGUID()
         if _tileClonesGuidSet[guid] then
             _tileClonesGuidSet[guid] = nil
-            _systemHelper.removeHomebrewSystems({ guid })
             _safeDestroyObject(object)
         elseif not system.home then
             local p = object.getPosition()

@@ -18,10 +18,11 @@ end
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _unitHelper = getHelperClient('TI4_UNIT_HELPER')
 
-local SMOOTH_POSITION_FAST = false
-
 -- This needs to be global for poking a new value in when updating the object.
 _activeSystemGuid = false
+
+-- Remember locked items, restore when warped back.
+_lockedGuidSet = {}
 
 -------------------------------------------------------------------------------
 
@@ -76,6 +77,24 @@ end
 
 -------------------------------------------------------------------------------
 
+function moveUnit(unitObject, position, isWarpIn)
+    assert(type(unitObject) == 'userdata' and type(position) == 'table')
+
+    -- Unlock units while in the arena, but restore when warping back.
+    if isWarpIn and unitObject.getLock() then
+        _lockedGuidSet[unitObject.getGUID()] = true
+    elseif (not isWarpIn) and _lockedGuidSet[unitObject.getGUID()] then
+        Wait.time(function() unitObject.setLock(true) end, 5)
+    end
+    unitObject.setLock(false)
+
+    local collide = false
+    local fast = false
+    unitObject.setPositionSmooth(position, collide, fast)
+end
+
+-------------------------------------------------------------------------------
+
 function getBoundingBox(object)
     local bounds = object.getBounds()
     return {
@@ -111,7 +130,7 @@ function warpIn()
         if isInsideBoundingBox(p, bb) and hex == _systemHelper.hexFromPosition(p) then
             p = self.positionToWorld(systemObject.positionToLocal(p))
             local object = getObjectFromGUID(unit.guid)
-            if object and not object.getLock() then
+            if object then
                 if object.tag == 'Tile' then
                     tokenToPos[unit] = p
                 else
@@ -121,20 +140,19 @@ function warpIn()
         end
     end
 
+    _lockedGuidSet = {}
     local extraY = 0
     for unit, p in pairs(tokenToPos) do
         local object = getObjectFromGUID(unit.guid)
         p.y = p.y + 1 + extraY
         extraY = extraY + 0.05
-        local collide = false
-        object.setPositionSmooth(p, collide, SMOOTH_POSITION_FAST)
+        moveUnit(object, p, true)
     end
     for unit, p in pairs(unitToPos) do
         local object = getObjectFromGUID(unit.guid)
         p.y = p.y + 1 + extraY
         extraY = extraY + 0.05
-        local collide = false
-        object.setPositionSmooth(p, collide, SMOOTH_POSITION_FAST)
+        moveUnit(object, p, true)
     end
 end
 
@@ -156,7 +174,7 @@ function warpOut()
             p = systemObject.positionToWorld(self.positionToLocal(p))
             if hex == _systemHelper.hexFromPosition(p) then
                 local object = getObjectFromGUID(unit.guid)
-                if object and not object.getLock() then
+                if object then
                     if object.tag == 'Tile' then
                         tokenToPos[unit] = p
                     else
@@ -172,16 +190,15 @@ function warpOut()
         local object = getObjectFromGUID(unit.guid)
         p.y = p.y + 1 + extraY
         extraY = extraY + 0.05
-        local collide = false
-        object.setPositionSmooth(p, collide, SMOOTH_POSITION_FAST)
+        moveUnit(object, p, false)
     end
     for unit, p in pairs(unitToPos) do
         local object = getObjectFromGUID(unit.guid)
         p.y = p.y + 1 + extraY
         extraY = extraY + 0.05
-        local collide = false
-        object.setPositionSmooth(p, collide, SMOOTH_POSITION_FAST)
+        moveUnit(object, p, false)
     end
+    _lockedGuidSet = {}
 end
 
 -------------------------------------------------------------------------------

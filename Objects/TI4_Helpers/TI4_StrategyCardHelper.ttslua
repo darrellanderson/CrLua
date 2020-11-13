@@ -690,7 +690,7 @@ function _returnStrategyCards()
             table.insert(foundGuids, guid)
             guidToPosition[guid] = object.getPosition()
         end
-        if object.getName() == 'Political Stability' and not object.is_face_down and not inHandGuidSet[guid] then
+        if object.getName() == 'Political Stability' and (not object.is_face_down) and (not inHandGuidSet[guid]) then
             politicalStabilityColor = _zoneHelper.zoneFromPosition(object.getPosition())
         end
     end

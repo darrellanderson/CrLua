@@ -56,24 +56,11 @@ local BLUE_BAG_GUID = '69311f'
 local SYSTEM_BAG_GUIDS = {
     RED_BAG_GUID,
     BLUE_BAG_GUID,
-    "dc3ab8",
-    "a28c98",
-    "4e62ee",
-    "64e0ad",
-    "236a35",
-    "e32608",
-    "10dc17",
-    "5530cc",
-    "888d81",
-    "b65c3f",
-    "be60fc",
-    "a5f431",
-    "db203a",
-    "1f9f1a",
-    "5b55e3",
-    "037d7e",
-    "bd8c3b",
+    "a9f343",  -- Hybrid Franken hexes
+    "223e51",  -- Alister systems
+    "f69885",  -- Pick-a-planet
     "cb9a22",  -- TI3 systems
+    "b0899d",  -- hyperlanes
 }
 
 local _mapString = false
@@ -366,12 +353,17 @@ function placeTilesCoroutine()
 
     local dy = 0.3
     local positionIterator = getSystemPositionsStartingAtOriginIterator(dy)
-    local rotation = { x = 0, y = 180, z = 0 }
 
     local placedTileSet = {}
 
-    for i, tile in ipairs(buildList) do
+    for i, buildEntry in ipairs(buildList) do
         local position = positionIterator()
+        local tile, ab, rotation = buildEntry.tile, buildEntry.ab, buildEntry.rotation
+        if rotation then
+            rotation = { x = 0, y = rotation * 60, z = ab == 'B' and 180 or 0 }
+        else
+            rotation = { x = 0, y = 180, z = 0 }
+        end
         if tile ~= 0 then
             local system = tileToSystem[tile]
             if system and not system.home then
@@ -399,7 +391,7 @@ local function delayedLock(object)
     Wait.time(function() doLock(object) end, 3)
 end
 
-function placeTile(system, bag, position, rotation)
+function placeTile(system, bag, position, rotation, ab)
     assert(type(system) == 'table' and (not bag or type(bag) == 'userdata'))
     assert(type(position) == 'table' and type(rotation) == 'table')
 
@@ -525,6 +517,11 @@ function saveTilesCoroutine()
     local guidToPosition = {}
     for system, object in pairs(systemToObject) do
         local guid = assert(system.guid)
+        local tile = system.tile
+        if system.hyperlane then
+            tile = tile .. (object.is_face_down and 'B' or 'A')
+            tile = tile .. math.floor((tile.getRotation().y / 60) + 0.5)
+        end
         guidToTile[guid] = assert(system.tile)
         guidToPosition[guid] = object.getPosition()
     end
@@ -549,7 +546,7 @@ function saveTilesCoroutine()
     local maxIndex = 0
     for guid, hex in pairs(guidToHex) do
         local index = assert(hexToMapStringIndex[hex], 'missing hex ' .. hex)
-        local tile = assert(guidToTile[guid], 'mssing tile ' .. guid)
+        local tile = assert(guidToTile[guid], 'missing tile ' .. guid)
         if index and tile then
             result[index] = tile
             maxIndex = math.max(maxIndex, index)
@@ -1000,11 +997,17 @@ function parseMapString(input)
         local a,b = string.find(input, '}')
         input = string.sub(input, b + 1)
     else
-        table.insert(buildList, MECATOL_TILE)
+        table.insert(buildList, { tile = MECATOL_TILE })
     end
 
-    for key in string.gmatch(input, '%d+') do
-        table.insert(buildList, tonumber(key))
+    -- %S is non-space
+    for key in string.gmatch(input, '%S+') do
+        local tile, ab, rotation = string.match(key, '(%d+)([AB])(%d+)')
+        table.insert(buildList, {
+            tile = tile and tonumber(tile) or tonumber(key),
+            ab = ab,
+            rotation = rotation
+        })
     end
     return buildList
 end

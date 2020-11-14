@@ -52,7 +52,7 @@ local function _attach(playerColor)
 
         -- Move to new planet position (might not be center if there's a wormhole).
         -- Re-fetch the system table to get new planet position.
-        system = _systemHelper.systemFromTile(system.tile)
+        system = _systemHelper.systemFromGuid(system.guid)
         local systemObject = getObjectFromGUID(system.guid)
         local p = false
         for i, planet in ipairs(system.planets or {}) do

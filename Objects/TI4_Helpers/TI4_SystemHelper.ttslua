@@ -39,6 +39,7 @@ local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 -- - anomalies: list of strings.
 -- - rotate: override, degrees number.
 -- - localY: override tile height (ghosts home system).
+-- - hyperlane: boolean, true if a hyperlane.
 --
 -- Planet attributes:
 -- - name: string.
@@ -436,7 +437,7 @@ function planets()
 end
 
 --- Get system at position.
--- @postition table: {xyz} position.
+-- @param postition (table): {xyz} position.
 -- @return system table.
 function systemFromPosition(position)
     assert(type(position) == 'table' and type(position.x) == 'number')
@@ -458,7 +459,7 @@ function systemFromPosition(position)
 end
 
 --- Get system with the given tile number.
--- @tile number.
+-- @param tile (number).
 -- @return system table.
 function systemFromTile(tile)
     for guid, system in pairs(_systems) do
@@ -466,6 +467,17 @@ function systemFromTile(tile)
             _fillMissingSystemData(guid, system)
             return system
         end
+    end
+end
+
+--- Get system from tile guid.
+-- @param guid (string): system tile guid.
+-- @return system table.
+function systemFromGuid(guid)
+    local system = _systems[guid]
+    if system then
+        _fillMissingSystemData(guid, system)
+        return system
     end
 end
 

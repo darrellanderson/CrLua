@@ -77,7 +77,8 @@ local SWAP = {
         '$COLOR PDS',
         '$COLOR Dreadnought',
         '$COLOR War Sun',
-        '$COLOR Flagship'
+        '$COLOR Flagship',
+        '$COLOR Mech',
     },
 }
 
@@ -923,7 +924,7 @@ function SwapPlan._getItems(prevColor, nextColor)
         if nameTable and nameTable.anon == ANONYMOUS_FLAGSHIP_NAME and object.tag == 'Tile' then
             nameTable = false
         end
-        
+
         if nameTable then
             local items = getItems(nameTable.anon)
             local item = SwapPlan._objectToItem(object, nameTable)
@@ -994,7 +995,10 @@ function SwapPlan._verifyNothingMissing(anonNameToItems)
             end
         end
         if not bag then
-            return false, 'missing unit bag "' .. anonymousName .. '"'
+            -- Tolerate Mech bag absence.
+            if not string.match(anonymousName, ' Mech$') then
+                return false, 'missing unit bag "' .. anonymousName .. '"'
+            end
         end
     end
     return true
@@ -1046,7 +1050,7 @@ function Pack.getUnitBagsAndUnits(anonNameToItems)
 
     local unitObjects = {}
     for _, anonName in ipairs(SWAP.UNITS) do
-        for _, item in ipairs(anonNameToItems[anonName]) do
+        for _, item in ipairs(anonNameToItems[anonName] or {}) do
             assert(item.live)
             local object = getObjectFromGUID(item.guid)
             assert(object)
@@ -1244,15 +1248,18 @@ function Pack.units(anonNameToItems, packBag)
     end
 
     for _, anonName in ipairs(SWAP.UNITS) do
-        local unitBag = assert(anonNameToUnitBag[anonName])
-        for i, item in ipairs(anonNameToItems[anonName] or {}) do
-            assert(item.live)
-            if item.live.tag ~= 'Bag' then
-                local object = getObjectFromGUID(item.guid)
-                assert(object)
-                object.setLock(false)
-                _registerPut(object)
-                unitBag.putObject(object)
+        -- Mech unit bag might not exist.
+        local unitBag = anonNameToUnitBag[anonName]
+        if unitBag then
+            for i, item in ipairs(anonNameToItems[anonName] or {}) do
+                assert(item.live)
+                if item.live.tag ~= 'Bag' then
+                    local object = getObjectFromGUID(item.guid)
+                    assert(object)
+                    object.setLock(false)
+                    _registerPut(object)
+                    unitBag.putObject(object)
+                end
             end
         end
         coroutine.yield(0)
@@ -1588,7 +1595,10 @@ function Unpack.units(anonNameToItems, unpackBag)
     -- Verify got all unit bags.
     for _, anonName in ipairs(SWAP.UNITS) do
         if not anonNameToUnitBag[anonName] then
-            error('missing unit bag "' .. anonName .. '"')
+            -- PoK adds mech units, might not be there for vanilla games.
+            if not string.match(anonName, ' Mech$') then
+                error('missing unit bag "' .. anonName .. '"')
+            end
         end
     end
 

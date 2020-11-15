@@ -405,6 +405,21 @@ function getDeckName(cardName)
     return deckAttributes and deckAttributes.deckName
 end
 
+--- Add a homebrew card.
+-- @params params (table): {deckName, cardName} string/string entries.
+-- E.g. _deckHelper.injectCard('Actions', 'My Action Card')
+function injectCard(params)
+    assert(type(params) == 'table', 'params must be a table')
+    assert(type(params.deckName == 'string'), 'params.deckName must be a string')
+    assert(type(params.cardName == 'string'), 'params.cardName must be a string')
+
+    -- Make sure _lowerCardNameToDeckAttributes exists.
+    _getDeckAttributes('bogus')
+
+    local deckAttributes = assert(DECKS[params.deckName], 'no such deck name "' .. params.deckName .. '"')
+    _lowerCardNameToDeckAttributes[string.lower(params.cardName)] = deckAttributes
+end
+
 -------------------------------------------------------------------------------
 
 --- Discard this card, optionally removing it from a contiainer.

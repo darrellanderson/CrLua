@@ -47,7 +47,7 @@ local SetupGeneric = {
     NAME_TO_PLAYER_ZONE_OFFSET = {
         ['^Technology Cards$'] = { x = 10, z = 2 },
         --['^TI4 Unpacker$'] = { x = -10, z = 2 },
-        ['Faction Selector'] = { x = 6, z = 11, lock = true },
+        ['Faction Selector'] = { x = 2.5, z = 11, lock = true },
         ['^Here/AFK$'] = { x = 1, z = 2 },
 
         ['^TI4 MultiRoller'] = { x = 0, z = 37, lock = true },  -- was z=42
@@ -142,7 +142,7 @@ local SetupColor = {
 local SetupFaction = {
     NAME_TO_PLAYER_ZONE_OFFSET = {
         -- For squeezed overlaping command sheet reference (8 players), x = 1.8.
-        ['$FACTION_NAME Sheet'] = { x = 4.8, x78 = 1.3, z = 11, lock = true, franken = true },
+        ['$FACTION_NAME Sheet'] = { x = 1.3, z = 11, lock = true, franken = true },
         ['$TOKEN_NAME Command Tokens Bag'] = { x = -8, z = 11, lock = true, franken = true },
         ['$TOKEN_NAME Owner Tokens Bag'] = { x = -5, z = 4.5, lock = true, franken = true },
         ['$TOKEN_NAME Tech Bag'] = { x = 10, y = 3, z = 2, unpack = true },
@@ -1110,14 +1110,6 @@ function SetupFaction.unpack(faction, factionBox, zone, isFranken)
 
     local nameToObject = {}
     for namePattern, offset in pairs(SetupFaction.NAME_TO_PLAYER_ZONE_OFFSET) do
-        if offset.x78 and _zoneHelper.getPlayerCount() > 6 then
-            local newOffset = {}
-            for k, v in pairs(offset) do
-                newOffset[k] = v
-            end
-            newOffset.x = newOffset.x78
-            offset = newOffset
-        end
         if (not isFranken) or offset.franken then
             namePattern = string.gsub(namePattern, '$FACTION_NAME', faction.name)
             namePattern = string.gsub(namePattern, '$TOKEN_NAME', faction.tokenName)

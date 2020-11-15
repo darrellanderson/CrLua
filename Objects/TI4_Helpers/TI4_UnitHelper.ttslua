@@ -273,11 +273,14 @@ local _flagshipModifiers = {
         owner = OWNER.SELF,
         type = TYPE.MUTATE,
         apply = function(unitAttrs, params)
-            local count = 0
-            local opponentUnitTypeToCount = params.opponentUnitTypeToCount or {}
-            for unitType, attr in pairs(unitAttrs) do
-                if unitType ~= 'Fighter' and unitType ~= 'Infantry' and attr.spaceCombat then
-                    count = count + (opponentUnitTypeToCount[unitType] or 0)
+            local count = 1  -- only override if given opponent units
+            if params.opponentUnitTypeToCount then
+                count = 0
+                local opponentUnitTypeToCount = params.opponentUnitTypeToCount or {}
+                for unitType, attr in pairs(unitAttrs) do
+                    if unitType ~= 'Fighter' and unitType ~= 'Infantry' and attr.spaceCombat then
+                        count = count + (opponentUnitTypeToCount[unitType] or 0)
+                    end
                 end
             end
             unitAttrs['Flagship'].spaceCombat.dice = count

@@ -380,6 +380,20 @@ local _flagshipModifiers = {
 }
 
 local _unitModifiers = {
+    ['2RAM'] = {
+        leader = true, -- L1Z1X commander
+        description = 'PLANETARY SHIELD does not prevent BOMBARDMENT',
+        owner = OWNER.SELF,
+        type = TYPE.MUTATE,
+        apply = function(unitAttrs)
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.bombardment then
+                    attr.disablePlanetaryShield = true
+                end
+            end
+        end
+    },
+
     ['Antimass Deflectors'] = {
         description = '-1 to all SPACE CANNON rolls',
         owner = OWNER.OPPONENT,

@@ -136,6 +136,7 @@ local SetupColor = {
         ['$COLOR Dreadnought'] = { x = 0, y = 1, z = 6 },
         ['$COLOR Flagship'] = { x = 0, y = 1, z = 9.6 },
         ['$COLOR War Sun'] = { x = 0, y = 1, z = 12.1 },
+        ['$COLOR Mech'] = { x = 0, y = 1, z = 0, pok = true }, -- XXX FILL POSITIONS!
     },
 }
 
@@ -171,8 +172,22 @@ local SetupFaction = {
 local SetupFranken = {}
 local SetupCards = {}
 
+local _includePoK = false
 local _putPendingGuidSet = {}
 local _deletedItemsBagGuid = false
+
+-------------------------------------------------------------------------------
+
+function setPoK(value)
+    assert(type(value) == 'boolean')
+    _includePoK = value
+end
+
+function getPoK()
+    return _includePoK
+end
+
+-------------------------------------------------------------------------------
 
 local function putPending(object)
     assert(type(object) == 'userdata')

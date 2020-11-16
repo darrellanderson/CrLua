@@ -339,7 +339,7 @@ local _flagshipModifiers = {
     },
 
     ['The Alastor'] = {
-        description = "Ground forces may participate in space combat",
+        description = 'Ground forces may participate in space combat',
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,  -- copy combat attributes AFTER all adjustments
         apply = function(unitAttrs)
@@ -352,7 +352,7 @@ local _flagshipModifiers = {
     },
 
     ['Quetzecoatl'] = {
-        description = "Other players cannot use SPACE CANNON against your ships in this system",
+        description = 'Other players cannot use SPACE CANNON against your ships in this system',
         owner = OWNER.OPPONENT,
         type = TYPE.MUTATE,
         apply = function(unitAttrs)
@@ -363,8 +363,8 @@ local _flagshipModifiers = {
         end
     },
 
-    ["Visz El Vir"] = {
-        description = "Your mechs in this system roll 1 additional die during combat",
+    ['Visz El Vir'] = {
+        description = 'Your mechs in this system roll 1 additional die during combat',
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
         apply = function(unitAttrs)
@@ -390,6 +390,19 @@ local _unitModifiers = {
                     attr.spaceCannon.hit = attr.spaceCannon.hit + 1
                 end
             end
+        end
+    },
+
+    ['Articles of War'] = {
+        description = 'Mechs lose non-SUSTAIN DAMAGE abilities',
+        owner = OWNER.SELF,
+        type = TYPE.MUTATE,
+        apply = function(unitAttrs)
+            local attr = unitAttrs['Mech']
+            attr.antiFighterBarrage = nil
+            attr.bombardment = nil
+            attr.planetaryShield = nil
+            attr.spaceCannon = nil
         end
     },
 
@@ -425,6 +438,26 @@ local _unitModifiers = {
         type = TYPE.MUTATE,
         apply = function(unitAttrs)
             unitAttrs['Space Dock'].spaceCannon = { dice = 3, hit = 5, range = 1, unitLimit = 1 }
+        end
+    },
+
+    ['Evelyn Delouis'] = {
+        leader = true, -- Sol agent
+        description = '+1 die to a single GROUND COMBAT roll',
+        owner = OWNER.SELF,
+        type = TYPE.CHOOSE,
+        apply = function(unitAttrs, params)
+            local best = false
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.groundCombat and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                    if (not best) or attr.groundCombat.hit < best.groundCombat.hit then
+                        best = attr
+                    end
+                end
+            end
+            if best then
+                best.groundCombat.extraDice = (best.groundCombat.extraDice or 0) + 1
+            end
         end
     },
 
@@ -546,6 +579,21 @@ local _unitModifiers = {
         end
     },
 
+    ['Rickar Rickani'] = {
+        leader = true, -- Winnu commander
+        description = '+2 to combat rolls',
+        owner = OWNER.SELF,
+        type = TYPE.ADJUST,
+        apply = function(unitAttrs)
+            if attr.spaceCombat then
+                attr.spaceCombat.hit = attr.spaceCombat.hit - 2
+            end
+            if attr.groundCombat then
+                attr.groundCombat.hit = attr.groundCombat.hit - 2
+            end
+        end
+    },
+
     ['Strike Wing Ambuscade'] = {
         description = '+1 die to a unit ability (anti-fighter barrage, bombardment, space cannon)',
         owner = OWNER.SELF,
@@ -605,7 +653,8 @@ local _unitModifiers = {
         end
     },
 
-    ['Trrakan Aun Zulok'] = { -- Strike Wing Commander
+    ['Trrakan Aun Zulok'] = {
+        leader = true, -- Strike Wing Commander
         description = '+1 die to a unit ability (anti-fighter barrage, bombardment, space cannon)',
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,
@@ -658,7 +707,8 @@ local _unitModifiers = {
         end
     },
 
-    ['Viscount Unlenn'] = { -- Barony agent, how to detect this correctly?
+    ['Viscount Unlenn'] = {
+        leader = true, -- Barony agent
         description = '+1 die to a single SPACE COMBAT roll',
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,

@@ -148,7 +148,7 @@ local _systems = {
         { name = 'Starpoint', resources = 3, influence = 1, trait = 'hazardous' },
     }},
     ['f8caf6'] = { tile = 28, planets = {
-        { name = "Tequ'Ran", resources = 2, influence = 0 , trait = 'hazardous'},
+        { name = "Tequ'Ran", resources = 2, influence = 0 , trait = 'hazardous' },
         { name = 'Torkan', resources = 0, influence = 3, trait = 'cultural' },
     }},
     ['0ac98b'] = { tile = 29, planets = {
@@ -194,7 +194,7 @@ local _systems = {
     ['0378a4'] = { tile = 39, wormholes = { 'alpha' } },
     ['ccd7ac'] = { tile = 40, wormholes = { 'beta' } },
     ['47a55d'] = { tile = 41, anomalies = { 'gravity rift' } },
-    ['d13aa2'] = { tile = 42, anomalies = { 'nebula'} },
+    ['d13aa2'] = { tile = 42, anomalies = { 'nebula' } },
     ['dca098'] = { tile = 43, anomalies = { 'supernova' } },
     ['cd58c7'] = { tile = 44, anomalies = { 'asteroid field' } },
     ['7db8d8'] = { tile = 45, anomalies = { 'asteroid field' } },
@@ -272,7 +272,7 @@ local _systems = {
     }},
     ['e0623a'] = { tile = 71, planets = {
         { name = "Ba'kal", resources = 3, influence = 2, trait = 'industrial' },
-        { name = 'Alio Prima', resources = 1, influence = 1, trait = 'cultural'}
+        { name = 'Alio Prima', resources = 1, influence = 1, trait = 'cultural' }
     }},
     ['be81dd'] = { tile = 72, planets = {
         { name = 'Lisis', resources = 2, influence = 2, trait = 'industrial' },
@@ -280,7 +280,7 @@ local _systems = {
     }},
     ['a57f26'] = { tile = 73, planets = {
         { name = 'Cealdri', resources = 0, influence = 2, trait = 'cultural', tech = 'yellow' },
-        { name = 'Xanhact', resources = 0, influence = 1, trait = 'hazardous'}
+        { name = 'Xanhact', resources = 0, influence = 1, trait = 'hazardous' }
     }},
     ['e754db'] = { tile = 74, planets = {
         { name = 'Vega Major', resources = 2, influence = 1, trait = 'cultural' },
@@ -304,16 +304,17 @@ local _systems = {
     ['e85105'] = { tile = 82, localY = 0.101, wormholes = { 'alpha', 'beta', 'gamma' }, planets = {
         { name = 'Mallice', resources = 0, influence = 3, legendary = true, legendaryCard = 'Exterrix Headquarters', trait = 'cultural', position = { x = 0.35, z = 0.18 }, radius = 0.8 },
     }},
-    -- warp zone tiles
-    ['d148cd'] = { tile = 83, warp = true },
-    ['ae4418'] = { tile = 84, warp = true },
-    ['3ff63d'] = { tile = 85, warp = true },
-    ['14dda2'] = { tile = 86, warp = true },
-    ['b5c9ac'] = { tile = 87, warp = true },
-    ['d826d3'] = { tile = 88, warp = true },
-    ['7cd271'] = { tile = 89, warp = true },
-    ['e24a00'] = { tile = 90, warp = true },
-    ['49dfeb'] = { tile = 91, warp = true },
+
+    -- Warp zone tiles
+    ['d148cd'] = { tile = 83, hyperlane = true },
+    ['ae4418'] = { tile = 84, hyperlane = true },
+    ['3ff63d'] = { tile = 85, hyperlane = true },
+    ['14dda2'] = { tile = 86, hyperlane = true },
+    ['b5c9ac'] = { tile = 87, hyperlane = true },
+    ['d826d3'] = { tile = 88, hyperlane = true },
+    ['7cd271'] = { tile = 89, hyperlane = true },
+    ['e24a00'] = { tile = 90, hyperlane = true },
+    ['49dfeb'] = { tile = 91, hyperlane = true },
 
     -- Pick-A-Planet systems.
     ['0dcdee'] = { tile = 2001, planets = {{ name = 'A' }} },
@@ -437,18 +438,18 @@ local _nonPlanetResourceInfluenceCards = {
   { name = 'Core Mining', resources = 2, influence = 0 },
   { name = 'Terraforming Initiative', resources = 1, influence = 1 },
   { name = 'Senate Sanctuary', resources = 0, influence = 2 },
-  { name = 'Rich World', resources = 1, influence = 0},
-  { name = 'Mining World', resources = 2, influence = 0},
-  { name = 'Lazax Survivors', resources = 1, influence = 2},
-  { name = 'Tomb of Emphidia', resources = 0, influence = 1},
-  { name = 'Paradise World', resources = 0, influence = 2},
-  { name = 'Dyson Sphere', resources = 2, influence = 1},
-  { name = 'Biotic Research Facility', resources = 1, influence = 1},
-  { name = 'Cybernetic Research Facility', resources = 1, influence = 1},
-  { name = 'Warfare Research Facility', resources = 1, influence = 1},
-  { name = 'Propulsion Research Facility', resources = 1, influence = 1},
-  { name = 'Terraform', resources = 1, influence = 1},
-  { name = 'Ul the Progenitor', resources = 3, influence = 3},
+  { name = 'Rich World', resources = 1, influence = 0 },
+  { name = 'Mining World', resources = 2, influence = 0 },
+  { name = 'Lazax Survivors', resources = 1, influence = 2 },
+  { name = 'Tomb of Emphidia', resources = 0, influence = 1 },
+  { name = 'Paradise World', resources = 0, influence = 2 },
+  { name = 'Dyson Sphere', resources = 2, influence = 1 },
+  { name = 'Biotic Research Facility', resources = 1, influence = 1 },
+  { name = 'Cybernetic Research Facility', resources = 1, influence = 1 },
+  { name = 'Warfare Research Facility', resources = 1, influence = 1 },
+  { name = 'Propulsion Research Facility', resources = 1, influence = 1 },
+  { name = 'Terraform', resources = 1, influence = 1 },
+  { name = 'Ul the Progenitor', resources = 3, influence = 3, requireFaceUp = true },
 }
 
 local LOCAL_DISTANCE_TO_PLANET = 1.1

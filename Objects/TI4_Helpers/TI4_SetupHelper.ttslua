@@ -1376,6 +1376,7 @@ function SetupFaction.unpackStartingTech(color, faction, zone)
         z = SetupFaction.STARTING_TECH_OFFSET.z
     }
     for i, name in ipairs(faction.startingTech) do
+        name = string.gsub(name, '-', '%%-')
         local guid = getEntryGuid(techDeck, name)
         if guid then
             techDeck.takeObject({

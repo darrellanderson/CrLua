@@ -120,7 +120,7 @@ local _unitTypes = {
         cost = 2,
         groundCombat = {dice = 1, hit = 6 },
         sustainDamage = true,
-        },
+    },
     ['PDS'] = {
         planetaryShield = true,
         spaceCannon = { dice = 1, hit = 6, range = 0, extraDice = 0 },
@@ -164,14 +164,14 @@ local _unitOverrides = {
     ['Super-Dreadnought I'] = { override = 'Dreadnought', capacity = 2 },
     ['Super-Dreadnought II'] = { upgrade = 'Dreadnought', bombardment = { dice = 1, hit = 4 }, spaceCombat = { hit = 4 }, move = 2, capacity = 2 },
     -- PoK faction unit overrides and upgrades
-    ['Strike Wing Alpha I'] = { override = 'Destroyer', spaceCombat = {hit = 8}, capacity = 1},
-    ['Strike Wing Alpha II'] = { upgrade = 'Destroyer', antiFighterBarrage = { dice = 3, hit = 6 }, spaceCombat = {hit = y}, capacity = 1},
+    ['Strike Wing Alpha I'] = { override = 'Destroyer', spaceCombat = { hit = 8 }, capacity = 1 },
+    ['Strike Wing Alpha II'] = { upgrade = 'Destroyer', antiFighterBarrage = { dice = 3, hit = 6 }, spaceCombat = { hit = 7 }, capacity = 1 },
     ['Crimson Legionnaire I'] = { override = 'Infantry', groundCombat = { hit = 8 } },
     ['Crimson Legionnaire II'] = { upgrade = 'Infantry', groundCombat = { hit = 7 } },
     ['Saturn Engine I'] = { override = 'Cruiser', spaceCombat = { hit = 7 }, capacity = 1 },
     ['Saturn Engine II'] = { upgrade = 'Cruiser', spaceCombat = { hit = 6 }, move = 3, capacity = 2 , sustainDamage = true },
-    ['Hel-Titan I'] = { override = 'PDS', groundCombat = { hit = 7, dice = 1 }, planetaryShield = true, spaceCannon = {dice = 1, hit = 6, range = 0, extraDice = 0}, production = 1, sustainDamage = true},
-    ['Hel-Titan II'] = { upgrade = 'PDS', groundCombat = { hit = 6, dice = 1 }, planetaryShield = true, spaceCannon = {dice = 1, hit = 5, range = 1, extraDice = 0}, production = 1, sustainDamage = true},
+    ['Hel-Titan I'] = { override = 'PDS', groundCombat = { hit = 7, dice = 1 }, planetaryShield = true, spaceCannon = { dice = 1, hit = 6, range = 0, extraDice = 0 }, production = 1, sustainDamage = true },
+    ['Hel-Titan II'] = { upgrade = 'PDS', groundCombat = { hit = 6, dice = 1 }, planetaryShield = true, spaceCannon = { dice = 1, hit = 5, range = 1, extraDice = 0 }, production = 1, sustainDamage = true },
     ['Dimensional Tear I'] = { override = 'Space Dock', production = 5 },
     ['Dimensional Tear II'] = { upgrade = 'Space Dock', production = 7 },
 
@@ -356,11 +356,10 @@ local _flagshipModifiers = {
         owner = OWNER.OPPONENT,
         type = TYPE.MUTATE,
         apply = function(unitAttrs)
-            for unitType, attr in pairs(unitAttrs) do
-                if attr.spaceCannon then
-                    attr.spaceCannon.dice = 0
-                end
-            end
+            -- Do nothing unless we can differentiate space cannon offense from defense.
+            --for unitType, attr in pairs(unitAttrs) do
+            --    attr.spaceCannon = nil
+            --end
         end
     },
 
@@ -369,11 +368,12 @@ local _flagshipModifiers = {
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
         apply = function(unitAttrs)
-            for unitType, attr in pairs(unitAttrs) do
-                if unitType == 'Mech' and attr.spaceCombat then
-                    attr.spaceCombat.dice = attr.spaceCombat.dice + 1
-                    attr.groundCombat.dice = attr.groundCombat.dice + 1
-                end
+            local attr = unitAttrs['Mech']
+            if attr.spaceCombat then
+                attr.spaceCombat.dice = (attr.spaceCombat.dice or 0) + 1
+            end
+            if attr.groundCombat then
+                attr.groundCombat.dice = (attr.groundCombat.dice or 0) + 1
             end
         end
     },

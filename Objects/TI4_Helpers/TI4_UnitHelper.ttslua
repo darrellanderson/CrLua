@@ -551,40 +551,44 @@ local _unitModifiers = {
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,
         apply = function(unitAttrs, params)
-            bestAFB = false
-            bestBomb = false
-            bestSpc = false
+            best = false
             for unitType, attr in pairs(unitAttrs) do
                 if attr.antiFighterBarrage and (params.myUnitTypeToCount[unitType] or 0) > 0 then
-                    if (not bestAFB) or (attr.antiFighterBarrage.hit < bestAFB.antiFighterBarrage.hit) then
-                        bestAFB = attr
+                    if (not best) or (attr.antiFighterBarrage.hit < best.antiFighterBarrage.hit) then
+                        best = attr
                     end
                 end
+            end
+            if best then
+                best.antiFighterBarrage.extraDice = (best.antiFighterBarrage.extraDice or 0) + 1
+            end
+            best = false
+            for unitType, attr in pairs(unitAttrs) do
                 if attr.bombardment and (params.myUnitTypeToCount[unitType] or 0) > 0 then
-                    if (not bestBomb) or (attr.bombardment.hit < bestBomb.bombardment.hit) then
-                        bestBomb = attr
+                    if (not best) or (attr.bombardment.hit < best.bombardment.hit) then
+                        best = attr
                     end
                 end
+            end
+            if best then
+                best.bombardment.extraDice = (best.bombardment.extraDice or 0) + 1
+            end
+            best = false
+            for unitType, attr in pairs(unitAttrs) do
                 if attr.spaceCannon and (params.myUnitTypeToCount[unitType] or 0) > 0 then
-                    if (not bestSpc) or (attr.spaceCannon.hit < bestSpc.spaceCannon.hit) then
-                        bestSpc = attr
+                    if (not best) or (attr.spaceCannon.hit < best.spaceCannon.hit) then
+                        best = attr
                     end
                 end
             end
-            if bestAFB then
-                bestAFB.extraDice = (bestAFB.extraDice or 0) + 1
-            end
-            if bestBomb then
-                bestBomb.extraDice = (bestBomb.extraDice or 0) + 1
-            end
-            if bestSpc then
-                bestSpc.extraDice = (bestSpc.extraDice or 0) + 1
+            if best then
+                best.spaceCannon.extraDice = (best.spaceCannon.extraDice or 0) + 1
             end
         end
     },
 
     ['Tekklar Legion'] = {
-        description = '+1 to ground COMBAT rolls for attacker, -1 to Sardakk if opponent owns',  -- -1 to Sardakk if other player has it
+        description = '+1 to GROUND COMBAT rolls for attacker, -1 to Sardakk if opponent owns',  -- -1 to Sardakk if other player has it
         owner = OWNER.ANY,
         type = TYPE.ADJUST,
         apply = function(unitAttrs, params)
@@ -650,6 +654,25 @@ local _unitModifiers = {
                 if attr.groundCombat then
                     attr.groundCombat.hit = attr.groundCombat.hit - 1
                 end
+            end
+        end
+    },
+
+    ['Viscount Unlenn'] = { -- Barony agent, how to detect this correctly?
+        description = '+1 die to a single SPACE COMBAT roll',
+        owner = OWNER.SELF,
+        type = TYPE.CHOOSE,
+        apply = function(unitAttrs, params)
+            best = false
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.spaceCombat and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                    if (not best) or (attr.spaceCombat.hit < best.spaceCombat.hit) then
+                        best = attr
+                    end
+                end
+            end
+            if best then
+                best.spaceCombat.extraDice = (best.spaceCombat.extraDice or 0) + 1
             end
         end
     },

@@ -1236,7 +1236,7 @@ function _dumpUnits()
     for _, adjacent in ipairs(_systemHelper.hexNeighbors(hex)) do
         adjacentSet[adjacent] = true
     end
-    for _, adjacent in ipairs(_systemHelper.hexAdjacentWormholes(hex)) do
+    for _, adjacent in ipairs(_systemHelper.hexAdjacentWormholes({ hex = hex })) do
         adjacentSet[adjacent] = true
     end
 

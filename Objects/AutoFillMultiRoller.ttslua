@@ -405,16 +405,20 @@ end
 -------------------------------------------------------------------------------
 
 --- Get the hex and adjacent hexes from a position.
-function getHexAndAdjacent(position)
+function getHexAndAdjacent(position, playerColor)
     CrLua.Log.d(TAG, 'getHexAndAdjacent')
     assert(type(position) == 'table' and type(position.x) == 'number')
+    assert(type(playerColor) == 'string')
 
     -- Get this hex, and adjacent hexes.
     local hex = _systemHelper.hexFromPosition(position)
     local adjacentHexes = _systemHelper.hexNeighbors(hex)
 
     -- Include through-wormhole.
-    local adjacentWormholeHexes = _systemHelper.hexAdjacentWormholes(hex)
+    local adjacentWormholeHexes = _systemHelper.hexAdjacentWormholes({
+        hex = hex,
+        playerColor = playerColor
+    })
     for _, wormholeHex in ipairs(adjacentWormholeHexes) do
         table.insert(adjacentHexes, wormholeHex)
     end
@@ -566,7 +570,7 @@ function autoFillCoroutine()
 
     -- Get units in hex and adjacent (including wormholes) systems.
     CrLua.Log.d(TAG, 'autoFillCoroutine: hexToUnits')
-    local hex, adjacentHexes = getHexAndAdjacent(systemObject.getPosition())
+    local hex, adjacentHexes = getHexAndAdjacent(systemObject.getPosition(), params.clickerColor)
     coroutine.yield(0)
     local units = _unitHelper.getUnits()
     coroutine.yield(0)

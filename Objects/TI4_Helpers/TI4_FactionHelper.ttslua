@@ -47,7 +47,8 @@ local _factionAttributes = {
         flagship = 'Duha Menaimon',
         flagshipDescription = 'After you activate this system, you may produce up to 5 units in this system.',
         abilities = { 'Mitosis' },
-        units = { 'Letani Warrior I', 'Letani Warrior II' },
+        units = { 'Letani Warrior I', 'Letani Warrior II', 'Letani Behemoth' },
+        commander = 'Dirzuga Rophal',
     },
 
     ['The Barony Of Letnev'] = {
@@ -59,7 +60,8 @@ local _factionAttributes = {
         flagship = 'Arc Secundus',
         flagshipDescription = "Other players’ units in this system lose PLANETARY SHIELD.  At the start of each space combat round, repair this ship.  BOMBARDMENT 5 (X3)",
         abilities = { 'Munitions Reserves', 'Armada' },
-        units = {},
+        units = {'Dunlain Reaper'},
+        commander = 'Rear Admiral Farran',
     },
 
     ['The Clan Of Saar'] = {
@@ -71,7 +73,8 @@ local _factionAttributes = {
         flagship = 'Son of Ragh',
         flagshipDescription = 'ANTI-FIGHTER BARRAGE 6 (X4)',
         abilities = { 'Scavenge', 'Nomadic' },
-        units = { 'Floating Factory I', 'Floating Factory II' },
+        units = { 'Floating Factory I', 'Floating Factory II', 'Scavenger Zeta' },
+        commander = 'Rowl Sarrig',
     },
 
     ['The Embers Of Muaat'] = {
@@ -83,7 +86,8 @@ local _factionAttributes = {
         flagship = 'The Inferno',
         flagshipDescription = "ACTION: Spend 1 token from your strategy pool to place 1 cruiser in this unit’s system.",
         abilities = { 'Star Forge', 'Gashlai Physiology' },
-        units = { 'Prototype War Sun I', 'Prototype War Sun II' },
+        units = { 'Prototype War Sun I', 'Prototype War Sun II', 'Ember Colossus' },
+        commander = 'Magmus',
     },
 
     ['The Emirates Of Hacan'] = {
@@ -95,7 +99,8 @@ local _factionAttributes = {
         flagship = 'Wrath of Kenara',
         flagshipDescription = 'After you roll a die during a space combat in this system, you may spend 1 trade good to apply +1 to the result.',
         abilities = { 'Masters of Trade', 'Guild Ships', 'Arbiters' },
-        units = {},
+        units = { 'Pride of Kenara' },
+        commander = 'Gila the Silvertongue',
     },
 
     ['The Federation Of Sol'] = {
@@ -107,7 +112,8 @@ local _factionAttributes = {
         flagship = 'Genesis',
         flagshipDescription = "At the end of the status phase, place 1 infantry from your reinforcements in this system’s space area.",
         abilities = { 'Orbital Drop', 'Versatile' },
-        units = { 'Advanced Carrier I', 'Advanced Carrier II', 'Spec Ops I', 'Spec Ops II' },
+        units = { 'Advanced Carrier I', 'Advanced Carrier II', 'Spec Ops I', 'Spec Ops II', 'ZS Thunderbolt M2' },
+        commander = 'Claire Gibson',
     },
 
     ['The Ghosts Of Creuss'] = {
@@ -119,7 +125,8 @@ local _factionAttributes = {
         flagship = 'Hil Colish',
         flagshipDescription = "This ship’s system contains a delta wormhole.  During movement, this ship may move before or after your other ships.",
         abilities = { 'Quantum Entanglement', 'Slipstream', 'Creuss Gate' },
-        units = {},
+        units = { 'Icarus Drive' },
+        commander = 'Sai Seravus',
     },
 
     ['The L1Z1X Mindnet'] = {
@@ -130,8 +137,9 @@ local _factionAttributes = {
         startingTech = { 'Neural Motivator', 'Plasma Scoring' },
         flagship = '[0.0.1]',
         flagshipDescription = 'During a space combat, hits produced by this ship and by your dreadnoughts in this system must be assigned to non-fighter ships if able.',
-        abilities = { 'Assimilate', 'Harrow' },
-        units = { 'Super-Dreadnought I', 'Super-Dreadnought II' },
+        abilities = { 'Assimilate' },
+        units = { 'Super-Dreadnought I', 'Super-Dreadnought II', 'Annihilator' },
+        commander = '2RAM',
     },
 
     ['The Mentak Coalition'] = {
@@ -143,7 +151,8 @@ local _factionAttributes = {
         flagship = 'Fourth Moon',
         flagshipDescription = "Other players’ ships in this system cannot use SUSTAIN DAMAGE.",
         abilities = { 'Ambush', 'Pillage' },
-        units = {},
+        units = { 'Moll Terminus' },
+        commander = "S'ula Mentarion",
     },
 
     ['The Naalu Collective'] = {
@@ -155,7 +164,8 @@ local _factionAttributes = {
         flagship = 'Matriarch',
         flagshipDescription = 'During an invasion in this system, you may commit fighters to planets as if they were ground forces.  When combat ends, return those units to the space area.',
         abilities = { 'Telepathic', 'Foresight' },
-        units = { 'Hybrid Crystal Fighter I', 'Hybrid Crystal Fighter II' },
+        units = { 'Hybrid Crystal Fighter I', 'Hybrid Crystal Fighter II', 'Iconoclast' },
+        commander = "M'aban",
     },
 
     ['The Nekro Virus'] = {
@@ -167,7 +177,8 @@ local _factionAttributes = {
         flagship = 'The Alastor',
         flagshipDescription = 'At the start of space combat, choose any number of your ground forces in this system to participate in that combat as is they were ships.  These ground forces do not count against fleet supply.',
         abilities = { 'Galactic Threat', 'Technological Singularity', 'Propagation' },
-        units = {},
+        units = { 'Mordred' },
+        commander = 'Nekro Acidos',
     },
 
     ["The Sardakk N'orr"] = {
@@ -179,7 +190,8 @@ local _factionAttributes = {
         flagship = "C'morran N'orr",
         flagshipDescription = "Apply +1 to the result of each of your other ship’s combat rolls in this system.",
         abilities = { 'Unrelenting' },
-        units = { 'Exotrireme I', 'Exotrireme II' },
+        units = { 'Exotrireme I', 'Exotrireme II', 'Valkyrie Exoskeleton' },
+        commander = "G'hom Sek'kus",
     },
 
     ['The Universities of Jol-Nar'] = {
@@ -191,7 +203,8 @@ local _factionAttributes = {
         flagship = 'J.N.S. Hylarim',
         flagshipDescription = 'When making a combat roll for this ship, each result of 9 or 10, before applying modifiers, produces 2 extra hits.',
         abilities = { 'Fragile', 'Brilliant', 'Analytical' },
-        units = {},
+        units = { 'Shield Paling' },
+        commander = 'Ta Zern',
     },
 
     ['The Winnu'] = {
@@ -204,7 +217,8 @@ local _factionAttributes = {
         flagshipDescription = "When this unit makes a combat roll, it rolls a number of dice equal to the number of your opponent’s non-fighter ships in this system.",
         startMessage = 'Pick 1 technology and return the other 3 to your deck.',
         abilities = { 'Blood Ties', 'Reclamation' },
-        units = {},
+        units = { 'Reclaimer' },
+        commander = 'Rickar Rickani',
     },
 
     ['The Xxcha Kingdom'] = {
@@ -216,7 +230,8 @@ local _factionAttributes = {
         flagship = 'Loncara Ssodu',
         flagshipDescription = "You may use this unit’s SPACE CANNON against ships that are in adjacent systems.  SPACE CANNON 5 (X3)",
         abilities = { 'Peace Accords', 'Quash' },
-        units = {},
+        units = { 'Indomitus' },
+        commander = 'Elder Qanoj',
     },
 
     ['The Yin Brotherhood'] = {
@@ -228,7 +243,8 @@ local _factionAttributes = {
         flagship = 'Van Hauge',
         flagshipDescription = 'When this ship is destroyed, destroy all ships in this system.',
         abilities = { 'Indoctrination', 'Devotion' },
-        units = {},
+        units = { "Moyin's Ashes" },
+        commander = 'Brother Omar',
     },
 
     ['The Yssaril Tribes'] = {
@@ -240,7 +256,100 @@ local _factionAttributes = {
         flagship = "Y'sia Y'ssrila",
         flagshipDescription = "This ship can move through systems that contain another players’ ships.",
         abilities = { 'Stall Tactics', 'Scheming', 'Crafty' },
-        units = {},
+        units = { 'Blackshade Infiltrator' },
+        commander = 'So Ata',
+    },
+
+    -- PoK Factions
+    ['The Nomad'] = {
+        tokenName = 'Nomad',
+        frankenName = 'Nomad',
+        home = 53,
+        startingUnits = { Infantry = 4, Fighter = 3, Destroyer = 1, Carrier = 1, Flagship = 1, Space_Dock = 1 },
+        startingTech = { 'Sling Relay' },
+        flagship = "Memoria I",
+        flagshipDescription = "You may treat this unit as if it were adjacent to systems that contain a planet with 1 of your mech units.",
+        abilities = { 'The Company', 'Future Sight' },
+        units = { 'Memoria II', 'Quantum Manipulator' },
+        commander = 'Navarch Feng',
+    },
+
+    ["The Vuil'raith Cabal"] = {
+        tokenName = "Vuil'raith Cabal",
+        frankenName = "Vuil'raith",
+        home = 54,
+        startingUnits = { Infantry = 3, Fighter = 3, Cruiser = 1, Carrier = 1, Dreadnought = 1, Space_Dock = 1 },
+        startingTech = { 'Self%-Assembly Routines' },
+        flagship = "The Terror Between",
+        flagshipDescription = "Capture all other units that are destroyed in this unit’s system, including your own.",
+        abilities = { 'Devour', 'Amalgamation', 'Riftmeld' },
+        units = { 'Dimensional Tear I', 'Dimensional Tear II', 'Reanimator' },
+        commander = 'That Which Molds Flesh',
+    },
+
+    ['The Argent Flight'] = {
+        tokenName = 'Argent Flight',
+        frankenName = 'Argent',
+        home = 58,
+        startingUnits = { Infantry = 5, Fighter = 2, Destroyer = 2, Carrier = 1, Space_Dock = 1, PDS = 1 },
+        startingTech = { 'Sarween Tools', 'Neural Motivator', 'Plasma Scoring' },
+        flagship = "Quetzecoatl",
+        flagshipDescription = "SPACE CANNON cannot be used by other players against your units in this system.",
+        abilities = { 'Zeal', 'Raid Formation' },
+        units = { 'Strike Wing Alpha I', 'Strike Wing Alpha II', 'Aerie Sentinel' },
+        commander = 'Trrakan Aun Zulok',
+    },
+
+    ['The Titans of Ul'] = {
+        tokenName = 'Titans of Ul',
+        frankenName = 'Titans',
+        home = 55,
+        startingUnits = { Infantry = 3, Fighter = 2, Cruiser = 2, Dreadnought = 1, Space_Dock = 1 },
+        startingTech = { 'Antimass Deflectors', 'Scanlink Drone Network' },
+        flagship = "Ouranos",
+        flagshipDescription = "When this unit is repaired by the 'Awaken' faction ability, place 2 fighters from your reinforcements in its system.",
+        abilities = { 'Terragenesis', 'Awaken', 'Coalescence' },
+        units = { 'Saturn Engine I', 'Saturn Engine II', 'Hel-Titan I', 'Hel-Titan II', 'Hecatoncheires' },
+        commander = 'Tungstantus',
+    },
+
+    ['The Empyrean'] = {
+        tokenName = 'Empyrean',
+        frankenName = 'Empyrean',
+        home = 56,
+        startingUnits = { Infantry = 4, Fighter = 2, Destroyer = 1, Carrier = 2, Space_Dock = 1 },
+        startingTech = { 'Dark Energy Tap' },
+        flagship = "Dynamo",
+        flagshipDescription = "When any player's unit in this system or an adjacent system uses SUSTAIN DAMAGE, you may spend 2 influence to repair it.",
+        abilities = { 'Voidborn', 'Aetherpassage', 'Dark Whispers' },
+        units = { 'Watcher' },
+        commander = 'Xuange',
+    },
+
+    ['The Mahact Gene-Sorcerers'] = {
+        tokenName = 'Mahact Gene-Sorcerers',
+        frankenName = 'Mahact',
+        home = 52,
+        startingUnits = { Infantry = 3, Fighter = 2, Cruiser = 1, Carrier = 1, Dreadnought = 1, Space_Dock = 1 },
+        startingTech = { 'Predictive Intelligence', 'Bio%-Stims' },
+        flagship = "Arvicon Rex",
+        flagshipDescription = "During combat against an opponent who has one of your faction's leaders deployed, this ship rolls 2 additional dice.",
+        abilities = { 'Edict', 'Imperia', 'Hubris' },
+        units = { 'Crimson Legionnaire I', 'Crimson Legionnaire II', 'Starlancer' },
+        commander = 'Il Na Viroset',
+    },
+
+    ['The Naaz-Rokha Alliance'] = {
+        tokenName = 'Naaz-Rokha Alliance',
+        frankenName = 'Naaz-Rokha',
+        home = 57,
+        startingUnits = { Infantry = 3, Fighter = 2, Carrier = 2, Destroyer = 1, Mech = 1, Space_Dock = 1 },
+        startingTech = { 'Psychoarchaeology', 'AI Development Algorithm' },
+        flagship = "Visz El Vir",
+        flagshipDescription = "Your mech units in this system roll 1 additional die during combat.",
+        abilities = { 'Distant Suns', 'Fabrication' },
+        units = { 'Eidolon' },
+        commander = 'Dart and Tai',
     },
 
     -- Tactic Blue's homebrew

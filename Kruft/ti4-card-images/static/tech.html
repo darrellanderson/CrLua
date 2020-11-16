@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <div class="columns">
+        <div class="form">
+            <form onclick="updateCardImage();" onsubmit="return false;">
+            <ul class="form-style-1">
+                <li>
+                    <label>Title</label>
+                    <textarea name="title" id="title" class="field-long" rows="1"></textarea>
+                </li>
+                <li>
+                    <label>Body</label>
+                    <textarea name="body" id="body" class="field-long field-textarea"></textarea>
+                </li>
+
+                <li id="prereqGreenBlock">
+                    <label>Prereq Green</label>
+                    <select name="prereqGreen" id="prereqGreen" class="field-select">
+                        <option value="0">0</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                    </select>
+                </li>
+                <li id="prereqBlueBlock">
+                    <label>Prereq Blue</label>
+                    <select name="prereqBlue" id="prereqBlue" class="field-select">
+                        <option value="0">0</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                    </select>
+                </li>
+                <li id="prereqYellowBlock">
+                    <label>Prereq Yellow</label>
+                    <select name="prereqYellow" id="prereqYellow" class="field-select">
+                        <option value="0">0</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                    </select>
+                </li>
+                <li id="prereqRedBlock">
+                    <label>Prereq Red</label>
+                    <select name="prereqRed" id="prereqRed" class="field-select">
+                        <option value="0">0</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                    </select>
+                </li>
+
+                <li id="generatesBlock">
+                    <label>Generates</label>
+                    <select name="generates" id="generates" class="field-select">
+                        <option value="blue">Blue</option>
+                        <option value="yellow">Yellow</option>
+                        <option value="red">Red</option>
+                        <option value="green">Green</option>
+                        <option value="none">None</option>
+                    </select>
+                </li>
+
+                <li id="factionBlock">
+                    <label>Faction</label>
+                    <select name="faction" id="faction" class="field-select">
+                        <option value="">None</option>
+                        <option value="Arborec.png">Arborec</option>
+                        <option value="Creuss.png">Creuss</option>
+                        <option value="Hacan.png">Hacan</option>
+                        <option value="JolNar.png">JolNar</option>
+                        <option value="L1Z1X.png">L1Z1X</option>
+                        <option value="Letnev.png">Letnev</option>
+                        <option value="Mentak.png">Mentak</option>
+                        <option value="Muaat.png">Muaat</option>
+                        <option value="Naalu.png">Naalu</option>
+                        <option value="Nekro.png">Nekro</option>
+                        <option value="Saar.png">Saar</option>
+                        <option value="Sardakk.png">Sardakk</option>
+                        <option value="Sol.png">Sol</option>
+                        <option value="Winnu.png">Winnu</option>
+                        <option value="Xxcha.png">Xxcha</option>
+                        <option value="Yin.png">Yin</option>
+                        <option value="Yssaril.png">Yssaril</option>
+                        <option value="">------------------</option>
+                        <option value="Blank">[Blank Space]</option>
+                        <option value="Axis.png">Axis</option>
+                    </select>
+                </li>
+
+
+                <li id="titleSizeBlock">
+                    <label>Title Size</label>
+                    <select name="titlesize" id="titlesize" class="field-select">
+                        <option value="0">Normal</option>
+                        <option value="-1">-1</option>
+                        <option value="-2">-2</option>
+                        <option value="-3">-3</option>
+                        <option value="-4">-4</option>
+                        <option value="-5">-5</option>
+                        <option value="-6">-6</option>
+                        <option value="-7">-7</option>
+                        <option value="-8">-8</option>
+                        <option value="-9">-9</option>
+                        <option value="-10">-10</option>
+                        <option value="-11">-11</option>
+                        <option value="-12">-12</option>
+                        <option value="-13">-13</option>
+                        <option value="-14">-14</option>
+                        <option value="-15">-15</option>
+                    </select>
+                </li>
+                <li id="fontSizeBlock">
+                    <label>Font Size</label>
+                    <select name="fontsize" id="fontsize" class="field-select">
+                        <option value="0">Normal</option>
+                        <option value="-1">-1</option>
+                        <option value="-2">-2</option>
+                        <option value="-3">-3</option>
+                        <option value="-4">-4</option>
+                        <option value="-5">-5</option>
+                        <option value="-6">-6</option>
+                        <option value="-7">-7</option>
+                        <option value="-8">-8</option>
+                        <option value="-9">-9</option>
+                        <option value="-10">-10</option>
+                        <option value="-11">-11</option>
+                        <option value="-12">-12</option>
+                        <option value="-13">-13</option>
+                        <option value="-14">-14</option>
+                        <option value="-15">-15</option>
+                    </select>
+                </li>
+
+                <li>
+                    <input type="submit" value="Update" />
+                </li>
+            </ul>
+            </form>
+            <br/>
+            <br/>
+            <a href="/static/card.html">Card</a>
+            <a href="/static/tech.html">Tech</a>
+            <a href="/static/unit.html">Unit</a>
+        </div>
+        <div class="cardW" id="cardcontainer">
+            <img id="cardimage" />
+        </div>
+        <div class="cardW" id="backcontainer">
+            <img id="backimage" />
+        </div>
+    </div>
+
+    <script>
+        function updateCardImage() {
+            var title = encodeURIComponent(document.getElementById("title").value)
+            var body = encodeURIComponent(document.getElementById("body").value)
+            var faction = encodeURIComponent(document.getElementById("faction").value)
+
+            var prereqBlue = encodeURIComponent(document.getElementById("prereqBlue").value)
+            var prereqGreen = encodeURIComponent(document.getElementById("prereqGreen").value)
+            var prereqRed = encodeURIComponent(document.getElementById("prereqRed").value)
+            var prereqYellow = encodeURIComponent(document.getElementById("prereqYellow").value)
+            var generates = encodeURIComponent(document.getElementById("generates").value)
+            var titlesize = encodeURIComponent(document.getElementById("titlesize").value)
+            var fontsize = encodeURIComponent(document.getElementById("fontsize").value)
+
+            var url = "/tech"
+            url = url + "?title=" + title
+            url = url + "&body=" + body
+            url = url + "&faction=" + faction
+            url = url + "&prereqGreen=" + prereqGreen
+            url = url + "&prereqBlue=" + prereqBlue
+            url = url + "&prereqYellow=" + prereqYellow
+            url = url + "&prereqRed=" + prereqRed
+            url = url + "&generates=" + generates
+            url = url + "&titlesize=" + titlesize
+            url = url + "&fontsize=" + fontsize
+
+            var img = document.getElementById("cardimage")
+            img.src = url
+
+            var url = "/back"
+            url = url + "?card=tech"
+            url = url + "&generates=" + generates
+            var img = document.getElementById("backimage")
+            img.src = url
+        }
+    </script>
+
+</body>
+</html>

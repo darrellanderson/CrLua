@@ -2,6 +2,7 @@
 -- @author the_Mantis
 -- @author MrStump for dice rolling functions
 -- @author Darrell use shared zone helper
+-- @author Plat combine larger font size + scale for crisper text
 
 --Distance the dice are placed from the tool
 radius = 5
@@ -14,11 +15,11 @@ ypos = 0.2
 zpos = {-0.9, -0.733, -0.566, -0.399, -0.232, -0.065, 0.102, 0.269, 0.436, 0.603, 0.85}
 
 --button parameters
-bFontSize = 40
-bFontSize = 40
-
+bScale = {0.2, 0.2, 0.2}
+bFontSize = 160
 --input parameters
-iFontSize = 50
+iScale = {0.2, 0.2, 0.2}
+iFontSize = 200
 
 --unit list
 unitList = {"Flagship", "War Sun", "Cruiser", "Dreadnought", "Destroyer", "Carrier", "Fighter", "Infantry", "PDS", "Space Dock"}
@@ -27,7 +28,7 @@ listAFB = {1,5}
 listCMBT = {1,2,3,4,5,6,7,8}
 listSPC = {1,4,9,10}
 listBOMB = {1,2,3,4,5,6,7}
-listPS = {1,2,4,7,9,10}
+listPS = {1,2,3,4,5,6,7,9,10}
 plasmaActive = 0
 
 local watchingDice = false
@@ -586,8 +587,9 @@ function addButton(click_function, label, position, width, height)
         function_owner = self,
         label          = label,
         position       = position,
-        width          = width,
-        height         = height,
+        width          = width / bScale[1],
+        height         = height / bScale[2],
+		scale          = bScale,
         font_size      = bFontSize,
     })
 end
@@ -599,8 +601,9 @@ function addInput(position, label, width, height)
         value          = 0,
         alignment      = 4,
         position       = position,
-        width          = width,
-        height         = height,
+        width          = width / iScale[1],
+        height         = height / iScale[2],
+		scale          = iScale,
         font_size      = iFontSize,
         --validation   = 2,
         label          = label
@@ -752,8 +755,8 @@ unitParams["TEC Flagship"] = {type="Flagship"}
 unitParams["For'xdar"] = {type="Flagship",hitCMBT=7,rollsCMBT=2}
 unitParams["Mho Rhodyn"] = {type="Flagship",hitCMBT=7,rollsCMBT=2}
 unitParams["Locus"] = {type="Flagship",hitCMBT=9,rollsCMBT=2}
-unitParams["Gheld'Atar"] = {type="Flagship",hitCMBT=7,rollsCMBT=2,hitBOMB=5,rollsBOMB=4}
-unitParams["Eru'Ishon"] = {type="Flagship",hitCMBT=7,rollsCMBT=1}
+unitParams["Gheld'atar"] = {type="Flagship",hitCMBT=7,rollsCMBT=2,hitBOMB=5,rollsBOMB=4}
+unitParams["Eru'ishon"] = {type="Flagship",hitCMBT=7,rollsCMBT=1}
 unitParams["Regulus"] = {type="Flagship",hitCMBT=5,rollsCMBT=1}
 unitParams["Noctul H'rgan"] = {type="Flagship",hitCMBT=7,rollsCMBT=2}
 unitParams["Robotic Reprocessing Center"] = {type="Flagship",hitCMBT=7,rollsCMBT=2}
@@ -928,8 +931,8 @@ unitType["TEC Flagship"] = "Flagship" -- Franken
 unitType["For'xdar"] = "Flagship" -- Franken
 unitType["Mho Rhodyn"] = "Flagship" -- Franken
 unitType["Locus"] = "Flagship" -- Franken
-unitType["Gheld'Atar"] = "Flagship" -- Franken
-unitType["Eru'Ishon"] = "Flagship" -- Franken
+unitType["Gheld'atar"] = "Flagship" -- Franken
+unitType["Eru'ishon"] = "Flagship" -- Franken
 unitType["Regulus"] = "Flagship" -- Franken
 unitType["Noctul H'rgan"] = "Flagship" -- Franken
 unitType["Robotic Reprocessing Center"] = "Flagship" -- Franken
@@ -1118,10 +1121,10 @@ function baseUnits(factionName)
             unitName["Flagship"] = "Locus"
             unitName["PDS"] = "Perdition Array I"
         elseif factionName == "The Gheldor Authority" then
-            unitName["Flagship"] = "Gheld'Atar"
+            unitName["Flagship"] = "Gheld'atar"
             unitName["Space Dock"] = "Planetary Fortress I"
         elseif factionName == "The Zeth Contingency" then
-            unitName["Flagship"] = "Eru'Ishon"
+            unitName["Flagship"] = "Eru'ishon"
         elseif factionName == "The Lazax" then
             unitName["Flagship"] = "Regulus"
             unitName["Fighter"] = "Heavy Bomber I"

@@ -47,15 +47,18 @@ local BUTTONS = {
 
 local _buttonIsState2 = {}
 
-function onLoad(saveState)
-    local scale = self.getScale()
-    local invScale = { x = 1 / scale.x, y = 1 / scale.y, z = 1 / scale.z }
+-------------------------------------------------------------------------------
 
-    local dx = 0.62
-    local y = -0.1
-    local z = -0.8
+function onLoad(saveState)
+    Wait.frames(createSnapPoints, 3)
+
+    local bounds = self.getBoundsNormalized()
+
+    local dx = -5
+    local y = 0.01
+    local z = -4.8
     local width = 2200
-    local height = 620
+    local height = 1200
     local fontSize = 200
 
     self.clearButtons()
@@ -65,8 +68,7 @@ function onLoad(saveState)
         function_owner = self,
         label          = '',
         position       = { x = dx, y = y, z = z },
-        rotation       = { x = 0, y = 0, z = 180 },
-        scale          = invScale,
+        rotation       = { x = 0, y = 0, z = 0 },
         width          = width,
         height         = height,
         font_size      = fontSize,
@@ -77,8 +79,7 @@ function onLoad(saveState)
         function_owner = self,
         label          = '',
         position       = { x = 0, y = y, z = z },
-        rotation       = { x = 0, y = 0, z = 180 },
-        scale          = invScale,
+        rotation       = { x = 0, y = 0, z = 0 },
         width          = width,
         height         = height,
         font_size      = fontSize,
@@ -89,8 +90,7 @@ function onLoad(saveState)
         function_owner = self,
         label          = '',
         position       = { x = -dx, y = y, z = z },
-        rotation       = { x = 0, y = 0, z = 180 },
-        scale          = invScale,
+        rotation       = { x = 0, y = 0, z = 0 },
         width          = width,
         height         = height,
         font_size      = fontSize,
@@ -99,6 +99,63 @@ function onLoad(saveState)
 
     resetButtons()
 end
+
+function getSnapPoint(index)
+    -- Get polar coordinates and point rotation relative to bottom center.
+    local degrees, r, rotation
+
+    -- MyCurveFit.com polynomials with error values.
+    local x = index
+    local stateId = self.getStateId()
+    if stateId == -1 or stateId == 1 then
+        degrees = 7.049048 - 20.05275*x - 0.813924*x^2 + 0.0650851*x^3 -- R^2 1
+        r = 9.231479 - 0.6100839*x + 0.1077831*x^2 - 0.01940475*x^3 + 0.00358401*x^4 - 0.0002154107*x^5 -- R^2 0.9998
+        rotation = -96.52601 + 22.12435*x - 0.4442263*x^2 + 0.03528454*x^3 -- R^2 1
+    else
+        degrees = -107.127 + 21.67016*x - 0.4358322*x^2 + 0.02599713*x^3 -- R^2 1
+        r = 9.059481 - 0.1146883*x + 0.1744545*x^2 - 0.03675651*x^3 + 0.002868113*x^4 - 0.00008123944*x^5 -- R^2 0.9991
+        rotation = 20.64305*x - 116.2335 -- R^2 1
+    end
+
+    -- Get bottom center "origin" in local coordinates.
+    -- local bounds = self.getBoundsNormalized()
+    -- local p = self.getPosition()
+    -- local forward = self.getTransformForward()
+    -- local bottomCenter = {
+    --     x = p.x + forward.x * bounds.size.z / 2,
+    --     y = p.y,
+    --     z = p.z + forward.z * bounds.size.z / 2,
+    -- }
+    -- local origin = self.positionToLocal(bottomCenter)
+    -- BOUNDS BREAKS WHEN CHANGING STATESS!!  Hard code origin in local space.
+    local origin = { x = 0, y = 0, z = 7.274 }
+
+    local phi = math.rad(degrees)
+    return {
+        position = {
+            x = origin.x + math.cos(phi) * r,
+            y = 0,
+            z = origin.z + math.sin(phi) * r,
+        },
+        rotation = {
+            x = 0,
+            y = rotation,
+            z = 0,
+        },
+        rotation_snap = true
+    }
+end
+
+function createSnapPoints()
+    -- Space for 8 strategy cards.
+    local snapPoints = {}
+    for i = 1, 8 do
+        table.insert(snapPoints, getSnapPoint(i))
+    end
+    self.setSnapPoints(snapPoints)
+end
+
+-------------------------------------------------------------------------------
 
 function resetButtons()
     for i, values in ipairs(BUTTONS) do
@@ -140,6 +197,8 @@ function confirmReturnStrategyCardsAndEndStatusPhase(obj, playerClickerColor, al
     _confirm('return')
 end
 
+-------------------------------------------------------------------------------
+
 function placeTradeGoodsAndSetTurns(obj, playerClickerColor, altClick)
     _reset('place')
 
@@ -158,7 +217,7 @@ function placeTradeGoodsAndSetTurns(obj, playerClickerColor, altClick)
             return bag
         end
         for _, object in ipairs(getAllObjects()) do
-            if object.tag == 'Infinite' and string.find(object.getName(), 'Tradegoods x1 Bag') then
+            if object.tag == 'Infinite' and object.getName() == 'x1 Commodities/Tradegoods Bag' then
                 _tradeGoodBagGuid = object.getGUID()
                 return object
             end
@@ -182,15 +241,6 @@ function placeTradeGoodsAndSetTurns(obj, playerClickerColor, altClick)
     -- (Skip non-grey "spectators", non-players that can interact with table.)
     local turnOrder = initiativeOrder.order
 
-    -- If alt (right) click, add clicking color player as new last turn (moderator?).
-    local colorToInitiative = {}
-    for i, color in ipairs(turnOrder) do
-        color = i
-    end
-    if altClick and not colorToInitiative[playerClickerColor] then
-        table.insert(turnOrder, playerClickerColor)
-    end
-
     printToAll('Turn order: ' .. table.concat(turnOrder, ', '), playerClickerColor)
 
     Turns.enable = true
@@ -201,12 +251,12 @@ end
 
 function dealActionCards(obj, playerClickerColor, altClick)
     _reset('deal')
-    _strategyCardHelper.dealAllActionCards()
+    _strategyCardHelper.dealAllActionCards(Turns.order)
 end
 
 function returnStrategyCardsAndEndStatusPhase(obj, playerClickerColor, altClick)
     _reset('return')
-    _strategyCardHelper.endStatusPhaseInInitiativeOrder()
+    _strategyCardHelper.endStatusPhase()
 end
 
 -------------------------------------------------------------------------------

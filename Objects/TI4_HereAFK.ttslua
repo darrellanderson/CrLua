@@ -24,19 +24,24 @@ local _timerId = false
 local _isFaceDown = false
 
 function onLoad(save_state)
-    _timerId = 'HereAFK:' .. self.getGUID()
     _isFaceDown = self.is_face_down
-    Timer.create({
-        identifier = _timerId,
-        function_owner = self,
-        function_name = 'timerCallback',
-        delay = 3,  -- seconds
-        repetitions = 0  -- repeat until explictly Timer.destroy'ed
-    })
-end
 
-function onDestroy()
-    Timer.destroy(_timerId)
+    -- Guid may change if there's a conflict.  Wait a moment before using.
+    local function delayedCreateTimer()
+        math.randomseed(tonumber(self.getGUID(), 16))
+
+        _timerId = 'HereAFK:' .. self.getGUID()
+        Timer.destroy(_timerId)
+        -- No need to remove the timer if this is destroyed, TTS ignores it.
+        Timer.create({
+            identifier = _timerId,
+            function_owner = self,
+            function_name = 'timerCallback',
+            delay = 2.5 + math.random(),  -- seconds
+            repetitions = 0  -- repeat until explictly Timer.destroy'ed
+        })
+    end
+    Wait.frames(delayedCreateTimer, 10)
 end
 
 function timerCallback()
@@ -49,5 +54,4 @@ function timerCallback()
 
         printToAll(message, color)
     end
-
 end

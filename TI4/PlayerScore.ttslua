@@ -208,13 +208,15 @@ end
 function CrLua.TI4.PlayerScore.score(scoreboard, ownerToken)
     assert(type(scoreboard) == 'userdata' and type(ownerToken) == 'userdata')
 
-    -- Owner tokens are not centered at their position!  Use the bounds center.
-    local center = ownerToken.getBounds().center
-
     -- Scoreboard local space x.
-    local p = scoreboard.positionToLocal(center)
+    local p = scoreboard.positionToLocal(ownerToken.getPosition())
     local u = -(p.x - 3.25) / 6.5
-    return u * (scoreboard.is_face_down and 15 or 11)
+    local limit = 11
+    if scoreboard.is_face_down then
+        u = 1 - u
+        limit = 15
+    end
+    return math.floor(u * limit)
 end
 
 function CrLua.TI4.PlayerScore.colorToScore(nameToScoreObjects, nameToOwnerTokens)
@@ -226,9 +228,11 @@ function CrLua.TI4.PlayerScore.colorToScore(nameToScoreObjects, nameToOwnerToken
     -- The scoreboard bounding box is larger than the image.  Prune out extras.
     if #ownerTokens > 0 then
         for i = #ownerTokens, 1, -1 do
-            local center = ownerTokens[i].getBounds().center
+            local center = ownerTokens[i].getPosition()
             local p = scoreboard.positionToLocal(center)
             if math.abs(p.z) > 0.5 then
+                table.remove(ownerTokens, i)
+            elseif p.x < -3.3 or p.x > 3.3 then
                 table.remove(ownerTokens, i)
             end
         end
@@ -245,14 +249,15 @@ function CrLua.TI4.PlayerScore.colorToScore(nameToScoreObjects, nameToOwnerToken
         local color = ownerTokenNameToColor[ownerToken.getName()]
         assert(color)
         local score = CrLua.TI4.PlayerScore.score(scoreboard, ownerToken)
-        colorToScore[color] = math.floor(math.max(colorToScore[color] or 0, score))
+        colorToScore[color] = math.max(colorToScore[color] or 0, score)
     end
     return colorToScore
 end
 
---- Generate the entire spreadsheet contents.
-function CrLua.TI4.PlayerScore.getCells(PHASE1objectives, PHASE2objectives, colorToScore, secretsOrder, playerSecrets, colorToStrategy, stageOneMap, stageTwoMap, supportMap, MecatolPoints, otherPoints)
-    local cells = {}
+-------------------------------------------------------------------------------
+
+function CrLua.TI4.PlayerScore.setCellsPlayerNames(cells)
+    assert(type(cells) == 'table')
     local colorToCellName = {
         ['Blue'] = 'B3',
         ['Purple'] = 'B4',
@@ -263,6 +268,21 @@ function CrLua.TI4.PlayerScore.getCells(PHASE1objectives, PHASE2objectives, colo
         --['Orange'] = 'H',
         --['Pink'] = 'I',
     }
+    for color, nameCell in pairs(colorToCellName) do
+        -- Not safe to access missing colors, scan.
+        local function steamName()
+            for _, player in ipairs(Player.getPlayers()) do
+                if player.color == color then
+                    return player.steam_name
+                end
+            end
+        end
+        cells[nameCell] = steamName() or CrLua.TI4.PlayerScore.MISSING
+    end
+end
+
+function CrLua.TI4.PlayerScore.setCellsFactions(cells)
+    assert(type(cells) == 'table')
     local colorToCellFaction = {
         ['Blue'] = 'F3',
         ['Purple'] = 'F4',
@@ -273,16 +293,15 @@ function CrLua.TI4.PlayerScore.getCells(PHASE1objectives, PHASE2objectives, colo
         --['Orange'] = 'H',
         --['Pink'] = 'I',
     }
-    local colorToCellScore = {
-        ['Blue'] = 'J3',
-        ['Purple'] = 'J4',
-        ['Yellow'] = 'J5',
-        ['Red'] = 'W3',
-        ['Green'] = 'W4',
-        ['White'] = 'W5',
-        --['Orange'] = 'H',
-        --['Pink'] = 'I',
-    }
+    for color, factionCell in pairs(colorToCellFaction) do
+        local faction = _factionHelper.fromColor(color)
+        local factionNickname = faction and CrLua.TI4.PlayerScore.factionNicknames[faction.name]
+        cells[factionCell] = factionNickname or CrLua.TI4.PlayerScore.MISSING
+    end
+end
+
+function CrLua.TI4.PlayerScore.setCellsStrategyCards(cells, colorToStrategy)
+    assert(type(cells) == 'table')
     local colorToCellStrategy = {
         ['Blue'] = 'K3',
         ['Purple'] = 'K4',
@@ -293,12 +312,106 @@ function CrLua.TI4.PlayerScore.getCells(PHASE1objectives, PHASE2objectives, colo
         --['Orange'] = 'H',
         --['Pink'] = 'I',
     }
+    for color, strategyCell in pairs(colorToCellStrategy) do
+        local strategy = colorToStrategy[color]
+        cells[strategyCell] = strategy and CrLua.TI4.PlayerScore.STRATEGY[strategy] or CrLua.TI4.PlayerScore.MISSING
+    end
+end
+
+function CrLua.TI4.PlayerScore.setCellsScores(cells, colorToScore)
+    assert(type(cells) == 'table' and type(colorToScore) == 'table')
+    local colorToCellScore = {
+        ['Blue'] = 'J3',
+        ['Purple'] = 'J4',
+        ['Yellow'] = 'J5',
+        ['Red'] = 'W3',
+        ['Green'] = 'W4',
+        ['White'] = 'W5',
+        --['Orange'] = 'H',
+        --['Pink'] = 'I',
+    }
+    for color, scoreCell in pairs(colorToCellScore) do
+        cells[scoreCell] = colorToScore[color] or 0
+    end
+end
+
+function CrLua.TI4.PlayerScore.setCellsPublicObjectivesAndRound(cells, PHASE1objectives, PHASE2objectives, stageOneMap, stageTwoMap)
+    assert(type(cells) == 'table' and type(PHASE1objectives) == 'table' and type(PHASE2objectives) == 'table')
     local stageOneCells = {
         'B7', 'B8', 'B9', 'B10', 'B11', 'B20',
     }
     local stageTwoCells = {
         'B14', 'B15', 'B16', 'B17', 'B18', 'B21',
     }
+    local PublicCompletionCells = {
+        ['Blue'] = 'G',
+        ['Purple'] = 'H',
+        ['Yellow'] = 'I',
+        ['Red'] = 'J',
+        ['Green'] = 'K',
+        ['White'] = 'L',
+        --['Orange'] = '',
+        --['Pink'] = 'I',
+    }
+    local RoundCell = 'O1'
+
+    local round = (#PHASE1objectives + #PHASE2objectives) - 1
+    for _, object in ipairs(getAllObjects()) do
+        if object.getName() == 'Incentive Program' and not object.is_face_down then
+            round = round - 1
+        end
+    end
+    cells[RoundCell] = math.max(round, 1)
+
+    for _, cell in ipairs(stageOneCells) do
+        cells[cell] = ''
+        local row = string.match(cell, '^%a+(%d+)$')
+        for _, col in pairs(PublicCompletionCells) do
+            cells[ col .. row ] = ''
+        end
+    end
+    for i, val in ipairs(PHASE1objectives) do
+        local cell = stageOneCells[i]
+        cells[cell] = CrLua.TI4.PlayerScore.PHASE1[val]
+        local completed = stageOneMap[val]
+        if completed then
+            local row = string.match(cell, '^%a+(%d+)$')
+            for _, color in ipairs(completed) do
+                local col = PublicCompletionCells[color]
+                local value = CrLua.TI4.PlayerScore.colorAbbreviation[color]
+                if col and row and value then
+                    cells[ col .. row ] = value
+                end
+            end
+        end
+    end
+
+    for _, cell in ipairs(stageTwoCells) do
+        cells[cell] = ''
+        local row = string.match(cell, '^%a+(%d+)$')
+        for _, col in pairs(PublicCompletionCells) do
+            cells[ col .. row ] = ''
+        end
+    end
+    for i, val in ipairs(PHASE2objectives) do
+        local cell = stageTwoCells[i]
+        cells[cell] = CrLua.TI4.PlayerScore.PHASE2[val]
+        local completed = stageTwoMap[val]
+        if completed then
+            local row = string.match(cell, '^%a+(%d+)$')
+            for _, color in ipairs(completed) do
+                local col = PublicCompletionCells[color]
+                local value = CrLua.TI4.PlayerScore.colorAbbreviation[color]
+                if col and row and value then
+                    cells[ col .. row ] = value
+                end
+            end
+        end
+    end
+end
+
+function CrLua.TI4.PlayerScore.setCellsSecretObjectives(cells, secretsOrder, playerSecrets)
+    assert(type(cells) == 'table' and type(secretsOrder) == 'table' and type(playerSecrets) == 'table')
     local secretsCells = {
         { 'M7', 'R7' },
         { 'M8', 'R8' },
@@ -319,18 +432,18 @@ function CrLua.TI4.PlayerScore.getCells(PHASE1objectives, PHASE2objectives, colo
         { 'M23', 'R23' },
         { 'M24', 'R24' },
     }
+    for _, cellPair in ipairs(secretsCells) do
+        cells[cellPair[1]] = ''
+        cells[cellPair[2]] = ''
+    end
+    for i, secret in ipairs(secretsOrder) do
+        local color = assert(playerSecrets[secret])
+        cells[secretsCells[i][1]] = CrLua.TI4.PlayerScore.SECRET[secret]
+        cells[secretsCells[i][2]] = CrLua.TI4.PlayerScore.colorAbbreviation[color]
+    end
+end
 
-    local PublicCompletionCells = {
-        ['Blue'] = 'G',
-        ['Purple'] = 'H',
-        ['Yellow'] = 'I',
-        ['Red'] = 'J',
-        ['Green'] = 'K',
-        ['White'] = 'L',
-        --['Orange'] = '',
-        --['Pink'] = 'I',
-    }
-
+function CrLua.TI4.PlayerScore.setCellsSupport(cells, supportMap)
     local SupportCells = {
         ['Blue'] = 'X8',
         ['Purple'] = 'X10',
@@ -341,7 +454,25 @@ function CrLua.TI4.PlayerScore.getCells(PHASE1objectives, PHASE2objectives, colo
         --['Orange'] = 'H',
         --['Pink'] = 'I',
     }
+    for _, cell in pairs(SupportCells) do
+        cells[cell] = ''
+    end
+    for owner, target in pairs(supportMap) do
+        cells[SupportCells[owner]] = CrLua.TI4.PlayerScore.colorAbbreviation[target]
+    end
+end
 
+function CrLua.TI4.PlayerScore.setCellsMecatol(cells, MecatolPoints)
+    local MecatolCells = {'G12', 'G13', 'H13', 'I13', 'J13', 'K13', 'L13'}
+    for _, cell in ipairs(MecatolCells) do
+        cells[cell] = ''
+    end
+    for i, color in ipairs(MecatolPoints) do
+        cells[MecatolCells[i]] = CrLua.TI4.PlayerScore.colorAbbreviation[color]
+    end
+end
+
+function CrLua.TI4.PlayerScore.setCellsOther(cells, otherPoints)
     local OtherPointCells = {
         ['Imperial Rider'] = 'X13',
         ['single'] = {
@@ -364,112 +495,6 @@ function CrLua.TI4.PlayerScore.getCells(PHASE1objectives, PHASE2objectives, colo
             }
         }
     }
-
-    local MecatolCells = {'G12', 'G13', 'H13', 'I13', 'J13', 'K13', 'L13'}
-
-    local RoundCell = 'O1'
-
-    local round = (#PHASE1objectives + #PHASE2objectives) - 1
-    for _, object in ipairs(getAllObjects()) do
-        if object.getName() == 'Incentive Program' and not object.is_face_down then
-            round = round - 1
-        end
-    end
-    cells[RoundCell] = math.max(round, 1)
-
-    for color, nameCell in pairs(colorToCellName) do
-        -- Not safe to access missing colors, scan.
-        local function steamName()
-            for _, player in ipairs(Player.getPlayers()) do
-                if player.color == color then
-                    return player.steam_name
-                end
-            end
-        end
-        cells[nameCell] = steamName() or CrLua.TI4.PlayerScore.MISSING
-    end
-
-    for color, factionCell in pairs(colorToCellFaction) do
-        local faction = _factionHelper.fromColor(color)
-        local factionNickname = faction and CrLua.TI4.PlayerScore.factionNicknames[faction.name]
-        cells[factionCell] = factionNickname or CrLua.TI4.PlayerScore.MISSING
-    end
-
-    for color, scoreCell in pairs(colorToCellScore) do
-        cells[scoreCell] = colorToScore[color] or 0
-    end
-
-    for color, strategyCell in pairs(colorToCellStrategy) do
-        local strategy = colorToStrategy[color]
-        cells[strategyCell] = strategy and CrLua.TI4.PlayerScore.STRATEGY[strategy] or CrLua.TI4.PlayerScore.MISSING
-    end
-
-    for _, cell in ipairs(stageOneCells) do
-        cells[cell] = ''
-        local row = string.match(cell, '^%a+(%d+)$')
-        for _, col in pairs(PublicCompletionCells) do
-            cells[ col .. row ] = ''
-        end
-    end
-    for i, val in ipairs(PHASE1objectives) do
-        local cell = stageOneCells[i]
-        cells[cell] = CrLua.TI4.PlayerScore.PHASE1[val]
-        local completed = stageOneMap[val]
-        if completed then
-            local row = string.match(cell, '^%a+(%d+)$')
-            for _, color in ipairs(completed) do
-                local col = PublicCompletionCells[color]
-                local value = CrLua.TI4.PlayerScore.colorAbbreviation[color]
-                cells[ col .. row ] = value
-            end
-        end
-    end
-
-    for _, cell in ipairs(stageTwoCells) do
-        cells[cell] = ''
-        local row = string.match(cell, '^%a+(%d+)$')
-        for _, col in pairs(PublicCompletionCells) do
-            cells[ col .. row ] = ''
-        end
-    end
-    for i, val in ipairs(PHASE2objectives) do
-        local cell = stageTwoCells[i]
-        cells[cell] = CrLua.TI4.PlayerScore.PHASE2[val]
-        local completed = stageTwoMap[val]
-        if completed then
-            local row = string.match(cell, '^%a+(%d+)$')
-            for _, color in ipairs(completed) do
-                local col = PublicCompletionCells[color]
-                local value = CrLua.TI4.PlayerScore.colorAbbreviation[color]
-                cells[ col .. row ] = value
-            end
-        end
-    end
-
-    for _, cellPair in ipairs(secretsCells) do
-        cells[cellPair[1]] = ''
-        cells[cellPair[2]] = ''
-    end
-    for i, secret in ipairs(secretsOrder) do
-        local color = assert(playerSecrets[secret])
-        cells[secretsCells[i][1]] = CrLua.TI4.PlayerScore.SECRET[secret]
-        cells[secretsCells[i][2]] = CrLua.TI4.PlayerScore.colorAbbreviation[color]
-    end
-
-    for _, cell in pairs(SupportCells) do
-        cells[cell] = ''
-    end
-    for owner, target in pairs(supportMap) do
-        cells[SupportCells[owner]] = CrLua.TI4.PlayerScore.colorAbbreviation[target]
-    end
-
-    for _, cell in ipairs(MecatolCells) do
-        cells[cell] = ''
-    end
-    for i, color in ipairs(MecatolPoints) do
-        cells[MecatolCells[i]] = CrLua.TI4.PlayerScore.colorAbbreviation[color]
-    end
-
     for _, cellPair in ipairs(OtherPointCells.single) do
         cells[cellPair[1]] = ''
         cells[cellPair[2]] = ''
@@ -500,18 +525,18 @@ function CrLua.TI4.PlayerScore.getCells(PHASE1objectives, PHASE2objectives, colo
             end
         end
     end
-
-    return cells
 end
+
+-------------------------------------------------------------------------------
 
 function CrLua.TI4.PlayerScore.updatePublicOneObjectives(PHASE1objectives, nameToScoreObjects)
     assert(type(PHASE1objectives) == 'table')
 
     local stageOne = {}
 
-    for key, map in pairs(nameToScoreObjects) do
-        local objective = CrLua.TI4.PlayerScore.PHASE1[key]
-        if objective then table.insert(stageOne, key) end
+    for name, scoreObjects in pairs(nameToScoreObjects) do
+        local objective = CrLua.TI4.PlayerScore.PHASE1[name]
+        if objective then table.insert(stageOne, name) end
     end
 
     local oldPHASE1 = PHASE1objectives or {}
@@ -526,9 +551,9 @@ function CrLua.TI4.PlayerScore.updatePublicTwoObjectives(PHASE2objectives, nameT
 
     local stageTwo = {}
 
-    for key, map in pairs(nameToScoreObjects) do
-        local objective = CrLua.TI4.PlayerScore.PHASE2[key]
-        if objective then table.insert(stageTwo, key) end
+    for name, scoreObjects in pairs(nameToScoreObjects) do
+        local objective = CrLua.TI4.PlayerScore.PHASE2[name]
+        if objective then table.insert(stageTwo, name) end
     end
 
     local oldPHASE2 = PHASE2objectives or {}
@@ -544,22 +569,21 @@ function CrLua.TI4.PlayerScore.updateSecrets(secretsOrder, playerSecrets, nameTo
     -- Map from secret name to owning player color.
     local updated = {}
     local newOrder = {}
-    for key, map in pairs(nameToOwnerTokens) do
-        if CrLua.TI4.PlayerScore.SECRET[key] then
-
+    for name, ownerTokens in pairs(nameToOwnerTokens) do
+        if CrLua.TI4.PlayerScore.SECRET[name] then
             -- Tolerate accidentally putting multiple tokens from the same player.
             local ownerSet = {}
-            for _, ownerToken in ipairs(map) do
+            for _, ownerToken in ipairs(ownerTokens) do
                 local faction = _factionHelper.fromTokenName(ownerToken.getName())
-                if faction then
+                if faction and faction.color then
                     ownerSet[faction.color] = true
                 end
             end
             local ownersList = CrLua.List.fromKeys(ownerSet)
 
             if #ownersList == 1 then
-                table.insert(newOrder, key)
-                updated[key] = ownersList[1]
+                table.insert(newOrder, name)
+                updated[name] = ownersList[1]
             end
         end
     end
@@ -569,45 +593,42 @@ function CrLua.TI4.PlayerScore.updateSecrets(secretsOrder, playerSecrets, nameTo
 end
 
 function CrLua.TI4.PlayerScore.mapStageOne(nameToOwnerTokens)
-
     local stageOneMap = {}
-    for key, map in pairs(nameToOwnerTokens) do
-        if CrLua.TI4.PlayerScore.PHASE1[key] then
+    for name, ownerTokens in pairs(nameToOwnerTokens) do
+        if CrLua.TI4.PlayerScore.PHASE1[name] then
             local tokenMap = {}
-            for i, token in ipairs(map) do
-                local ownerToken = map[i].getName()
-                local faction = _factionHelper.fromTokenName(ownerToken)
-                local playerColor = faction.color
-                table.insert(tokenMap, playerColor)
+            for i, ownerToken in ipairs(ownerTokens) do
+                local faction = _factionHelper.fromTokenName(ownerToken.getName())
+                local playerColor = faction and faction.color
+                if playerColor then
+                    table.insert(tokenMap, playerColor)
+                end
             end
-            stageOneMap[key] = tokenMap
+            stageOneMap[name] = tokenMap
         end
     end
-
     return stageOneMap
 end
 
 function CrLua.TI4.PlayerScore.mapStageTwo(nameToOwnerTokens)
-
     local stageTwoMap = {}
-    for key, map in pairs(nameToOwnerTokens) do
-        if CrLua.TI4.PlayerScore.PHASE2[key] then
+    for name, ownerTokens in pairs(nameToOwnerTokens) do
+        if CrLua.TI4.PlayerScore.PHASE2[name] then
             local tokenMap = {}
-            for i, token in ipairs(map) do
-                local ownerToken = map[i].getName()
-                local faction = _factionHelper.fromTokenName(ownerToken)
-                local playerColor = faction.color
-                table.insert(tokenMap, playerColor)
+            for i, ownerToken in ipairs(ownerTokens) do
+                local faction = _factionHelper.fromTokenName(ownerToken.getName())
+                local playerColor = faction and faction.color
+                if playerColor then
+                    table.insert(tokenMap, playerColor)
+                end
             end
-            stageTwoMap[key] = tokenMap
+            stageTwoMap[name] = tokenMap
         end
     end
-
     return stageTwoMap
 end
 
 function CrLua.TI4.PlayerScore.updateStrategy()
-
     local guidToName = {}
     local guidToPosition = {}
     for _, object in ipairs(getAllObjects()) do
@@ -638,10 +659,11 @@ function CrLua.TI4.PlayerScore.mapSupports(nameToOwnerTokens)
             local ownerToken = map[1].getName()
             local faction = _factionHelper.fromTokenName(ownerToken)
             local playerColor = faction.color
-            supportMap[color] = playerColor
+            if playerColor then
+                supportMap[color] = playerColor
+            end
         end
     end
-
     return supportMap
 end
 
@@ -655,7 +677,7 @@ function CrLua.TI4.PlayerScore.getMecatolPoints(currentMecatolPoints, nameToOwne
         if not _custodians then
             return true
         end
-        local p1 = ownerToken.getBounds().center
+        local p1 = ownerToken.getPosition()
         local p2 = _custodians.getPosition()
         local d = math.sqrt((p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2)
         return d < 1.5
@@ -690,7 +712,9 @@ function CrLua.TI4.PlayerScore.mapOtherPoints(currentOtherPoints, nameToOwnerTok
                 local ownerToken = map[i].getName()
                 local faction = _factionHelper.fromTokenName(ownerToken)
                 local playerColor = faction.color
-                table.insert(otherPoints[key], playerColor)
+                if playerColor then
+                    table.insert(otherPoints[key], playerColor)
+                end
             end
         end
     end

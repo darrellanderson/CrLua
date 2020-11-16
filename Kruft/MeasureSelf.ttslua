@@ -1,0 +1,10 @@
+function onLoad(save_state)
+    local size = self.getBoundsNormalized().size
+    local message = {
+        self.getGUID(),
+        'x=' .. (math.floor(size.x * 100) / 100),
+        'y=' .. (math.floor(size.y * 100) / 100),
+        'z=' .. (math.floor(size.z * 100) / 100),
+    }
+    print(table.concat(message, ' '))
+end

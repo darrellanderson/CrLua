@@ -77,17 +77,18 @@ local SWAP = {
         '$COLOR PDS',
         '$COLOR Dreadnought',
         '$COLOR War Sun',
-        '$COLOR Flagship'
+        '$COLOR Flagship',
+        '$COLOR Mech',
     },
 }
 
 local DEFAULT_TINT = {
-    White = '8C8C8C',
-    Blue = '0C98D7',
-    Purple = '7500B7',
-    Yellow = 'A5A300',
+    White = '8B8B8B',
+    Blue = '07B2FF',
+    Purple = '7400B7',
+    Yellow = 'D6B700',
     Red = 'CB0000',
-    Green = '007406',
+    Green = '007306',
     Orange = 'F3631C',
     Brown = '703A16',
     Pink = 'F46FCD',
@@ -96,12 +97,12 @@ local DEFAULT_TINT = {
 }
 
 local TINTS = {
-    White = { '000000', '333333', '666666', '8C8C8C', 'CCCCCC', 'FFFFFF' },
-    Blue = { '0000FF', '4169E1', '0C98D7', '00BFFF', '87CEFA', 'B0E0E6' },
-    Purple = { '800080', '4B0082', '7500B7', '8A2BE2', '9932CC', '9370DB' },
-    Yellow = { 'A5A300', 'CCCC00', 'FFFF00', 'FFFF66', 'F0E68C', 'EEE8AA' },
+    White = { '000000', '333333', '666666', '8B8B8B', 'CCCCCC', 'FFFFFF' },
+    Blue = { '0000FF', '4169E1', '07B2FF', '00BFFF', '87CEFA', 'B0E0E6' },
+    Purple = { '800080', '4B0082', '7400B7', '8A2BE2', '9932CC', '9370DB' },
+    Yellow = { 'D6B700', 'CCCC00', 'FFFF00', 'FFFF66', 'F0E68C', 'EEE8AA' },
     Red = { '8B0000', 'B22222', 'CB0000', 'FF0000', 'DC143C', 'CD5C5C' },
-    Green = { '006400', '007406', '808000', '6B8E23', '9ACD32', '7CFC00' },
+    Green = { '006400', '007306', '808000', '6B8E23', '9ACD32', '7CFC00' },
     Orange = { 'FF4500', 'F3631C', 'FF8C00', 'FFA500', 'FF7F50', 'FF6347' },
     Brown = { '664A3D', '703A16', '8B4513', 'A0522D', 'CD853F', 'D2B48C' },
     Pink = { 'C71585', 'FF1493', 'F46FCD', 'FF69B4', 'DB7093', 'FFB6C1' },
@@ -135,6 +136,8 @@ local _prevTint = false
 local _nextColor = false
 local _nextTint = false
 
+local _waitingForDele = {}
+
 -------------------------------------------------------------------------------
 
 function onLoad(saveState)
@@ -144,12 +147,27 @@ function onLoad(saveState)
     Wait.frames(resetUi, 2)
 end
 
-function onPlayerChangeColor(player_color)
+function onPlayerChangeColor(playerColor)
     Wait.frames(resetUi, 2)
 end
 
-function filterObjectEnter(enterObject)
-    return string.match(enterObject.getName(), ' Player Pieces$') and true or false
+function onObjectDestroy(dyingObject)
+    _waitingForDele[dyingObject.getGUID()] = nil
+end
+
+function _registerPut(object)
+    _waitingForDele[object.getGUID()] = true
+end
+
+function _waitForPuts()
+    local function hasOutstandingPuts()
+        for _, _ in pairs(_waitingForDele) do
+            return true
+        end
+    end
+    while hasOutstandingPuts() do
+        coroutine.yield(0)
+    end
 end
 
 -------------------------------------------------------------------------------
@@ -279,9 +297,8 @@ end
 
 function swapColorsUi()
     local prevColorSet = {}
-    CrLua.TI4.Zone.update()
-    for _, zone in ipairs(CrLua.TI4.Zone.all()) do
-        prevColorSet[zone.color] = true
+    for _, zoneColor in ipairs(_zoneHelper.zones()) do
+        prevColorSet[zoneColor] = true
     end
 
     local nextColorSet = {}
@@ -437,11 +454,10 @@ function swapCoroutine()
     -- Gather swap plans, source ("prev") is always an in-use color.  "Next"
     -- may be inside this container in which case the single plan is enough.
     -- This step does not modify anything, and errors out if anything missing.
-    CrLua.TI4.Zone.update()
-    assert(CrLua.TI4.Zone.fromColor(_prevColor))
+    assert(_zoneHelper.zoneAttributes(_prevColor))
     local swapPlans = { SwapPlan.get(_prevColor, _nextColor, _nextTint) }
     -- If "next" is also in-use, then create a second swap plan for it.
-    if _nextColor ~= _prevColor and CrLua.TI4.Zone.fromColor(_nextColor) then
+    if _nextColor ~= _prevColor and _zoneHelper.zoneAttributes(_nextColor) then
         table.insert(swapPlans, SwapPlan.get(_nextColor, _prevColor, _prevTint))
     end
 
@@ -459,6 +475,11 @@ function swapCoroutine()
             CrLua.Log.d(TAG, 'only changing tint')
             local unitObjects = Pack.getUnitBagsAndUnits(swapPlan.anonNameToItems)
             tintUnits(unitObjects, swapPlan.nextColor, swapPlan.nextTint)
+            _factionHelper.updateFactions()
+            _factionHelper.tintTokens({
+                color = swapPlan.nextColor,
+                tint = swapPlan.nextTint
+            })
             CrLua.Log.i(TAG, 'FINISHED')
             return 1
         end
@@ -496,15 +517,15 @@ function swapCoroutine()
         coroutine.yield(0)
         coroutine.yield(0)
 
-        Pack.singletons(swapPlan.anonNameToItems, packBag)
-        coroutine.yield(0)
-        coroutine.yield(0)
-
         Pack.decks(swapPlan.anonNameToItems, swapPlan.prevColor, packBag)
         coroutine.yield(0)
         coroutine.yield(0)
 
         Pack.units(swapPlan.anonNameToItems, packBag)
+        coroutine.yield(0)
+        coroutine.yield(0)
+
+        Pack.singletons(swapPlan.anonNameToItems, packBag)
         coroutine.yield(0)
         coroutine.yield(0)
     end
@@ -590,11 +611,36 @@ function swapCoroutine()
     coroutine.yield(0)
     coroutine.yield(0)
 
+    -- Reset token tints.
+    for _, swapPlan in ipairs(swapPlans) do
+        _factionHelper.updateFactions()
+        _factionHelper.tintTokens({
+            color = swapPlan.nextColor,
+            tint = swapPlan.nextTint
+        })
+    end
+
     CrLua.Log.i(TAG, 'FINISHED')
     return 1
 end
 
 -------------------------------------------------------------------------------
+
+local function waitForSpawnComplete(tableWithObjectValues)
+    assert(type(tableWithObjectValues) == 'table')
+    for _, object in pairs(tableWithObjectValues) do
+        while object.spawning do
+            coroutine.yield(0)
+        end
+    end
+
+    -- Even though spawning is done, give TTS a moment to finish.
+    -- A single yield does not seem to be enough time.  Two is good,
+    -- but be paranoid and give it three.
+    coroutine.yield(0)
+    coroutine.yield(0)
+    coroutine.yield(0)
+end
 
 function getBagContainer()
     for _, object in ipairs(getAllObjects()) do
@@ -645,6 +691,9 @@ function getBags(bagNameSet)
         bag.setLock(true)
         bagNameToBag[bagName] = bag
     end
+
+    waitForSpawnComplete(bagNameToBag)
+
     return bagNameToBag
 end
 
@@ -654,12 +703,14 @@ function putBags(bagNameToBag)
     for bagName, bag in pairs(bagNameToBag) do
         bag.setLock(false)
         if string.match(bagName, ' Box$') then
+            _registerPut(bag)
             bagContainer.putObject(bag)
         else
             assert(bag.getQuantity() == 0)
             destroyObject(bag)
         end
     end
+    _waitForPuts()
 end
 
 -------------------------------------------------------------------------------
@@ -675,22 +726,6 @@ function getContainerEntryGuid(container, name)
             return entry.guid
         end
     end
-end
-
-local function waitForSpawnComplete(tableWithObjectValues)
-    assert(type(tableWithObjectValues) == 'table')
-    for _, object in pairs(tableWithObjectValues) do
-        while object.spawning do
-            coroutine.yield(0)
-        end
-    end
-
-    -- Even though spawning is done, give TTS a moment to finish.
-    -- A single yield does not seem to be enough time.  Two is good,
-    -- but be paranoid and give it three.
-    coroutine.yield(0)
-    coroutine.yield(0)
-    coroutine.yield(0)
 end
 
 --- Change tint color
@@ -724,10 +759,12 @@ function tintUnits(unitBagsAndUnits, playerColor, tintColorHex)
             -- Put back into unit bag.
             for _, entryObject in ipairs(entryObjects) do
                 entryObject.setLock(false)
+                _registerPut(entryObject)
                 object.putObject(entryObject)
             end
         end
     end
+    _waitForPuts()
 end
 
 -------------------------------------------------------------------------------
@@ -882,6 +919,12 @@ function SwapPlan._getItems(prevColor, nextColor)
 
         -- Live objects.
         local nameTable = prevNameToNameTable[name]
+
+        -- Watch out for Franken tokens with flagship names.
+        if nameTable and nameTable.anon == ANONYMOUS_FLAGSHIP_NAME and object.tag == 'Tile' then
+            nameTable = false
+        end
+
         if nameTable then
             local items = getItems(nameTable.anon)
             local item = SwapPlan._objectToItem(object, nameTable)
@@ -952,7 +995,10 @@ function SwapPlan._verifyNothingMissing(anonNameToItems)
             end
         end
         if not bag then
-            return false, 'missing unit bag "' .. anonymousName .. '"'
+            -- Tolerate Mech bag absence.
+            if not string.match(anonymousName, ' Mech$') then
+                return false, 'missing unit bag "' .. anonymousName .. '"'
+            end
         end
     end
     return true
@@ -1004,7 +1050,7 @@ function Pack.getUnitBagsAndUnits(anonNameToItems)
 
     local unitObjects = {}
     for _, anonName in ipairs(SWAP.UNITS) do
-        for _, item in ipairs(anonNameToItems[anonName]) do
+        for _, item in ipairs(anonNameToItems[anonName] or {}) do
             assert(item.live)
             local object = getObjectFromGUID(item.guid)
             assert(object)
@@ -1020,37 +1066,41 @@ function Pack.renameFlagship(anonNameToItems)
 
     local items = anonNameToItems[ANONYMOUS_FLAGSHIP_NAME] or {}
     for _, item in ipairs(items) do
-        assert(item.live and item.name.insidePrevBag)
-        local object = getObjectFromGUID(item.guid)
-        assert(object)
-        object.setName(item.name.insidePrevBag)
-        if object.tag == 'Bag' then
-            -- Remove flagships from the flagship bag.
-            local entryObjects = {}
-            local pos = object.getPosition()
-            for i, entry in ipairs(object.getObjects()) do
-                local entryObject = object.takeObject({
-                    guid = entry.guid,
-                    position = { x = pos.x, y = pos.y + 5 + i, z = pos.z },
-                    smooth = false,
-                })
-                coroutine.yield(0)
-                entryObject.setLock(true)
-                entryObject.setName(item.name.insidePrevBag)
-                table.insert(entryObjects, entryObject)
-            end
+        if item.name.insidePrevBag then
+            assert(item.live)
+            local object = getObjectFromGUID(item.guid)
+            assert(object)
+            object.setName(item.name.insidePrevBag)
+            if object.tag == 'Bag' then
+                -- Remove flagships from the flagship bag.
+                local entryObjects = {}
+                local pos = object.getPosition()
+                for i, entry in ipairs(object.getObjects()) do
+                    local entryObject = object.takeObject({
+                        guid = entry.guid,
+                        position = { x = pos.x, y = pos.y + 5 + i, z = pos.z },
+                        smooth = false,
+                    })
+                    coroutine.yield(0)
+                    entryObject.setLock(true)
+                    entryObject.setName(item.name.insidePrevBag)
+                    table.insert(entryObjects, entryObject)
+                end
 
-            -- Wait after take for TTS to finish the takes.
-            waitForSpawnComplete(entryObjects)
+                -- Wait after take for TTS to finish the takes.
+                waitForSpawnComplete(entryObjects)
 
-            -- Put back into unit bag.
-            for _, entryObject in ipairs(entryObjects) do
-                entryObject.setLock(false)
-                object.putObject(entryObject)
+                -- Put back into unit bag.
+                for _, entryObject in ipairs(entryObjects) do
+                    entryObject.setLock(false)
+                    _registerPut(entryObject)
+                    object.putObject(entryObject)
+                end
             end
+            coroutine.yield(0)
         end
-        coroutine.yield(0)
     end
+    _waitForPuts()
 end
 
 function Pack.singletons(anonNameToItems, packBag)
@@ -1065,7 +1115,9 @@ function Pack.singletons(anonNameToItems, packBag)
             assert(object)
             if i == 1 then
                 object.setLock(false)
+                _registerPut(object)
                 packBag.putObject(object)
+                _waitForPuts()
             else
                 destroyObject(object)
             end
@@ -1154,11 +1206,13 @@ function Pack.decks(anonNameToItems, deckColor, packBag)
         for i, cardObject in ipairs(cardObjects or {}) do
             cardObject.setLock(false)
             deckObject.setLock(false)
+            _registerPut(cardObject)
             deckObject = deckObject.putObject(cardObject)
             deckObject.setLock(true)
             coroutine.yield(0)  -- give deck time to spawn
             coroutine.yield(0)
         end
+        _waitForPuts()
 
         local deckName = SwapPlan._applyColorToAnonymousName(anonDeckName, deckColor)
         deckObject.setName(deckName)
@@ -1168,8 +1222,10 @@ function Pack.decks(anonNameToItems, deckColor, packBag)
         end
 
         deckObject.setLock(false)
+        _registerPut(deckObject)
         packBag.putObject(deckObject)
         coroutine.yield(0)
+        _waitForPuts()
     end
 end
 
@@ -1192,27 +1248,35 @@ function Pack.units(anonNameToItems, packBag)
     end
 
     for _, anonName in ipairs(SWAP.UNITS) do
-        local unitBag = assert(anonNameToUnitBag[anonName])
-        for i, item in ipairs(anonNameToItems[anonName] or {}) do
-            assert(item.live)
-            if item.live.tag ~= 'Bag' then
-                local object = getObjectFromGUID(item.guid)
-                assert(object)
-                object.setLock(false)
-                object.jointTo()
-                unitBag.putObject(object)
+        -- Mech unit bag might not exist.
+        local unitBag = anonNameToUnitBag[anonName]
+        if unitBag then
+            for i, item in ipairs(anonNameToItems[anonName] or {}) do
+                assert(item.live)
+                if item.live.tag ~= 'Bag' then
+                    local object = getObjectFromGUID(item.guid)
+                    assert(object)
+                    object.setLock(false)
+                    _registerPut(object)
+                    unitBag.putObject(object)
+                end
             end
         end
         coroutine.yield(0)
     end
     coroutine.yield(0)
     coroutine.yield(0)
+    _waitForPuts()
 
     for _, unitBag in pairs(anonNameToUnitBag) do
         unitBag.setLock(false)
-        packBag.putObject(unitBag)
+        unitBag.jointTo()  -- break all joints
         coroutine.yield(0)
+        packBag.putObject(unitBag)
     end
+    coroutine.yield(0)
+    coroutine.yield(0)
+    _waitForPuts()
 end
 
 function Pack.handCards(playerColor, handBag)
@@ -1224,9 +1288,11 @@ function Pack.handCards(playerColor, handBag)
     for i = 1, player.getHandCount() do
         for _, object in ipairs(player.getHandObjects(i)) do
             object.setLock(false)
+            _registerPut(object)
             handBag.putObject(object)
         end
     end
+    _waitForPuts()
 end
 
 function Pack.moveHand(playerColor)
@@ -1529,7 +1595,10 @@ function Unpack.units(anonNameToItems, unpackBag)
     -- Verify got all unit bags.
     for _, anonName in ipairs(SWAP.UNITS) do
         if not anonNameToUnitBag[anonName] then
-            error('missing unit bag "' .. anonName .. '"')
+            -- PoK adds mech units, might not be there for vanilla games.
+            if not string.match(anonName, ' Mech$') then
+                error('missing unit bag "' .. anonName .. '"')
+            end
         end
     end
 
@@ -1539,7 +1608,7 @@ function Unpack.units(anonNameToItems, unpackBag)
             local unitBag = anonNameToUnitBag[anonName]
             if item.live and item.live.tag ~= 'Bag' then
                 local object = Unpack._unpackItem(item, unitBag)
-                assert(object)
+                assert(object, 'MISSING ' .. (item.name.insideNextBag or item.name.next) .. ' FROM ' .. unitBag.getName())
                 table.insert(unitObjects, object)
             end
         end
@@ -1555,6 +1624,9 @@ function Unpack.renameFlagship(anonNameToItems, unitObjects)
     local items = anonNameToItems[ANONYMOUS_FLAGSHIP_NAME] or {}
     assert(items and #items > 0)
     local firstItem = items[1]
+    if not firstItem.name.insideNextBag then
+        return  -- Franken games have anonymous flagships
+    end
     local fromName = assert(firstItem.name.insideNextBag)
     local toName = assert(firstItem.name.next)
 
@@ -1583,11 +1655,13 @@ function Unpack.renameFlagship(anonNameToItems, unitObjects)
                 -- Put back into unit bag.
                 for _, entryObject in ipairs(entryObjects) do
                     entryObject.setLock(false)
+                    _registerPut(entryObject)
                     object.putObject(entryObject)
                 end
             end
         end
     end
+    _waitForPuts()
 end
 
 -------------------------------------------------------------------------------
@@ -1665,16 +1739,14 @@ end
 #include <~/CrLua/List>
 #include <~/CrLua/LockTable>
 #include <~/CrLua/Log>
-#include <~/CrLua/Polygon>
 #include <~/CrLua/Table>
 #include <~/CrLua/Util>
 
 #include <~/CrLua/TI4/Unit>
-#include <~/CrLua/TI4/Zone>
 
 #include <~/CrLua/TTS/HelperClient>
 
-CrLua.assertRequired({ 'Color', 'Log', 'TI4.Unit', 'TI4.Zone', 'TTS.HelperClient' })
+CrLua.assertRequired({ 'Color', 'Log', 'TI4.Unit', 'TTS.HelperClient' })
 CrLua.lock()
 
 SWAP = CrLua.LockTable.readOnlyRequireKey('SWAP', SWAP)

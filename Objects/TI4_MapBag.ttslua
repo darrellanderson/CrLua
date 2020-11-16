@@ -7,10 +7,7 @@ local config = {
         name = 'Copy &\nReturn',
         tooltip = 'Copy map string to map builder, return map tile to map bag.',
     },
-    mapTool = {
-        objectName = 'TI4 Map Tool',
-        inputLabel = "Enter map string or press 'save' to save the current map",
-    }
+    mapTool = 'TI4 Map Tool',
 }
 
 function onObjectLeaveContainer(container, object)
@@ -57,14 +54,9 @@ function onBuildMap(buttonContainer, clickerColor, altClick)
 
     -- Copy map string to map tool input.
     for _, object in ipairs(getAllObjects()) do
-        if object.getName() == config.mapTool.objectName then
-            for _, input in ipairs(object.getInputs() or {}) do
-                if input.label == config.mapTool.inputLabel then
-                    input.value = mapString
-                    object.editInput(input)
-                end
-            end
-            object.setVar('cur_input', mapString)
+        if object.getName() == config.mapTool then
+            assert(object.getVar('setMapString'))
+            object.call('setMapString', mapString)
         end
     end
 

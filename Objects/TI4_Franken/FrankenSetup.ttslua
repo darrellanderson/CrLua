@@ -7,32 +7,23 @@
 
 -- TI4 Frankenstein MultiRoller
 
-local CREATE_BAGS = {
-    {
-        position = { 4, 3, -6 },
-        color = 'Yellow'
-    },
-    {
-        position = {0,3,-6},
-        color = 'Red'
-    },
-    {
-        position = {-4,3,-6},
-        color = 'Green'
-    },
-    {
-        position = {4,3,6},
-        color = 'Purple'
-    },
-    {
-        position = {0,3,6},
-        color = 'Blue'
-    },
-    {
-        position = {-4,3,6},
-        color = 'White'
-    },
-}
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
+        return function(parameters) return helperObject.call(functionName, parameters) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
+local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 -- Unpack items directly to these positions.
 local UNPACK_TRANSFORMS = {
@@ -74,54 +65,56 @@ local UNPACK_TO_BAGS = {
     ['Starting Techs'] = 2,
     ['Commodity Tiles'] = 2,
     ['Starting Units'] = 2,
-    ['Faction Abilities'] = 3,
+    ['Faction Abilities'] = 4,
     ['Faction Techs'] = 3,
 }
 
+local UNPACK_TO_BAGS_BLU = {
+    ['Promissory Notes'] = 2,
+    ['Home Systems'] = 2,
+    ['Flagships'] = 2,
+    ['Starting Techs'] = 2,
+    ['Commodity Tiles'] = 3,
+    ['Starting Units'] = 2,
+    ['Faction Abilities'] = 5,
+    ['Faction Techs'] = 4
+}
+
+-- Index by player count (1 not allowed).  Based on setup instruction counts.
 local EXTERNAL_TO_BAGS = {
-    ['Blue Planet Tiles'] = 3,
-    ['Red Anomaly Tiles'] = 2
+    ['Blue Planet Tiles'] = { -1, 7, 6, 5, 4, 3, 2, 2 },
+    ['Red Anomaly Tiles'] = { -1, 2, 2, 3, 2, 2, 1, 1 },
 }
 
 local CLONE_TO_HIDDEN = {
     'Frankenstein Checklist',
 }
 
-local HIDDEN_ZONE_SCALE = {20, 6, 10}
-
-local HIDDEN_ZONE_TRANSFORMS = {
-    White = {
-        position = {-38, 3, 18},
-        rotation = {0, 0, 0},
-    },
-    Blue = {
-        position = {-12, 3, 18},
-        rotation = {0, 0, 0},
-    },
-    Purple = {
-        position = {37, 3, 18},
-        rotation = {0, 0, 0},
-    },
-    Yellow = {
-        position = {38, 3, -18},
-        rotation = {0, 180, 0},
-    },
-    Red = {
-        position = {12, 3, -18},
-        rotation = {0, 180, 0},
-    },
-    Green = {
-        position = {-37, 3, -18},
-        rotation = {0, 180, 0},
-    },
-}
-
+local HIDDEN_ZONE_SCALE = { x = 20, y = 6, z = 10 }
 local HIDDEN_ZONE_NAME = 'FrankenZone'
 
 local MAX_UI_ROWS = 25
 
 local _useToggles = false
 local _toggles = false
+
+-------------------------------------------------------------------------------
+
+local function getHiddenZoneTransforms()
+    local result = {}
+    for _, zoneAttributes in ipairs(_zoneHelper.zonesAttributes()) do
+        local color = assert(zoneAttributes.color)
+        result[color] = {
+            position = {
+                x = zoneAttributes.center.x,
+                y = zoneAttributes.center.y + HIDDEN_ZONE_SCALE.y / 2,
+                z = zoneAttributes.center.z + 9 * (zoneAttributes.center.z > 0 and -1 or 1)
+            },
+            rotation = zoneAttributes.rotation
+        }
+    end
+    return result
+end
 
 -------------------------------------------------------------------------------
 
@@ -139,7 +132,8 @@ local function takeToAbove(container, name)
     local pos = container.getPosition()
     local object = self.takeObject({
         position = { pos.x, pos.y + 5, pos.z },
-        guid = guid
+        guid = guid,
+        smooth = false
     })
     assert(object)
     return object
@@ -154,8 +148,23 @@ local function packFactions()
     end
 end
 
+local function createPackBagsHiddenZone()
+    local hiddenZone = spawnObject({
+        type              = 'FogOfWarTrigger',
+        position          = { x = 0, y = 10, z = 0 },
+        rotation          = { x = 0, y = 0, z = 0 },
+        scale             = { x = 20, y = 20, z = 20 },
+        callback_fucntion = nil,
+        sound             = false,
+        params            = {},
+        snap_to_grid      = false,
+    })
+    hiddenZone.setValue('Teal')
+    return hiddenZone
+end
+
 local function createHiddenZones()
-    for color, transform in pairs(HIDDEN_ZONE_TRANSFORMS) do
+    for color, transform in pairs(getHiddenZoneTransforms()) do
         local hiddenZone = spawnObject({
             type              = 'FogOfWarTrigger',
             position          = transform.position,
@@ -178,7 +187,7 @@ local function cloneToHidden(name)
     local json = object.getJSON()
     destroyObject(object)
 
-    for _, transform in pairs(HIDDEN_ZONE_TRANSFORMS) do
+    for _, transform in pairs(getHiddenZoneTransforms()) do
         local clone = spawnObjectJSON({
             json = json,
             position = transform.position,
@@ -194,16 +203,20 @@ local function cloneToHidden(name)
 end
 
 local function createHiddenBags()
-    for _, transform in pairs(HIDDEN_ZONE_TRANSFORMS) do
+    for _, transform in pairs(getHiddenZoneTransforms()) do
         local p = transform.position
-        for i = 1, 2 do
+        local deltas = {
+            { x = 4, y = 0, z = 0 },
+            { x = 8, y = 4, z = 0 },
+        }
+        for _, delta in ipairs(deltas) do
             local bag = spawnObject({
                 type = 'Bag',
-                position = { p[1] + 2 + (i * 3), p[2], p[3] },
+                position = { p.x + delta.x, p.y + delta.y, p.z + delta.z },
                 sound = false,
-                snap_to_grid = false,
+                snap_to_grid = true,
             })
-            bag.use_grid = false
+            bag.use_grid = true
             bag.use_snap_points = false
             bag.sticky = false
             coroutine.yield(0)
@@ -221,20 +234,8 @@ local function unpackToTable()
             guid = guid,
         })
         coroutine.yield(0)
-    end
-end
-
-local function replaceMultiRollers(name)
-    local toReplace = {}
-    for _, object in ipairs(getAllObjects()) do
-        if string.match(object.getName(), '^TI4 MultiRoller') then
-            table.insert(toReplace, object)
-        end
-    end
-
-    -- MultiRoller is now Franken aware.
-    for _, object in ipairs(toReplace) do
-        object.call('setFranken')
+        coroutine.yield(0)
+        coroutine.yield(0)
     end
 end
 
@@ -242,23 +243,41 @@ end
 
 local function createBags()
     local result = {}
-    for _, rule in ipairs(CREATE_BAGS) do
+    for _, zoneAttributes in ipairs(_zoneHelper.zonesAttributes()) do
+        local p = zoneAttributes.center
+        local magnitude = math.sqrt(p.x ^ 2 + p.z ^2)
+        local normalized = { x = p.x / magnitude, y = p.y, z = p.z / magnitude }
+        p = {
+            x = normalized.x * 7,
+            y = p.y + 3,
+            z = normalized.z * 7
+        }
         local bag = spawnObject({
             type              = 'Bag',
-            position          = rule.position,
+            position          = p,
             sound             = false,
-            snap_to_grid      = false,
+            snap_to_grid      = true,
         })
-        bag.use_grid = false
+        bag.use_grid = true
         bag.use_snap_points = false
-        bag.setColorTint(rule.color)
+        bag.setColorTint(zoneAttributes.color or 'White')
         table.insert(result, bag)
     end
     return result
 end
 
 local function unpackToBags(bags)
-    for name, count in pairs(UNPACK_TO_BAGS) do
+    local unpackSet = UNPACK_TO_BAGS
+
+    -- Override unpack counts for FrankenBlu.
+    local tint = self.getColorTint()
+    tint = string.upper(Color(tint.r, tint.g, tint.b, 1):toHex())
+    if tint == '005DC7' then
+        print('Using larger unpack numbers for FrankenBlu')
+        unpackSet = UNPACK_TO_BAGS_BLU
+    end
+
+    for name, count in pairs(unpackSet) do
         local container = takeToAbove(self, name)
         assert(container, 'missing ' .. name)
         coroutine.yield(0)
@@ -304,6 +323,37 @@ local function unpackToBags(bags)
         container.setLock(false)
         self.putObject(container)
     end
+
+    local numPlayers = _zoneHelper.getPlayerCount()
+    for name, perPlayerCounts in pairs(EXTERNAL_TO_BAGS) do
+        local count = perPlayerCounts[numPlayers]
+        local function getExternal()
+            for _, object in ipairs(getAllObjects()) do
+                if object.getName() == name then
+                    return object
+                end
+            end
+            error('missing "' .. name .. '"')
+        end
+        local external = getExternal()
+        coroutine.yield(0)
+
+        external.shuffle()
+        coroutine.yield(0)
+
+        for _, bag in ipairs(bags) do
+            for i = 1, count do
+                local pos = bag.getPosition()
+                local object = external.takeObject({
+                    position = { x = pos.x, y = pos.y + 5 + i, z = pos.z },
+                    smooth = false,
+                    callback_function = function(object) bag.putObject(object) end
+                })
+                coroutine.yield(0)
+            end
+        end
+    end
+
 end
 
 -------------------------------------------------------------------------------
@@ -319,6 +369,8 @@ function doSetupCoroutine()
     local bags = createBags()
     coroutine.yield(0)
 
+    local bagsZone = createPackBagsHiddenZone()
+    coroutine.yield(0)
     unpackToBags(bags)
     coroutine.yield(0)
 
@@ -337,7 +389,23 @@ function doSetupCoroutine()
         coroutine.yield(0)
     end
 
-    replaceMultiRollers()
+    local f = 'onFrankenEnabled'
+    local inform = {}
+    for _, object in ipairs(getAllObjects()) do
+        if object.getVar(f) then
+            table.insert(inform, object)
+        end
+    end
+    for i, object in ipairs(inform) do
+        local function delayedInform()
+            print('Sending ' .. f .. ' to ' .. object.getName())
+            object.call(f, true)
+        end
+        Wait.frames(delayedInform, i)
+    end
+
+    -- Unpack should have finished packing the center bags by now.
+    destroyObject(bagsZone)
     coroutine.yield(0)
 
     return 1
@@ -351,6 +419,10 @@ function removeHiddenZones()
     end
 end
 
+function reportFactions()
+    _factionHelper.reportFactions()
+end
+
 function onLoad(saveState)
     local function doSimpleSetup()
         _useToggles = false
@@ -359,6 +431,8 @@ function onLoad(saveState)
     self.addContextMenuItem('Setup Franken', doSimpleSetup)
     self.addContextMenuItem('Custom Franken..', createCustomSelectionUi)
     self.addContextMenuItem('Remove hidden zones', removeHiddenZones)
+
+    self.addContextMenuItem('Report Factions', reportFactions)
 
     --createCustomSelectionUi() -- for testing
 end
@@ -431,10 +505,10 @@ function createCustomSelectionUiLuaCoroutine()
     local numRows = 1
     for _, entries in pairs(nameToEntries) do
         local entriesPerColumn = math.ceil(#entries / numCols)
-        print('xxx ' .. (#entries) .. ' ' .. entriesPerColumn .. ' ' .. (#entries / numCols) .. ' ' .. numRows)
+        --print('xxx ' .. (#entries) .. ' ' .. entriesPerColumn .. ' ' .. (#entries / numCols) .. ' ' .. numRows)
         numRows = math.max(numRows, entriesPerColumn + 4)
     end
-    print('Table ' .. numCols .. 'x' .. numRows)
+    --print('Table ' .. numCols .. 'x' .. numRows)
 
     -- Create columns and add tabs.
     local cols = {}

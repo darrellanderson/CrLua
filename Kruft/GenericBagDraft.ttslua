@@ -1,0 +1,277 @@
+--- Create per-player draft bags, fill with items from existing bags.
+
+-------------------------------------------------------------------------------
+-- Helpers are basically TTS/lua shared libraries.
+-------------------------------------------------------------------------------
+
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
+        return function(parameters) return helperObject.call(functionName, parameters) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
+
+local _nameToBagCache = {}
+local _bagToNextTransferSlot = {}
+
+-------------------------------------------------------------------------------
+-- Draft bag building functions.  Call these to do stuff.
+-------------------------------------------------------------------------------
+
+--- Create one bag per player zone (set player count and "setup" first).
+-- @return table : list of player bags.
+function createPerPlayerBags()
+    local result = {}
+    for _, zoneAttributes in ipairs(_zoneHelper.zonesAttributes()) do
+        local p = zoneAttributes.center
+        local magnitude = math.sqrt(p.x ^ 2 + p.z ^2)
+        local normalized = { x = p.x / magnitude, y = p.y, z = p.z / magnitude }
+        p = {
+            x = normalized.x * 7,
+            y = p.y + 3,
+            z = normalized.z * 7
+        }
+        local bag = spawnObject({
+            type              = 'Bag',
+            position          = p,
+            sound             = false,
+            snap_to_grid      = true,
+        })
+        bag.use_grid = true
+        bag.use_snap_points = false
+        bag.setColorTint(zoneAttributes.color or 'White')
+        bag.setName('Draft Bag')
+        table.insert(result, bag)
+    end
+    return result
+end
+
+--- Find a source bag.
+-- @param name (string) : bag name.
+-- @return object : bag object.
+function getBagByName(name)
+    assert(type(name) == 'string', 'bad name')
+
+    local bag = _nameToBagCache[name]
+    if bag then
+        return bag
+    end
+
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Bag' and object.getName() == name then
+            _nameToBagCache[name] = object
+            return object
+        end
+    end
+    error('getBagByName: missing bag "' .. name .. '"')
+end
+
+--- Transfer one items from source bag to another bag.
+-- Optionally specify the item to move, otherwise take one at random.  (Specify
+-- lets draft allocate the "best" systems in one pass, then residue in another.)
+-- @param fromBag (bag) : take from this bag.
+-- @param toBag (bag) : move to this bag.
+-- @param guid (string) : OPTIONAL.  If given, transfer this item (otherwise random).
+function transferOne(fromBag, toBag, guid)
+    assert(type(fromBag) == 'userdata' and fromBag.tag == 'Bag', 'bad fromBag')
+    assert(type(toBag) == 'userdata' and toBag.tag == 'Bag', 'bad toBag')
+    assert(not guid or type(guid) == 'string', 'bad guid')
+
+    if fromBag.getQuantity() == 0 then
+        error('transfer: "' .. fromBag.getName() '" empty')
+    end
+
+    if guid then
+        -- Make sure item is in bag.
+        local found = false
+        for _, entry in ipairs(fromBag.getObjects()) do
+            if entry.guid == guid then
+                found = true
+                break
+            end
+        end
+        if not found then
+            error('transfer: "' .. fromBag.getName() '" does not contain "' .. guid .. '"')
+        end
+    end
+
+    -- Take item from source bag to a collision-safe location.  Once take
+    -- finishes the callback moves item into the destination bag.
+    fromBag.takeObject({
+        guid              = guid or nil,  -- get first if not given
+        position          = _nextTransferSlot(toBag),
+        callback_function = function(object) toBag.putObject(object) end,
+        smooth            = false
+    })
+end
+
+--- Choose an in-bag guid either in or not in the given list.
+-- @param bag (bag) : get item guid from this bag.
+-- @param restrictedGuids (table) : list of guid strings.
+-- @param include (boolean) : if true, only guids in this list, otherwise only not in list.
+-- @return guid (string).
+function getRandomRestrictedGuid(bag, restrictedGuids, include)
+    assert(type(bag) == 'userdata' and bag.tag == 'Bag', 'bad bag')
+    assert(type(restrictedGuids) == 'table', 'bad restrictedGuids')
+    assert(type(include) == 'boolean', 'bag include')
+
+    local restrictedGuidSet = {}
+    for _, guid in ipairs(restrictedGuids) do
+        restrictedGuidSet[guid] = true
+    end
+
+    local chooseGuids = {}
+    for _, entry in ipairs(bag.getObjects()) do
+        if (include and restrictedGuidSet[entry.guid]) or ((not include) and (not restrictedGuidSet[entry.guid])) then
+            table.insert(chooseGuids, entry.guid)
+        end
+    end
+    if #chooseGuids == 0 then
+        error('getRandomRestrictedGuid: no candidates from bag "' .. bag.getName() .. '"')
+    end
+
+    local choice = table.remove(chooseGuids, math.random(#chooseGuids))
+    return choice
+end
+
+-------------------------------------------------------------------------------
+-- Internal functions, draft bag logic probably doesn't need to look here.
+-------------------------------------------------------------------------------
+
+--- Moving items between bags must first move to an in-game position, then to bag.
+-- Get and increment and "above the bag" position to avoid collisions.
+-- @param toBag (bag) : get a slot above this bag.
+-- @return table : position {xyz} table.
+function _nextTransferSlot(toBag)
+    assert(type(toBag) == 'userdata' and toBag.tag == 'Bag', 'bad toBag')
+
+    -- Get or create the next transfer slot.
+    local slot = _bagToNextTransferSlot[toBag]
+    if not slot then
+        slot = {
+            x = toBag.getPosition().x,
+            y = toBag.getPosition().y + 3,
+            z = toBag.getPosition().z,
+        }
+    end
+
+    -- Increment next position.
+    _bagToNextTransferSlot[toBag] = {
+        x = slot.x,
+        y = slot.y + 1,
+        z = slot.z
+    }
+
+    return slot
+end
+
+--- Setup this object, called by TTS.
+function onLoad(saveState)
+    self.createButton({
+        click_function = 'doDraft',
+        function_owner = self,
+        label          = 'Build\nBags',
+        position       = {x=0, y=-0.01, z=0},
+        rotation       = {x=0, y=0, z=180},
+        width          = 1200,
+        height         = 800,
+        font_size      = 200,
+    })
+end
+
+function doDraft()
+    startLuaCoroutine(self, 'doDraftCoroutine')
+end
+
+-------------------------------------------------------------------------------
+-- Below be the draft bag building!
+-------------------------------------------------------------------------------
+
+local BEST_SYSTEMS = { 'b958aa', 'e0ff33', 'dd2ca7', 'fc239f', 'eb99c0', 'aaae9f', 'f8caf6', 'd5ed63' }
+
+local DRAFT_RULES = {
+    {
+        bag = 'Pick a Faction to Play',
+        count = 2
+    },
+    {
+        -- Best systems
+        bag = 'Blue Planet Tiles',
+        count = 1,
+        include = BEST_SYSTEMS,
+    },
+    {
+        -- Other systems
+        bag = 'Blue Planet Tiles',
+        count = 2,
+        exclude = BEST_SYSTEMS,
+    },
+    {
+        bag = 'Red Anomaly Tiles',
+        count = 2
+    },
+}
+
+--- Draft!  This is a coroutine, can call coroutine.yield(0) to stall a frame
+-- giving TTS a moment to breath between moving objects.
+function doDraftCoroutine()
+    print('doDraftCoroutine: starting')
+
+    -- Create the per-player draft bags.
+    local draftBags = createPerPlayerBags()
+    coroutine.yield(0)
+
+    -- Move items to the draft bags.
+    for _, rule in ipairs(DRAFT_RULES) do
+        print('doDraftCoroutine: getting "' .. rule.bag .. '" x' .. rule.count)
+        local bag = getBagByName(rule.bag)
+        bag.shuffle()
+        for _, draftBag in ipairs(draftBags) do
+            for _ = 1, rule.count do
+                local guid = false
+                if rule.include then
+                    guid = getRandomRestrictedGuid(bag, rule.include, true)
+                elseif rule.exclude then
+                    guid = getRandomRestrictedGuid(bag, rule.exclude, false)
+                end
+                transferOne(bag, draftBag, guid)
+                coroutine.yield(0)
+            end
+        end
+    end
+
+    print('doDraftCoroutine: finished')
+    return 1  -- COROUTINE MUST RETURN 1!
+end
+
+-------------------------------------------------------------------------------
+--- Partially lock the _G global variable table.
+-- Include this AFTER creating any necessary globals to prevent new ones.
+--
+-- - Existing globals can still be read AND WRITTEN.
+-- - Cannot read non-existent globals.
+-- - Cannot write new globals.
+--
+-- This helps catch typos where what was meant to access a local instead
+-- references a (hopefully non-existent) global, as well as forgetting to use
+-- "local" when creating objects.
+-------------------------------------------------------------------------------
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

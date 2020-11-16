@@ -50,9 +50,12 @@ function onLoad(saveState)
     for _, name in ipairs(STANDARD) do
         table.insert(_cardNames, name)
     end
+    table.insert(_cardNames, 'BACK FACE CARD, DELETE THIS')
     for _, name in ipairs(BLUE_SPACE) do
         table.insert(_cardNames, name)
     end
+    print('Expect "RESET DECK" with ' .. #_cardNames .. ' cards')
+
 
     self.createButton({
         click_function = 'doReset',
@@ -68,28 +71,61 @@ function onLoad(saveState)
 end
 
 function doReset()
+    startLuaCoroutine(self, 'doResetCoroutine')
+end
+
+function doResetCoroutine()
     local deck = false
+    local pickBag = false
     for _, object in ipairs(getAllObjects()) do
         if object.tag == 'Deck' and object.getName() == 'RESET DECK' then
             deck = object
+        end
+        if object.tag == 'Bag' and object.getName() == 'Pick a Faction to Play' then
+            pickBag = object
         end
     end
     if not deck then
         error('did not find "RESET DECK"')
     end
-
     if deck.getQuantity() ~= #_cardNames then
         error('deck must have ' .. (#_cardNames) .. ' cards')
     end
+    coroutine.yield(0)
 
     local pos = deck.getPosition()
-    for i = 1, deck.getQuantity() do
-        local name = _cardNames[i]
-        local desc = _nameToDesc[name]
-        local card = deck.remainder or deck.takeObject({
-            position = { x = pos.x, y = pos.y + 5 + i + 1, z = pos.z },
-        })
-        card.setName(name)
+    local count = deck.getQuantity()
+    local remainder = false
+    for i = 1, count do
+        local inv = count + 1 - i
+        local name = assert(_cardNames[inv])
+        local desc = _nameToDesc[name] or ''
+        local position = { x = pos.x + 5, y = pos.y + 5 + i, z = pos.z }
+
+        local card = false
+        if remainder then
+            card = remainder
+            coroutine.yield(0)
+            card.setPosition(position, false, false)
+        else
+            card = deck.takeObject({
+                position = position,
+                smooth = false,
+            })
+            remainder = deck.remainder
+        end
+        assert(card and card.tag == 'Card')
+
+        card.setName(name .. ' Faction Token')
         card.setDescription(desc)
+
+        coroutine.yield(0)
+        pickBag.putObject(card)
+
+        for _ = 1, 30 do
+            coroutine.yield(0)
+        end
     end
+
+    return 1
 end

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <div class="columns">
+        <div class="form">
+            <form onclick="updateCardImage();" onsubmit="return false;">
+            <ul class="form-style-1">
+                <li>
+                    <label>Card type</label>
+                    <select name="card" id="card" class="field-select" onchange="onSelectChanged();">
+                    <option value="action">Action</option>
+                    <option value="action-c">Action (clean)</option>
+                    <option value="action_codex">Action (Codex)</option>
+                    <option value="secret">Secret Objective</option>
+                    <option value="secret-c">Secret Objective (clean)</option>
+                    <option value="stage1">Stage 1 Public Objective</option>
+                    <option value="stage1-c">Stage 1 Public Objective (clean)</option>
+                    <option value="stage2">Stage 2 Public Objective</option>
+                    <option value="stage2-c">Stage 2 Public Objective (clean)</option>
+                    <option value="agenda">Agenda</option>
+                    <option value="agenda-c">Agenda (clean)</option>
+                    <option value="nobility">Nobility</option>
+                    </select>
+                </li>
+                <li>
+                    <label>Title</label>
+                    <textarea name="title" id="title" class="field-long" rows="1"></textarea>
+                </li>
+                <li id="subtitleBlock">
+                    <label>Subtitle</label>
+                    <select name="type" id="type" class="field-select">
+                        <option value="PHASE D'ACTION|ff0000">PHASE D'ACTION</option>
+                        <option value="PHASE DE STATUT|ffffff">PHASE DE STATUT</option>
+                        <option value="PHASE DE PROJET|ffffff">PHASE DE PROJET</option>
+                        <option value="TOUTES PHASES|ffffff">TOUTES PHASES</option>
+                        <option value="DIRECTIVE|ffff00">DIRECTIVE</option>
+                        <option value="LOI|ddad63">LOI</option>
+                    </select>
+                </li>
+                <li>
+                    <label>Body</label>
+                    <textarea name="body" id="body" class="field-long field-textarea"></textarea>
+                </li>
+                <li id="actionFlavorBlock">
+                    <label>Action card flavor text</label>
+                    <textarea name="flavor" id="flavor" class="field-long field-textarea"></textarea>
+                </li>
+
+                <li id="nobilityColorBlock">
+                    <label>Nobility color</label>
+                    <select name="color" id="color" class="field-select">
+                        <option value="white">White</option>
+                        <option value="blue">Blue</option>
+                        <option value="purple">Purple</option>
+                        <option value="yellow">Yellow</option>
+                        <option value="red">Red</option>
+                        <option value="green">Green</option>
+                    </select>
+                </li>
+                <li id="nobilityFooterBlock">
+                    <label>Nobility public/secret</label>
+                    <select name="footer" id="footer" class="field-select">
+                        <option value="public">Public</option>
+                        <option value="secret">Secret</option>
+                    </select>
+                </li>
+                <li id="nobilityPointsBlock">
+                    <label>Points</label>
+                    <select name="points" id="points" class="field-select">
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                    </select>
+                </li>
+
+                <li id="titleSizeBlock">
+                    <label>Title Size</label>
+                    <select name="titlesize" id="titlesize" class="field-select">
+                        <option value="0">Normal</option>
+                        <option value="-1">-1</option>
+                        <option value="-2">-2</option>
+                        <option value="-3">-3</option>
+                        <option value="-4">-4</option>
+                        <option value="-5">-5</option>
+                        <option value="-6">-6</option>
+                        <option value="-7">-7</option>
+                        <option value="-8">-8</option>
+                        <option value="-9">-9</option>
+                        <option value="-10">-10</option>
+                        <option value="-11">-11</option>
+                        <option value="-12">-12</option>
+                        <option value="-13">-13</option>
+                        <option value="-14">-14</option>
+                        <option value="-15">-15</option>
+                    </select>
+                </li>
+                <li id="fontSizeBlock">
+                    <label>Font Size</label>
+                    <select name="fontsize" id="fontsize" class="field-select">
+                        <option value="0">Normal</option>
+                        <option value="-1">-1</option>
+                        <option value="-2">-2</option>
+                        <option value="-3">-3</option>
+                        <option value="-4">-4</option>
+                        <option value="-5">-5</option>
+                        <option value="-6">-6</option>
+                        <option value="-7">-7</option>
+                        <option value="-8">-8</option>
+                        <option value="-9">-9</option>
+                        <option value="-10">-10</option>
+                        <option value="-11">-11</option>
+                        <option value="-12">-12</option>
+                        <option value="-13">-13</option>
+                        <option value="-14">-14</option>
+                        <option value="-15">-15</option>
+                    </select>
+                </li>
+
+                <li>
+                    <input type="submit" value="Update" />
+                </li>
+            </ul>
+            </form>
+        </div>
+        <div class="card" id="cardcontainer">
+            <img id="cardimage" />
+        </div>
+        <div class="card" id="backcontainer">
+            <img id="backimage" />
+        </div>
+    </div>
+
+    <script>
+        function updateCardImage() {
+            var card = encodeURIComponent(document.getElementById("card").value)
+            var title = encodeURIComponent(document.getElementById("title").value)
+            var type = encodeURIComponent(document.getElementById("type").value)
+            var body = encodeURIComponent(document.getElementById("body").value)
+            var flavor = encodeURIComponent(document.getElementById("flavor").value)
+
+            var color = encodeURIComponent(document.getElementById("color").value)
+            var footer = encodeURIComponent(document.getElementById("footer").value)
+            var points = encodeURIComponent(document.getElementById("points").value)
+            var titlesize = encodeURIComponent(document.getElementById("titlesize").value)
+            var fontsize = encodeURIComponent(document.getElementById("fontsize").value)
+
+            if (card == 'secret' || card == 'secret-c') {
+                footer = 'POINT DE VICTOIRE|dea3a9'
+            } else if (card == 'stage1' || card == 'stage1-c') {
+                footer = 'POINT DE VICTOIRE|dfbc96'
+            } else if (card == 'stage2' || card == 'stage2-c') {
+                footer = 'POINTS DE VICTOIRE|e3f5f9'
+            }
+
+            var url = "/img"
+            url = url + "?card=" + card
+            url = url + "&title=" + title
+            url = url + "&type=" + type
+            url = url + "&body=" + body
+            url = url + "&flavor=" + flavor
+            url = url + "&color=" + color
+            url = url + "&footer=" + footer
+            url = url + "&points=" + points
+            url = url + "&titlesize=" + titlesize
+            url = url + "&fontsize=" + fontsize
+
+            var img = document.getElementById("cardimage")
+            img.src = url
+
+            var url = "/back"
+            url = url + "?card=" + card
+            var img = document.getElementById("backimage")
+            img.src = url
+        }
+
+        function onSelectChanged() {
+            var card = document.getElementById("card").value
+
+            document.getElementById("subtitleBlock").style.display = 'none';
+            document.getElementById("actionFlavorBlock").style.display = 'none';
+            document.getElementById("nobilityColorBlock").style.display = 'none';
+            document.getElementById("nobilityFooterBlock").style.display = 'none';
+            document.getElementById("nobilityPointsBlock").style.display = 'none';
+
+            if (card == 'action' || card == 'action_codex' || card == 'action-c') {
+                document.getElementById("actionFlavorBlock").style.display = 'block';
+            }
+            if (card == 'secret' || card == 'secret-c') {
+                document.getElementById("subtitleBlock").style.display = 'block';
+            }
+            if (card == 'agenda' || card == 'agenda-c' || card == 'stage1' || card == 'stage1-c' || card == 'stage2' || card == 'stage2-c') {
+                document.getElementById("subtitleBlock").style.display = 'block';
+            }
+
+            if (card == 'nobility') {
+                document.getElementById("subtitleBlock").style.display = 'block';
+                document.getElementById("nobilityColorBlock").style.display = 'block';
+                document.getElementById("nobilityFooterBlock").style.display = 'block';
+                document.getElementById("nobilityPointsBlock").style.display = 'block';
+            }
+        }
+
+        onSelectChanged();
+    </script>
+
+</body>
+</html>

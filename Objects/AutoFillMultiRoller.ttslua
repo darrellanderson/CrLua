@@ -30,42 +30,53 @@
 local TAG = 'AutoFillMultiRoller'
 
 local data = {
-    visualizeHexes = false,
     colorToMultiRoller = false,
-    lastActivatedPosition = false,
     perPlanetButtons = {}  -- map from function name to button index
 }
 
 local AUTOFILL_TYPE = {
-    SPACE_CANNON_OFFENSE = { name = 'Space Cannon Offense', clickButtonLabel = 'SPC' },
-    ANTI_FIGHTER_BARRAGE = { name = 'Anti-Fighter Barrage', clickButtonLabel = 'AFB' },
-    SPACE_COMBAT = { name = 'Space Combat', clickButtonLabel = 'CMBT' },
-    BOMBARDMENT = { name = 'Bombardment', perPlanet = true, clickButtonLabel = 'BOMB' },
-    SPACE_CANNON_DEFENSE = { name = 'Space Cannon Defense', perPlanet = true, clickButtonLabel = 'SPC' },
-    GROUND_COMBAT = { name = 'Ground Combat', perPlanet = true, clickButtonLabel = 'CMBT' }
+    SPACE_CANNON_OFFENSE = { name = 'Space Cannon Offense', rollType = 'spaceCannon' },
+    ANTI_FIGHTER_BARRAGE = { name = 'Anti-Fighter Barrage', rollType = 'antiFighterBarrage' },
+    SPACE_COMBAT = { name = 'Space Combat', rollType = 'spaceCombat' },
+    BOMBARDMENT = { name = 'Bombardment', perPlanet = true, rollType = 'bombardment' },
+    SPACE_CANNON_DEFENSE = { name = 'Space Cannon Defense', perPlanet = true, rollType = 'spaceCannon' },
+    GROUND_COMBAT = { name = 'Ground Combat', perPlanet = true, rollType = 'groundCombat' }
 }
 
-local PLASMA_SCORING_BUTTON = {
-    ['Flagship'] = 'PS1',
-    ['War Sun'] = 'PS2',
-    ['Dreadnought'] = 'PS4',
-    ['PDS'] = 'PS9',
-    ['Space Dock'] = 'PS10'
-}
+-------------------------------------------------------------------------------
 
-local CARDS = {
-    ['PDS II'] = { owner = 'us' },
-    ['Antimass Deflectors'] = { owner = 'them' },
-    ['Plasma Scoring'] = { owner = 'us' },
-    ['Experimental Battlestation'] = { owner = 'us' },
-    ['Blitz'] = { owner = 'us' },
-    ['Perdition Array II'] = { owner = 'us' },  -- Blue Space HCEN
-    ['Tachyon Lance II'] = { owner = 'us' },  -- Blue Space Veldyr
-}
-
-local function hasPDS2(cardSet)
-    return cardSet['PDS II'] or cardSet['Perdition Array II'] or cardSet['Tachyon Lance II']
+-- Register click functions.
+function getOnClickFunctionName(autoFillType, planetIndex)
+    assert(AUTOFILL_TYPE[autoFillType])
+    return 'onClick_' .. autoFillType .. (planetIndex and ('_' .. planetIndex) or '')
 end
+function getOnClickFunctionBody(autoFillType, planetIndex)
+    local function body(clickObject, clickerColor, altClick)
+        autoFill({
+            clickerColor = clickerColor,
+            altClick = altClick and true or false,
+            autoFillType = autoFillType,
+            planetIndex = planetIndex or false
+        })
+    end
+    return body
+end
+function createOnClickFunctions()
+    for autoFillType, attrs in pairs(AUTOFILL_TYPE) do
+        if attrs.perPlanet then
+            for i = 1, 5 do
+                local n = getOnClickFunctionName(autoFillType, i)
+                local f = getOnClickFunctionBody(autoFillType, i)
+                self.setVar(n, f)
+            end
+        else
+            local n = getOnClickFunctionName(autoFillType, false)
+            local f = getOnClickFunctionBody(autoFillType, false)
+            self.setVar(n, f)
+        end
+    end
+end
+createOnClickFunctions()
 
 -------------------------------------------------------------------------------
 
@@ -76,46 +87,43 @@ function getHelperClient(helperObjectName)
         end
         error('missing object "' .. helperObjectName .. '"')
     end
+    -- Nested tables are considered cross script.  Make a local copy.
+    local function copyTable(t)
+        if t and type(t) == 'table' then
+            local copy = {}
+            for k, v in pairs(t) do
+                copy[k] = type(v) == 'table' and copyTable(v) or v
+            end
+            t = copy
+        end
+        return t
+    end
     local helperObject = false
     local function getCallWrapper(functionName)
         helperObject = helperObject or getHelperObject()
         if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
-        return function(parameters) return helperObject.call(functionName, parameters) end
+        return function(parameters) return copyTable(helperObject.call(functionName, parameters)) end
     end
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
-local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
+local _unitHelper = getHelperClient('TI4_UNIT_HELPER')
+local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
+
+local _bombardmentPlasmaScoringOnPlanet = false
+local _rollOnSelf = false
 
 -------------------------------------------------------------------------------
 
 function onLoad(save_state)
     CrLua.Log.d(TAG, 'onLoad')
+    self.addContextMenuItem('Toggle roll nearby', function() _rollOnSelf = not _rollOnSelf end)
     Wait.frames(updateUi, 2)
 end
 
-function onPlayerTurnStart(playerColorStart, playerColorPrevious)
-    CrLua.Log.d(TAG, 'onPlayerTurnStart: clearing last activated position')
-    data.lastActivatedPosition = false
-    updateUi()
-end
-
-function onObjectDrop(playerColor, droppedObject)
-    local isPlayerCurrentTurn = playerColor == Turns.turn_color
-    if not isPlayerCurrentTurn then
-        return
-    end
-    local isCommandToken = string.find(droppedObject.getName(), ' Command Token')
-    if not isCommandToken then
-        return
-    end
-    local system = _systemHelper.systemFromPosition(droppedObject.getPosition())
-    if not system then
-        return  -- ignore tokens not dropped on a system
-    end
-
-    CrLua.Log.d(TAG, 'onObjectDrop: activated by ' .. playerColor)
-    data.lastActivatedPosition = droppedObject.getPosition()
+function onSystemActivation(system)
+    CrLua.Log.d(TAG, 'onSystemActivation')
+    _bombardmentPlasmaScoringOnPlanet = false
     updateUi()
 end
 
@@ -127,7 +135,6 @@ function updateColorToMultiRoller()
     for _, object in ipairs(getAllObjects()) do
         local name = object.getName()
         if string.match(name, '^TI4 MultiRoller') then
-            object = CrLua.TTS.ClickButtonHack.inject(object)
             table.insert(multiRollers, object)
         end
         local color = string.match(name, '^Command Sheet %((%a+)%)$')
@@ -148,260 +155,302 @@ end
 
 -------------------------------------------------------------------------------
 
-function getButtonId(autoFillType, planetIndex)
-    assert(AUTOFILL_TYPE[autoFillType])
-    assert(not planetIndex or type(planetIndex) == 'number')
-    return autoFillType .. '@' .. (planetIndex or 0)
-end
-
-function onButtonClick(player, option, id)
-    CrLua.Log.d(TAG, 'onButtonClick: id=' .. id)
-    local clickerColor = assert(player and player.color)
-    local altClick = tonumber(option) == -2 and true or false
-    local autoFillType, planetIndex = string.match(id, '^([%a_]+)@(%d)$')
-    planetIndex = tonumber(planetIndex)
-    CrLua.Log.d(TAG, 'onButtonClick: ' .. table.concat({
-        'color=' .. clickerColor,
-        'altClick=' .. tostring(altClick),
-        'type=' .. (autoFillType or 'nil'),
-        'planetIndex=' .. (planetIndex or 'nil'),
-    }, ' '))
-
-    autoFill({
-        clickerColor = clickerColor,
-        altClick = altClick and true or false,
-        autoFillType = autoFillType,
-        planetIndex = planetIndex > 0 and planetIndex or false,
-    })
-end
-
--------------------------------------------------------------------------------
-
 function updateUi()
-    local system = data.lastActivatedPosition and _systemHelper.systemFromPosition(data.lastActivatedPosition)
-    local planets = system and system.planets or {}
+    local system = _systemHelper.getActivatedSystem()
+    local planets = system and system.planets or false
 
-    local result = {}
+    -- Object in game space is x=1.43, y=0.2, z=2
+    -- Object in button space is x=715, y=0.2, z=1000
 
-    local function getAutoFillButton(autoFillType, planetIndex)
-        assert(AUTOFILL_TYPE[autoFillType])
-        assert(not planetIndex or type(planetIndex) == 'number')
+    local NO_LABEL = '---'
 
-        local tooltip = AUTOFILL_TYPE[autoFillType].name
+    local fontSize = 44
+    local labelFontSize = 30
+    local scaleUpDown = 4
 
-        local buttonLabel = AUTOFILL_TYPE[autoFillType].name
-        if planetIndex == 0 then
-            buttonLabel = '---'
-        elseif planetIndex then
-            buttonLabel = planets[planetIndex].name
-        end
+    local gapXZ = 0.04
+    local gapU = gapXZ / 1.43
+    local hMajorZ = 0.3
+    local hMinorZ = 0.03
+
+    local hMajor = hMajorZ / 2 * 1000
+    local hMinor = hMinorZ / 2 * 1000
+
+    local panelX = 1.43 - (gapXZ * 2)  -- remove gap padding
+
+    self.clearButtons()
+
+    local function numColsAttrs(cols)
+        local gapTotalU = gapU * (cols - 1)
+        local colTotalU = 1 - gapTotalU
+        local w = colTotalU / cols
+        local u0 = w / 2
+        local du = w + gapU
+
+        -- Slightly off for some reason.  Ad-hoc fix.
+        --u0 = u0 - (cols - 1) * 0.01
+        w = w - 0.01 + (cols - 1) * 0.01
 
         return {
-            tag = 'Button',
-            attributes = {
-                id = getButtonId(autoFillType, planetIndex),
-                --tooltip = tooltip,
-                --tooltipPosition = 'Above'
-            },
-            value = buttonLabel
+            x0 = (u0 * panelX) - (panelX / 2),
+            dx = du * panelX,
+            w = w * (panelX * 500)
         }
     end
 
-    local function getLabel(autoFillType)
-        return {
-            tag = 'Text',
-            value = AUTOFILL_TYPE[autoFillType].name
-        }
-    end
-
-    local function getAutoFillButtonRow(autoFillType)
-        local row = {}
-        for i = 1, math.max(1, #planets) do
-            table.insert(row, getAutoFillButton(autoFillType, i <= #planets and i or 0))
-        end
-        return {
-            tag = 'HorizontalLayout',
-            children = row
-        }
-    end
-
-    local function getAutoFillElements()
-        return {
-            {
-                tag = 'HorizontalLayout',
-                children = {
-                    getAutoFillButton('SPACE_CANNON_OFFENSE', false),
-                    getAutoFillButton('ANTI_FIGHTER_BARRAGE', false),
-                }
-            },
-            {
-                tag = 'HorizontalLayout',
-                children = {
-                    getAutoFillButton('SPACE_COMBAT', false),
-                }
-            },
-            getLabel('BOMBARDMENT'),
-            getAutoFillButtonRow('BOMBARDMENT'),
-            getLabel('SPACE_CANNON_DEFENSE'),
-            getAutoFillButtonRow('SPACE_CANNON_DEFENSE'),
-            getLabel('GROUND_COMBAT'),
-            getAutoFillButtonRow('GROUND_COMBAT'),
-        }
-    end
-
-    self.UI.setXmlTable({
-        {
-            tag = 'Defaults',
-            children = {
-                {
-                    tag = 'Button',
-                    attributes = {
-                        onClick = 'onButtonClick',
-                        fontSize = 12,
-                        fontStyle = 'Bold',
-                    }
-                },
-                {
-                    tag = 'Text',
-                    attributes = {
-                        fontSize = 10,
-                        fontStyle = 'Bold',
-                        alignment = 'MiddleCenter',
-                        horizontalOverflow = 'Overflow',
-                        verticalOverflow = 'Overflow',
-                        preferredHeight = 12,
-                    }
-                },
-                {
-                    tag = 'VerticalLayout',
-                    attributes = {
-                        padding = '10 10 10 10',
-                        spacing = 5,
-                    }
-                },
-                {
-                    tag = 'HorizontalLayout',
-                    attributes = {
-                        spacing = 5,
-                    }
-                },
-            }
-        },
-        {
-            tag = 'Panel',
-            attributes = {
-                position = '0 0 2',  -- 0.05
-                rotation = '0 180 90',
-                width = 200,
-                height = 280,
-            },
-            children = {
-                {
-                    tag = 'VerticalLayout',
-                    attributes = {
-                        childForceExpandHeight = false,
-                    },
-                    children = getAutoFillElements()
-                },
-            }
-        }
+    -- ROW
+    local attrs = numColsAttrs(2)
+    local x = attrs.x0
+    local y = 0.21
+    local z = -1 + gapXZ + (hMajorZ / 2)
+    local w = attrs.w
+    local h = hMajor
+    self.createButton({
+        click_function = getOnClickFunctionName('SPACE_CANNON_OFFENSE', false),
+        function_owner = self,
+        label          = 'Space Cannon\nOffense',
+        position       = { x = x, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+        width          = w * scaleUpDown,
+        height         = h * scaleUpDown,
+        font_size      = fontSize * scaleUpDown,
+        tooltip        = 'Space Cannon Offense',
     })
+    x = x + attrs.dx
+    self.createButton({
+        click_function = getOnClickFunctionName('ANTI_FIGHTER_BARRAGE', false),
+        function_owner = self,
+        label          = 'Anti-Fighter\nBarrage',
+        position       = { x = x, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+        width          = attrs.w * scaleUpDown,
+        height         = h * scaleUpDown,
+        font_size      = fontSize * scaleUpDown,
+        tooltip        = 'Anti-Fighter Barrage',
+    })
+
+    -- ROW
+    z = z + gapXZ + hMajorZ + hMinorZ
+    --z = z + gapXZ + hMajorZ
+    local attrs = numColsAttrs(1)
+    local x = attrs.x0
+    local w = attrs.w
+    self.createButton({
+        click_function = getOnClickFunctionName('SPACE_COMBAT', false),
+        function_owner = self,
+        label          = 'Space Combat',
+        position       = { x = x, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+        width          = w * scaleUpDown,
+        height         = h * scaleUpDown,
+        font_size      = fontSize * scaleUpDown,
+        tooltip        = 'Space combat',
+    })
+
+    -- LABEL+ROW
+    z = z + gapXZ + (hMajorZ + hMinorZ) / 2
+    self.createButton({
+        click_function = 'doNothing',
+        function_owner = self,
+        label          = string.upper('Bombardment'),
+        position       = { x = 0, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+        width          = 0,
+        height         = 0,
+        font_size      = labelFontSize * scaleUpDown,
+        tooltip        = nil,
+    })
+    z = z + gapXZ + (hMajorZ + hMinorZ) / 2
+    local attrs = numColsAttrs(planets and #planets or 1)
+    local x = attrs.x0
+    local w = attrs.w
+    if not planets then
+        self.createButton({
+            click_function = 'doNothing',
+            function_owner = self,
+            label          = NO_LABEL,
+            position       = { x = x, y = y, z = z },
+            rotation       = { x = 0, y = 0, z = 0 },
+            scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+            width          = w * scaleUpDown,
+            height         = h * scaleUpDown,
+            font_size      = fontSize * scaleUpDown,
+            tooltip        = nil,
+        })
+    else
+        for i, planet in ipairs(planets) do
+            self.createButton({
+                click_function = getOnClickFunctionName('BOMBARDMENT', i),
+                function_owner = self,
+                label          = planet.name,
+                position       = { x = x, y = y, z = z },
+                rotation       = { x = 0, y = 0, z = 0 },
+                scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+                width          = w * scaleUpDown,
+                height         = h * scaleUpDown,
+                font_size      = fontSize * scaleUpDown,
+                tooltip        = 'Bombard ' .. planet.name,
+            })
+            x = x + attrs.dx
+        end
+    end
+
+    -- LABEL+ROW
+    z = z + gapXZ + (hMajorZ + hMinorZ) / 2
+    self.createButton({
+        click_function = 'doNothing',
+        function_owner = self,
+        label          = string.upper('Space Cannon Defense'),
+        position       = { x = 0, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+        width          = 0,
+        height         = 0,
+        font_size      = labelFontSize * scaleUpDown,
+        tooltip        = nil,
+    })
+    z = z + gapXZ + (hMajorZ + hMinorZ) / 2
+    local attrs = numColsAttrs(planets and #planets or 1)
+    local x = attrs.x0
+    local w = attrs.w
+    if not planets then
+        self.createButton({
+            click_function = 'doNothing',
+            function_owner = self,
+            label          = NO_LABEL,
+            position       = { x = x, y = y, z = z },
+            rotation       = { x = 0, y = 0, z = 0 },
+            scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+            width          = w * scaleUpDown,
+            height         = h * scaleUpDown,
+            font_size      = fontSize * scaleUpDown,
+            tooltip        = nil,
+        })
+    else
+        for i, planet in ipairs(planets) do
+            self.createButton({
+                click_function = getOnClickFunctionName('SPACE_CANNON_DEFENSE', i),
+                function_owner = self,
+                label          = planet.name,
+                position       = { x = x, y = y, z = z },
+                rotation       = { x = 0, y = 0, z = 0 },
+                scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+                width          = w * scaleUpDown,
+                height         = h * scaleUpDown,
+                font_size      = fontSize * scaleUpDown,
+                tooltip        = 'Space Cannon Defense on ' .. planet.name,
+            })
+            x = x + attrs.dx
+        end
+    end
+
+    -- LABEL+ROW
+    z = z + gapXZ + (hMajorZ + hMinorZ) / 2
+    self.createButton({
+        click_function = 'doNothing',
+        function_owner = self,
+        label          = string.upper('Ground Combat'),
+        position       = { x = 0, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+        width          = 0,
+        height         = 0,
+        font_size      = labelFontSize * scaleUpDown,
+        tooltip        = nil,
+    })
+    z = z + gapXZ + (hMajorZ + hMinorZ) / 2
+    local attrs = numColsAttrs(planets and #planets or 1)
+    local x = attrs.x0
+    local w = attrs.w
+    if not planets then
+        self.createButton({
+            click_function = 'doNothing',
+            function_owner = self,
+            label          = NO_LABEL,
+            position       = { x = x, y = y, z = z },
+            rotation       = { x = 0, y = 0, z = 0 },
+            scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+            width          = w * scaleUpDown,
+            height         = h * scaleUpDown,
+            font_size      = fontSize * scaleUpDown,
+            tooltip        = nil,
+        })
+    else
+        for i, planet in ipairs(planets) do
+            self.createButton({
+                click_function = getOnClickFunctionName('GROUND_COMBAT', i),
+                function_owner = self,
+                label          = planet.name,
+                position       = { x = x, y = y, z = z },
+                rotation       = { x = 0, y = 0, z = 0 },
+                scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+                width          = w * scaleUpDown,
+                height         = h * scaleUpDown,
+                font_size      = fontSize * scaleUpDown,
+                tooltip        = 'Ground combat on ' .. planet.name,
+            })
+            x = x + attrs.dx
+        end
+    end
+end
+
+function doNothing()
+    --
 end
 
 -------------------------------------------------------------------------------
 
 --- Get the hex and adjacent hexes from a position.
-function getHexes(position)
+function getHexAndAdjacent(position, playerColor)
+    CrLua.Log.d(TAG, 'getHexAndAdjacent')
     assert(type(position) == 'table' and type(position.x) == 'number')
+    assert(type(playerColor) == 'string')
 
     -- Get this hex, and adjacent hexes.
-    local hex = CrLua.TI4.Hex.fromPosition(position)
-    local adjacentHexes = CrLua.TI4.Hex.neighbors(hex)
+    local hex = _systemHelper.hexFromPosition(position)
+    local adjacentHexes = _systemHelper.hexNeighbors(hex)
 
-    -- Get the wormholes in this hex, plus other wormhole-adjacent hexes.
-    -- As a side-effect, the filter function adds 'hex' to each wormhole.
-    local function isWormholeInSelfHex(wormhole)
-        local position = wormhole.object.getPosition()
-        wormhole.hex = CrLua.TI4.Hex.fromPosition(position)
-        return wormhole.hex == hex
-    end
-    local wormholes, adjacentWormholes = CrLua.TI4.Wormhole.getAllWormholes(isWormholeInSelfHex)
-    for _, wormhole in ipairs(adjacentWormholes) do
-        table.insert(adjacentHexes, wormhole.hex)
+    -- Include through-wormhole.
+    local adjacentWormholeHexes = _systemHelper.hexAdjacentWormholes({
+        hex = hex,
+        playerColor = playerColor
+    })
+    for _, wormholeHex in ipairs(adjacentWormholeHexes) do
+        table.insert(adjacentHexes, wormholeHex)
     end
 
     -- Remove any duplicates.
     adjacentHexes = CrLua.List.unique(adjacentHexes)
 
-    if data.visualizeHexes then
-        local lines = {}
-        table.insert(lines, CrLua.TI4.Hex.vectorLine(hex, { color = {1,0,0} }))
-        for _, adjacentHex in ipairs(adjacentHexes) do
-            table.insert(lines, CrLua.TI4.Hex.vectorLine(adjacentHex, { color = {0,1,0} }))
-        end
-        Global.setVectorLines(lines)
-    end
-
     return hex, adjacentHexes
 end
 
---- Get units in the position's hex, as well as units in adjacent hexes.
-function getUnits(hex, adjacentHexes)
-    assert(type(hex) == 'string' and not adjacentHexes or type(adjacentHexes) == 'table')
+function getHexToUnits(units)
+    CrLua.Log.d(TAG, 'getHexToUnits')
+    assert(type(units) == 'table')
 
-    -- Get units in this hex and adjacent hexes.
-    -- As a side-effect, filter adds 'hex' to each unit.
-    local adjacentHexesSet = CrLua.List.toSet(adjacentHexes or {})
-    local function isInSelfOrAdjacentHex(unit)
-        local position = unit.object.getPosition()
-        unit.position = position
-        unit.hex = CrLua.TI4.Hex.fromPosition(position)
-        return unit.hex == hex or adjacentHexesSet[unit.hex]
-    end
-    local units = CrLua.TI4.Unit.getAllUnits(isInSelfOrAdjacentHex)
-
-    -- Split into in-hex and in-adjacent hex lists.
-    local unitsInHex = {}
-    local unitsInAdjacent = {}
+    local hexToUnits = {}
     for _, unit in ipairs(units) do
-        if unit.hex == hex then
-            table.insert(unitsInHex, unit)
-        else
-            table.insert(unitsInAdjacent, unit)
+        local entry = hexToUnits[unit.hex]
+        if not entry then
+            entry = {}
+            hexToUnits[unit.hex] = entry
         end
+        table.insert(entry, unit)
     end
-
-    -- Fill in any missing colors (anonymous 'x3 Infantry' tokens, etc).
-    -- Only do this for the hex in question.
-    CrLua.TI4.Unit.assignUnitTokenColors(unitsInHex)
-
-    return unitsInHex, unitsInAdjacent
-end
-
---- Get cards if held by appropriate player.
-function getCards(selfColor, enemyColor)
-    local objectNames = CrLua.List.fromKeys(CARDS)
-    local objectsByName = CrLua.TTS.Object.getByName(objectNames)
-
-    local result = {}
-    for cardName, cardObjects in pairs(objectsByName) do
-        for _, cardObject in ipairs(cardObjects) do
-            if not cardObject.is_face_down then
-                local owner = CARDS[cardName].owner
-                local zone = owner == 'us' and selfColor or enemyColor
-                if zone and _zoneHelper.zoneFromPosition(cardObject.getPosition()) == zone then
-                    table.insert(result, cardName)
-                    break
-                end
-            end
-        end
-    end
-    return result
+    return hexToUnits
 end
 
 -------------------------------------------------------------------------------
 
-function getArenaUnits(activatedSystemGuid)
+function rewritePositionAndHexForInArenaUnits(hex, units)
+    CrLua.Log.d(TAG, 'rewritePositionAndHexForInArenaUnits')
+    assert(type(hex) == 'string' and type(units) == 'table')
+
     local arenaName = 'TI4 Auto-fill MultiRoller Arena'
 
     -- Allow multiple arena objects to coexist.
@@ -428,32 +477,68 @@ function getArenaUnits(activatedSystemGuid)
         return false
     end
 
-    local activatedSystemObject = getObjectFromGUID(activatedSystemGuid)
-    local hex = CrLua.TI4.Hex.fromPosition(activatedSystemObject.getPosition())
+    local activatedSystem = _systemHelper.getActivatedSystem()
+    local activatedSystemObject = getObjectFromGUID(activatedSystem.guid)
 
-    local function checkUnit(unit)
-        local p = unit.object.getPosition()
+    for _, unit in ipairs(units) do
+        local p = unit.position
         for bb, arenaObject in pairs(bbToArenaObject) do
             if p.x >= bb.min.x and p.x <= bb.max.x and p.z >= bb.min.z and p.z <= bb.max.z then
                 -- unit is in arena bounding box.  Get in-system position to
                 -- make sure it is actually in the hex.
                 p = activatedSystemObject.positionToWorld(arenaObject.positionToLocal(p))
-                if hex == CrLua.TI4.Hex.fromPosition(p) then
+                if hex == _systemHelper.hexFromPosition(p) then
+                    -- Overwrite position data to act like in-hex rather than in-arena.
                     unit.hex = hex
                     unit.position = p  -- world position inside activated system
-                    return true
                 end
             end
         end
     end
-    local result = CrLua.TI4.Unit.getAllUnits(checkUnit)
-    CrLua.Log.d(TAG, 'getArenaUnits: #units=' .. (result and #result or 0))
-    return result
+
+    return true
+end
+
+function getOpponentColor(selfColor, activatingColor, unitsInHex)
+    CrLua.Log.d(TAG, 'getOpponentColor')
+    assert(type(selfColor) == 'string' and type(activatingColor) == 'string' and type(unitsInHex) == 'table')
+
+    -- If self is not the activating player, then activating player is enemy.
+    -- (This could be a third player firing PDS2 from an adjacent hex).
+    if selfColor ~= activatingColor then
+        return activatingColor
+    end
+
+    -- If there are any ships this is a space combat.  Get ship color.
+    local genericAttrs = _unitHelper.getUnitAttributes({})
+    for _, unit in ipairs(unitsInHex) do
+        if unit.color and unit.color ~= selfColor then
+            if genericAttrs[unit.unitType].spaceCombat then
+                return unit.color
+            end
+        end
+    end
+
+    -- Otherwise ground combat?  Get any unit color (assume already filtered to planet).
+    for _, unit in ipairs(unitsInHex) do
+        if unit.color and unit.color ~= selfColor then
+            return unit.color
+        end
+    end
 end
 
 -------------------------------------------------------------------------------
 
+local _autoFillQueue = {}
+
 function autoFill(params)
+    table.insert(_autoFillQueue, params)
+    startLuaCoroutine(self, 'autoFillCoroutine')
+end
+
+function autoFillCoroutine()
+    CrLua.Log.d(TAG, 'autoFillCoroutine')
+    local params = assert(table.remove(_autoFillQueue))
     assert(type(params.clickerColor) == 'string', 'clickerColor')
     assert(type(params.altClick) == 'boolean', 'altClick')
     assert(AUTOFILL_TYPE[params.autoFillType], 'autoFillType')
@@ -462,203 +547,346 @@ function autoFill(params)
     local autofillTypeAttributes = assert(AUTOFILL_TYPE[params.autoFillType])
 
     updateColorToMultiRoller()
+    coroutine.yield(0)
 
     local multiRoller = data.colorToMultiRoller[params.clickerColor]
     if not multiRoller then
         printToAll(TAG .. ': no MultiRoller for ' .. params.clickerColor, {1,0,0})
-        return
+        return 1
     end
 
-    if not data.lastActivatedPosition then
+    local system = _systemHelper.getActivatedSystem()
+    local systemObject = system and getObjectFromGUID(system.guid)
+    if not systemObject then
         printToAll(TAG .. ': no activated system', {1,0,0})
-        return
+        return 1
     end
 
     local activatingColor = Turns.turn_color
     if not activatingColor then
         printToAll(TAG .. ': no activating player', {1,0,0})
-        return
+        return 1
     end
 
     -- Get units in hex and adjacent (including wormholes) systems.
-    local hex, adjacent = getHexes(data.lastActivatedPosition)
-    local unitsInHex, unitsInAdjacent = getUnits(hex, adjacent)
+    CrLua.Log.d(TAG, 'autoFillCoroutine: hexToUnits')
+    local hex, adjacentHexes = getHexAndAdjacent(systemObject.getPosition(), params.clickerColor)
+    coroutine.yield(0)
+    local units = _unitHelper.getUnits()
+    coroutine.yield(0)
+    rewritePositionAndHexForInArenaUnits(hex, units)
+    coroutine.yield(0)
+    local hexToUnits = getHexToUnits(units)
+    for unitsHex, units in pairs(hexToUnits) do
+        hexToUnits[unitsHex] = _unitHelper.fillUnitColors(units)  -- iteration allows overwrites of existing keys
+    end
+    coroutine.yield(0)
 
-    -- Inject units on supplemental tile, using a fake object for position.
-    local system = _systemHelper.systemFromPosition(data.lastActivatedPosition)
-    local arenaUnits = getArenaUnits(system.guid)
-    if arenaUnits then
-        unitsInHex = CrLua.List.join(unitsInHex, arenaUnits)
+    local colorToUnitOverrides = _unitHelper.getColorToUnitOverrides()
+    coroutine.yield(0)
+    local colorToUnitModifiers = _unitHelper.getColorToUnitModifiers()
+    coroutine.yield(0)
+
+    -- Get per-hex unit attributes.  Per-hex because sometimes flagships modify
+    -- peers, opponent non-fighter ships counts matter, etc.
+    local function getUnitAttrs(units, color, opponentColor)
+        local colorToUnits = _unitHelper.getColorToUnits(units)
+        local unitTypeToCount = _unitHelper.getUnitTypeToCount(colorToUnits[color] or {})
+        local opponentUnitTypeToCount = _unitHelper.getUnitTypeToCount(colorToUnits[opponentColor] or {})
+
+        local unitOverrides = colorToUnitOverrides[color] or {}
+        local unitAttrs = _unitHelper.getUnitAttributes(unitOverrides)
+
+        -- Apply flagships.
+        unitAttrs = _unitHelper.applyFlagshipModifiers({
+            unitAttrs = assert(unitAttrs),
+            myUnitTypeToCount = unitTypeToCount,
+            opponentUnitTypeToCount = opponentUnitTypeToCount
+        })
+
+        -- Apply unit modifiers.
+        unitAttrs = _unitHelper.applyUnitModifiers({
+            unitAttrs = assert(unitAttrs),
+            myColor = color,
+            myUnitModifiers = colorToUnitModifiers[color] or {},
+            myUnitTypeToCount = unitTypeToCount,
+            opponentColor = opponentColor,
+            opponentUnitModifiers = colorToUnitModifiers[opponentColor] or {},
+            opponentUnitTypeToCount = opponentUnitTypeToCount
+        })
+
+        return unitAttrs
     end
 
-    -- If per-planet, restrict to units in hex to those on the given planet.
+    -- If a planet is given, restrict to ground combat units.  Need to get
+    -- attributes in order to apply fighters-on-ground, even through do not yet
+    -- know opponent color (attributes may be slightly off, but good enough).
     local planet = false
     if params.planetIndex then
+        CrLua.Log.d(TAG, 'autoFillCoroutine: restricting to planet')
         if system and system.planets and #system.planets >= params.planetIndex then
             planet = system.planets[params.planetIndex].name
-            local onPlanet = {}
-            for _, unit in ipairs(unitsInHex) do
+
+            local function inPlanetZone(unit)
+                if unit.groundCombat and unit.groundCombat.anyPlanet then
+                    return true
+                end
                 local p = _systemHelper.planetFromPosition({
                     systemGuid = system.guid,
                     position = unit.position,
                     exact = false
                 })
-                if p and p.name == planet then
-                    table.insert(onPlanet, unit)
-                elseif unit.unitName == 'Fighter' or unit.unitName == 'Flagship' then
-                    -- Also include fighters and flagship in order to include
-                    -- them in ground combat if the Naalu flagship.  This will
-                    -- get filtered out later if not Naalu.
-                    table.insert(onPlanet, unit)
-                end
+                return p and (p.name == planet)
             end
-            unitsInHex = onPlanet
-            unitsInAdjacent = {}
+
+            for unitsHex, units in pairs(hexToUnits) do
+                local useUnits = {}
+                if unitsHex == hex then
+                    local units = hexToUnits[hex]
+                    for _, unit in ipairs(units) do
+                        if inPlanetZone(unit) then
+                            table.insert(useUnits, unit)
+                        end
+                    end
+                end
+                hexToUnits[unitsHex] = useUnits
+            end
         end
     end
+    coroutine.yield(0)
 
     -- Deduce enemy color as the only non-self in the system.
-    local enemyColors = CrLua.TI4.Unit.getEnemyColors(params.clickerColor, activatingColor, unitsInHex)
-    if enemyColors and #enemyColors > 1 then
-        error(TAG .. ': multiple enemies? (' .. table.concat(enemyColors, ', ') .. ')')
-    end
-    local enemyColor = enemyColors and enemyColors[1]
+    local selfColor = params.clickerColor
+    local enemyColor = getOpponentColor(selfColor, activatingColor, hexToUnits[hex] or {})
 
     -- Split into self and enemy units.
-    local selfUnitsInHex = CrLua.TI4.Unit.filterToColor(unitsInHex, params.clickerColor)
-    local selfUnitsAdacent = CrLua.TI4.Unit.filterToColor(unitsInAdjacent, params.clickerColor)
-    local enemyUnitsInHex = enemyColor and CrLua.TI4.Unit.filterToColor(unitsInHex, enemyColor) or {}
-    unitsInHex = nil
-    unitsInAdjacent = nil
-
-    -- Get cards.
-    local cards = getCards(params.clickerColor, enemyColor)
-    local cardSet = CrLua.List.toSet(cards)
+    CrLua.Log.d(TAG, 'autoFillCoroutine: split self/enemy')
+    local adjacentHexSet = {}
+    for _, adjacentHex in ipairs(adjacentHexes) do
+        adjacentHexSet[adjacentHex] = true
+    end
+    local selfUnitsInHex = {}
+    local enemyUnitsInHex = {}
+    local selfUnitsAdacent = {}
+    for unitHex, units in pairs(hexToUnits) do
+        for _, unit in ipairs(units) do
+            if unitHex == hex then
+                if unit.color == selfColor then
+                    table.insert(selfUnitsInHex, unit)
+                elseif unit.color == enemyColor then
+                    table.insert(enemyUnitsInHex, unit)
+                end
+            elseif adjacentHexSet[unit.hex] and unit.color == selfColor then
+                table.insert(selfUnitsAdacent, unit)
+            end
+        end
+    end
+    local selfUnitTypeToCount = _unitHelper.getUnitTypeToCount(selfUnitsInHex)
+    local enemyUnitTypeToCount = _unitHelper.getUnitTypeToCount(enemyUnitsInHex)
+    local selfAdjUnitTypeToCount = _unitHelper.getUnitTypeToCount(selfUnitsAdacent)
 
     -- Is bombardment allowed?
+    CrLua.Log.d(TAG, 'autoFillCoroutine: checking planetary shield')
     local planetaryShield = false
     if enemyColor then
-        local units = CrLua.TI4.Unit.filterToPlanetaryShield(enemyUnitsInHex)
-        planetaryShield = planetaryShield or #units > 0
+        local unitTypeToAttrs = assert(getUnitAttrs(hexToUnits[hex] or {}, enemyColor, selfColor))
+        for unitType, attrs in pairs(unitTypeToAttrs) do
+            if attrs.planetaryShield and (enemyUnitTypeToCount[unitType] or 0) > 0 then
+                planetaryShield = true
+                break
+            end
+        end
     end
-    if params.clickerColor then
-        local units = CrLua.TI4.Unit.filterToIgnorePlanetaryShield(selfUnitsInHex)
-        planetaryShield = planetaryShield and #units == 0
+    local unitTypeToAttrs = assert(getUnitAttrs(hexToUnits[hex] or {}, selfColor, enemyColor))
+    for unitType, attrs in pairs(unitTypeToAttrs) do
+        if attrs.disablePlanetaryShield and (selfUnitTypeToCount[unitType] or 0) > 0 then
+            planetaryShield = false
+            break
+        end
+    end
+    coroutine.yield(0)
+
+    -- Apply any per-unit limits (Experimental Battlestation).
+    local function applyUnitLimit(unitLimit, inHex, adjHex)
+        local avail = unitLimit
+        inHex = math.min(inHex, avail)
+        avail = avail - inHex
+        adjHex = math.min(adjHex, avail)
+        return inHex, adjHex
     end
 
     -- Now get just the units that matter for the combat type.
-    local fillUnits = {}
-    local psUnit = false
+    CrLua.Log.d(TAG, 'autoFillCoroutine: getting fill units')
+    local fillUnitTypeToCount = {}
+    local adjacentUnitTypeToCount = {}
     if autofillTypeAttributes == AUTOFILL_TYPE.SPACE_CANNON_OFFENSE then
-        fillUnits = CrLua.TI4.Unit.filterToSpaceCannon(selfUnitsInHex)
-        local adjacentSpaceCannons = CrLua.TI4.Unit.filterToSpaceCannon(selfUnitsAdacent)
 
-        if cardSet['Tachyon Lance II'] then
-            -- Only include Dreadnoughts when in the same hex as a PDS.
-            local pdsHexSet = {}
-            for _, unit in ipairs(adjacentSpaceCannons) do
-                if unit.unitName == 'PDS' then
-                    pdsHexSet[unit.hex] = true
+        for unitType, attrs in pairs(unitTypeToAttrs) do
+            if attrs.spaceCannon then
+                fillUnitTypeToCount[unitType] = selfUnitTypeToCount[unitType] or 0
+                if attrs.spaceCannon.range and attrs.spaceCannon.range > 0 then
+                    fillUnitTypeToCount[unitType] = fillUnitTypeToCount[unitType] + (selfAdjUnitTypeToCount[unitType] or 0)
+                    adjacentUnitTypeToCount[unitType] = (adjacentUnitTypeToCount[unitType] or 0) + (selfAdjUnitTypeToCount[unitType] or 0)
                 end
-            end
-            for i = #adjacentSpaceCannons, 1, -1 do
-                if not pdsHexSet[adjacentSpaceCannons[i].hex] then
-                    table.remove(adjacentSpaceCannons, i)
+                if attrs.spaceCannon.unitLimit then
+                    local a, b = applyUnitLimit(attrs.spaceCannon.unitLimit, fillUnitTypeToCount[unitType], adjacentUnitTypeToCount[unitType])
+                    fillUnitTypeToCount[unitType] = a
+                    adjacentUnitTypeToCount[unitType] = b
                 end
             end
         end
 
-        for _, unit in ipairs(adjacentSpaceCannons) do
-            if unit.unitName == 'Flagship' or hasPDS2(cardSet) then
-                table.insert(fillUnits, unit)
-            end
-        end
-        fillUnits, psUnit = CrLua.TI4.Unit.filterToSpaceCannon(fillUnits)
     elseif autofillTypeAttributes == AUTOFILL_TYPE.ANTI_FIGHTER_BARRAGE then
-        fillUnits = CrLua.TI4.Unit.filterToAntiFighterBarrage(selfUnitsInHex)
+
+        for unitType, attrs in pairs(unitTypeToAttrs) do
+            if attrs.antiFighterBarrage then
+                fillUnitTypeToCount[unitType] = selfUnitTypeToCount[unitType] or 0
+            end
+        end
+
     elseif autofillTypeAttributes == AUTOFILL_TYPE.SPACE_COMBAT then
-        fillUnits = CrLua.TI4.Unit.filterToShips(selfUnitsInHex)
+
+        for unitType, attrs in pairs(unitTypeToAttrs) do
+            if attrs.spaceCombat then
+                fillUnitTypeToCount[unitType] = selfUnitTypeToCount[unitType] or 0
+            end
+        end
+
     elseif autofillTypeAttributes == AUTOFILL_TYPE.BOMBARDMENT then
-        if cardSet['Blitz'] then
-            fillUnits, psUnit = CrLua.TI4.Unit.filterToNonFighterShips(selfUnitsInHex)
-        else
-            fillUnits, psUnit = CrLua.TI4.Unit.filterToBombardment(selfUnitsInHex)
+
+        if not planetaryShield then
+            for unitType, attrs in pairs(unitTypeToAttrs) do
+                if attrs.bombardment then
+                    fillUnitTypeToCount[unitType] = selfUnitTypeToCount[unitType] or 0
+                end
+            end
+
+            if not _bombardmentPlasmaScoringOnPlanet then
+                _bombardmentPlasmaScoringOnPlanet = planet
+            end
+
         end
-        if planetaryShield then
-            fillUnits = {}
-        end
+
     elseif autofillTypeAttributes == AUTOFILL_TYPE.SPACE_CANNON_DEFENSE then
-        fillUnits, psUnit = CrLua.TI4.Unit.filterToSpaceCannon(selfUnitsInHex)
+
+        for unitType, attrs in pairs(unitTypeToAttrs) do
+            if attrs.spaceCannon then
+                fillUnitTypeToCount[unitType] = selfUnitTypeToCount[unitType] or 0
+                if unitType == 'Space Dock' then
+                    fillUnitTypeToCount[unitType] = 0  -- Experimental Battlestation does not apply
+                end
+            end
+        end
+
     elseif autofillTypeAttributes == AUTOFILL_TYPE.GROUND_COMBAT then
-        fillUnits = CrLua.TI4.Unit.filterToGround(selfUnitsInHex)
+
+        for unitType, attrs in pairs(unitTypeToAttrs) do
+            if attrs.groundCombat then
+                fillUnitTypeToCount[unitType] = selfUnitTypeToCount[unitType] or 0
+            end
+        end
+
+        -- Reset for L1Z1X Harrow (bombardment each ground combat round).
+        _bombardmentPlasmaScoringOnPlanet = false
+
     else
         error(TAG .. ' unknown type "' .. typeAttributes.name .. "'")
     end
 
-    -- Employ experimental battlestation?
-    if autofillTypeAttributes == AUTOFILL_TYPE.SPACE_CANNON_OFFENSE and cardSet['Experimental Battlestation'] then
-        -- Look for at least one local or adjacent.
-        for _, unit in ipairs(CrLua.List.join(selfUnitsInHex, selfUnitsAdacent)) do
-            if unit.unitName == 'Space Dock' then
-                unit.special = 'Experimental Battlestation'
-                table.insert(fillUnits, unit)
-                psUnit = unit
+    if unitTypeToAttrs['Flagship'].spaceCombat.diceAsCount then
+        fillUnitTypeToCount['Flagship'] = unitTypeToAttrs['Flagship'].spaceCombat.dice
+    end
+
+    -- Compute best PS unit based on available candidates.  Assigns extra die
+    -- to the best non-zero-count unit.
+    local psUnitType = false
+    local fillUnits = {}
+    for unitType, count in pairs(fillUnitTypeToCount) do
+        if count > 0 then
+            table.insert(fillUnits, { unitType = unitType, color = selfColor, count = 1 })
+        end
+    end
+    local fillUnitTypeToAttrs = getUnitAttrs(fillUnits, selfColor, enemyColor)
+    for unitType, attrs in pairs(fillUnitTypeToAttrs) do
+        if autofillTypeAttributes == AUTOFILL_TYPE.SPACE_CANNON_OFFENSE then
+            if attrs.spaceCannon and (attrs.spaceCannon.extraDice or 0) > 0 then
+                psUnitType = unitType
+                break
+            end
+        elseif autofillTypeAttributes == AUTOFILL_TYPE.BOMBARDMENT then
+            if attrs.bombardment and (attrs.bombardment.extraDice or 0) > 0 then
+                psUnitType = unitType
+                break
+            end
+        elseif autofillTypeAttributes == AUTOFILL_TYPE.SPACE_CANNON_DEFENSE then
+            if attrs.spaceCannon and (attrs.spaceCannon.extraDice or 0) > 0 then
+                psUnitType = unitType
                 break
             end
         end
     end
 
-    -- Clear psUnit if no plasma scoring.
-    if not cardSet['Plasma Scoring'] then
-        psUnit = false
+    -- Only bombard the first clicked planet.
+    local psAlreadyUsed = false
+    if autofillTypeAttributes == AUTOFILL_TYPE.BOMBARDMENT and psUnitType and _bombardmentPlasmaScoringOnPlanet and _bombardmentPlasmaScoringOnPlanet ~= planet then
+        psUnitType = false
+        psAlreadyUsed = true
     end
 
-    -- Consolidate units to a single entry per type.
-    local unitCount = {}
-    local adjacentUnitCount = {}
-    local special = {}
-    for _, unit in ipairs(fillUnits or {}) do
-        local unitName = assert(unit.unitName)
-        local count = assert(unit.count)
+    -- Does enemy have PS/AMD?
+    local plasmaScoring = false
+    local antimassDeflectors = false
+    for _, modifier in ipairs(colorToUnitModifiers[selfColor] or {}) do
+        if modifier == 'Plasma Scoring' then
+            plasmaScoring = true
+            break
+        end
+    end
+    for _, modifier in ipairs(colorToUnitModifiers[enemyColor] or {}) do
+        if modifier == 'Antimass Deflectors' then
+            antimassDeflectors = true
+            break
+        end
+    end
 
-        -- Respect non-fighter-dice ability.
-        if unitName == 'Flagship' then
-            local attrs = CrLua.TI4.Unit.attributes(unit)
-            if attrs.nonFighterDice then
-                count = #CrLua.TI4.Unit.filterToNonFighterShips(enemyUnitsInHex) or 0
+    -- Nebula Defence?
+    local extraUnitModifiers = false
+    local function isNebula()
+        for _, anomaly in ipairs(system.anomalies or {}) do
+            if anomaly == 'nebula' then
+                return true
             end
         end
-        unitCount[unitName] = (unitCount[unitName] or 0) + count
-        if unit.hex ~= hex then
-            adjacentUnitCount[unitName] = (adjacentUnitCount[unitName] or 0) + count
-        end
-        special[unitName] = special[unitName] or unit.special
+    end
+    if isNebula() and selfColor ~= activatingColor then
+        extraUnitModifiers = extraUnitModifiers or {}
+        table.insert(extraUnitModifiers, 'Nebula Defence')
     end
 
+    CrLua.Log.d(TAG, 'autoFillCoroutine: assembling message')
     local prefix = { 'AutoFill ' .. autofillTypeAttributes.name }
     if planet then
         table.insert(prefix, '(' .. planet .. ')')
     end
-    table.insert(prefix, params.clickerColor .. ' vs ' .. (enemyColor or '<unknown>'))
+    table.insert(prefix, selfColor .. ' vs ' .. (enemyColor or '<unknown>'))
     local message = table.concat(prefix, ' ') .. ': '
 
     local messages = {}
-    for unitName, count in pairs(unitCount) do
-        local name = unitName
-        if count > 1 and unitName ~= 'Infantry' and unitName ~= 'PDS' then
-            name = name .. 's'
+    for unitType, count in pairs(fillUnitTypeToCount) do
+        if count > 0 then
+            local name = unitType
+            if count > 1 and unitType ~= 'Infantry' and unitType ~= 'PDS' then
+                name = name .. 's'
+            end
+            local message = count .. ' ' .. name
+            if adjacentUnitTypeToCount[unitType] and adjacentUnitTypeToCount[unitType] > 0 then
+                message = message .. ' (' .. adjacentUnitTypeToCount[unitType] .. ' adjacent)'
+            end
+            if psUnitType == unitType then
+                message = message .. ' (Plasma Scoring)'
+            end
+            table.insert(messages, message)
         end
-        local message = count .. ' ' .. name
-        if adjacentUnitCount[unitName] then
-            message = message .. ' (' .. adjacentUnitCount[unitName] .. ' adjacent)'
-        end
-        if special[unitName] then
-            message = message .. ' (' .. special[unitName] .. ')'
-        end
-        if psUnit and psUnit.unitName == unitName then
-            message = message .. ' (Plasma Scoring)'
-        end
-        table.insert(messages, message)
     end
     if #messages == 0 then
         if autofillTypeAttributes == AUTOFILL_TYPE.BOMBARDMENT and planetaryShield then
@@ -667,68 +895,49 @@ function autoFill(params)
             table.insert(messages, 'no units')
         end
     end
-    if cardSet['Antimass Deflectors'] then
+
+    if fillUnitTypeToCount['Flagship'] and fillUnitTypeToCount['Flagship'] > 0 then
+        for _, modifier in ipairs(unitTypeToAttrs._flagshipModifiers) do
+            if modifier.type == 'mutate' then
+                table.insert(messages, '(' .. modifier.name .. ': ' .. modifier.description .. ')')
+            end
+        end
+    end
+    for _, modifier in ipairs(unitTypeToAttrs._unitModifiers) do
+        if modifier.type == 'mutate' then
+            table.insert(messages, '(' .. modifier.name .. ': ' .. modifier.description .. ')')
+        end
+    end
+
+    if psAlreadyUsed then
+        table.insert(messages, '(Plasma Scoring was used on “' .. _bombardmentPlasmaScoringOnPlanet .. '”)')
+    end
+
+    if antimassDeflectors then
         table.insert(messages, enemyColor .. ' has Antimass Deflectors')
     end
+
     if #messages > 0 then
         message = message .. table.concat(messages, ', ') .. '.'
     end
     printToAll(message, params.clickerColor)
 
-    injectValues{
-        multiRoller = assert(multiRoller),
-        unitCount = assert(unitCount),
-        hasAntimassDeflectors = cardSet['Antimass Deflectors'],
-        suggestPdsUnitName = psUnit and psUnit.unitName,
-        clickerColor = assert(params.clickerColor),
-        clickButtonLabel = autofillTypeAttributes.clickButtonLabel,
-        doClick = params.altClick
-    }
-end
-
--------------------------------------------------------------------------------
-
-function injectValues(params)
-    local multiRoller = assert(params.multiRoller)
-    local color = assert(params.clickerColor)
-    local unitCount = params.unitCount
-
-    --multiRoller.call('resetCounters')
-    CrLua.TTS.ClickButtonHack.invoke(multiRoller, 'RESET', color)
-
-    local inputs = params.multiRoller.getInputs()
-    for unitName, count in pairs(unitCount) do
-        local inputLabel = 'UNIT:' .. unitName
-        local found = false
-        for _, input in ipairs(inputs) do
-            if input.label == inputLabel then
-                found = true
-                params.multiRoller.editInput({ index = input.index, value = count })
-                break
-            end
-        end
-        if not found then
-            error('Warning: no input ' .. inputLabel)
-        end
+    CrLua.Log.d(TAG, 'autoFillCoroutine: injecting MR')
+    local doClick = not params.altClick
+    multiRoller.call('inject', {
+        clickerColor = params.clickerColor,
+        unitTypeToCount = fillUnitTypeToCount,
+        plasmaScoring = plasmaScoring and true or false,
+        antimassDeflectors = antimassDeflectors and true or false,
+        rollType = doClick and autofillTypeAttributes.rollType or false,
+        extraModifiers = extraUnitModifiers or false,
+        rollObjectGuid = _rollOnSelf and self.getGUID(),
+    })
+    if not doClick then
+        printToAll('AutoFill: left click to fill and roll.', params.clickerColor)
     end
 
-    if params.hasAntimassDeflectors then
-        --multiRoller.call('clickAMD')
-        CrLua.TTS.ClickButtonHack.invoke(multiRoller, 'AMD', color)
-    end
-
-    if params.suggestPdsUnitName then
-        local button = assert(PLASMA_SCORING_BUTTON[params.suggestPdsUnitName])
-        multiRoller.call(button)
-    end
-
-    -- "Update" by calling the associated function.  Call can only pass one argument!
-    --multiRoller.call('detectCards', color)
-    CrLua.TTS.ClickButtonHack.invoke(multiRoller, 'UPDATE', color)
-
-    if params.doClick then
-        CrLua.TTS.ClickButtonHack.invoke(multiRoller, params.clickButtonLabel, color)
-    end
+    return 1
 end
 
 -------------------------------------------------------------------------------
@@ -736,21 +945,12 @@ end
 #include <~/CrLua/CrLua>
 #include <~/CrLua/LockGlobals>
 
-#include <~/CrLua/TI4/Hex>
-#include <~/CrLua/TI4/Unit>
-#include <~/CrLua/TI4/Wormhole>
-
-#include <~/CrLua/TTS/ClickButtonHack>
-#include <~/CrLua/TTS/HelperClient>
 #include <~/CrLua/TTS/Object>
 #include <~/CrLua/TTS/Player>
 
 #include <~/CrLua/List>
 #include <~/CrLua/LockTable>
 #include <~/CrLua/Log>
-#include <~/CrLua/Polygon>
-#include <~/CrLua/RedBlobHex>
-#include <~/CrLua/Table>
 #include <~/CrLua/Util>
 
 --CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.DEBUG)
@@ -758,11 +958,8 @@ end
 --CrLua.UnitTest.runTests(TAG, CrLua, true)
 
 CrLua.assertRequired({
-    'TI4.Hex',
-    'TI4.Unit',
-    'TI4.Wormhole',
+    'TTS.Object',
     'TTS.Player',
-    'TTS.ClickButtonHack',
     'List',
     'Log' })
 CrLua.lock()

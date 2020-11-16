@@ -1,0 +1,208 @@
+--- Movable mat for placing strategy cards.
+-- Add the start/end phase buttons here rather than on tiles/strategy cards.
+-- @author Darrell
+
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
+        return function(parameters) return helperObject.call(functionName, parameters) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+local _strategyCardHelper = getHelperClient('TI4_STRATEGY_CARD_HELPER')
+
+local _tradeGoodBagGuid = false
+
+local BUTTONS = {
+    {
+        id = 'place',
+        label1 = 'Place Trade Goods\nand Set Turns',
+        function1 = 'confirmPlaceTradeGoodsAndSetTurns',
+        label2 = 'CLICK AGAIN\nTO CONFIRM',
+        function2 = 'placeTradeGoodsAndSetTurns'
+    },
+    {
+        id = 'deal',
+        label1 = 'Deal Action Cards',
+        function1 = 'confirmDealActionCards',
+        label2 = 'CLICK AGAIN\nTO CONFIRM',
+        function2 = 'dealActionCards'
+    },
+    {
+        id = 'return',
+        label1 = 'Return Strategy Cards\nand End Status Phase',
+        function1 = 'confirmReturnStrategyCardsAndEndStatusPhase',
+        label2 = 'CLICK AGAIN\nTO CONFIRM',
+        function2 = 'returnStrategyCardsAndEndStatusPhase'
+    }
+}
+
+local _buttonIsState2 = {}
+
+function onLoad(saveState)
+    local bounds = self.getBoundsNormalized()
+
+    local dx = -5
+    local y = bounds.size.y + 0.01
+    local z = -4.8
+    local width = 2200
+    local height = 1200
+    local fontSize = 200
+
+    self.clearButtons()
+
+    self.createButton({
+        click_function = 'doNothing',
+        function_owner = self,
+        label          = '',
+        position       = { x = dx, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
+        width          = width,
+        height         = height,
+        font_size      = fontSize,
+        tooltip        = 'End of strategy phase: place trade goods on unclaimed strategy cards and set turn order',
+    })
+    self.createButton({
+        click_function = 'doNothing',
+        function_owner = self,
+        label          = '',
+        position       = { x = 0, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
+        width          = width,
+        height         = height,
+        font_size      = fontSize,
+        tooltip        = 'After status phase scoring: deal action cards to all players in initiative order, shuffling the discard if necessary',
+    })
+    self.createButton({
+        click_function = 'doNothing',
+        function_owner = self,
+        label          = '',
+        position       = { x = -dx, y = y, z = z },
+        rotation       = { x = 0, y = 0, z = 0 },
+        width          = width,
+        height         = height,
+        font_size      = fontSize,
+        tooltip        = 'End of status phase: return and gain command tokens, ready cards, repair units, and return strategy cards'
+    })
+
+    resetButtons()
+end
+
+function resetButtons()
+    for i, values in ipairs(BUTTONS) do
+        local color = _buttonIsState2[values.id] and { r = 1, g = 0, b = 0 } or { r = 1, g = 1, b = 1 }
+        self.editButton({
+            index          = i - 1,
+            click_function = _buttonIsState2[values.id] and values.function2 or values.function1,
+            label          = _buttonIsState2[values.id] and values.label2 or values.label1,
+            color          = color,
+        })
+    end
+end
+
+function doNothing()
+end
+
+function _confirm(buttonId)
+    _buttonIsState2[buttonId] = true
+    resetButtons()
+
+    local function delayedReset()
+        _reset(buttonId)
+    end
+    Wait.time(delayedReset, 5)
+end
+
+function _reset(buttonId)
+    _buttonIsState2[buttonId] = false
+    resetButtons()
+end
+
+function confirmPlaceTradeGoodsAndSetTurns(obj, playerClickerColor, altClick)
+    _confirm('place')
+end
+function confirmDealActionCards(obj, playerClickerColor, altClick)
+    _confirm('deal')
+end
+function confirmReturnStrategyCardsAndEndStatusPhase(obj, playerClickerColor, altClick)
+    _confirm('return')
+end
+
+function placeTradeGoodsAndSetTurns(obj, playerClickerColor, altClick)
+    _reset('place')
+
+    local initiativeOrder = _strategyCardHelper.getInitiativeOrder()
+    local unpickedStrategyCards = {}
+    for guid, color in pairs(initiativeOrder.strategyCardGuidToPlayerColor) do
+        if not color then
+            table.insert(unpickedStrategyCards, getObjectFromGUID(guid))
+        end
+    end
+
+    -- Place trade goods.
+    local function getTradeGoodBag()
+        local bag = _tradeGoodBagGuid and getObjectFromGUID(_tradeGoodBagGuid)
+        if bag then
+            return bag
+        end
+        for _, object in ipairs(getAllObjects()) do
+            if object.tag == 'Infinite' and object.getName() == 'x1 Commodities/Tradegoods Bag' then
+                _tradeGoodBagGuid = object.getGUID()
+                return object
+            end
+        end
+        error('no Trade Goods x1 bag')
+    end
+    local tradeGoodBag = getTradeGoodBag()
+    for _, unpickedStrategyCard in ipairs(unpickedStrategyCards) do
+        -- Copy jitter logic from v2.0, looks good.
+        local pos = unpickedStrategyCard.getPosition()
+        pos.x = pos.x + 0.5 * math.random(-1, 1)
+        pos.z = pos.z + 0.5 * math.random(-1, 1)
+        tradeGoodBag.takeObject({
+            position = { x = pos.x, y = 5, z = pos.z },
+            rotation = { x = 180, y = 90, z = math.random(30,60) },
+            smooth = false
+        })
+    end
+
+    -- Generate turn order, ONLY INCLUDE PLAYERS WITH INITIATIVE VALUES!
+    -- (Skip non-grey "spectators", non-players that can interact with table.)
+    local turnOrder = initiativeOrder.order
+
+    printToAll('Turn order: ' .. table.concat(turnOrder, ', '), playerClickerColor)
+
+    Turns.enable = true
+    Turns.type = 2
+    Turns.order = turnOrder
+    Turns.turn_color = turnOrder[1]
+end
+
+function dealActionCards(obj, playerClickerColor, altClick)
+    _reset('deal')
+    _strategyCardHelper.dealAllActionCards(Turns.order)
+end
+
+function returnStrategyCardsAndEndStatusPhase(obj, playerClickerColor, altClick)
+    _reset('return')
+    _strategyCardHelper.endStatusPhase()
+end
+
+-------------------------------------------------------------------------------
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

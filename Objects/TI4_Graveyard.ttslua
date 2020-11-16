@@ -24,107 +24,163 @@ function getHelperClient(helperObjectName)
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
 local _deckHelper = getHelperClient('TI4_DECK_HELPER')
-local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
-
--- Token bags use inconsistent name to bag, hard code for simplicity.
-local TOKEN_BAGS = {
-    ['x1 Fighter Token'] = 'x1 Fighters Tokens Bag',
-    ['x3 Fighter Token'] = 'x3 Fighters Tokens Bag',
-    ['x1 Infantry'] = 'x1 Infantry Token Bag',
-    ['x3 Infantry'] = 'x3 Infantry Token Bag',
-    ['Commodities/Tradegoods x1'] = 'Commodities/Tradegoods x1 Bag',
-    ['Commodities/Tradegoods x3'] = 'Commodities/Tradegoods x3 Bag'
-}
 
 -- Bag with faction tokens.
 local PICK_FACTION_BAG = 'Pick a Faction to Play'
 
 -------------------------------------------------------------------------------
 
-local data = {
-    objectNameToBagGuid = {},
-    pickFactionTokenBagGuid = nil,
+local _objectNameToBagGuid = {}
 
-    objects = {
-        -- Objects added to graveyard deemed worth processing.
-        waitingForDestroy = {},
+local _guidToPending = {}  -- waiting for put into self to finish
+local _guidToLimbo = {}  -- put into self is done
+local _guidToFinal = {}  -- waiting for put into final to finish
 
-        -- When an object from waitingForDestroy gets destroyed, move here.
-        ready = {},
-    },
-
-    coroutineStartTime = false,
-}
+local _reportTrashed = false
 
 -------------------------------------------------------------------------------
 
 --- Get bag for object.
-local function getNonCardDestination(objectName)
+local function getNonCardDestination(objectTag, objectName)
     assert(type(objectName) == 'string')
 
-    local bagGuid = data.objectNameToBagGuid[objectName]
-    local bag = bagGuid and getObjectFromGUID(bagGuid)
+    if string.len(objectName) == 0 then
+        return false
+    end
 
-    -- If we do not have a bag, look for one and remember it if found.  If more
-    -- than one choose closest (reduces objects from flying over the table).
+    -- Do we already know where to put it?
+    local bagGuid = _objectNameToBagGuid[objectName]
+    local bag = bagGuid and getObjectFromGUID(bagGuid)
+    if bag then
+        return bag
+    end
+
+    -- Look forand remember bag if found.  If more than one choose closest
+    -- (reduces objects from flying over the table).
     -- Remember via guid to prevent trying to access a deleted bag later.
     -- Do not store "nacks" for objects with no bag, it could be unpacked!
-    if not bag and string.len(objectName) > 0 then
-        local acceptBag = {
-            [objectName] = true,
-            [objectName .. 's Bag'] = true,
-            [TOKEN_BAGS[objectName] or false] = true
-        }
-        local bestDistance = false
-        for _, candidate in ipairs(getAllObjects()) do
-            local tag = candidate.tag
-            local name = candidate.getName()
-            if (tag == 'Bag' or tag == 'Infinite') and acceptBag[name] then
-                local p1 = self.getPosition()
-                local p2 = candidate.getPosition()
-                local dSq = ((p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2)
-                if not bestDistance or dSq < bestDistance then
-                    bag = candidate
-                    bestDistance = dSq
-                end
-            end
-        end
-        data.objectNameToBagGuid[objectName] = bag and bag.getGUID()
+    local acceptBag = {
+        [objectName] = true,
+        [objectName .. ' Bag'] = true,
+        [objectName .. 's Bag'] = true,
+    }
+    if string.match(objectName, ' Faction Token$') then
+        acceptBag[PICK_FACTION_BAG] = true
     end
 
-    -- If "FACTION Owner Token" and no bag, put in the "Pick a Faction to Play"
-    -- bag (scan again to make earlier, more common scan do less work).
-    local faction = (not bag) and _factionHelper.fromTokenName(objectName)
-    if not bag and faction then
-        local bagGuid = data.pickFactionTokenBagGuid
-        bag = bagGuid and getObjectFromGUID(bagGuid)
-        if not bag then
-            for _, candidate in ipairs(getAllObjects()) do
-                if candidate.getName() == PICK_FACTION_BAG then
-                    bag = candidate
-                    break
-                end
+    local bestDistance = false
+    for _, candidate in ipairs(getAllObjects()) do
+        local tag = candidate.tag
+        local name = candidate.getName()
+        if (tag == 'Bag' or tag == 'Infinite') and acceptBag[name] then
+            local p1 = self.getPosition()
+            local p2 = candidate.getPosition()
+            local dSq = ((p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2)
+            if not bestDistance or dSq < bestDistance then
+                bag = candidate
+                bestDistance = dSq
             end
         end
-        data.pickFactionTokenBagGuid = bag and bag.getGUID()
     end
-
+    _objectNameToBagGuid[objectName] = bag and bag.getGUID()
     return bag
 end
 
 -------------------------------------------------------------------------------
 
+local function reportTrashed(object)
+    local function _report()
+        local message = {}
+        for name, countOrCards in pairs(_reportTrashed or {}) do
+            local count = type(countOrCards) == 'table' and #countOrCards or countOrCards
+            local cards = type(countOrCards) == 'table' and countOrCards
+            local plural = count > 1 and (not string.match(name, '[ys]$') and 's') or ''
+            if cards then
+                cards = table.concat(cards, ', ')
+                table.insert(message, count .. ' ' .. name .. plural .. ' (' .. cards .. ')')
+            else
+                table.insert(message, count .. ' ' .. name .. plural)
+            end
+        end
+        message = 'Graveyard moving ' .. table.concat(message, ', ')
+        printToAll(message)
+
+        _reportTrashed = false
+    end
+
+    if not _reportTrashed then
+        _reportTrashed = {}
+        Wait.frames(_report, 2)
+    end
+
+    local name = object.getName()
+    local deckName = object.tag == 'Card' and _deckHelper.getDeckName(object.getName())
+    if deckName == 'Secret Objectives' then
+        name = 'Secret Objective' -- ALWAYS hide secrets
+        deckName = false
+    end
+    if deckName then
+        local cards = _reportTrashed[deckName]
+        if not cards then
+            cards = {}
+            _reportTrashed[deckName] = cards
+        end
+        table.insert(cards, name)
+    else
+        _reportTrashed[name] = (_reportTrashed[name] or 0) + 1
+    end
+end
+
+-------------------------------------------------------------------------------
+
+function _processLimbo()
+    local function getFirst(tbl)
+        for k, v in pairs(tbl) do
+            return k, v
+        end
+    end
+
+    -- Wait for puts into self or puts into final bags to finish.
+    if getFirst(_guidToPending) or getFirst(_guidToFinal) then
+        return
+    end
+
+    -- Otherwise nothing is in progress, get an item from limbo.
+    local guid, bag = getFirst(_guidToLimbo)
+    if not guid then
+        return
+    end
+    assert(bag.tag == 'Bag' or bag.tag == 'Infinite')
+    _guidToLimbo[guid] = nil
+
+    -- Make sure it is still valid.
+    local function haveGuid(guid)
+        for _, entry in ipairs(self.getObjects()) do
+            if entry.guid == guid then
+                return true
+            end
+        end
+    end
+    if not haveGuid(guid) then
+        Wait.frames(_processLimbo, 1)
+        return  -- got removed somehow
+    end
+
+    -- Mark it as in-progress, put into final bag when take finishes.
+    -- That put will trigger a future onObjectDestroy, furthers the cycle.
+    _guidToFinal[guid] = bag
+
+    local p = self.getPosition()
+    local object = self.takeObject({
+        guid              = guid,
+        position          = { x = p.x, y = p.y + 5, z = p.z },
+        smooth            = false,
+        callback_function = function(object) bag.putObject(object) end
+    })
+end
+
 function onObjectEnterContainer(container, enterObject)
     if container == self then
-
-        -- Take note of an object we want to move once TTS finishes destroy.
-        local function waitForDestroy(object, state)
-            data.objects.waitingForDestroy[object] = {
-                guid = object.guid,
-                name = object.getName(),
-                state = state
-            }
-        end
 
         local discardParams = {
             guid = enterObject.getGUID(),
@@ -135,77 +191,48 @@ function onObjectEnterContainer(container, enterObject)
 
         if enterObject.tag == 'Card' and _deckHelper.discardCard(discardParams) then
             -- deck helper is handling it.
+            reportTrashed(enterObject)
         elseif enterObject.tag == 'Deck' and _deckHelper.discardDeck(discardParams) then
             -- deck helper is handling it.
+            reportTrashed(enterObject)
         else
-            local bag = getNonCardDestination(enterObject.getName())
+            local bag = getNonCardDestination(enterObject.tag, enterObject.getName())
             if bag then
-                waitForDestroy(enterObject, bag)
+                _guidToPending[enterObject.getGUID()] = bag
+                reportTrashed(enterObject)
             end
         end
+    end
+end
+
+function onObjectLeaveContainer(container, leaveObject)
+    if container == self then
+        -- Not normally needed, but just in case an object moves by non-self means.
+        _guidToPending[leaveObject.getGUID()] = nil
+        _guidToLimbo[leaveObject.getGUID()] = nil
     end
 end
 
 function onObjectDestroy(dyingObject)
-    local objectData = data.objects.waitingForDestroy[dyingObject]
-    if objectData then
-        -- Promote to ready.
-        data.objects.waitingForDestroy[dyingObject] = nil
-        table.insert(data.objects.ready, objectData)
+    local guid = dyingObject.getGUID()
 
-        -- Start coroutine if work to be done.
-        local isRunning = data.coroutineStartTime and (Time.time - data.coroutineStartTime) < 3
-        if #data.objects.ready > 0 and not isRunning then
-            startLuaCoroutine(self, 'processReadyCoroutine')
-            data.coroutineStartTime = Time.time
-        end
+    if _guidToPending[guid] then
+        _guidToLimbo[guid] = _guidToPending[guid]
+        _guidToPending[guid] = nil
+        Wait.frames(_processLimbo, 2)
+    elseif _guidToFinal[guid] then
+        _guidToFinal[guid] = nil
+        Wait.frames(_processLimbo, 2)
     end
 end
 
-function processReadyCoroutine()
-    -- Coroutine started on object's last frame (during onObjectDestroy).
-    -- Wait one more frame for TTS to reclaim it, so we can retrieve it from
-    -- self preserving the same GUID.
-    coroutine.yield(0)
-
-    while #data.objects.ready > 0 do
-        local objectData = table.remove(data.objects.ready)
-
-        -- Be paranoid about guid collisions.  Unlikely but not impossible.
-        local function getObjectIndex()
-            for _, entry in ipairs(self.getObjects()) do
-                if entry.guid == objectData.guid and entry.name == objectData.name then
-                    return entry.index
-                end
-            end
-            -- When an entry does not have a name, TTS uses the tag (it seems).
-            -- If we did not find a guid AND name match, try guid only.
-            for _, entry in ipairs(self.getObjects()) do
-                if entry.guid == objectData.guid then
-                    return entry.index
-                end
-            end
-            error(self.getName() .. ': missing entry')
-        end
-
-        local position = self.getPosition()
-        local object = self.takeObject({
-            index = getObjectIndex(),
-            position = { x = position.x, y = position.y + 10, z = position.z }
-        })
-        assert(object)
-
-        -- Wait a frame after takeObject before put so the leave/enter
-        -- events happen in logical order.
-        object.setLock(true)
-        coroutine.yield(0)
-        object.setLock(false)
-
-        object.setRotation(objectData.state.getRotation()) -- rotate to match bag
-        objectData.state.putObject(object)
-    end
-
-    -- Finished.  RETURN 1 TO STOP COROUTINE!
-    data.coroutineStartTime = false
-    return 1
+-------------------------------------------------------------------------------
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
 end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

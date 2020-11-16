@@ -1,0 +1,86 @@
+--- Return meeples to their per-player mats.
+-- Suggested block scale: { x = 5, y = 0.5, z = 3 }.
+-- Rotate player mats to align with player seat positions for better placements.
+
+function returnMeeples()
+    local colorToPlayArea = {}
+    local colorToSubordinates = {}
+    local colorToParagons = {}
+
+    -- Find all relevant objects in a single sweep.
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        local color = string.match(name, '^(.*) Play Area$')
+        if color then
+            colorToPlayArea[color] = object
+        end
+        local color = string.match(name, '^(.*) Subordinate$')
+        if color then
+            local entry = colorToSubordinates[color] or {}
+            colorToSubordinates[color] = entry
+            table.insert(entry, object)
+        end
+        local color = string.match(name, '^(.*) Paragon$')
+        if color then
+            local entry = colorToParagons[color] or {}
+            colorToParagons[color] = entry
+            table.insert(entry, object)
+        end
+    end
+
+    -- Move meeples.
+    for color, playArea in pairs(colorToPlayArea) do
+        local objects = {}
+        for _, object in ipairs(colorToSubordinates[color] or {}) do
+            table.insert(objects, object)
+        end
+        for _, object in ipairs(colorToParagons[color] or {}) do
+            table.insert(objects, object)
+        end
+        local x0 = -0.3
+        local dx = 0.2
+        local z0 = 0.3
+        local dz = -0.2
+        for i, object in ipairs(objects) do
+            local row = math.floor((i - 1) / 4)
+            local col = (i - 1) % 4
+            local p = playArea.positionToWorld({
+                x = x0 + col * dx,
+                y = 3,
+                z = z0 + row * dz,
+            })
+            local collide = false
+            local fast = true
+            object.setPositionSmooth(p, collide, fast)
+            object.setRotationSmooth({0,0,0}, collide, fast)
+        end
+    end
+end
+
+function onLoad(saveState)
+    local size = self.getBoundsNormalized().size
+    local scale = self.getScale()
+    self.createButton({
+        click_function = 'returnMeeples',
+        function_owner = self,
+        label          = 'Return\nMeeples',
+        position       = { x = 0, y = size.y + 0.01, z = 0 },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1 / scale.x, y = 1 / scale.y, z = 1 / scale.z },
+        width          = 2000,
+        height         = 1000,
+        font_size      = 300,
+    })
+end
+
+-------------------------------------------------------------------------------
+-- Some LUA magic to help catch typos (using variables that do not exist).
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

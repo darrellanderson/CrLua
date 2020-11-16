@@ -1,0 +1,25 @@
+function onLoad(save_state)
+    self.addContextMenuItem('make bags', putTokensIntoInfiniteBags)
+end
+
+function putTokensIntoInfiniteBags()
+    startLuaCoroutine(self, 'putTokensIntoInfiniteBagsCoroutine')
+end
+
+function putTokensIntoInfiniteBagsCoroutine()
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Tile' then
+            local p = object.getPosition()
+            p.y = p.y + 1
+            local bag = spawnObject({
+                type              = 'Infinite_Bag',
+                position          = p,
+            })
+            coroutine.yield(0)
+            coroutine.yield(0)
+            coroutine.yield(0)
+            bag.putObject(object)
+        end
+    end
+    return 1
+end

@@ -33,16 +33,15 @@ function CrLua.TTS.Overlap.overlap(srcs, dsts)
         local bounds = dst.getBounds()
         local bb = {
             min = {
-                x = bounds.center.x - bounds.size.x,
-                z = bounds.center.z - bounds.size.z,
+                x = bounds.center.x - bounds.size.x / 2,
+                z = bounds.center.z - bounds.size.z / 2,
             },
             max = {
-                x = bounds.center.x + bounds.size.x,
-                z = bounds.center.z + bounds.size.z,
+                x = bounds.center.x + bounds.size.x / 2,
+                z = bounds.center.z + bounds.size.z / 2,
             }
         }
         for _, src in ipairs(srcs) do
-            local p = src.getBounds().center
             if src ~= dst and maybeInside(bb, src.getPosition()) then
                 if definitelyInside(src, dst) then
                     local srcs = dstToSrcs[dst]

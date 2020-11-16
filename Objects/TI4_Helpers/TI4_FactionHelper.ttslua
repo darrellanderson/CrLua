@@ -30,334 +30,595 @@ function getHelperClient(helperObjectName)
     end
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
+local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
+-- Per-faction attributes.  This helper will also add the following fields:
+-- - color (string) or nil if not in use.
+-- - commandSheetGuid (string) or nil if not in use.
+-- - factionSheetGuid (string) or nil if not in use.
 local _factionAttributes = {
 
     ['The Arborec'] = {
         tokenName = 'Arborec',
+        frankenName = 'Arborec',
+        home = 5,
         startingUnits = { Infantry = 4, Fighter = 2, Cruiser = 1, Carrier = 1, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Magen Defense Grid' },
         flagship = 'Duha Menaimon',
         flagshipDescription = 'After you activate this system, you may produce up to 5 units in this system.',
+        abilities = { 'Mitosis' },
+        units = { 'Letani Warrior I', 'Letani Warrior II', 'Letani Behemoth' },
+        commander = 'Dirzuga Rophal',
     },
 
     ['The Barony Of Letnev'] = {
         tokenName = 'Barony of Letnev',
+        frankenName = 'Letnev',
+        home = 10,
         startingUnits = { Infantry = 3, Fighter = 1, Destroyer = 1, Carrier = 1, Dreadnought = 1, Space_Dock = 1 },
         startingTech = { 'Antimass Deflectors', 'Plasma Scoring' },
         flagship = 'Arc Secundus',
         flagshipDescription = "Other players’ units in this system lose PLANETARY SHIELD.  At the start of each space combat round, repair this ship.  BOMBARDMENT 5 (X3)",
+        abilities = { 'Munitions Reserves', 'Armada' },
+        units = {'Dunlain Reaper'},
+        commander = 'Rear Admiral Farran',
     },
 
     ['The Clan Of Saar'] = {
         tokenName = 'Clan of Saar',
+        frankenName = 'Saar',
+        home = 11,
         startingUnits = { Infantry = 4, Fighter = 2, Cruiser = 1, Carrier = 2, Space_Dock = 1 },
         startingTech = { 'Antimass Deflectors' },
         flagship = 'Son of Ragh',
-        flagshipDescription = 'ANTI-FIGHTER BARRAGE 6 (X4)'
+        flagshipDescription = 'ANTI-FIGHTER BARRAGE 6 (X4)',
+        abilities = { 'Scavenge', 'Nomadic' },
+        units = { 'Floating Factory I', 'Floating Factory II', 'Scavenger Zeta' },
+        commander = 'Rowl Sarrig',
     },
 
     ['The Embers Of Muaat'] = {
         tokenName = 'Embers of Muaat',
+        frankenName = 'Muaat',
+        home = 4,
         startingUnits = { Infantry = 4, Fighter = 2, War_Sun = 1, Space_Dock = 1 },
         startingTech = { 'Plasma Scoring' },
         flagship = 'The Inferno',
         flagshipDescription = "ACTION: Spend 1 token from your strategy pool to place 1 cruiser in this unit’s system.",
+        abilities = { 'Star Forge', 'Gashlai Physiology' },
+        units = { 'Prototype War Sun I', 'Prototype War Sun II', 'Ember Colossus' },
+        commander = 'Magmus',
     },
 
     ['The Emirates Of Hacan'] = {
         tokenName = 'Emirates of Hacan',
+        frankenName = 'Hacan',
+        home = 16,
         startingUnits = { Infantry = 4, Fighter = 2, Cruiser = 1, Carrier = 2, Space_Dock = 1 },
         startingTech = { 'Antimass Deflectors', 'Sarween Tools' },
         flagship = 'Wrath of Kenara',
         flagshipDescription = 'After you roll a die during a space combat in this system, you may spend 1 trade good to apply +1 to the result.',
+        abilities = { 'Masters of Trade', 'Guild Ships', 'Arbiters' },
+        units = { 'Pride of Kenara' },
+        commander = 'Gila the Silvertongue',
     },
 
     ['The Federation Of Sol'] = {
         tokenName = 'Federation of Sol',
+        frankenName = 'Sol',
+        home = 1,
         startingUnits = { Infantry = 5, Fighter = 3, Destroyer = 1, Carrier = 2, Space_Dock = 1 },
         startingTech = { 'Antimass Deflectors', 'Neural Motivator' },
         flagship = 'Genesis',
         flagshipDescription = "At the end of the status phase, place 1 infantry from your reinforcements in this system’s space area.",
-        extraCommandTokens = 1,
+        abilities = { 'Orbital Drop', 'Versatile' },
+        units = { 'Advanced Carrier I', 'Advanced Carrier II', 'Spec Ops I', 'Spec Ops II', 'ZS Thunderbolt M2' },
+        commander = 'Claire Gibson',
     },
 
     ['The Ghosts Of Creuss'] = {
         tokenName = 'Ghosts of Creuss',
+        frankenName = 'Creuss',
+        home = 51,
         startingUnits = { Infantry = 4, Fighter = 2, Destroyer = 2, Carrier = 1, Space_Dock = 1 },
         startingTech = { 'Gravity Drive' },
         flagship = 'Hil Colish',
         flagshipDescription = "This ship’s system contains a delta wormhole.  During movement, this ship may move before or after your other ships.",
+        abilities = { 'Quantum Entanglement', 'Slipstream', 'Creuss Gate' },
+        units = { 'Icarus Drive' },
+        commander = 'Sai Seravus',
     },
 
     ['The L1Z1X Mindnet'] = {
         tokenName = 'L1Z1X Mindnet',
+        frankenName = 'L1Z1X',
+        home = 6,
         startingUnits = { Infantry = 5, Fighter = 3, Carrier = 1, Dreadnought = 1, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Neural Motivator', 'Plasma Scoring' },
         flagship = '[0.0.1]',
         flagshipDescription = 'During a space combat, hits produced by this ship and by your dreadnoughts in this system must be assigned to non-fighter ships if able.',
+        abilities = { 'Assimilate' },
+        units = { 'Super-Dreadnought I', 'Super-Dreadnought II', 'Annihilator' },
+        commander = '2RAM',
     },
 
     ['The Mentak Coalition'] = {
         tokenName = 'Mentak Coalition',
+        frankenName = 'Mentak',
+        home = 2,
         startingUnits = { Infantry = 4 ,Fighter = 3, Cruiser = 2, Carrier = 1, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Sarween Tools', 'Plasma Scoring' },
         flagship = 'Fourth Moon',
         flagshipDescription = "Other players’ ships in this system cannot use SUSTAIN DAMAGE.",
+        abilities = { 'Ambush', 'Pillage' },
+        units = { 'Moll Terminus' },
+        commander = "S'ula Mentarion",
     },
 
     ['The Naalu Collective'] = {
         tokenName = 'Naalu Collective',
+        frankenName = 'Naalu',
+        home = 9,
         startingUnits = { Infantry = 4, Fighter = 3, Destroyer = 1, Cruiser = 1, Carrier = 1, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Neural Motivator', 'Sarween Tools' },
         flagship = 'Matriarch',
         flagshipDescription = 'During an invasion in this system, you may commit fighters to planets as if they were ground forces.  When combat ends, return those units to the space area.',
+        abilities = { 'Telepathic', 'Foresight' },
+        units = { 'Hybrid Crystal Fighter I', 'Hybrid Crystal Fighter II', 'Iconoclast' },
+        commander = "M'aban",
     },
 
     ['The Nekro Virus'] = {
         tokenName = 'Nekro Virus',
+        frankenName = 'Nekro',
+        home = 8,
         startingUnits = { Infantry = 2, Fighter = 2, Cruiser = 1, Carrier = 1, Dreadnought = 1, Space_Dock = 1 },
         startingTech = { 'Dacxive Animators', 'Valefar Assimilator X', 'Valefar Assimilator Y' },
         flagship = 'The Alastor',
         flagshipDescription = 'At the start of space combat, choose any number of your ground forces in this system to participate in that combat as is they were ships.  These ground forces do not count against fleet supply.',
+        abilities = { 'Galactic Threat', 'Technological Singularity', 'Propagation' },
+        units = { 'Mordred' },
+        commander = 'Nekro Acidos',
     },
 
     ["The Sardakk N'orr"] = {
         tokenName = "Sardakk N'orr",
+        frankenName = 'Sardakk',
+        home = 13,
         startingUnits = { Infantry = 5, Cruiser = 1, Carrier = 2, Space_Dock = 1, PDS = 1 },
         startingTech = {},
         flagship = "C'morran N'orr",
         flagshipDescription = "Apply +1 to the result of each of your other ship’s combat rolls in this system.",
+        abilities = { 'Unrelenting' },
+        units = { 'Exotrireme I', 'Exotrireme II', 'Valkyrie Exoskeleton' },
+        commander = "G'hom Sek'kus",
     },
 
     ['The Universities of Jol-Nar'] = {
         tokenName = 'Universities of Jol-Nar',
+        frankenName = 'Jol Nar',
+        home = 12,
         startingUnits = { Infantry = 2, Fighter = 1, Carrier = 2, Dreadnought = 1, Space_Dock = 1, PDS = 2 },
         startingTech = { 'Antimass Deflectors', 'Neural Motivator', 'Sarween Tools', 'Plasma Scoring' },
         flagship = 'J.N.S. Hylarim',
         flagshipDescription = 'When making a combat roll for this ship, each result of 9 or 10, before applying modifiers, produces 2 extra hits.',
+        abilities = { 'Fragile', 'Brilliant', 'Analytical' },
+        units = { 'Shield Paling' },
+        commander = 'Ta Zern',
     },
 
     ['The Winnu'] = {
         tokenName = 'Winnu',
+        frankenName = 'Winnu',
+        home = 7,
         startingUnits = { Infantry = 2, Fighter = 2, Cruiser = 1, Carrier = 1, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Antimass Deflectors', 'Neural Motivator', 'Sarween Tools', 'Plasma Scoring' },
         flagship = 'Salai Sai Corian',
         flagshipDescription = "When this unit makes a combat roll, it rolls a number of dice equal to the number of your opponent’s non-fighter ships in this system.",
-        startMessage = 'Pick 1 technology and return the other 3 to your deck.'
+        startMessage = 'Pick 1 technology and return the other 3 to your deck.',
+        abilities = { 'Blood Ties', 'Reclamation' },
+        units = { 'Reclaimer' },
+        commander = 'Rickar Rickani',
     },
 
     ['The Xxcha Kingdom'] = {
         tokenName = 'Xxcha Kingdom',
+        frankenName = 'Xxcha',
+        home = 14,
         startingUnits = { Infantry = 4, Fighter = 3, Cruiser = 2, Carrier = 1, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Graviton Laser System' },
         flagship = 'Loncara Ssodu',
         flagshipDescription = "You may use this unit’s SPACE CANNON against ships that are in adjacent systems.  SPACE CANNON 5 (X3)",
+        abilities = { 'Peace Accords', 'Quash' },
+        units = { 'Indomitus' },
+        commander = 'Elder Qanoj',
     },
 
     ['The Yin Brotherhood'] = {
         tokenName = 'Yin Brotherhood',
+        frankenName = 'Yin',
+        home = 3,
         startingUnits = { Infantry = 4, Fighter = 4, Destroyer = 1, Carrier = 2, Space_Dock = 1 },
         startingTech = { 'Sarween Tools' },
         flagship = 'Van Hauge',
         flagshipDescription = 'When this ship is destroyed, destroy all ships in this system.',
+        abilities = { 'Indoctrination', 'Devotion' },
+        units = { "Moyin's Ashes" },
+        commander = 'Brother Omar',
     },
 
     ['The Yssaril Tribes'] = {
         tokenName = 'Yssaril Tribes',
+        frankenName = 'Yssaril',
+        home = 15,
         startingUnits = { Infantry = 5, Fighter = 2, Cruiser = 1, Carrier = 2, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Neural Motivator' },
         flagship = "Y'sia Y'ssrila",
         flagshipDescription = "This ship can move through systems that contain another players’ ships.",
-        extraActionCards = 1,
+        abilities = { 'Stall Tactics', 'Scheming', 'Crafty' },
+        units = { 'Blackshade Infiltrator' },
+        commander = 'So Ata',
+    },
+
+    -- PoK Factions
+    ['The Nomad'] = {
+        tokenName = 'Nomad',
+        frankenName = 'Nomad',
+        home = 53,
+        startingUnits = { Infantry = 4, Fighter = 3, Destroyer = 1, Carrier = 1, Flagship = 1, Space_Dock = 1 },
+        startingTech = { 'Sling Relay' },
+        flagship = "Memoria I",
+        flagshipDescription = "You may treat this unit as if it were adjacent to systems that contain a planet with 1 of your mech units.",
+        abilities = { 'The Company', 'Future Sight' },
+        units = { 'Memoria II', 'Quantum Manipulator' },
+        commander = 'Navarch Feng',
+    },
+
+    ["The Vuil'raith Cabal"] = {
+        tokenName = "Vuil'raith Cabal",
+        frankenName = "Vuil'raith",
+        home = 54,
+        startingUnits = { Infantry = 3, Fighter = 3, Cruiser = 1, Carrier = 1, Dreadnought = 1, Space_Dock = 1 },
+        startingTech = { 'Self-Assembly Routines' },
+        flagship = "The Terror Between",
+        flagshipDescription = "Capture all other units that are destroyed in this unit’s system, including your own.",
+        abilities = { 'Devour', 'Amalgamation', 'Riftmeld' },
+        units = { 'Dimensional Tear I', 'Dimensional Tear II', 'Reanimator' },
+        commander = 'That Which Molds Flesh',
+    },
+
+    ['The Argent Flight'] = {
+        tokenName = 'Argent Flight',
+        frankenName = 'Argent',
+        home = 58,
+        startingUnits = { Infantry = 5, Fighter = 2, Destroyer = 2, Carrier = 1, Space_Dock = 1, PDS = 1 },
+        startingTech = { 'Sarween Tools', 'Neural Motivator', 'Plasma Scoring' },
+        flagship = "Quetzecoatl",
+        flagshipDescription = "SPACE CANNON cannot be used by other players against your units in this system.",
+        abilities = { 'Zeal', 'Raid Formation' },
+        units = { 'Strike Wing Alpha I', 'Strike Wing Alpha II', 'Aerie Sentinel' },
+        commander = 'Trrakan Aun Zulok',
+    },
+
+    ['The Titans of Ul'] = {
+        tokenName = 'Titans of Ul',
+        frankenName = 'Titans',
+        home = 55,
+        startingUnits = { Infantry = 3, Fighter = 2, Cruiser = 2, Dreadnought = 1, Space_Dock = 1 },
+        startingTech = { 'Antimass Deflectors', 'Scanlink Drone Network' },
+        flagship = "Ouranos",
+        flagshipDescription = "When this unit is repaired by the 'Awaken' faction ability, place 2 fighters from your reinforcements in its system.",
+        abilities = { 'Terragenesis', 'Awaken', 'Coalescence' },
+        units = { 'Saturn Engine I', 'Saturn Engine II', 'Hel-Titan I', 'Hel-Titan II', 'Hecatoncheires' },
+        commander = 'Tungstantus',
+    },
+
+    ['The Empyrean'] = {
+        tokenName = 'Empyrean',
+        frankenName = 'Empyrean',
+        home = 56,
+        startingUnits = { Infantry = 4, Fighter = 2, Destroyer = 1, Carrier = 2, Space_Dock = 1 },
+        startingTech = { 'Dark Energy Tap' },
+        flagship = "Dynamo",
+        flagshipDescription = "When any player's unit in this system or an adjacent system uses SUSTAIN DAMAGE, you may spend 2 influence to repair it.",
+        abilities = { 'Voidborn', 'Aetherpassage', 'Dark Whispers' },
+        units = { 'Watcher' },
+        commander = 'Xuange',
+    },
+
+    ['The Mahact Gene-Sorcerers'] = {
+        tokenName = 'Mahact Gene-Sorcerers',
+        frankenName = 'Mahact',
+        home = 52,
+        startingUnits = { Infantry = 3, Fighter = 2, Cruiser = 1, Carrier = 1, Dreadnought = 1, Space_Dock = 1 },
+        startingTech = { 'Predictive Intelligence', 'Bio-Stims' },
+        flagship = "Arvicon Rex",
+        flagshipDescription = "During combat against an opponent who has one of your faction's leaders deployed, this ship rolls 2 additional dice.",
+        abilities = { 'Edict', 'Imperia', 'Hubris' },
+        units = { 'Crimson Legionnaire I', 'Crimson Legionnaire II', 'Starlancer' },
+        commander = 'Il Na Viroset',
+    },
+
+    ['The Naaz-Rokha Alliance'] = {
+        tokenName = 'Naaz-Rokha Alliance',
+        frankenName = 'Naaz-Rokha',
+        home = 57,
+        startingUnits = { Infantry = 3, Fighter = 2, Carrier = 2, Destroyer = 1, Mech = 1, Space_Dock = 1 },
+        startingTech = { 'Psychoarchaeology', 'AI Development Algorithm' },
+        flagship = "Visz El Vir",
+        flagshipDescription = "Your mech units in this system roll 1 additional die during combat.",
+        abilities = { 'Distant Suns', 'Fabrication' },
+        units = { 'Eidolon' },
+        commander = 'Dart and Tai',
     },
 
     -- Tactic Blue's homebrew
     ['The Advent'] = {
         source = 'Blue Space',
         tokenName = 'Advent',
+        frankenName = 'Advent',
+        home = 3006,
         startingUnits = { Infantry = 2, Fighter = 6, Destroyer = 1, Carrier = 2, Space_Dock = 1 },
         startingTech = { 'Neural Motivator', 'Sarween Tools' },
         flagship = 'Advent Flagship',
-        flagshipDescription = '',
+        flagshipDescription = '-',
+        abilities = { 'Ascended Populace', 'Drone Hosts', 'Drone Swarm' },
+        units = {},
     },
 
     ['The Drahn Consortium'] = {
         source = 'Blue Space',
         tokenName = 'Drahn Consortium',
+        frankenName = 'Drahn',
+        home = 3001,
         startingUnits = { Infantry = 4, Fighter = 3, Destroyer = 1, Carrier = 2, Space_Dock = 1 },
         startingTech = { 'Neural Motivator', 'Plasma Scoring' },
         flagship = 'Nightingale II',
         flagshipDescription = 'Other players cannot play action cards during a space combat in this system.',
+        abilities = { 'Bounty Hunters', 'Contract Network', 'Smuggler Captiains' },
+        units = { 'Wraith Corvette I', 'Wraith Corvette II' },
     },
 
     ['The Free Systems Alliance'] = {
         source = 'Blue Space',
         tokenName = 'Free Systems Alliance',
+        frankenName = 'Free Systems',
+        home = 3007,
         startingUnits = { Infantry = 4, Fighter = 2, Cruiser = 2, Carrier = 1, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Neural Motivator' },
         flagship = 'Vox',
         flagshipDescription = 'When this unit makes a combat roll, it rolls 1 additional die for each planet in this system of any single trait.',
+        abilities = { 'Diplomats', 'Rally to the Cause', 'Free People' },
+        units = {},
     },
 
     ['The Fremen'] = {
         source = 'Blue Space',
         tokenName = 'Fremen',
+        frankenName = 'Fremen',
+        home = 3002,
         startingUnits = { Infantry = 7, Fighter = 2, Cruiser = 2, Carrier = 1, Space_Dock = 1 },
         startingTech = { 'Antimass Deflectors' },
         flagship = 'Shai-Hulud',
         flagshipDescription = 'During a round of combat in the system, 1 unit you control may roll 1 additional combat die.',
+        abilities = { 'Guerilla Warriors', 'Fedaykin', 'Water Reclamation' },
+        units = { 'Ashkari I', 'Ashkari II' },
     },
 
     ['The Gheldor Authority'] = {
         source = 'Blue Space',
         tokenName = 'Gheldor Authority',
+        frankenName = 'Gheldor',
+        home = 3014,
         startingUnits = { Infantry = 4, Fighter = 2, Destroyer = 1, Carrier = 2, Space_Dock = 1 },
         startingTech = { 'Magen Defense Grid' },
-        flagship = "Gheld'Atar",
+        flagship = "Gheld'atar",
         flagshipDescription = 'Units you control that are on planets adjacent to this system cannot lose PLANETARY SHIELD.',
+        abilities = { 'Entrenchment', 'Forge Lords' },
+        units = { 'Planetary Fortress I', 'Planetary Fortress II' },
     },
 
     ['The HCEN Defense System'] = {
         source = 'Blue Space',
         tokenName = 'HCEN Defense System',
+        frankenName = 'HCEN',
+        home = 3013,
         startingUnits = { Infantry = 3, Cruiser = 1, Carrier = 1, PDS = 2, Space_Dock = 1 },
         startingTech = { 'Graviton Laser System' },
         flagship = 'Locus',
         flagshipDescription = 'At the start of your turn, you may move 1 of your PDS to a planet you control in this system.',
+        abilities = { 'Autonomous Installations', 'Mobile Defense Platforms', 'Overcharge' },
+        units = { 'Perdition Array I', 'Perdition Array II' },
     },
 
     ['The Khet Drakkol Union'] = {
         source = 'Blue Space',
         tokenName = 'Khet Drakkol Union',
+        frankenName = 'Khet Drakkol',
+        home = 3003,
         startingUnits = { Infantry = 4, Fighter = 3, Destroyer = 1, Dreadnought = 2, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Sarween Tools' },
         flagship = 'Khage',
-        flagshipDescription = '',
+        flagshipDescription = '-',
+        abilities = { 'Enlistment Doctrine', 'Warrior Code' },
+        units = {},
     },
 
     ['The Kortali Horde'] = {
         source = 'Blue Space',
         tokenName = 'Kortali Horde',
+        frankenName = 'Kortali',
+        home = 3011,
         startingUnits = { Infantry = 5, Fighter = 3, Cruiser = 1, Carrier = 2, Space_Dock = 1 },
         startingTech = { 'Dacxive Animators' },
         flagship = "For'xdar",
         flagshipDescription = 'Planets controlled by other players in this system cannot be readied.',
+        abilities = { 'Relentless', 'Merciless' },
+        units = {},
     },
 
     ['The Lazax'] = {
         source = 'Blue Space',
         tokenName = 'Lazax',
+        frankenName = 'Lazax',
+        home = 3016,
         startingUnits = { Infantry = 3, Fighter = 2, Cruiser = 1, Carrier = 1, Dreadnought = 1, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Antimass Deflectors', 'Neural Motivator', 'Sarween Tools', 'Plasma Scoring' },
         flagship = 'Regulus',
         flagshipDescription = 'When this unit makes a combat roll, it rolls 1 additional die for each victory point you have.',
-        startMessage = 'Pick 1 technology and return the other 3 to your deck.'
+        startMessage = 'Pick 1 technology and return the other 3 to your deck.',
+        abilities = { 'Imperious', 'Right to Rule' },
+        units = { 'Heavy Bomber I', 'Heavy Bomber II' },
     },
 
     ['The Mahact Sorcerer Kings'] = {
         source = 'Blue Space',
-        tokenName = '',
+        tokenName = 'Mahact Sorcerer Kings',
+        frankenName = 'Mahact',
+        home = 3017,
         startingUnits = { Infantry = 4, Fighter = 2, Cruiser = 1, Carrier = 2, Space_Dock = 1, PDS = 2 },
         startingTech = { },
         flagship = "Noctul H'rgan",
         flagshipDescription = "Other units you control in this system may instead have the abilities and attributes of another player’s units of the same type in this system.",
+        abilities = { 'Genetic Sorcerers' },
+        units = {},
     },
 
     ['The Mandalorian Clans'] = {
         source = 'Blue Space',
         tokenName = 'Mandalorian Clans',
+        frankenName = 'Mandalorian',
+        home = 3005,
         startingUnits = { Infantry = 5, Fighter = 2, Cruiser = 2, Carrier = 1, Space_Dock = 1 },
         startingTech = { 'Neural Motivator', 'Antimass Deflectors' },
         flagship = "Kyr'tsad",
         flagshipDescription = 'This ship cannot be destroyed by Direct Hit action cards.',
+        abilities = { 'Mandalorian Steel', 'Clan Unity' },
+        units = { 'Battlecruiser I', 'Battlecruiser II', 'Raid Shuttle I', 'Raid Shuttle II' },
     },
 
     ["The Navigators' Guild"] = {
         source = 'Blue Space',
         tokenName = "Navigators' Guild",
+        frankenName = 'Navigators',
+        home = 3008,
         startingUnits = { Infantry = 4, Fighter = 1, Cruiser = 1, Carrier = 2, Space_Dock = 1 },
         startingTech = { 'Antimass Deflectors', 'Sarween Tools' },
         flagship = 'Chogra Tuhn',
         flagshipDescription = "Other players' ships cannot move through this unit’s system.",
+        abilities = { 'Destabilization', 'Navigators', 'The Wound' },
+        units = {},
     },
 
     ['The Rhodyn Migrant Fleet'] = {
         source = 'Blue Space',
         tokenName = 'Rhodyn Migrant Fleet',
+        frankenName = 'Rhodyn',
+        home = 3012,
         startingUnits = { Infantry = 4, Fighter = 2, Destroyer = 1, Space_Dock = 1, Flagship = 1 },
         startingTech = { 'Gravity Drive' },
         flagship = 'Mho Rhodyn',
-        flagshipDescription = "At the end of the status phase, place 1 fighter from your reinforcements into this system’s space area."
+        flagshipDescription = "At the end of the status phase, place 1 fighter from your reinforcements into this system’s space area.",
+        abilities = { 'Regular Refits', 'Civilian Fleet' },
+        units = {},
     },
 
     ['The Trader Emergency Coalition'] = {
         source = 'Blue Space',
         tokenName = 'Trader Emergency Coalition',
+        frankenName = 'Trader',
+        home = 3010,
         startingUnits = { Infantry = 2, Fighter = 2, Cruiser = 1, Destroyer = 1, Carrier = 1, Space_Dock = 2 },
         startingTech = { 'Sarween Tools', 'Plasma Scoring' },
         flagship = 'Trader Flagship',
-        flagshipDescription = '',
+        flagshipDescription = '-',
+        abilities = { 'Rapid Development', 'Trade Ports', 'Industrialists' },
+        units = {},
     },
 
     ['The Vasari Empire'] = {
         source = 'Blue Space',
         tokenName = 'Vasari Empire',
+        frankenName = 'Vasari',
+        home = 3009,
         startingUnits = { Infantry = 3, Fighter = 2, Destroyer = 1, Carrier = 1, Dreadnought = 1, Space_Dock = 1 },
         startingTech = { 'Antimass Deflectors', 'Plasma Scoring' },
         flagship = 'Vasari Flagship',
-        flagshipDescription = '',
+        flagshipDescription = '-',
+        abilities = { 'Phase Gates', 'Dark Fleet' },
+        units = {},
     },
 
     ['The Veldyr Sovereignty'] = {
         source = 'Blue Space',
         tokenName = 'Veldyr Sovereignty',
+        frankenName = 'Veldyr',
+        home = 3004,
         startingUnits = { Infantry = 3, Fighter = 2, Destroyer = 1 ,Dreadnought = 1, Carrier = 1, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Plasma Scoring' },
         flagship = 'Richtyrian',
         flagshipDescription = 'When this ship makes a combat roll, it rolls 1 additional die for each round of space combat that has been resolved this combat.',
+        abilities = { 'War Profiteers', 'Development Contracts', 'Sylvari Veil' },
+        units = { 'Lancer Dreadnought I', 'Lancer Dreadnought II', 'Tachyon Lance I', 'Tachyon Lance II' },
     },
 
     ['The Zeth Contingency'] = {
         source = 'Blue Space',
         tokenName = 'Zeth Contingency',
+        frankenName = 'Zeth',
+        home = 3015,
         startingUnits = { Infantry = 3, Fighter = 2, Destroyer = 2, Carrier = 1, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Antimass Deflectors', 'Neural Motivator', 'Sarween Tools', 'Plasma Scoring' },
-        flagship = "Eru'Ishon",
+        flagship = "Eru'ishon",
         flagshipDescription = 'When this unit makes a combat roll, it rolls a number of dice equal to the greatest number of technologies you control in any color.',
-        startMessage = 'Pick 2 technologies and return the other 2 to your deck.'
+        startMessage = 'Pick 2 technologies and return the other 2 to your deck.',
+        abilities = { 'Obsessive Scholars', 'Adaptive Intelligence' },
+        units = {},
     },
 
     ['The Savages of Cymiae'] = {
         source = 'Other Homebrew',
         tokenName = 'Savages of Cymiae',
+        frankenName = 'Savages of Cymiae',
+        home = 3018,
         startingUnits = { Infantry = 2, Fighter = 2, Cruiser = 1, Carrier = 1, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Plasma Scoring', 'Magen Defense Grid' },
         flagship = 'Robotic Reprocessing Center',
         flagshipDescription = 'Your infantry in this system gain SUSTAIN DAMAGE during ground combat.',
+        abilities = {},
+        units = {},
     },
 }
 
 local _colorToFaction = {}
+local _tokenNameToFaction = {}
 
 local _update = {
     time = false,
-    periodicUpdateSeconds = 10,
+    periodicUpdateSeconds = 30,
 }
+
+local _state = {
+    frankenEnabled = false
+}
+
+function isFrankenEnabled()
+    return _state.frankenEnabled
+end
 
 function allFactions(includeFactionsNotAtTable)
     assert(not includeFactionsNotAtTable or type(includeFactionsNotAtTable) == 'boolean')
     if includeFactionsNotAtTable then
         return _factionAttributes
     else
-        _maybeUpdate()
+        _maybeUpdateFactions()
         return _colorToFaction
     end
 end
 
 function fromColor(color)
     assert(type(color) == 'string')
-    _maybeUpdate()
+    _maybeUpdateFactions()
     return _colorToFaction[color]
 end
 
@@ -365,120 +626,370 @@ end
 function fromTokenName(tokenName)
     assert(type(tokenName) == 'string')
     tokenName = string.match(tokenName, '^(.*) .* Token$') or tokenName
-    _maybeUpdate()
-    for _, faction in pairs(_factionAttributes) do
-        if faction.tokenName == tokenName then
-            return faction
+    if string.len(tokenName) > 0 then
+        _maybeUpdateFactions()
+        return _tokenNameToFaction[tokenName]
+    end
+end
+
+-------------------------------------------------------------------------------
+
+function verifyAllFactions()
+    local errors = false
+    for name, faction in pairs(_factionAttributes) do
+        local success, errorMessage = _factionIsValid(faction)
+        if not success then
+            errors = errors or {}
+            table.insert(errors, name .. ': ' .. errorMessage)
+        end
+    end
+    if errors then
+        error('verifyAllFactions ' .. table.concat(errors, ', '))
+    end
+    print('verifyAllFactions: success')
+end
+
+--- Let homebrew add custom factions via runtime injection.
+-- @param faction: faction table.
+function injectFaction(faction)
+    assert(type(faction) == 'table')
+
+    -- Unclear if the faction is shared with the caller, make a copy to be
+    -- sure any later mutations to the caller's version does not change this.
+    local function copyTable(t)
+        if t and type(t) == 'table' then
+            local copy = {}
+            for k, v in pairs(t) do
+                copy[k] = type(v) == 'table' and copyTable(v) or v
+            end
+            t = copy
+        end
+        return t
+    end
+    faction = copyTable(faction)
+
+    local success, errorMessage = _factionIsValid(faction)
+    if not success then
+        error('injectFaction: ' .. guid .. ' ' .. errorMessage)
+    end
+
+    if _factionAttributes[faction.name] then
+        print('injectFaction: WARNING, already have "' .. faction.name ..'", replacing with new attributes.')
+    end
+
+    _factionAttributes[faction.name] = faction
+    _tokenNameToFaction[faction.tokenName] = faction
+    if faction.frankenName and not _tokenNameToFaction[faction.frankenName] then
+        _tokenNameToFaction[faction.frankenName] = _tokenNameToFaction[faction.tokenName]
+    end
+end
+
+function _factionIsValid(faction)
+    local name = faction.name
+    if not name or type(name) ~= 'string' or string.len(name) == 0 then
+        return false, 'faction.name must be a non-empty string'
+    end
+
+    local tokenName = faction.tokenName
+    if not tokenName or type(tokenName) ~= 'string' or string.len(tokenName) == 0 then
+        return false, 'faction.tokenName must be a non-empty string'
+    end
+
+    local frankenName = faction.frankenName
+    if not frankenName or type(frankenName) ~= 'string' or string.len(frankenName) == 0 then
+        return false, 'faction.frankenName must be a non-empty string'
+    end
+
+    local home = faction.home
+    if not home or type(home) ~= 'number' then
+        return false, 'faction.home must be a number'
+    end
+
+    local startingUnits = faction.startingUnits
+    if not startingUnits or type(startingUnits) ~= 'table' then
+        return false, 'faction.startingUnits must be a table'
+    end
+
+    local startingTech = faction.startingTech
+    if not startingTech or type(startingTech) ~= 'table' then
+        return false, 'faction.startingTech must be a table'
+    end
+
+    local flagship = faction.flagship
+    if not flagship or type(flagship) ~= 'string' or string.len(flagship) == 0 then
+        return false, 'faction.flagship must be a non-empty string'
+    end
+
+    local flagshipDescription = faction.flagshipDescription
+    if not flagshipDescription or type(flagshipDescription) ~= 'string' or string.len(flagshipDescription) == 0 then
+        return false, 'faction.flagshipDescription must be a non-empty string'
+    end
+
+    local abilities = faction.abilities
+    if not abilities or type(abilities) ~= 'table' then
+        return false, 'faction.abilities must be a table'
+    end
+
+    local units = faction.units
+    if not units or type(units) ~= 'table' then
+        return false, 'faction.units must be a table'
+    end
+
+    return true
+end
+
+-------------------------------------------------------------------------------
+
+function _maybeUpdateFactions()
+    if not _update.time or (Time.time - _update.time) > _update.periodicUpdateSeconds then
+        updateFactions()
+    end
+end
+
+function updateFactions()
+    _update.time = Time.time
+
+    local factionLowerToFactionName = {}
+    for factionName, _ in pairs(_factionAttributes) do
+        factionLowerToFactionName[string.lower(factionName)] = factionName
+    end
+
+    local flagshipSet = {}
+    local abilitySet = {}
+    local guidToName = {}
+    local guidToPosition = {}
+    if _state.frankenEnabled then
+        for _, faction in pairs(_factionAttributes) do
+            flagshipSet[faction.flagship] = true
+            for _, ability in ipairs(faction.abilities) do
+                abilitySet[ability] = true
+            end
+        end
+    end
+
+    -- Find command sheets (indexed by color), faction sheets (indexed by
+    -- faction name), and command token bags (indexed by "token faction" name,
+    -- which may differ slightly from the faction sheet faction name).
+    local colorToCommandSheet = {}
+    local factionSheetGuidToFactionSheet = {}
+    local factionSheetGuidToFactionName = {}
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        local guid = object.getGUID()
+
+        -- "Command Sheet (COLOR)"
+        local color = string.match(name, '^Command Sheet %((%a+)%)$')
+        if color then
+            colorToCommandSheet[color] = object
+        end
+
+        -- "FACTION Sheet" (only accept if FACTION in whitelist!)
+        -- Replace name with "expected" case, sometimes "of" vs "Of" depending on object.
+        local factionName = string.match(name, '^(.+) Sheet$')
+        factionName = factionName and factionLowerToFactionName[string.lower(factionName)]
+        if factionName then
+            factionSheetGuidToFactionSheet[guid] = object
+            factionSheetGuidToFactionName[guid] = factionName
+        end
+
+        if _state.frankenEnabled and object.tag == 'Tile' and (flagshipSet[name] or abilitySet[name]) then
+            guidToName[guid] = name
+            guidToPosition[guid] = object.getPosition()
+        end
+    end
+
+    -- Given a key/object-value table, return a map from command sheet color
+    -- to the key whose object is closest to the command sheet AND VICE VERSA.
+    -- For example, consider a table with an empty seat that has a command sheet
+    -- but no faction sheet.  In that case, that orphaned command sheet does
+    -- have a closest faction sheet, but that faction sheet is closer to another.
+    -- Likewise consider an extra faction sheet placed on the table for some
+    -- reason.  That faction sheet has a closest command sheet, but that
+    -- command sheet is closer to another.
+    local function distanceSq(p1, p2)
+        return (p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2
+    end
+    local function minKV(map, f)
+        local bestF = false
+        local bestK = false
+        for k, v in pairs(map) do
+            local thisF = f(v)
+            if not bestF or thisF < bestF then
+                bestF = thisF
+                bestK = k
+            end
+        end
+        return bestK, map[bestK]
+    end
+    local function colorToClosestKey(keyToObjectTable)
+        local result = {}
+        -- Assign each object to its closest command sheet.
+        local colorToKeys = {}
+        for key, object in pairs(keyToObjectTable) do
+            local objectPosition = object.getPosition()
+            local function distance(commandSheet)
+                local commandSheetPosition = commandSheet.getPosition()
+                return distanceSq(objectPosition, commandSheetPosition)
+            end
+            local color, _ = minKV(colorToCommandSheet, distance)
+            if color then
+                local entry = colorToKeys[color]
+                if not entry then
+                    entry = {}
+                    colorToKeys[color] = entry
+                end
+                table.insert(entry, key)
+            end
+        end
+        -- For each color, get the closest candidate object.
+        for color, keys in pairs(colorToKeys) do
+            local colorPosition = colorToCommandSheet[color].getPosition()
+            local function distance(key)
+                local objectPosition = keyToObjectTable[key].getPosition()
+                return distanceSq(objectPosition, colorPosition)
+            end
+            local _, key = minKV(keys, distance)
+            result[color] = key
+        end
+        return result
+    end
+
+    -- Map command sheet color to nearest faction, tokenFaction, and seated player.
+    local colorToFactionSheetGuid = colorToClosestKey(factionSheetGuidToFactionSheet)
+
+    _colorToFaction = {}
+    _tokenNameToFaction = {}
+    for color, factionSheetGuid in pairs(colorToFactionSheetGuid) do
+        local factionName = factionSheetGuidToFactionName[factionSheetGuid]
+        local attributes = {
+            color = color,
+            commandSheetGuid = colorToCommandSheet[color].getGUID(),
+            factionSheetGuid = colorToFactionSheetGuid[color],
+        }
+        for k, v in pairs(_factionAttributes[factionName]) do
+            attributes[k] = v
+        end
+        _colorToFaction[color] = attributes
+        _tokenNameToFaction[attributes.tokenName] = attributes
+    end
+
+    -- Add any missing factions to token name map.
+    for factionName, attributes in pairs(_factionAttributes) do
+        if not _tokenNameToFaction[attributes.tokenName] then
+            _tokenNameToFaction[attributes.tokenName] = attributes
+        end
+    end
+
+    -- Also add using the Franken name (if different from token name).
+    -- The Franken name is the shorthand faction name for Franken tokens.
+    for factionName, attributes in pairs(_factionAttributes) do
+        if attributes.frankenName and not _tokenNameToFaction[attributes.frankenName] then
+            _tokenNameToFaction[attributes.frankenName] = _tokenNameToFaction[attributes.tokenName]
+        end
+    end
+
+    -- If franken is enabled, reset flagship and abilities based on franken tiles.
+    if _state.frankenEnabled then
+        local guidToColor = _zoneHelper.zonesFromPositions(guidToPosition)
+        for color, faction in pairs(_colorToFaction) do
+            faction.flagship = '?'
+            faction.abilities = {}
+            faction.units = {}
+            for guid, tileColor in pairs(guidToColor) do
+                local name = guidToName[guid]
+                if color == tileColor then
+                    if flagshipSet[name] then
+                        faction.flagship = name
+                    elseif abilitySet[name] then
+                        table.insert(faction.abilities, name)
+                    end
+                end
+            end
         end
     end
 end
 
-function _maybeUpdate()
-    if not _update.time or (Time.time - _update.time) > _update.periodicUpdateSeconds then
-        _update.time = Time.time
+-------------------------------------------------------------------------------
 
-        local factionLowerToFactionName = {}
-        for factionName, _ in pairs(_factionAttributes) do
-            factionLowerToFactionName[string.lower(factionName)] = factionName
+local DEFAULT_TINT = {
+    White = '8C8C8C',
+    Blue = '0C98D7',
+    Purple = '7500B7',
+    Yellow = 'A5A300',
+    Red = 'CB0000',
+    Green = '007406',
+    Orange = 'F3631C',
+    Brown = '703A16',
+    Pink = 'F46FCD',
+    --Grey = '7F7F7F',
+    --Black = '050505',
+}
+
+function tintTokens(params)
+    _maybeUpdateFactions()
+
+    -- No color means do all colors.
+    if not params then
+        for color, _ in pairs(_colorToFaction) do
+            tintTokens({ color = color })
         end
+        return
+    end
+    assert(type(params.color) == 'string')
+    assert(not params.tint or type(params.tint) == 'string')
 
-        -- Find command sheets (indexed by color), faction sheets (indexed by
-        -- faction name), and command token bags (indexed by "token faction" name,
-        -- which may differ slightly from the faction sheet faction name).
-        local colorToCommandSheet = {}
-        local factionSheetGuidToFactionSheet = {}
-        local factionSheetGuidToFactionName = {}
-        for _, object in ipairs(getAllObjects()) do
-            local name = object.getName()
-            local guid = object.getGUID()
+    local tintColor = assert(params.tint or DEFAULT_TINT[params.color], 'no tint color for "' .. params.color .. '"')
+    assert(string.match(tintColor, '^%x%x%x%x%x%x$'), 'bad tint color "' .. tintColor .. '"')
+    tintColor = Color.fromHex('#' .. tintColor .. 'ff')  -- RGBA
 
-            -- "Command Sheet (COLOR)"
-            local color = string.match(name, '^Command Sheet %((%a+)%)$')
-            if color then
-                colorToCommandSheet[color] = object
-            end
+    local faction = _colorToFaction[params.color]
+    if not faction then
+        return
+    end
 
-            -- "FACTION Sheet" (only accept if FACTION in whitelist!)
-            -- Replace name with "expected" case, sometimes "of" vs "Of" depending on object.
-            local factionName = string.match(name, '^(.+) Sheet$')
-            factionName = factionName and factionLowerToFactionName[string.lower(factionName)]
-            if factionName then
-                factionSheetGuidToFactionSheet[guid] = object
-                factionSheetGuidToFactionName[guid] = factionName
-            end
+    local tintSet = {
+        [faction.tokenName .. ' Command Token'] = true,
+        [faction.tokenName .. ' Owner Token'] = true,
+        [faction.tokenName .. ' Command Tokens Bag'] = true,
+        [faction.tokenName .. ' Owner Tokens Bag'] = true,
+    }
+
+    local function tintCommandTokensBag(bag)
+        local p = bag.getPosition()
+        local function takeCallback(object)
+            object.setColorTint(tintColor)
+            bag.putObject(object)
         end
-
-        -- Given a key/object-value table, return a map from command sheet color
-        -- to the key whose object is closest to the command sheet AND VICE VERSA.
-        -- For example, consider a table with an empty seat that has a command sheet
-        -- but no faction sheet.  In that case, that orphaned command sheet does
-        -- have a closest faction sheet, but that faction sheet is closer to another.
-        -- Likewise consider an extra faction sheet placed on the table for some
-        -- reason.  That faction sheet has a closest command sheet, but that
-        -- command sheet is closer to another.
-        local function distanceSq(p1, p2)
-            return (p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2
+        for i, entry in ipairs(bag.getObjects()) do
+            bag.takeObject({
+                guid = entry.guid,
+                position = { x = p.x, y = p.y + 5 + i, z = p.z },
+                callback_function = takeCallback
+            })
         end
-        local function minKV(map, f)
-            local bestF = false
-            local bestK = false
-            for k, v in pairs(map) do
-                local thisF = f(v)
-                if not bestF or thisF < bestF then
-                    bestF = thisF
-                    bestK = k
-                end
-            end
-            return bestK, map[bestK]
-        end
-        local function colorToClosestKey(keyToObjectTable)
-            local result = {}
-            -- Assign each object to its closest command sheet.
-            local colorToKeys = {}
-            for key, object in pairs(keyToObjectTable) do
-                local objectPosition = object.getPosition()
-                local function distance(commandSheet)
-                    local commandSheetPosition = commandSheet.getPosition()
-                    return distanceSq(objectPosition, commandSheetPosition)
-                end
-                local color, _ = minKV(colorToCommandSheet, distance)
-                if color then
-                    local entry = colorToKeys[color]
-                    if not entry then
-                        entry = {}
-                        colorToKeys[color] = entry
-                    end
-                    table.insert(entry, key)
-                end
-            end
-            -- For each color, get the closest candidate object.
-            for color, keys in pairs(colorToKeys) do
-                local colorPosition = colorToCommandSheet[color].getPosition()
-                local function distance(key)
-                    local objectPosition = keyToObjectTable[key].getPosition()
-                    return distanceSq(objectPosition, colorPosition)
-                end
-                local _, key = minKV(keys, distance)
-                result[color] = key
-            end
-            return result
-        end
+    end
 
-        -- Map command sheet color to nearest faction, tokenFaction, and seated player.
-        local colorToFactionSheetGuid = colorToClosestKey(factionSheetGuidToFactionSheet)
+    local function tintOwnerTokensBag(bag)
+        local p = bag.getPosition()
+        local function takeCallback(object)
+            object.setColorTint(tintColor)
+            bag.reset()
+            bag.putObject(object)
+        end
+        bag.takeObject({
+            position = { x = p.x, y = p.y + 5, z = p.z },
+            callback_function = takeCallback
+        })
+    end
 
-        _colorToFaction = {}
-        for color, factionSheetGuid in pairs(colorToFactionSheetGuid) do
-            local factionName = factionSheetGuidToFactionName[factionSheetGuid]
-            local attributes = {
-                color = color,
-                commandSheetGuid = colorToCommandSheet[color].getGUID(),
-                factionSheetGuid = colorToFactionSheetGuid[color],
-            }
-            for k, v in pairs(_factionAttributes[factionName]) do
-                attributes[k] = v
+    for _, object in ipairs(getAllObjects()) do
+        if tintSet[object.getName()] then
+            object.setColorTint(tintColor)
+            if object.tag == 'Bag' then
+                tintCommandTokensBag(object)
+            elseif object.tag == 'Infinite' then
+                tintOwnerTokensBag(object)
             end
-            _colorToFaction[color] = attributes
         end
     end
 end
@@ -489,6 +1000,9 @@ function onLoad(saveState)
     self.setName('TI4_FACTION_HELPER')
     self.setDescription('Shared helper functions used by other objects, PLEASE LEAVE ON TABLE! This object is only visible to the black (GM) player.')
 
+    self.addContextMenuItem('Verify Factions', verifyAllFactions)
+    self.addContextMenuItem('Report Factions', reportFactions)
+
     -- Only the GM/black player can see this object.  Others can still interact!
     local invisibleTo = {}
     for _, color in ipairs(Player.getColors()) do
@@ -498,8 +1012,49 @@ function onLoad(saveState)
     end
     self.setInvisibleTo(invisibleTo)
 
+    _state = saveState and string.len(saveState) > 0 and JSON.decode(saveState) or _state
+
     -- Add faction names to attributes.
     for factionName, attributes in pairs(_factionAttributes) do
         attributes.name = factionName
     end
 end
+
+function onSave()
+    return JSON.encode(_state)
+end
+
+function onFrankenEnabled(value)
+    _state.frankenEnabled = value or false
+    updateFactions()
+end
+
+function reportFactions()
+    _maybeUpdateFactions()
+    local message = { 'FactionHelper.reportFactions: Franken=' .. tostring(_state.frankenEnabled)}
+    for _, color in ipairs(_zoneHelper.zones()) do
+        local faction = _colorToFaction[color]
+        if faction then
+            local hex = Color.fromString(color):toHex()
+            table.insert(message, table.concat({
+                '[' .. hex .. ']' .. color,
+                'name={' .. (faction.name or '-') .. '}',
+                'flagship={' .. (faction.flagship or '-') .. '}',
+                'abilities={' .. table.concat(faction.abilities or {}, ', ') .. '}',
+                'units={' .. table.concat(faction.units or {}, ', ') .. '}',
+            }, ' '))
+        end
+    end
+    printToAll(table.concat(message, '\n'))
+end
+
+-------------------------------------------------------------------------------
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

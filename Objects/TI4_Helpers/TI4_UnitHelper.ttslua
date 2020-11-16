@@ -116,7 +116,11 @@ local _unitTypes = {
         cost = 0.5,
         groundCombat = { dice = 1, hit = 8 },
     },
-    ['Mech'] = {},
+    ['Mech'] = {
+        cost = 2,
+        groundCombat = {dice = 1, hit = 6 },
+        sustainDamage = true,
+        },
     ['PDS'] = {
         planetaryShield = true,
         spaceCannon = { dice = 1, hit = 6, range = 0, extraDice = 0 },
@@ -159,6 +163,17 @@ local _unitOverrides = {
     ['Spec Ops II'] = { upgrade = 'Infantry', groundCombat = { hit = 6 } },
     ['Super-Dreadnought I'] = { override = 'Dreadnought', capacity = 2 },
     ['Super-Dreadnought II'] = { upgrade = 'Dreadnought', bombardment = { dice = 1, hit = 4 }, spaceCombat = { hit = 4 }, move = 2, capacity = 2 },
+    -- PoK faction unit overrides and upgrades
+    ['Strike Wing Alpha I'] = { override = 'Destroyer', spaceCombat = {hit = 8}, capacity = 1},
+    ['Strike Wing Alpha II'] = { upgrade = 'Destroyer', antiFighterBarrage = { dice = 3, hit = 6 }, spaceCombat = {hit = y}, capacity = 1},
+    ['Crimson Legionnaire I'] = { override = 'Infantry', groundCombat = { hit = 8 } },
+    ['Crimson Legionnaire II'] = { upgrade = 'Infantry', groundCombat = { hit = 7 } },
+    ['Saturn Engine I'] = { override = 'Cruiser', spaceCombat = { hit = 7 }, capacity = 1 },
+    ['Saturn Engine II'] = { upgrade = 'Cruiser', spaceCombat = { hit = 6 }, move = 3, capacity = 2 , sustainDamage = true },
+    ['Hel-Titan I'] = { override = 'PDS', groundCombat = { hit = 7, dice = 1 }, planetaryShield = true, spaceCannon = {dice = 1, hit = 6, range = 0, extraDice = 0}, production = 1, sustainDamage = true},
+    ['Hel-Titan II'] = { upgrade = 'PDS', groundCombat = { hit = 6, dice = 1 }, planetaryShield = true, spaceCannon = {dice = 1, hit = 5, range = 1, extraDice = 0}, production = 1, sustainDamage = true},
+    ['Dimensional Tear I'] = { override = 'Space Dock', production = 5 },
+    ['Dimensional Tear II'] = { upgrade = 'Space Dock', production = 7 },
 
     -- Flagships.
     ['Arc Secundus'] = { override = 'Flagship', disablePlanetaryShield = true, bombardment = { dice = 3, hit = 5, extraDice = 0 }, spaceCombat = { dice = 2, hit = 5 } },
@@ -178,6 +193,41 @@ local _unitOverrides = {
     ['Wrath of Kenara'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 7 } },
     ["Y'sia Y'ssrila"] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 5 }, move = 2 },
     ['[0.0.1]'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 5 }, capacity = 5 },
+        -- PoK flagships
+    ['Quetzecoatl'] = { override = 'Flagship', spaceCombat = {dice = 2, hit = 7 } },
+    ['The Terror Between'] = { override = 'Flagship', spaceCombat = {dice = 2, hit = 5 }, bombardment = {dice = 1, hit = 5, extraDice = 0 } },
+    ['Dynamo'] = { override = 'Flagship', spaceCombat = {dice = 2, hit = 5 } },
+    ['Arvicon Rex'] = { override = 'Flagship', spaceCombat = {dice = 2, hit = 5 } },
+    ['Visz El Vir'] = { override = 'Flagship', spaceCombat = {dice = 2, hit = 9 }, capacity = 4 },
+    ['Memoria I'] = { override = 'Flagship', antiFighterBarrage = { dice = 3, hit = 8 }, spaceCombat = { dice = 2, hit = 7 } },
+    ['Memoria II'] = { upgrade = 'Flagship', antiFighterBarrage = { dice = 3, hit = 5 }, spaceCombat = { dice = 2, hit = 5 }, capacity = 6 },
+    ['Ouranos'] = { override = 'Flagship', spaceCombat = {dice = 2, hit = 7 } },
+
+    -- PoK Mechs
+    ['Letani Behemoth'] = { override = 'Mech', production = 2, planetaryShield = true },
+    ['Aerie Sentinel'] = { override = 'Mech' },
+    ['Dunlain Reaper'] = { override = 'Mech' },
+    ['Reanimator'] = { override = 'Mech' },
+    ['Icarus Drive'] = { override = 'Mech' },
+    ['Watcher'] = { override = 'Mech' },
+    ['Pride of Kenara'] = { override = 'Mech' },
+    ['Shield Paling'] = { override = 'Mech' },
+    ['Annihilator'] = { override = 'Mech', bombardment = { dice = 1, hit = 8 } },
+    ['Starlancer'] = { override = 'Mech' },
+    ['Moll Terminus']  = { override = 'Mech' },
+    ['Ember Colossus'] = { override = 'Mech' },
+    ['Iconoclast'] = { override = 'Mech' },
+    ['Eidolon'] = { override = 'Mech', spaceCombat = {dice = 2, hit = 8 }, groundCombat = { dice = 2, hit = 6} },
+    ['Mordred'] = { override = 'Mech' },
+    ['Quantum Manipulator'] = { override = 'Mech' },
+    ['Scavenger Zeta'] = { override = 'Mech' },
+    ['Valkyrie Exoskeleton'] = { override = 'Mech' },
+    ['ZS Thunderbolt M2'] = { override = 'Mech' },
+    ['Hecatoncheires'] = { override = 'Mech' },
+    ['Reclaimer'] = { override = 'Mech' },
+    ['Indomitus'] = { override = 'Mech', spaceCannon = { dice = 1, hit = 8, range = 1} },
+    ["Moyin's Ashes"] = { override = 'Mech' },
+    ['Blackshade Infiltrator'] = { override = 'Mech' },
 
     -- Codex.
     ['????_REDACTED_????'] = { override = 'Destroyer', antiFighterBarrage = { dice = 3, hit = 6 }, spaceCombat = { hit = 7 }, capacity = 1 },
@@ -296,6 +346,33 @@ local _flagshipModifiers = {
             for unitType, attr in pairs(unitAttrs) do
                 if attr.groundCombat then
                     attr.spaceCombat = _copy(attr.groundCombat)
+                end
+            end
+        end
+    },
+
+    ['Quetzecoatl'] = {
+        description = "Other players cannot use SPACE CANNON against your ships in this system",
+        owner = OWNER.OPPONENT,
+        type = TYPE.MUTATE,
+        apply = function(unitAttrs)
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.spaceCannon then
+                    attr.spaceCannon.dice = 0
+                end
+            end
+        end
+    },
+
+    ["Visz El Vir"] = {
+        description = "Your mechs in this system roll 1 additional die during combat",
+        owner = OWNER.SELF,
+        type = TYPE.ADJUST,
+        apply = function(unitAttrs)
+            for unitType, attr in pairs(unitAttrs) do
+                if unitType == 'Mech' and attr.spaceCombat then
+                    attr.spaceCombat.dice = attr.spaceCombat.dice + 1
+                    attr.groundCombat.dice = attr.groundCombat.dice + 1
                 end
             end
         end

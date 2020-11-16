@@ -546,6 +546,43 @@ local _unitModifiers = {
         end
     },
 
+    ['Strike Wing Ambuscade'] = {
+        description = '+1 die to a unit ability (anti-fighter barrage, bombardment, space cannon)',
+        owner = OWNER.SELF,
+        type = TYPE.CHOOSE,
+        apply = function(unitAttrs, params)
+            bestAFB = false
+            bestBomb = false
+            bestSpc = false
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.antiFighterBarrage and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                    if (not bestAFB) or (attr.antiFighterBarrage.hit < bestAFB.antiFighterBarrage.hit) then
+                        bestAFB = attr
+                    end
+                end
+                if attr.bombardment and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                    if (not bestBomb) or (attr.bombardment.hit < bestBomb.bombardment.hit) then
+                        bestBomb = attr
+                    end
+                end
+                if attr.spaceCannon and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                    if (not bestSpc) or (attr.spaceCannon.hit < bestSpc.spaceCannon.hit) then
+                        bestSpc = attr
+                    end
+                end
+            end
+            if bestAFB then
+                bestAFB.extraDice = (bestAFB.extraDice or 0) + 1
+            end
+            if bestBomb then
+                bestBomb.extraDice = (bestBomb.extraDice or 0) + 1
+            end
+            if bestSpc then
+                bestSpc.extraDice = (bestSpc.extraDice or 0) + 1
+            end
+        end
+    },
+
     ['Tekklar Legion'] = {
         description = '+1 to ground COMBAT rolls for attacker, -1 to Sardakk if opponent owns',  -- -1 to Sardakk if other player has it
         owner = OWNER.ANY,
@@ -561,6 +598,43 @@ local _unitModifiers = {
                 end
             end
 
+        end
+    },
+
+    ['Trrakan Aun Zulok'] = { -- Strike Wing Commander
+        description = '+1 die to a unit ability (anti-fighter barrage, bombardment, space cannon)',
+        owner = OWNER.SELF,
+        type = TYPE.CHOOSE,
+        apply = function(unitAttrs, params)
+            bestAFB = false
+            bestBomb = false
+            bestSpc = false
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.antiFighterBarrage and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                    if (not bestAFB) or (attr.antiFighterBarrage.hit < bestAFB.antiFighterBarrage.hit) then
+                        bestAFB = attr
+                    end
+                end
+                if attr.bombardment and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                    if (not bestBomb) or (attr.bombardment.hit < bestBomb.bombardment.hit) then
+                        bestBomb = attr
+                    end
+                end
+                if attr.spaceCannon and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                    if (not bestSpc) or (attr.spaceCannon.hit < bestSpc.spaceCannon.hit) then
+                        bestSpc = attr
+                    end
+                end
+            end
+            if bestAFB then
+                bestAFB.extraDice = (bestAFB.extraDice or 0) + 1
+            end
+            if bestBomb then
+                bestBomb.extraDice = (bestBomb.extraDice or 0) + 1
+            end
+            if bestSpc then
+                bestSpc.extraDice = (bestSpc.extraDice or 0) + 1
+            end
         end
     },
 

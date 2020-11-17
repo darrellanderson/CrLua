@@ -691,17 +691,19 @@ function SetupColor.unpackUnits(color, colorBox, directionaliser)
 
     local unitBags = {}
     for namePattern, offset in pairs(SetupColor.NAME_TO_DIRECTIONALISER_OFFSET) do
-        namePattern = string.gsub(namePattern, '$COLOR', color)
-        local guid = assert(getEntryGuid(colorBox, namePattern), 'missing ' .. namePattern)
-        local object = colorBox.takeObject({
-            guid              = guid,
-            position          = directionaliser.positionToWorld(offset),
-            rotation          = directionaliser.getRotation(),
-            callback_function = function(object) object.setLock(offset.lock or false) end,
-            smooth            = false,
-        })
-        object.use_grid = false
-        table.insert(unitBags, object)
+        if (not offset.pok) or _includePoK then
+            namePattern = string.gsub(namePattern, '$COLOR', color)
+            local guid = assert(getEntryGuid(colorBox, namePattern), 'missing ' .. namePattern)
+            local object = colorBox.takeObject({
+                guid              = guid,
+                position          = directionaliser.positionToWorld(offset),
+                rotation          = directionaliser.getRotation(),
+                callback_function = function(object) object.setLock(offset.lock or false) end,
+                smooth            = false,
+            })
+            object.use_grid = false
+            table.insert(unitBags, object)
+        end
     end
     return unitBags
 end

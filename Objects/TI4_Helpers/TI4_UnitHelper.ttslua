@@ -1073,10 +1073,10 @@ function getColorToUnitModifiers()
 
     local guidToName = {}
     local guidToPosition = {}
+    local colorToLeaderSheet = {}
     for _, object in ipairs(getAllObjects()) do
         local name, unitModifier = getUnitModifier(object)
         if unitModifier then
-
             -- Tekklar Legion buffs non-Sardakk and penalizes Sardakk, BUT
             -- players expect Sardakk to be able to have it face up on the
             -- table with a "for sale" sign.  Only add when not in Sarakk zone.
@@ -1100,11 +1100,36 @@ function getColorToUnitModifiers()
                 guidToPosition[guid] = object.getPosition()
             end
         end
+        local color = string.match(obect.getName(), '^Leader Sheet %((.*)%)$')
+        if color then
+            colorToLeaderSheet[color] = object
+        end
     end
     local guidToZoneColor = _zoneHelper.zonesFromPositions(guidToPosition)
     for guid, zoneColor in pairs(guidToZoneColor) do
         local name = guidToName[guid]
-        addModifier(zoneColor, name)
+        local modifier = _unitModifiers[name]
+        local leaderSheet = modifier.leader and colorToLeaderSheet[zoneColor]
+        if leaderSheet then
+            -- Ignore leaders on the leader sheet.
+            local bounds = leaderSheet.getBounds()
+            local bb = {
+                min = {
+                    x = bounds.center.x - bounds.size.x / 2,
+                    z = bounds.center.z - bounds.size.z / 2,
+                },
+                max = {
+                    x = bounds.center.x + bounds.size.x / 2,
+                    z = bounds.center.z + bounds.size.z / 2,
+                }
+            }
+            local p = guidToPosition[guid]
+            if p.x > bb.min.x and p.x < bb.max.x and p.z > bb.min.z and p.z < bb.max.z then
+                addModifier(zoneColor, name)
+            end
+        else
+            addModifier(zoneColor, name)
+        end
     end
 
     local colorToUnitModifiers = {}

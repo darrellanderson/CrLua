@@ -1362,6 +1362,8 @@ end
 function activateSystem(playerColor, system)
     assert(type(playerColor) == 'string' and type(system) == 'table')
 
+    _fillMissingSystemData(system.guid, system)
+
     _activatedSystem = system
     _lastActivatedSystem = system
 

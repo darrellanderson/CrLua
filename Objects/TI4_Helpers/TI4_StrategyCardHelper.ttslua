@@ -248,6 +248,7 @@ function dealAllActionCards(dealOrder)
 
     local guidToPosition = {}
     local guidToName = {}
+    local eliminatedPlayerSet = {}
 
     local inHandGuidSet = _zoneHelper.inHand()
     for _, object in ipairs(getAllObjects()) do
@@ -257,6 +258,12 @@ function dealAllActionCards(dealOrder)
             guidToPosition[guid] = object.getPosition()
             guidToName[guid] = name
         end
+        if object.getName() == 'Player Eliminated' then
+            local color = _zoneHelper.zoneFromPosition(object.getPosition())
+            if color then
+                eliminatedPlayerSet[color] = true
+            end
+        end
     end
 
     local guidToColor = _zoneHelper.zonesFromPositions(guidToPosition)
@@ -265,6 +272,11 @@ function dealAllActionCards(dealOrder)
         local faction = _factionHelper.fromColor(color)
         if not faction then
             broadcastToAll('Deal action cards: no faction for ' .. color, 'Red')
+            return
+        end
+
+        if eliminatedPlayerSet[color] then
+            broadcastToAll('Deal action cards: ' .. color .. ' eliminated, skipping')
             return
         end
 

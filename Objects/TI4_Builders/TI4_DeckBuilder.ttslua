@@ -48,9 +48,10 @@ end
 
 local function getCards(sheet, namesCol, descriptionCol, imagesCol)
     assert(type(sheet) == 'string' and type(namesCol) == 'string' and type(imagesCol) == 'string')
-    local names = getCol(sheet, namesCol, 2)
-    local descriptions = descriptionCol and getCol(sheet, descriptionCol, 2, #names)
-    local images = getCol(sheet, imagesCol, 2)
+    local startRow = 2
+    local names = getCol(sheet, namesCol, startRow)
+    local descriptions = descriptionCol and getCol(sheet, descriptionCol, startRow, #names)
+    local images = getCol(sheet, imagesCol, startRow)
 
     local result = {}
     for i = 1, math.min(#names, #images) do

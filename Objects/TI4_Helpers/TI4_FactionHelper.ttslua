@@ -670,7 +670,7 @@ function injectFaction(faction)
 
     local success, errorMessage = _factionIsValid(faction)
     if not success then
-        error('injectFaction: ' .. guid .. ' ' .. errorMessage)
+        error('injectFaction: ' .. errorMessage)
     end
 
     if _factionAttributes[faction.name] then

@@ -9,6 +9,9 @@ function onLoad(save_state)
     self.addContextMenuItem('Action Deck', buildActionDeck)
     self.addContextMenuItem('Agenda Deck', buildAgendaDeck)
     self.addContextMenuItem('Promissory Deck', buildPromissoryDeck)
+    self.addContextMenuItem('Secrets Deck', buildSecretsDeck)
+    self.addContextMenuItem('Stage1 Deck', buildStage1Deck)
+    self.addContextMenuItem('Stage2 Deck', buildStage2Deck)
 end
 
 -------------------------------------------------------------------------------
@@ -90,14 +93,19 @@ end
 
 local function spawnDeck(deckName, cards, cardSheetUrl, backUrl)
     assert(type(deckName) == 'string' and type(cards) == 'table' and type(cardSheetUrl) == 'string' and type(backUrl) == 'string')
+
     local params = {
         face = cardSheetUrl,
         back = backUrl,
         unique_back = false,
         width = 8,
         height = math.max(2, math.ceil(#cards / 8)),
-        number = #cards
+        number = math.max(#cards, 3),  -- min 3 for deck handling
     }
+    if #cards % 8 == 0 then
+        local minHeight = math.floor(#cards / 8) + 1
+        params.height = math.max(minHeight, params.height)
+    end
     local deck = spawnObject({
         type              = 'DeckCustom',
         position          = { x = 0, y = 1, z = 0 },
@@ -121,9 +129,11 @@ local function spawnDeck(deckName, cards, cardSheetUrl, backUrl)
             smooth = false
         })
         card.use_grid = false
-        card.setName(cards[i].name)
-        if cards[i].description then
-            card.setDescription(cards[i].description)
+        if i <= #cards then
+            card.setName(cards[i].name)
+            if cards[i].description then
+                card.setDescription(cards[i].description)
+            end
         end
         coroutine.yield(0)
         coroutine.yield(0)
@@ -135,8 +145,25 @@ local function spawnDeck(deckName, cards, cardSheetUrl, backUrl)
         coroutine.yield(0)
     end
 
+    local waitUntil = Time.time + 2
+    while Time.time < waitUntil do
+        coroutine.yield(0)
+    end
+
     -- Move to final position.
     deck.setPosition({ x = 3, y = 5, z = 0 })
+
+    -- Remove any extra cards.
+    while deck.getQuantity() > #cards do
+        local card = deck.takeObject({
+            top = true
+        })
+        destroyObject(card)
+        coroutine.yield(0)
+        coroutine.yield(0)
+        coroutine.yield(0)
+    end
+
     local waitUntil = Time.time + 1
     while Time.time < waitUntil do
         coroutine.yield(0)
@@ -205,6 +232,48 @@ function buildAgendaDeckCoroutine()
     local cards = getCards('Agenda', 'A', false, 'G')
     local back = '/tmp/t.decks/Agenda_Back.jpg'
     buildDeck('Agenda', cards, back)
+    print('done!')
+    return 1
+end
+
+-------------------------------------------------------------------------------
+
+function buildSecretsDeck()
+    startLuaCoroutine(self, 'buildSecretsDeckCoroutine')
+end
+
+function buildSecretsDeckCoroutine()
+    local cards = getCards('Secrets', 'A', false, 'E')
+    local back = '/tmp/t.decks/SecretObjective_Back.jpg'
+    buildDeck('Secret Objectives', cards, back)
+    print('done!')
+    return 1
+end
+
+-------------------------------------------------------------------------------
+
+function buildStage1Deck()
+    startLuaCoroutine(self, 'buildStage1DeckCoroutine')
+end
+
+function buildStage1DeckCoroutine()
+    local cards = getCards('Public1', 'A', false, 'E')
+    local back = '/tmp/t.decks/Stage1_Back.jpg'
+    buildDeck('Public Objectives I', cards, back)
+    print('done!')
+    return 1
+end
+
+-------------------------------------------------------------------------------
+
+function buildStage2Deck()
+    startLuaCoroutine(self, 'buildStage2DeckCoroutine')
+end
+
+function buildStage2DeckCoroutine()
+    local cards = getCards('Public2', 'A', false, 'E')
+    local back = '/tmp/t.decks/Stage2_Back.jpg'
+    buildDeck('Public Objectives II', cards, back)
     print('done!')
     return 1
 end

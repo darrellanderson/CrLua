@@ -49,6 +49,12 @@ local TYPE = {
     CHOOSE = 'choose',  -- picks from available unit(s), do after all others.
 }
 
+local LEADER = {
+    AGENT = 'agent',
+    COMMANDER = 'commander',
+    HERO = 'hero'
+}
+
 -- Unit attributes:
 --
 -- - antiFighterBarrage {dice=#,hit=#} table.
@@ -381,7 +387,7 @@ local _flagshipModifiers = {
 
 local _unitModifiers = {
     ['2Ram'] = {
-        leader = true, -- L1Z1X commander
+        leader = LEADER.COMMANDER, -- L1Z1X
         description = 'PLANETARY SHIELD does not prevent BOMBARDMENT',
         owner = OWNER.SELF,
         type = TYPE.MUTATE,
@@ -456,7 +462,7 @@ local _unitModifiers = {
     },
 
     ['Evelyn Delouis'] = {
-        leader = true, -- Sol agent
+        leader = LEADER.AGENT, -- Sol
         description = '+1 die to a single GROUND COMBAT roll',
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,
@@ -594,7 +600,7 @@ local _unitModifiers = {
     },
 
     ['Rickar Rickani'] = {
-        leader = true, -- Winnu commander
+        leader = LEADER.COMMANDER, -- Winnu
         description = '+2 to combat rolls',
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
@@ -611,7 +617,7 @@ local _unitModifiers = {
     },
 
     ['Ssruu'] = {
-        leader = true, -- Yssaril agent
+        leader = LEADER.AGENT, -- Yssaril agent
         description = 'Copy abilities from other agents',
         owner = OWNER.SELF,
         type = TYPE.MUTATE,
@@ -678,7 +684,7 @@ local _unitModifiers = {
     },
 
     ['Trrakan Aun Zulok'] = {
-        leader = true, -- Strike Wing Commander
+        leader = LEADER.COMMANDER, -- Strike Wing
         description = '+1 die to a unit ability (anti-fighter barrage, bombardment, space cannon)',
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,
@@ -732,7 +738,7 @@ local _unitModifiers = {
     },
 
     ['Viscount Unlenn'] = {
-        leader = true, -- Barony agent
+        leader = LEADER.AGENT, -- Barony agent
         description = '+1 die to a single SPACE COMBAT roll',
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,
@@ -1031,6 +1037,9 @@ end
 --- Get a table from player color to list of unit modifier names.
 function getColorToUnitModifiers()
     local colorToUnitModifierSet = {}
+    for _, color in ipairs(_zoneHelper.zones()) do
+        colorToUnitModifierSet[color] = {}
+    end
 
     local allModifiersSet = {}
     local function addModifier(color, name)
@@ -1086,6 +1095,8 @@ function getColorToUnitModifiers()
     local guidToName = {}
     local guidToPosition = {}
     local colorToLeaderSheet = {}
+    local colorToAlliances = {}
+    local colorToCommander = {}
     for _, object in ipairs(getAllObjects()) do
         local name, unitModifier = getUnitModifier(object)
         if unitModifier then
@@ -1111,10 +1122,20 @@ function getColorToUnitModifiers()
                 guidToName[guid] = name
                 guidToPosition[guid] = object.getPosition()
             end
+            if unitModifier.leader == LEADER.COMMANDER then
+                local color = _zoneHelper.zoneFromPosition(object.getPosition())
+                colorToCommander[color] = name
+            end
         end
         local color = string.match(object.getName(), '^Leader Sheet %((.*)%)$')
         if color then
             colorToLeaderSheet[color] = object
+        end
+        local color = string.match(object.getName(), '^Alliance %((.*)%)$')
+        if color then
+            local zoneColor = _zoneHelper.zoneFromPosition(object.getPosition())
+            colorToAlliances[zoneColor] = colorToAlliances[zoneColor] or {}
+            table.insert(colorToAlliances[zoneColor], color)
         end
     end
     local guidToZoneColor = _zoneHelper.zonesFromPositions(guidToPosition)
@@ -1149,14 +1170,20 @@ function getColorToUnitModifiers()
         local entry = {}
         for name, _ in pairs(unitModifiersSet) do
             table.insert(entry, name)
+            -- Yssaril agent, copies other agents.
             if name == 'Ssruu' then
-                -- Yssaril agent, copies others
-                if allModifiersSet['Evelyn Delouis'] then
-                    table.insert(entry, 'Evelyn Delouis')
+                for other, _ in pairs(allModifiersSet) do
+                    if other ~= 'Ssruu' and _unitModifiers[other].leader == LEADER.AGENT then
+                        table.insert(entry, other)
+                    end
                 end
-                if allModifiersSet['Viscount Unlenn'] then
-                    table.insert(entry, 'Viscount Unlenn')
-                end
+            end
+        end
+        -- Alliance copies unlocked commander(s).
+        for _, alliance in ipairs(colorToAlliances[color] or {}) do
+            local commander = colorToCommander[alliance]
+            if commander then
+                table.insert(entry, commander)
             end
         end
         colorToUnitModifiers[color] = entry

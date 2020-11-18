@@ -49,6 +49,12 @@ local TYPE = {
     CHOOSE = 'choose',  -- picks from available unit(s), do after all others.
 }
 
+local LEADER = {
+    AGENT = 'agent',
+    COMMANDER = 'commander',
+    HERO = 'hero'
+}
+
 -- Unit attributes:
 --
 -- - antiFighterBarrage {dice=#,hit=#} table.
@@ -339,7 +345,7 @@ local _flagshipModifiers = {
     },
 
     ['The Alastor'] = {
-        description = "Ground forces may participate in space combat",
+        description = 'Ground forces may participate in space combat',
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,  -- copy combat attributes AFTER all adjustments
         apply = function(unitAttrs)
@@ -352,7 +358,7 @@ local _flagshipModifiers = {
     },
 
     ['Quetzecoatl'] = {
-        description = "Other players cannot use SPACE CANNON against your ships in this system",
+        description = 'Other players cannot use SPACE CANNON against your ships in this system',
         owner = OWNER.OPPONENT,
         type = TYPE.MUTATE,
         apply = function(unitAttrs)
@@ -363,8 +369,8 @@ local _flagshipModifiers = {
         end
     },
 
-    ["Visz El Vir"] = {
-        description = "Your mechs in this system roll 1 additional die during combat",
+    ['Visz El Vir'] = {
+        description = 'Your mechs in this system roll 1 additional die during combat',
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
         apply = function(unitAttrs)
@@ -380,6 +386,20 @@ local _flagshipModifiers = {
 }
 
 local _unitModifiers = {
+    ['2Ram'] = {
+        leader = LEADER.COMMANDER, -- L1Z1X
+        description = 'PLANETARY SHIELD does not prevent BOMBARDMENT',
+        owner = OWNER.SELF,
+        type = TYPE.MUTATE,
+        apply = function(unitAttrs)
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.bombardment then
+                    attr.disablePlanetaryShield = true
+                end
+            end
+        end
+    },
+
     ['Antimass Deflectors'] = {
         description = '-1 to all SPACE CANNON rolls',
         owner = OWNER.OPPONENT,
@@ -390,6 +410,19 @@ local _unitModifiers = {
                     attr.spaceCannon.hit = attr.spaceCannon.hit + 1
                 end
             end
+        end
+    },
+
+    ['Articles of War'] = {
+        description = 'Mechs lose non-SUSTAIN DAMAGE abilities',
+        owner = OWNER.SELF,
+        type = TYPE.MUTATE,
+        apply = function(unitAttrs)
+            local attr = unitAttrs['Mech']
+            attr.antiFighterBarrage = nil
+            attr.bombardment = nil
+            attr.planetaryShield = nil
+            attr.spaceCannon = nil
         end
     },
 
@@ -425,6 +458,26 @@ local _unitModifiers = {
         type = TYPE.MUTATE,
         apply = function(unitAttrs)
             unitAttrs['Space Dock'].spaceCannon = { dice = 3, hit = 5, range = 1, unitLimit = 1 }
+        end
+    },
+
+    ['Evelyn Delouis'] = {
+        leader = LEADER.AGENT, -- Sol
+        description = '+1 die to a single GROUND COMBAT roll',
+        owner = OWNER.SELF,
+        type = TYPE.CHOOSE,
+        apply = function(unitAttrs, params)
+            local best = false
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.groundCombat and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                    if (not best) or attr.groundCombat.hit < best.groundCombat.hit then
+                        best = attr
+                    end
+                end
+            end
+            if best then
+                best.groundCombat.extraDice = (best.groundCombat.extraDice or 0) + 1
+            end
         end
     },
 
@@ -546,8 +599,74 @@ local _unitModifiers = {
         end
     },
 
+    ['Rickar Rickani'] = {
+        leader = LEADER.COMMANDER, -- Winnu
+        description = '+2 to combat rolls',
+        owner = OWNER.SELF,
+        type = TYPE.ADJUST,
+        apply = function(unitAttrs)
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.spaceCombat then
+                    attr.spaceCombat.hit = attr.spaceCombat.hit - 2
+                end
+                if attr.groundCombat then
+                    attr.groundCombat.hit = attr.groundCombat.hit - 2
+                end
+            end
+        end
+    },
+
+    ['Ssruu'] = {
+        leader = LEADER.AGENT, -- Yssaril agent
+        description = 'Copy abilities from other agents',
+        owner = OWNER.SELF,
+        type = TYPE.MUTATE,
+        apply = function(unitAttrs) end
+    },
+
+    ['Strike Wing Ambuscade'] = {
+        description = '+1 die to a unit ability (anti-fighter barrage, bombardment, space cannon)',
+        owner = OWNER.SELF,
+        type = TYPE.CHOOSE,
+        apply = function(unitAttrs, params)
+            best = false
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.antiFighterBarrage and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                    if (not best) or (attr.antiFighterBarrage.hit < best.antiFighterBarrage.hit) then
+                        best = attr
+                    end
+                end
+            end
+            if best then
+                best.antiFighterBarrage.extraDice = (best.antiFighterBarrage.extraDice or 0) + 1
+            end
+            best = false
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.bombardment and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                    if (not best) or (attr.bombardment.hit < best.bombardment.hit) then
+                        best = attr
+                    end
+                end
+            end
+            if best then
+                best.bombardment.extraDice = (best.bombardment.extraDice or 0) + 1
+            end
+            best = false
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.spaceCannon and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                    if (not best) or (attr.spaceCannon.hit < best.spaceCannon.hit) then
+                        best = attr
+                    end
+                end
+            end
+            if best then
+                best.spaceCannon.extraDice = (best.spaceCannon.extraDice or 0) + 1
+            end
+        end
+    },
+
     ['Tekklar Legion'] = {
-        description = '+1 to ground COMBAT rolls for attacker, -1 to Sardakk if opponent owns',  -- -1 to Sardakk if other player has it
+        description = '+1 to GROUND COMBAT rolls for attacker, -1 to Sardakk if opponent owns',  -- -1 to Sardakk if other player has it
         owner = OWNER.ANY,
         type = TYPE.ADJUST,
         apply = function(unitAttrs, params)
@@ -564,6 +683,44 @@ local _unitModifiers = {
         end
     },
 
+    ['Trrakan Aun Zulok'] = {
+        leader = LEADER.COMMANDER, -- Strike Wing
+        description = '+1 die to a unit ability (anti-fighter barrage, bombardment, space cannon)',
+        owner = OWNER.SELF,
+        type = TYPE.CHOOSE,
+        apply = function(unitAttrs, params)
+            for unitType, attr in pairs(unitAttrs) do
+                local best = false
+                if attr.antiFighterBarrage and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                    if (not best) or (attr.antiFighterBarrage.hit < best.antiFighterBarrage.hit) then
+                        best = attr
+                    end
+                end
+                if best then
+                    best.antiFighterBarrage.extraDice = (best.antiFighterBarrage.extraDice or 0) + 1
+                end
+                local best = false
+                if attr.bombardment and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                    if (not best) or (attr.bombardment.hit < best.bombardment.hit) then
+                        best = attr
+                    end
+                end
+                if best then
+                    best.bombardment.extraDice = (best.bombardment.extraDice or 0) + 1
+                end
+                local best = false
+                if attr.spaceCannon and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                    if (not best) or (attr.spaceCannon.hit < best.spaceCannon.hit) then
+                        best = attr
+                    end
+                end
+                if best then
+                    best.spaceCannon.extraDice = (best.spaceCannon.extraDice or 0) + 1
+                end
+            end
+        end
+    },
+
     ['Unrelenting'] = {
         description = '+1 to all COMBAT rolls',
         owner = OWNER.SELF,
@@ -576,6 +733,26 @@ local _unitModifiers = {
                 if attr.groundCombat then
                     attr.groundCombat.hit = attr.groundCombat.hit - 1
                 end
+            end
+        end
+    },
+
+    ['Viscount Unlenn'] = {
+        leader = LEADER.AGENT, -- Barony agent
+        description = '+1 die to a single SPACE COMBAT roll',
+        owner = OWNER.SELF,
+        type = TYPE.CHOOSE,
+        apply = function(unitAttrs, params)
+            local best = false
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.spaceCombat and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                    if (not best) or (attr.spaceCombat.hit < best.spaceCombat.hit) then
+                        best = attr
+                    end
+                end
+            end
+            if best then
+                best.spaceCombat.extraDice = (best.spaceCombat.extraDice or 0) + 1
             end
         end
     },
@@ -860,7 +1037,11 @@ end
 --- Get a table from player color to list of unit modifier names.
 function getColorToUnitModifiers()
     local colorToUnitModifierSet = {}
+    for _, color in ipairs(_zoneHelper.zones()) do
+        colorToUnitModifierSet[color] = {}
+    end
 
+    local allModifiersSet = {}
     local function addModifier(color, name)
         local entry = colorToUnitModifierSet[color]
         if not entry then
@@ -868,6 +1049,7 @@ function getColorToUnitModifiers()
             colorToUnitModifierSet[color] = entry
         end
         entry[name] = true
+        allModifiersSet[name] = true
     end
 
     -- Faction abilities.
@@ -912,10 +1094,12 @@ function getColorToUnitModifiers()
 
     local guidToName = {}
     local guidToPosition = {}
+    local colorToLeaderSheet = {}
+    local colorToAlliances = {}
+    local colorToCommander = {}
     for _, object in ipairs(getAllObjects()) do
         local name, unitModifier = getUnitModifier(object)
         if unitModifier then
-
             -- Tekklar Legion buffs non-Sardakk and penalizes Sardakk, BUT
             -- players expect Sardakk to be able to have it face up on the
             -- table with a "for sale" sign.  Only add when not in Sarakk zone.
@@ -938,12 +1122,47 @@ function getColorToUnitModifiers()
                 guidToName[guid] = name
                 guidToPosition[guid] = object.getPosition()
             end
+            if unitModifier.leader == LEADER.COMMANDER then
+                local color = _zoneHelper.zoneFromPosition(object.getPosition())
+                colorToCommander[color] = name
+            end
+        end
+        local color = string.match(object.getName(), '^Leader Sheet %((.*)%)$')
+        if color then
+            colorToLeaderSheet[color] = object
+        end
+        local color = string.match(object.getName(), '^Alliance %((.*)%)$')
+        if color then
+            local zoneColor = _zoneHelper.zoneFromPosition(object.getPosition())
+            colorToAlliances[zoneColor] = colorToAlliances[zoneColor] or {}
+            table.insert(colorToAlliances[zoneColor], color)
         end
     end
     local guidToZoneColor = _zoneHelper.zonesFromPositions(guidToPosition)
     for guid, zoneColor in pairs(guidToZoneColor) do
         local name = guidToName[guid]
-        addModifier(zoneColor, name)
+        local modifier = _unitModifiers[name]
+        local leaderSheet = modifier.leader and colorToLeaderSheet[zoneColor]
+        if leaderSheet then
+            -- Ignore leaders on the leader sheet.
+            local bounds = leaderSheet.getBounds()
+            local bb = {
+                min = {
+                    x = bounds.center.x - bounds.size.x / 2,
+                    z = bounds.center.z - bounds.size.z / 2,
+                },
+                max = {
+                    x = bounds.center.x + bounds.size.x / 2,
+                    z = bounds.center.z + bounds.size.z / 2,
+                }
+            }
+            local p = guidToPosition[guid]
+            if p.x > bb.min.x and p.x < bb.max.x and p.z > bb.min.z and p.z < bb.max.z then
+                addModifier(zoneColor, name)
+            end
+        else
+            addModifier(zoneColor, name)
+        end
     end
 
     local colorToUnitModifiers = {}
@@ -951,6 +1170,21 @@ function getColorToUnitModifiers()
         local entry = {}
         for name, _ in pairs(unitModifiersSet) do
             table.insert(entry, name)
+            -- Yssaril agent, copies other agents.
+            if name == 'Ssruu' then
+                for other, _ in pairs(allModifiersSet) do
+                    if other ~= 'Ssruu' and _unitModifiers[other].leader == LEADER.AGENT then
+                        table.insert(entry, other)
+                    end
+                end
+            end
+        end
+        -- Alliance copies unlocked commander(s).
+        for _, alliance in ipairs(colorToAlliances[color] or {}) do
+            local commander = colorToCommander[alliance]
+            if commander then
+                table.insert(entry, commander)
+            end
         end
         colorToUnitModifiers[color] = entry
     end

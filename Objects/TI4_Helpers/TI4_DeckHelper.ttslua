@@ -41,27 +41,30 @@ local DECKS = {
             }
         },
         cardNames = {
-            'Corner the Market',
-            'Develop Weaponry',
-            'Diversify Research',
-            'Erect a Monument',
-            'Expand Borders',
-            'Found Research Outposts',
-            'Intimidate Council',
-            'Lead From The Front',
-            'Negotiate Trade Routes',
-            'Sway the Council',
-            -- PoK objectives
-            'Amass Wealth',
-            'Build Defenses',
-            'Discover Lost Outposts',
-            'Engineer a Marvel',
-            'Explore Deep Space',
-            'Improve Infrastructure',
-            'Make History',
-            'Populate the Outer Rim',
-            'Push Boundaries',
-            'Raise a Fleet',
+            base = {
+                'Corner the Market',
+                'Develop Weaponry',
+                'Diversify Research',
+                'Erect a Monument',
+                'Expand Borders',
+                'Found Research Outposts',
+                'Intimidate Council',
+                'Lead From The Front',
+                'Negotiate Trade Routes',
+                'Sway the Council',
+            },
+            pok = {
+                'Amass Wealth',
+                'Build Defenses',
+                'Discover Lost Outposts',
+                'Engineer a Marvel',
+                'Explore Deep Space',
+                'Improve Infrastructure',
+                'Make History',
+                'Populate the Outer Rim',
+                'Push Boundaries',
+                'Raise a Fleet',
+            },
         },
     },
     ['Public Objectives II'] = {
@@ -78,27 +81,30 @@ local DECKS = {
             }
         },
         cardNames = {
-            'Centralize Galactic Trade',
-            'Conquer the Weak',
-            'Form Galactic Brain Trust',
-            'Found a Golden Age',
-            'Galvanize the People',
-            'Manipulate Galactic Law',
-            'Master the Sciences',
-            'Revolutionize Warfare',
-            'Subdue the Galaxy',
-            'Unify the Colonies',
-            -- PoK objectives
-            'Achieve Supremacy',
-            'Become a Legend',
-            'Command an Armada',
-            'Construct Massive Cities',
-            'Control the Borderlands',
-            'Hold Vast Reserves',
-            'Patrol Vast Territories',
-            'Protect the Border',
-            'Reclaim Ancient Monuments',
-            'Rule Distant Lands',
+            base = {
+                'Centralize Galactic Trade',
+                'Conquer the Weak',
+                'Form Galactic Brain Trust',
+                'Found a Golden Age',
+                'Galvanize the People',
+                'Manipulate Galactic Law',
+                'Master the Sciences',
+                'Revolutionize Warfare',
+                'Subdue the Galaxy',
+                'Unify the Colonies',
+            },
+            pok = {
+                'Achieve Supremacy',
+                'Become a Legend',
+                'Command an Armada',
+                'Construct Massive Cities',
+                'Control the Borderlands',
+                'Hold Vast Reserves',
+                'Patrol Vast Territories',
+                'Protect the Border',
+                'Reclaim Ancient Monuments',
+                'Rule Distant Lands',
+            },
         },
     },
     ['Secret Objectives'] = {
@@ -111,47 +117,50 @@ local DECKS = {
         },
         shuffleOnDiscard = true,
         cardNames = {
-            'Adapt New Strategies',
-            'Become the Gatekeeper',
-            'Control the Region',
-            'Cut Supply Lines',
-            'Destroy Their Greatest Ship',
-            'Establish A Perimeter',
-            'Forge An Alliance',
-            'Form a Spy Network',
-            'Fuel the War Machine',
-            'Gather A Mighty Fleet',
-            'Learn Secrets of the Cosmos',
-            'Make an Example of Their World',
-            'Master the Laws of Physics',
-            'Mine Rare Metals',
-            'Monopolize Production',
-            'Occupy the Seat of the Empire',
-            'Spark a Rebellion',
-            'Threaten Enemies',
-            'Turn Their Fleets to Dust',
-            'Unveil Flagship',
-            -- PoK objectives
-            'Defy Space and Time',
-            'Stake Your Claim',
-            'Strengthen Bonds',
-            'Occupy the Fringe',
-            'Destroy Heretical Works',
-            'Mechanize the Military',
-            'Foster Cohesion',
-            'Hoard Raw Materials',
-            'Establish Hegemony',
-            'Seize an Icon',
-            'Drive the Debate',
-            'Dictate Policy',
-            'Fight with Precision',
-            'Betray a Friend',
-            'Demonstrate Your Power',
-            'Brave the Void',
-            'Produce en Masse',
-            'Darken the Skies',
-            'Become a Martyr',
-            'Prove Endurance',
+            base = {
+                'Adapt New Strategies',
+                'Become the Gatekeeper',
+                'Control the Region',
+                'Cut Supply Lines',
+                'Destroy Their Greatest Ship',
+                'Establish A Perimeter',
+                'Forge An Alliance',
+                'Form a Spy Network',
+                'Fuel the War Machine',
+                'Gather A Mighty Fleet',
+                'Learn Secrets of the Cosmos',
+                'Make an Example of Their World',
+                'Master the Laws of Physics',
+                'Mine Rare Metals',
+                'Monopolize Production',
+                'Occupy the Seat of the Empire',
+                'Spark a Rebellion',
+                'Threaten Enemies',
+                'Turn Their Fleets to Dust',
+                'Unveil Flagship',
+            },
+            pok = {
+                'Defy Space and Time',
+                'Stake Your Claim',
+                'Strengthen Bonds',
+                'Occupy the Fringe',
+                'Destroy Heretical Works',
+                'Mechanize the Military',
+                'Foster Cohesion',
+                'Hoard Raw Materials',
+                'Establish Hegemony',
+                'Seize an Icon',
+                'Drive the Debate',
+                'Dictate Policy',
+                'Fight with Precision',
+                'Betray a Friend',
+                'Demonstrate Your Power',
+                'Brave the Void',
+                'Produce en Masse',
+                'Darken the Skies',
+                'Become a Martyr',
+                'Prove Endurance',
+            },
         },
     },
     ['Agenda'] = {
@@ -167,69 +176,72 @@ local DECKS = {
             }
         },
         cardNames = {
-            'Anti-Intellectual Revolution',
-            'Archived Secret',
-            'Arms Reduction',
-            'Classified Document Leaks',
-            'Colonial Redistribution',
-            'Committee Formation',
-            'Compensated Disarmament',
-            'Conventions of War',
-            'Core Mining',
-            'Demilitarized Zone',
-            'Economic Equality',
-            'Enforced Travel Ban',
-            'Executive Sanctions',
-            'Fleet Regulations',
-            'Holy Planet of Ixth',
-            'Homeland Defense Act',
-            'Imperial Arbiter',
-            'Incentive Program',
-            'Ixthian Artifact',
-            'Judicial Abolishment',
-            'Minister of Commerce',
-            'Minister of Exploration',
-            'Minister of Industry',
-            'Minister of Peace',
-            'Minister of Policy',
-            'Minister of Sciences',
-            'Minister of War',
-            'Miscount Disclosed',
-            'Mutiny',
-            'New Constitution',
-            'Prophecy of Ixth',
-            'Public Execution',
-            'Publicize Weapon Schematics',
-            'Regulated Conscription',
-            'Representative Government',
-            'Research Team: Biotic',
-            'Research Team: Cybernetic',
-            'Research Team: Propulsion',
-            'Research Team: Warfare',
-            'Seed of an Empire',
-            'Senate Sanctuary',
-            'Shard of the Throne',
-            'Shared Research',
-            'Swords to Plowshares',
-            'Terraforming Initiative',
-            'The Crown of Emphidia',
-            'The Crown of Thalnos',
-            'Unconventional Measures',
-            'Wormhole Reconstruction',
-            'Wormhole Research',
-            -- PoK agendas
-            'Clandestine Operations',
-            'Galactic Crisis Pact',
-            'Armed Forces Standardization',
-            'Nexus Sovereignty',
-            'Checks and Balances',
-            'Articles of War',
-            'Rearmament Agreement',
-            'Research Grant Allocation',
-            'Covert Legislation',
-            'Minister of Antiquities',
-            'Search Warrant',
-            'Political Censure',
+            base = {
+                'Anti-Intellectual Revolution',
+                'Archived Secret',
+                'Arms Reduction',
+                'Classified Document Leaks',
+                'Colonial Redistribution',
+                'Committee Formation',
+                'Compensated Disarmament',
+                'Conventions of War',
+                'Core Mining',
+                'Demilitarized Zone',
+                'Economic Equality',
+                'Enforced Travel Ban',
+                'Executive Sanctions',
+                'Fleet Regulations',
+                'Holy Planet of Ixth',
+                'Homeland Defense Act',
+                'Imperial Arbiter',
+                'Incentive Program',
+                'Ixthian Artifact',
+                'Judicial Abolishment',
+                'Minister of Commerce',
+                'Minister of Exploration',
+                'Minister of Industry',
+                'Minister of Peace',
+                'Minister of Policy',
+                'Minister of Sciences',
+                'Minister of War',
+                'Miscount Disclosed',
+                'Mutiny',
+                'New Constitution',
+                'Prophecy of Ixth',
+                'Public Execution',
+                'Publicize Weapon Schematics',
+                'Regulated Conscription',
+                'Representative Government',
+                'Research Team: Biotic',
+                'Research Team: Cybernetic',
+                'Research Team: Propulsion',
+                'Research Team: Warfare',
+                'Seed of an Empire',
+                'Senate Sanctuary',
+                'Shard of the Throne',
+                'Shared Research',
+                'Swords to Plowshares',
+                'Terraforming Initiative',
+                'The Crown of Emphidia',
+                'The Crown of Thalnos',
+                'Unconventional Measures',
+                'Wormhole Reconstruction',
+                'Wormhole Research',
+            },
+            pok = {
+                'Clandestine Operations',
+                'Galactic Crisis Pact',
+                'Armed Forces Standardization',
+                'Nexus Sovereignty',
+                'Checks and Balances',
+                'Articles of War',
+                'Rearmament Agreement',
+                'Research Grant Allocation',
+                'Covert Legislation',
+                'Minister of Antiquities',
+                'Search Warrant',
+                'Political Censure',
+            },
         },
     },
     ['Actions'] = {
@@ -240,133 +252,137 @@ local DECKS = {
                 rotation = { x = 0, y = 0, z = 180 },
             },
             discard = {
-                position = { x = -2.81, y = 0, z = 2.53 },
+                position = { x = -2.81, y = 0.26, z = 2.53 },
                 rotation = { x = 0, y = 0, z = 0 },
             }
         },
         cardNames = {
-            'Ancient Burial Sites',
-            'Assassinate Representative',
-            'Bribery',
-            'Bunker',
-            'Confusing Legal Text',
-            'Construction Rider',
-            'Courageous to the End',
-            'Cripple Defenses',
-            'Diplomacy Rider',
-            'Direct Hit (1)',
-            'Direct Hit (2)',
-            'Direct Hit (3)',
-            'Direct Hit (4)',
-            'Disable',
-            'Distinguished Councilor',
-            'Economic Initiative',
-            'Emergency Repairs',
-            'Experimental Battlestation',
-            'Fighter Prototype',
-            'Fire Team',
-            'Flank Speed (1)',
-            'Flank Speed (2)',
-            'Flank Speed (3)',
-            'Flank Speed (4)',
-            'Focused Research',
-            'Frontline Deployment',
-            'Ghost Ship',
-            'Imperial Rider',
-            'In the Silence of Space',
-            'Industrial Initiative',
-            'Infiltrate',
-            'Insubordination',
-            'Intercept',
-            'Leadership Rider',
-            'Lost Star Chart',
-            'Lucky Shot',
-            'Maneuvering Jets (1)',
-            'Maneuvering Jets (2)',
-            'Maneuvering Jets (3)',
-            'Maneuvering Jets (4)',
-            'Mining Initiative',
-            'Morale Boost (1)',
-            'Morale Boost (2)',
-            'Morale Boost (3)',
-            'Morale Boost (4)',
-            'Parley',
-            'Plague',
-            'Political Stability',
-            'Politics Rider',
-            'Public Disgrace',
-            'Reactor Meltdown',
-            'Reparations',
-            'Repeal Law',
-            'Rise of a Messiah',
-            'Sabotage (1)',
-            'Sabotage (2)',
-            'Sabotage (3)',
-            'Sabotage (4)',
-            'Salvage',
-            'Shields Holding (1)',
-            'Shields Holding (2)',
-            'Shields Holding (3)',
-            'Shields Holding (4)',
-            'Signal Jamming',
-            'Skilled Retreat (1)',
-            'Skilled Retreat (2)',
-            'Skilled Retreat (3)',
-            'Skilled Retreat (4)',
-            'Spy',
-            'Summit',
-            'Tactical Bombardment',
-            'Technology Rider',
-            'Trade Rider',
-            'Unexpected Action',
-            'Unstable Planet',
-            'Upgrade',
-            'Uprising',
-            'Veto',
-            'War Effort',
-            'Warfare Rider',
-            -- Codex action cards
-            'Hack Election',
-            'Harness Energy',
-            'Blitz',
-            'Fighter Conscription',
-            'Forward Supply Base',
-            'Rally',
-            'War Machine (1)',
-            'War Machine (2)',
-            'War Machine (3)',
-            'War Machine (4)',
-            'Master Plan',
-            'Insider Information',
-            'Plagiarize',
-            'Scramble Frequency',
-            'Solar Flare',
-            'Reflective Shielding',
-            'Impersonation',
-            'Sanction',
-            'Counterstroke',
-            'Ghost Squad',
-            -- PoK action cards
-            'Exploration Probe',
-            'Nav Suite',
-            'Archaeological Expedition',
-            'Seize Artifact',
-            'Reverse Engineer',
-            "Coup d'Etat",
-            'Decoy Operation',
-            'Deadly Plot',
-            'Waylay',
-            'Divert Funding',
-            'Refit Troops',
-            'Reveal Prototype',
-            'Rout',
-            'Scuttle',
-            'Confounding Legal Text',
-            'Manipulate Investments',
-            'Diplomatic Pressure (1)',
-            'Diplomatic Pressure (2)',
-            'Diplomatic Pressure (3)',
-            'Diplomatic Pressure (4)',
+            base = {
+                'Ancient Burial Sites',
+                'Assassinate Representative',
+                'Bribery',
+                'Bunker',
+                'Confusing Legal Text',
+                'Construction Rider',
+                'Courageous to the End',
+                'Cripple Defenses',
+                'Diplomacy Rider',
+                'Direct Hit (1)',
+                'Direct Hit (2)',
+                'Direct Hit (3)',
+                'Direct Hit (4)',
+                'Disable',
+                'Distinguished Councilor',
+                'Economic Initiative',
+                'Emergency Repairs',
+                'Experimental Battlestation',
+                'Fighter Prototype',
+                'Fire Team',
+                'Flank Speed (1)',
+                'Flank Speed (2)',
+                'Flank Speed (3)',
+                'Flank Speed (4)',
+                'Focused Research',
+                'Frontline Deployment',
+                'Ghost Ship',
+                'Imperial Rider',
+                'In the Silence of Space',
+                'Industrial Initiative',
+                'Infiltrate',
+                'Insubordination',
+                'Intercept',
+                'Leadership Rider',
+                'Lost Star Chart',
+                'Lucky Shot',
+                'Maneuvering Jets (1)',
+                'Maneuvering Jets (2)',
+                'Maneuvering Jets (3)',
+                'Maneuvering Jets (4)',
+                'Mining Initiative',
+                'Morale Boost (1)',
+                'Morale Boost (2)',
+                'Morale Boost (3)',
+                'Morale Boost (4)',
+                'Parley',
+                'Plague',
+                'Political Stability',
+                'Politics Rider',
+                'Public Disgrace',
+                'Reactor Meltdown',
+                'Reparations',
+                'Repeal Law',
+                'Rise of a Messiah',
+                'Sabotage (1)',
+                'Sabotage (2)',
+                'Sabotage (3)',
+                'Sabotage (4)',
+                'Salvage',
+                'Shields Holding (1)',
+                'Shields Holding (2)',
+                'Shields Holding (3)',
+                'Shields Holding (4)',
+                'Signal Jamming',
+                'Skilled Retreat (1)',
+                'Skilled Retreat (2)',
+                'Skilled Retreat (3)',
+                'Skilled Retreat (4)',
+                'Spy',
+                'Summit',
+                'Tactical Bombardment',
+                'Technology Rider',
+                'Trade Rider',
+                'Unexpected Action',
+                'Unstable Planet',
+                'Upgrade',
+                'Uprising',
+                'Veto',
+                'War Effort',
+                'Warfare Rider',
+            },
+            codex1 = {
+                'Hack Election',
+                'Harness Energy',
+                'Blitz',
+                'Fighter Conscription',
+                'Forward Supply Base',
+                'Rally',
+                'War Machine (1)',
+                'War Machine (2)',
+                'War Machine (3)',
+                'War Machine (4)',
+                'Master Plan',
+                'Insider Information',
+                'Plagiarize',
+                'Scramble Frequency',
+                'Solar Flare',
+                'Reflective Shielding',
+                'Impersonation',
+                'Sanction',
+                'Counterstroke',
+                'Ghost Squad',
+            },
+            pok = {
+                'Exploration Probe',
+                'Nav Suite',
+                'Archaeological Expedition',
+                'Seize Artifact',
+                'Reverse Engineer',
+                "Coup d'Etat",
+                'Decoy Operation',
+                'Deadly Plot',
+                'Waylay',
+                'Divert Funding',
+                'Refit Troops',
+                'Reveal Prototype',
+                'Rout',
+                'Scuttle',
+                'Confounding Legal Text',
+                'Manipulate Investments',
+                'Diplomatic Pressure (1)',
+                'Diplomatic Pressure (2)',
+                'Diplomatic Pressure (3)',
+                'Diplomatic Pressure (4)',
+            },
         },
     },
     ['Planets'] = {
@@ -383,160 +399,170 @@ local DECKS = {
         transform = {
             parent = 'Exploration Mat',
             deck = {
-              position = { x = 1.46, y = 0, z = 0.53},
+              position = { x = -2.5, y = 0.26, z = -1.75},
               rotation = { x = 0, y = 0, z = 180 },
             },
             discard = {
-                position = {x = 1.46, y = 0, z = -0.49},
+                position = {x = -2.5, y = 0.26, z = 1.75},
                 rotation = { x = 0, y = 0, z = 0 },
             }
         },
         cardNames = {
-            'Industrial Relic Fragment (1)',
-            'Industrial Relic Fragment (2)',
-            'Industrial Relic Fragment (3)',
-            'Industrial Relic Fragment (4)',
-            'Industrial Relic Fragment (5)',
-            'Abandoned Warehouses (1)',
-            'Abandoned Warehouses (2)',
-            'Abandoned Warehouses (3)',
-            'Abandoned Warehouses (4)',
-            'Local Fabricators (1)',
-            'Local Fabricators (2)',
-            'Local Fabricators (3)',
-            'Local Fabricators (4)',
-            'Functioning Base (1)',
-            'Functioning Base (2)',
-            'Functioning Base (3)',
-            'Functioning Base (4)',
-            'Biotic Research Facility - Technology Specialty',
-            'Propulsion Research Facility - Technology Specialty',
-            'Cybernetic Research Facility - Technology Specialty',
+            pok = {
+                'Industrial Relic Fragment (1)',
+                'Industrial Relic Fragment (2)',
+                'Industrial Relic Fragment (3)',
+                'Industrial Relic Fragment (4)',
+                'Industrial Relic Fragment (5)',
+                'Abandoned Warehouses (1)',
+                'Abandoned Warehouses (2)',
+                'Abandoned Warehouses (3)',
+                'Abandoned Warehouses (4)',
+                'Local Fabricators (1)',
+                'Local Fabricators (2)',
+                'Local Fabricators (3)',
+                'Local Fabricators (4)',
+                'Functioning Base (1)',
+                'Functioning Base (2)',
+                'Functioning Base (3)',
+                'Functioning Base (4)',
+                'Biotic Research Facility - Technology Specialty',
+                'Propulsion Research Facility - Technology Specialty',
+                'Cybernetic Research Facility - Technology Specialty',
+            },
         },
     },
     ['Hazardous Exploration'] = {
         transform = {
             parent = 'Exploration Mat',
             deck = {
-                position = { x = 0.72, y = 0, z = 0.53},
+                position = { x = 0, y = 0.26, z = -1.75},
                 rotation = { x = 0, y = 0, z = 180 },
             },
             discard = {
-                position = {x = 0.72, y = 0, z = -0.49},
+                position = {x = 0, y = 0.26, z = 1.75},
                 rotation = { x = 0, y = 0, z = 0 },
             }
         },
         cardNames = {
-            'Hazardous Relic Fragment (1)',
-            'Hazardous Relic Fragment (2)',
-            'Hazardous Relic Fragment (3)',
-            'Hazardous Relic Fragment (4)',
-            'Hazardous Relic Fragment (5)',
-            'Hazardous Relic Fragment (6)',
-            'Hazardous Relic Fragment (7)',
-            'Expedition (1)',
-            'Expedition (2)',
-            'Expedition (3)',
-            'Core Mine (1)',
-            'Core Mine (2)',
-            'Core Mine (3)',
-            'Volatile Fuel Source (1)',
-            'Volatile Fuel Source (2)',
-            'Volatile Fuel Source (3)',
-            'Mining World',
-            'Lazax Survivors',
-            'Warfare Research Facility',
-            'Rich World',
+            pok = {
+                'Hazardous Relic Fragment (1)',
+                'Hazardous Relic Fragment (2)',
+                'Hazardous Relic Fragment (3)',
+                'Hazardous Relic Fragment (4)',
+                'Hazardous Relic Fragment (5)',
+                'Hazardous Relic Fragment (6)',
+                'Hazardous Relic Fragment (7)',
+                'Expedition (1)',
+                'Expedition (2)',
+                'Expedition (3)',
+                'Core Mine (1)',
+                'Core Mine (2)',
+                'Core Mine (3)',
+                'Volatile Fuel Source (1)',
+                'Volatile Fuel Source (2)',
+                'Volatile Fuel Source (3)',
+                'Mining World',
+                'Lazax Survivors',
+                'Warfare Research Facility',
+                'Rich World',
+            },
         },
     },
     ['Cultural Exploration'] = {
         transform = {
             parent = 'Exploration Mat',
             deck = {
-                position = { x = 0.01, y = 0, z = 0.54},
+                position = { x = 2.5, y = 0.26, z = -1.75},
                 rotation = { x = 0, y = 0, z = 180 },
             },
             discard = {
-                position = {x = 0.01, y = 0, z = -0.49},
+                position = {x = 2.5, y = 0.26, z = 1.75},
                 rotation = { x = 0, y = 0, z = 0 },
             }
         },
         cardNames = {
-            'Cultural Relic Fragment (1)',
-            'Cultural Relic Fragment (2)',
-            'Cultural Relic Fragment (3)',
-            'Cultural Relic Fragment (4)',
-            'Cultural Relic Fragment (5)',
-            'Cultural Relic Fragment (6)',
-            'Cultural Relic Fragment (7)',
-            'Cultural Relic Fragment (8)',
-            'Cultural Relic Fragment (9)',
-            'Mercenary Outfit (1)',
-            'Mercenary Outfit (2)',
-            'Mercenary Outfit (3)',
-            'Freelancers (1)',
-            'Freelancers (2)',
-            'Freelancers (3)',
-            'Demilitarized Zone',
-            'Dyson Sphere',
-            'Paradise World',
-            'Tomb of Emphidia',
-            'Gamma Wormhole',
+            pok = {
+                'Cultural Relic Fragment (1)',
+                'Cultural Relic Fragment (2)',
+                'Cultural Relic Fragment (3)',
+                'Cultural Relic Fragment (4)',
+                'Cultural Relic Fragment (5)',
+                'Cultural Relic Fragment (6)',
+                'Cultural Relic Fragment (7)',
+                'Cultural Relic Fragment (8)',
+                'Cultural Relic Fragment (9)',
+                'Mercenary Outfit (1)',
+                'Mercenary Outfit (2)',
+                'Mercenary Outfit (3)',
+                'Freelancers (1)',
+                'Freelancers (2)',
+                'Freelancers (3)',
+                'Demilitarized Zone',
+                'Dyson Sphere',
+                'Paradise World',
+                'Tomb of Emphidia',
+                'Gamma Wormhole',
+            },
         },
     },
     ['Frontier Exploration'] = {
         transform = {
             parent = 'Exploration Mat',
             deck = {
-                position = { x = -0.71, y = 0, z = 0.55},
+                position = { x = -5, y = 0.26, z = -1.75},
                 rotation = { x = 0, y = 0, z = 180 },
             },
             discard = {
-                position = {x = -0.71, y = 0, z = -0.49},
+                position = {x  = -5, y = 0.26, z = 1.75},
                 rotation = { x = 0, y = 0, z = 0 },
             }
         },
         cardNames = {
-            'Unknown Relic Fragment (1)',
-            'Unknown Relic Fragment (2)',
-            'Unknown Relic Fragment (3)',
-            'Enigmatic Device (1)',
-            'Enigmatic Device (2)',
-            'Ion Storm',
-            'Gamma Relay',
-            'Lost Crew (1)',
-            'Lost Crew (2)',
-            'Merchant Station (1)',
-            'Merchant Station (2)',
-            'Derelict Vessel (1)',
-            'Derelict Vessel (2)',
-            'Mirage',
+            pok = {
+                'Unknown Relic Fragment (1)',
+                'Unknown Relic Fragment (2)',
+                'Unknown Relic Fragment (3)',
+                'Enigmatic Device (1)',
+                'Enigmatic Device (2)',
+                'Ion Storm',
+                'Gamma Relay',
+                'Lost Crew (1)',
+                'Lost Crew (2)',
+                'Merchant Station (1)',
+                'Merchant Station (2)',
+                'Derelict Vessel (1)',
+                'Derelict Vessel (2)',
+                'Mirage (Exploration)',
+            },
         },
     },
     ['Relics'] = {
         transform = {
             parent = 'Exploration Mat',
             deck = {
-                position = { x = -1.43, y = 0, z = 0.52},
+                position = { x = 5, y = 0.26, z = -1.75} ,
                 rotation = { x = 0, y = 0, z = 180 },
             },
             discard = {
-                position = {x = -1.43, y = 0, z = -0.49},
+                position = { x = 5, y = 0.26, z = 1.75 },
                 rotation = { x = 0, y = 0, z = 0 },
             }
         },
         cardNames = {
-            'Dominus Orb',
-            'Maw of Worlds',
-            'Scepter of Emelpar',
-            'Shard of the Throne',
-            'Stellar Converter',
-            'The Codex',
-            'The Crown of Emphidia',
-            'The Crown of Thalnos',
-            'The Obsidian',
-            "The Prophet's Tears",
-            },
+            pok = {
+                'Dominus Orb',
+                'Maw of Worlds',
+                'Scepter of Emelpar',
+                'Shard of the Throne',
+                'Stellar Converter',
+                'The Codex',
+                'The Crown of Emphidia',
+                'The Crown of Thalnos',
+                'The Obsidian',
+                "The Prophet's Tears",
+                },
+            }
       }
 }
 
@@ -562,7 +588,6 @@ local function _getParent(parentName)
             return object
         end
     end
-    error('Deck Helper: missing "' .. parentName .. '"')
 end
 
 local function _getDeckAttributes(cardName)
@@ -570,8 +595,10 @@ local function _getDeckAttributes(cardName)
     if not _lowerCardNameToDeckAttributes then
         _lowerCardNameToDeckAttributes = {}
         for _, attributes in pairs(DECKS) do
-            for _, cardName in ipairs(attributes.cardNames) do
-                _lowerCardNameToDeckAttributes[string.lower(cardName)] = attributes
+            for _, cardNames in pairs(attributes.cardNames) do
+                for _, cardName in ipairs(cardNames) do
+                    _lowerCardNameToDeckAttributes[string.lower(cardName)] = attributes
+                end
             end
         end
     end
@@ -587,15 +614,15 @@ local function _getTransform(deckAttributes, deckOrDiscard)
         local parent = _getParent(deckAttributes.transform.parent)
         local parentRot = parent and parent.getRotation()
         return {
-            position = parent and parent.positionToWorld(transform.position) or {
+            position = (parent and parent.positionToWorld(transform.position)) or {
                 x = transform.position.x,  -- make a copy, caller may mutate!
                 y = transform.position.y,
                 z = transform.position.z
             },
             rotation = {
-                x = transform.rotation.x + (parentRot and parentRot.x) or 0,
-                y = transform.rotation.y + (parentRot and parentRot.y) or 0,
-                z = transform.rotation.z + (parentRot and parentRot.z) or 0,
+                x = transform.rotation.x + (parentRot and parentRot.x or 0),
+                y = transform.rotation.y + (parentRot and parentRot.y or 0),
+                z = transform.rotation.z + (parentRot and parentRot.z or 0),
             }
         }
     end
@@ -1311,6 +1338,123 @@ end
 
 -------------------------------------------------------------------------------
 
+local function _splitDecks()
+    -- Get per-card info.
+    local cardNameToInfo = {}
+    local deckNameToSources = {}
+    for deckName, deckAttributes in pairs(DECKS) do
+        deckNameToSources[deckName] = {}
+        for source, cardNames in pairs(deckAttributes.cardNames) do
+            for _, cardName in ipairs(cardNames) do
+                cardNameToInfo[cardName] = {
+                    cardName = cardName,
+                    deckName = deckName,
+                    source = source
+                }
+            end
+            table.insert(deckNameToSources[deckName], source)
+        end
+    end
+    for deckName, sources in pairs(deckNameToSources) do
+        table.sort(deckNameToSources[deckName])  -- consistent order
+    end
+
+    -- Find cards.
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Card' then
+            local info = cardNameToInfo[object.getName()]
+            if info then
+                info.card = object
+            end
+        elseif object.tag == 'Deck' then
+            for _, entry in ipairs(object.getObjects()) do
+                local info = cardNameToInfo[entry.name]
+                if info then
+                    info.guid = entry.guid
+                    info.deck = object
+                end
+            end
+        end
+    end
+
+    -- Organize by deck/source.
+    local deckNameToSourceToInfos = {}
+    for cardName, info in pairs(cardNameToInfo) do
+        local sourceToInfos = deckNameToSourceToInfos[info.deckName]
+        if not sourceToInfos then
+            sourceToInfos = {}
+            deckNameToSourceToInfos[info.deckName] = sourceToInfos
+        end
+        local infos = sourceToInfos[info.source]
+        if not infos then
+            infos = {}
+            sourceToInfos[info.source] = infos
+        end
+        table.insert(infos, info)
+    end
+
+    -- Move cards.
+    for deckName, sourceToInfos in pairs(deckNameToSourceToInfos) do
+        local transform = _getTransform(DECKS[deckName], 'deck')
+        local pos = transform.position
+        pos.y = pos.y + 5
+        local rot = transform.rotation
+
+        -- Remove first, let that be the base pile (preserving deck name).
+        table.remove(deckNameToSources[deckName], 1)
+        rot.y = (rot.y + 90) % 360
+
+        for i, source in ipairs(deckNameToSources[deckName]) do
+            for _, info in ipairs(sourceToInfos[source]) do
+                if info.deck and info.deck.remainder then
+                    info.card = info.deck.remainder
+                    info.deck = nil
+                end
+                if info.card then
+                    info.card.setPosition({ x = pos.x, y = pos.y, z = pos.z })
+                    info.card.setRotation({ x = rot.x, y = rot.y, z = rot.z })
+                elseif info.deck then
+                    info.deck.takeObject({
+                        guid              = info.guid,
+                        position          = { x = pos.x, y = pos.y, z = pos.z },
+                        rotation          = { x = rot.x, y = rot.y, z = rot.z },
+                        smooth            = false,
+                    })
+                else
+                    print('missing "' .. info.cardName .. '"')
+                end
+                pos.y = pos.y + 0.1
+            end
+            rot.y = (rot.y + 90) % 360
+        end
+    end
+
+    -- Rename split decks.
+    local function delayedRename()
+        for deckName, sourceToInfos in pairs(deckNameToSourceToInfos) do
+            local pos = _getTransform(DECKS[deckName], 'deck').position
+            local hits = Physics.cast({
+                origin       = pos,
+                direction    = { x = 0, y = -1, z = 0 },
+                type         = 3,  -- box
+                size         = { x = 0.1, y = 10, z = 0.1 }
+            }) -- returns {{Vector point, Vector normal, float distance, Object hit_object}, ...}
+            for _, hit in ipairs(hits or {}) do
+                if hit.hit_object.tag == 'Deck' then
+                    local deck = hit.hit_object
+                    local cardName = deck.getObjects()[1].name
+                    local info = cardNameToInfo[cardName]
+                    if info and string.len(deck.getName()) == 0 then
+                        deck.setName(info.source .. ' ' .. info.deckName)
+                    end
+                end
+            end
+        end
+        print('split decks finished')
+    end
+    Wait.time(delayedRename, 5)
+end
+
 -- Helper to read deck positions based on deck locations (hard coded above).
 local function _reportDeckPositionsInParentSpace()
     local parentNameSet = {}
@@ -1344,13 +1488,17 @@ local function _reportDeckPositionsInParentSpace()
 end
 
 function resetPlanetCardNames()
-    local deckAttributes = assert(DECKS['Planets'])
-    deckAttributes.cardNames = {}
+    local planetNames = {}
     for _, system in pairs(_systemHelper.systems()) do
         for _, planet in ipairs(system.planets or {}) do
-            table.insert(deckAttributes.cardNames, planet.name)
+            table.insert(planetNames, planet.name)
         end
     end
+
+    local deckAttributes = assert(DECKS['Planets'])
+    deckAttributes.cardNames = {
+        all = planetNames
+    }
 end
 
 function resetSnapPoints()
@@ -1422,6 +1570,7 @@ function onLoad(saveState)
     end
 
     -- Test methods.
+    self.addContextMenuItem('Split decks', _splitDecks, false)
     self.addContextMenuItem('Get locations', _reportDeckPositionsInParentSpace, false)
     self.addContextMenuItem('Discard cards', testDiscardCards, false)
     self.addContextMenuItem('Discard deck', testDiscardDeck, false)

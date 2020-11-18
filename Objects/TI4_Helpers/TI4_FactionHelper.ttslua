@@ -49,6 +49,7 @@ local _factionAttributes = {
         abilities = { 'Mitosis' },
         units = { 'Letani Warrior I', 'Letani Warrior II', 'Letani Behemoth' },
         commander = 'Dirzuga Rophal',
+        hero = 'Letania Miasmiala'
     },
 
     ['The Barony Of Letnev'] = {
@@ -62,6 +63,7 @@ local _factionAttributes = {
         abilities = { 'Munitions Reserves', 'Armada' },
         units = { 'Dunlain Reaper' },
         commander = 'Rear Admiral Farran',
+        hero = 'Darktalon Treilla'
     },
 
     ['The Clan Of Saar'] = {
@@ -75,6 +77,7 @@ local _factionAttributes = {
         abilities = { 'Scavenge', 'Nomadic' },
         units = { 'Floating Factory I', 'Floating Factory II', 'Scavenger Zeta' },
         commander = 'Rowl Sarrig',
+        hero = 'Gurno Aggero'
     },
 
     ['The Embers Of Muaat'] = {
@@ -88,6 +91,7 @@ local _factionAttributes = {
         abilities = { 'Star Forge', 'Gashlai Physiology' },
         units = { 'Prototype War Sun I', 'Prototype War Sun II', 'Ember Colossus' },
         commander = 'Magmus',
+        hero = "Adjudicator Ba'al"
     },
 
     ['The Emirates Of Hacan'] = {
@@ -101,6 +105,7 @@ local _factionAttributes = {
         abilities = { 'Masters of Trade', 'Guild Ships', 'Arbiters' },
         units = { 'Pride of Kenara' },
         commander = 'Gila the Silvertongue',
+        hero = 'Harrugh Gefhara'
     },
 
     ['The Federation Of Sol'] = {
@@ -114,6 +119,7 @@ local _factionAttributes = {
         abilities = { 'Orbital Drop', 'Versatile' },
         units = { 'Advanced Carrier I', 'Advanced Carrier II', 'Spec Ops I', 'Spec Ops II', 'ZS Thunderbolt M2' },
         commander = 'Claire Gibson',
+        hero = 'Jace X, 4th Air Legion'
     },
 
     ['The Ghosts Of Creuss'] = {
@@ -127,6 +133,7 @@ local _factionAttributes = {
         abilities = { 'Quantum Entanglement', 'Slipstream', 'Creuss Gate' },
         units = { 'Icarus Drive' },
         commander = 'Sai Seravus',
+        hero = 'Riftwalker Meian'
     },
 
     ['The L1Z1X Mindnet'] = {
@@ -140,6 +147,7 @@ local _factionAttributes = {
         abilities = { 'Assimilate' },
         units = { 'Super-Dreadnought I', 'Super-Dreadnought II', 'Annihilator' },
         commander = '2RAM',
+        hero = 'The Helmsman'
     },
 
     ['The Mentak Coalition'] = {
@@ -153,6 +161,7 @@ local _factionAttributes = {
         abilities = { 'Ambush', 'Pillage' },
         units = { 'Moll Terminus' },
         commander = "S'ula Mentarion",
+        hero = 'Ipswitch, Loose Cannon'
     },
 
     ['The Naalu Collective'] = {
@@ -166,6 +175,7 @@ local _factionAttributes = {
         abilities = { 'Telepathic', 'Foresight' },
         units = { 'Hybrid Crystal Fighter I', 'Hybrid Crystal Fighter II', 'Iconoclast' },
         commander = "M'aban",
+        hero = 'The Oracle'
     },
 
     ['The Nekro Virus'] = {
@@ -179,6 +189,7 @@ local _factionAttributes = {
         abilities = { 'Galactic Threat', 'Technological Singularity', 'Propagation' },
         units = { 'Mordred' },
         commander = 'Nekro Acidos',
+        hero = 'Unit.dsgn.FLAYESH'
     },
 
     ["The Sardakk N'orr"] = {
@@ -192,6 +203,7 @@ local _factionAttributes = {
         abilities = { 'Unrelenting' },
         units = { 'Exotrireme I', 'Exotrireme II', 'Valkyrie Exoskeleton' },
         commander = "G'hom Sek'kus",
+        hero = "Sh'val, Harbinger"
     },
 
     ['The Universities of Jol-Nar'] = {
@@ -205,6 +217,7 @@ local _factionAttributes = {
         abilities = { 'Fragile', 'Brilliant', 'Analytical' },
         units = { 'Shield Paling' },
         commander = 'Ta Zern',
+        hero = "Rin, the Master's Legacy"
     },
 
     ['The Winnu'] = {
@@ -219,6 +232,7 @@ local _factionAttributes = {
         abilities = { 'Blood Ties', 'Reclamation' },
         units = { 'Reclaimer' },
         commander = 'Rickar Rickani',
+        hero = 'Mathis Mathinus'
     },
 
     ['The Xxcha Kingdom'] = {
@@ -232,6 +246,7 @@ local _factionAttributes = {
         abilities = { 'Peace Accords', 'Quash' },
         units = { 'Indomitus' },
         commander = 'Elder Qanoj',
+        hero = 'Xxekir Grom'
     },
 
     ['The Yin Brotherhood'] = {
@@ -245,6 +260,7 @@ local _factionAttributes = {
         abilities = { 'Indoctrination', 'Devotion' },
         units = { "Moyin's Ashes" },
         commander = 'Brother Omar',
+        hero = 'Dannel of the Tenth'
     },
 
     ['The Yssaril Tribes'] = {
@@ -258,6 +274,7 @@ local _factionAttributes = {
         abilities = { 'Stall Tactics', 'Scheming', 'Crafty' },
         units = { 'Blackshade Infiltrator' },
         commander = 'So Ata',
+        hero = 'Kyver, Blade and Key'
     },
 
     -- PoK Factions
@@ -272,6 +289,7 @@ local _factionAttributes = {
         abilities = { 'The Company', 'Future Sight' },
         units = { 'Memoria II', 'Quantum Manipulator' },
         commander = 'Navarch Feng',
+        hero = 'Ahk-Syl Siven'
     },
 
     ["The Vuil'raith Cabal"] = {
@@ -285,6 +303,7 @@ local _factionAttributes = {
         abilities = { 'Devour', 'Amalgamation', 'Riftmeld' },
         units = { 'Dimensional Tear I', 'Dimensional Tear II', 'Reanimator' },
         commander = 'That Which Molds Flesh',
+        hero = 'It Feeds on Carrion'
     },
 
     ['The Argent Flight'] = {
@@ -298,6 +317,7 @@ local _factionAttributes = {
         abilities = { 'Zeal', 'Raid Formation' },
         units = { 'Strike Wing Alpha I', 'Strike Wing Alpha II', 'Aerie Sentinel' },
         commander = 'Trrakan Aun Zulok',
+        hero = 'Mirik Aun Sissiri'
     },
 
     ['The Titans of Ul'] = {
@@ -311,6 +331,7 @@ local _factionAttributes = {
         abilities = { 'Terragenesis', 'Awaken', 'Coalescence' },
         units = { 'Saturn Engine I', 'Saturn Engine II', 'Hel-Titan I', 'Hel-Titan II', 'Hecatoncheires' },
         commander = 'Tungstantus',
+        hero = 'Ul the Progenitor'
     },
 
     ['The Empyrean'] = {
@@ -324,6 +345,7 @@ local _factionAttributes = {
         abilities = { 'Voidborn', 'Aetherpassage', 'Dark Whispers' },
         units = { 'Watcher' },
         commander = 'Xuange',
+        hero = 'Conservator Procyon'
     },
 
     ['The Mahact Gene-Sorcerers'] = {
@@ -337,6 +359,7 @@ local _factionAttributes = {
         abilities = { 'Edict', 'Imperia', 'Hubris' },
         units = { 'Crimson Legionnaire I', 'Crimson Legionnaire II', 'Starlancer' },
         commander = 'Il Na Viroset',
+        hero = 'Airo Shir Aur'
     },
 
     ['The Naaz-Rokha Alliance'] = {
@@ -350,6 +373,7 @@ local _factionAttributes = {
         abilities = { 'Distant Suns', 'Fabrication' },
         units = { 'Eidolon' },
         commander = 'Dart and Tai',
+        hero = 'Hesh and Prit'
     },
 
     -- Tactic Blue's homebrew

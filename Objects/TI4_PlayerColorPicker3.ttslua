@@ -63,6 +63,7 @@ local SWAP = {
             'Support for the Throne ($COLOR)',
             'Political Secret ($COLOR)',
             'Ceasefire ($COLOR)',
+            'Alliance ($COLOR)',
         },
     },
 
@@ -976,7 +977,9 @@ function SwapPlan._verifyNothingMissing(anonNameToItems)
         for _, anonymousCard in ipairs(anonymousCards) do
             local items = anonNameToItems[anonymousCard]
             if not items then
-                return false, 'missing "' .. anonymousCard .. '"'
+                if anonymousCard ~= 'Alliance ($COLOR)' then
+                    return false, 'missing "' .. anonymousCard .. '"'
+                end
             elseif #items > 1 then
                 return false, 'multiple "' .. anonymousCard .. '"'
             end
@@ -1137,48 +1140,50 @@ function Pack.decks(anonNameToItems, deckColor, packBag)
         local cardObjects = {}
         for i, anonCardName in ipairs(anonCardNames) do
             local items = anonNameToItems[anonCardName]
-            assert(items and #items == 1)
-            local item = items[1]
-            local position = { x = pos.x, y = pos.y + 5 + i, z = pos.z }
-            local cardObject = false
-            if item.live then
-                cardObject = getObjectFromGUID(item.guid)
-                assert(cardObject)
-                local collide = false
-                local fast = true
-                cardObject.setPositionSmooth(position, collide, fast)
-            else
-                assert(item.deck)
-                local deckObject = getObjectFromGUID(item.deck.guid)
-                if deckObject then
-                    local remainder = deckObject.remainder
-                    if remainder then
-                        if remainder.getGUID() == item.guid then
-                            cardObject = remainder
+            if items then
+                assert(items and #items == 1)
+                local item = items[1]
+                local position = { x = pos.x, y = pos.y + 5 + i, z = pos.z }
+                local cardObject = false
+                if item.live then
+                    cardObject = getObjectFromGUID(item.guid)
+                    assert(cardObject)
+                    local collide = false
+                    local fast = true
+                    cardObject.setPositionSmooth(position, collide, fast)
+                else
+                    assert(item.deck)
+                    local deckObject = getObjectFromGUID(item.deck.guid)
+                    if deckObject then
+                        local remainder = deckObject.remainder
+                        if remainder then
+                            if remainder.getGUID() == item.guid then
+                                cardObject = remainder
+                                local collide = false
+                                local fast = true
+                                cardObject.setPositionSmooth(position, collide, fast)
+                            end
+                        else
+                            cardObject = deckObject.takeObject({
+                                guid = item.guid,
+                                position = position,
+                                smooth = false,
+                            })
+                        end
+                    end
+                    -- Still not found?  Maybe got orphaned via unexpected remainder.
+                    if not cardObject then
+                        cardObject = getObjectFromGUID(item.guid)
+                        if cardObject then
                             local collide = false
                             local fast = true
                             cardObject.setPositionSmooth(position, collide, fast)
                         end
-                    else
-                        cardObject = deckObject.takeObject({
-                            guid = item.guid,
-                            position = position,
-                            smooth = false,
-                        })
                     end
                 end
-                -- Still not found?  Maybe got orphaned via unexpected remainder.
-                if not cardObject then
-                    cardObject = getObjectFromGUID(item.guid)
-                    if cardObject then
-                        local collide = false
-                        local fast = true
-                        cardObject.setPositionSmooth(position, collide, fast)
-                    end
-                end
+                assert(cardObject)
+                table.insert(cardObjects, cardObject)
             end
-            assert(cardObject)
-            table.insert(cardObjects, cardObject)
         end
 
         -- Wait for setPositionSmooth before locking.
@@ -1535,13 +1540,20 @@ function Unpack.decks(anonNameToItems, deckColor, unpackBag)
         -- Move to their destinations.
         for i, anonCardName in ipairs(anonCardNames) do
             local items = anonNameToItems[anonCardName]
-            assert(items and #items == 1)
-            local item = items[1]
-            local cardObject = getCardObject(item.name.next)
-            cardObject.setLock(false)
-            Unpack._positionItem(item, cardObject, i)
+            if items then
+                assert(items and #items == 1)
+                local item = items[1]
+                local cardObject = getCardObject(item.name.next)
+                cardObject.setLock(false)
+                Unpack._positionItem(item, cardObject, i)
+            end
         end
         coroutine.yield(0)
+
+        -- Return any unused cards.
+        for _, cardObject in ipairs(cardObjects) do
+            unpackBag.putObject(cardObject)
+        end
     end
 end
 

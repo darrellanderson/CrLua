@@ -1,0 +1,212 @@
+-- @author Darrell for context menu stuff
+-- @author Milty for adapting to exploration
+
+local explorationBagGUID = '763340'
+local attachmentCardToTokenMap = {
+    ["Propulsion Research Facility - Technology Specialty"] = {"Blue Tech Specialty Token"},
+    ["Cybernetic Research Facility - Technology Specialty"] = {"Yellow Tech Specialty Token"},
+    ["Biotic Research Facility - Technology Specialty"] = {"Green Tech Specialty Token"},
+    ["Warfare Research Facility - Technology Specialty"] = {"Red Tech Specialty Token"},
+    ["Lazax Survivors"] = {"+1 Resource +2 Influence (Lazax Survivors) Token"},
+    ["Rich World"] = {"+1 Resource (Rich World) Token"},
+    ["Mining World"] = {"+2 Resource (Mining World) Token"},
+    ["Dyson Sphere"] = {"+2 Resource +1 Influence (Dyson Sphere) Token"},
+    ["Paradise World"] = {"+2 Influence (Paradise World) Token"},
+    ["Tomb of Emphidia"] = {"+1 Influence (Tomb of Emphidia) Token"},
+    ["Demilitarized Zone"] = {"DMZ Token"},
+    ["Gamma Wormhole"] = {"Gamma Wormhole Token - Cultural"},
+    ["Gamma Relay"] = {"Gamma Wormhole Token - Frontier"},
+    ["Mirage (Exploration)"] = {"Mirage Token", "Mirage", "Mirage Flight Academy"},
+    ["Ion Storm"] = {"Ion Storm Token"},
+}
+
+local data = {}
+
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
+        return function(parameters) return helperObject.call(functionName, parameters) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
+local _deckHelper = getHelperClient('TI4_DECK_HELPER')
+
+-------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+
+function onLoad(saveState)
+    self.setColorTint({ r = 0.25, g = 0.25, b = 0.25 })
+    self.setScale({ x = 2, y = 0.01, z = 2 })
+    self.setName('TI4_Explorer')
+    self.setDescription('Adds right-click exploration options to system tiles and frontier tokens, PLEASE LEAVE ON TABLE! This object is only visible to the black (GM) player.')
+
+    -- Only the GM/black player can see this object.  Others can still interact!
+    local invisibleTo = {}
+    for _, color in ipairs(Player.getColors()) do
+        if color ~= 'Black' then
+            table.insert(invisibleTo, color)
+        end
+    end
+    self.setInvisibleTo(invisibleTo)
+
+    local function delayedAdd()
+        for _, object in ipairs(getAllObjects()) do
+            if isSystemTile(object) then
+                applyExplorationGoodness(object)
+            elseif isFrontierToken(object) then
+                applyFrontierGoodness(object)
+            end
+        end
+    end
+    Wait.frames(delayedAdd, 11)
+end
+
+function applyExplorationGoodness(object)
+    local systemList = _systemHelper.systems()
+    local planetList = systemList[object.getGUID()].planets
+    if planetList ~= nil then
+        for i, planet in ipairs(planetList) do
+            if planet.trait ~= nil then
+                object.addContextMenuItem('Explore ' .. planet.name, function() explorePlanet(object.getGUID(), planet.name) end, false)
+            end
+        end
+    end
+end
+
+function applyFrontierGoodness(object)
+    object.addContextMenuItem('Explore Frontier', function() exploreFrontier(object) end, false)
+end
+
+
+function onObjectLeaveContainer(container, leaveObject)
+    if isSystemTile(leaveObject) then
+        applyExplorationGoodness(leaveObject)
+    elseif isFrontierToken(leaveObject) then
+        applyFrontierGoodness(leaveObject)
+    end
+end
+
+function onObjectEnterContainer(container, enterObject)
+    if isSystemTile(enterObject) then
+        clearGoodness(enterObject)
+    elseif isFrontierToken(enterObject) then
+        clearGoodness(enterObject)
+    end
+end
+
+function clearGoodness(object)
+    object.clearContextMenu()
+end
+
+function explorePlanet(tileGUID, planetName)
+    local systemList = _systemHelper.systems()
+    local planetTrait = false
+    local deckType = false
+    local tile = false
+    local tilePos = false
+    local planetPos = false
+    local tileRot = false
+    
+    local traitMap = {
+        ['cultural'] = 'Cultural Exploration',
+        ['hazardous'] = 'Hazardous Exploration',
+        ['industrial'] = 'Industrial Exploration'
+    }
+
+    for i, planet in ipairs(systemList[tileGUID].planets) do
+        if planet.name == planetName then
+            planetTrait = planet.trait
+            planetPos = planet.position
+        end
+    end
+    deckType = traitMap[planetTrait]
+
+    local tile = getObjectFromGUID(tileGUID)
+    local tilePos = tile.getPosition()
+    local tileRot = tile.getRotation()
+
+    local exploreDeck = _deckHelper.getDeckWithReshuffle(deckType)
+
+    if exploreDeck.tag == 'Deck' then
+        exploreDeck.takeObject({
+          position = tile.positionToWorld({planetPos.x, planetPos.y + 1, planetPos.z}),
+          rotation = {tileRot.x, tileRot.y, 0},
+          callback_function = function(obj) checkCardForToken(obj, tileGUID, planetName) end,
+        })
+    else
+        exploreDeck.setPosition(tile.positionToWorld({planetPos.x, planetPos.y + 1, planetPos.z}))
+        exploreDeck.setRotation({tileRot.x, tileRot.y, 0})
+    end
+    broadcastToAll('Exploring Planet: ' .. planetName)
+end
+
+function exploreFrontier(token)
+    local tokenPos = token.getPosition()
+    local tokenRot = token.getRotation()
+
+    local frontierDeck = _deckHelper.getDeckWithReshuffle('Frontier Exploration')
+
+    if frontierDeck.tag == 'Deck' then
+        frontierDeck.takeObject({
+          position = {tokenPos.x, tokenPos.y + 1, tokenPos.z},
+          rotation = {tokenRot.x, tokenRot.y, 0},
+          callback_function = function(obj) checkCardForToken(obj, '', false) end,
+        })
+    else
+        frontierDeck.setPosition({tokenPos.x, tokenPos.y + 1, tokenPos.z})
+        frontierDeck.setRotation({tokenRot.x, tokenRot.y, 0})
+    end
+    broadcastToAll('Exploring Frontier Token')
+    token.destruct()
+end
+
+function checkCardForToken(object_spawned, tileGUID, planetName)
+    local cardName = object_spawned.getName()
+    local systemList = _systemHelper.systems()
+    local tokenList = attachmentCardToTokenMap[cardName]
+    if tokenList then
+        local explorationBag = getObjectFromGUID(explorationBagGUID)
+        local explorationBagContents = explorationBag.getObjects()
+        for _, item in ipairs(tokenList) do
+            for i, token in ipairs(explorationBagContents) do
+                if token.name == item then
+                    local objRot = object_spawned.getRotation()
+                    local techRot = 0
+                    if planetName then
+                        for _, planet in ipairs(systemList[tileGUID].planets) do
+                            if planet.name == planetName then
+                                if planet.tech ~= nil then techRot = 180 end
+                            end
+                        end
+                    end
+                    explorationBag.takeObject({
+                        position = object_spawned.getPosition(),
+                        rotation = {objRot.x, objRot.y, techRot},
+                        guid = token.guid,
+                    })
+                end
+            end
+        end
+    end
+end
+
+function isSystemTile(object)
+    if not data.systemTileSet then
+        local systemList = _systemHelper.systems()
+        data.systemTileSet = systemList
+    end
+    return object.tag == 'Generic' and data.systemTileSet[object.getGUID()] or false
+end
+
+function isFrontierToken(object)
+    return object.tag == 'Generic' and object.getName() == 'Frontier Token'
+end

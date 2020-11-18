@@ -578,6 +578,11 @@ local function _getDeckAttributes(cardName)
     return _lowerCardNameToDeckAttributes[string.lower(cardName)]
 end
 
+local function _getDeckAttributesByType(deckType)
+    assert(type(deckType) == 'string')
+    return DECKS[deckType]
+end
+
 local function _getTransform(deckAttributes, deckOrDiscard)
     assert(type(deckAttributes) == 'table' and type(deckOrDiscard) == 'string')
 
@@ -632,6 +637,34 @@ function getDeck(name)
     local deckTransform = deckAttributes and _getTransform(deckAttributes, 'deck')
     local deck = deckTransform and _getDeck(deckTransform)
     return deck and deck.getGUID()
+end
+
+function getDeckWithReshuffle(name)
+    local deckAttributes = _getDeckAttributesByType(name)
+    local deckTransform = _getTransform(deckAttributes, 'deck')
+    local deck = _getDeck(deckTransform)
+
+    if deck == nil then
+        local deckDiscardTransform = _getTransform(deckAttributes, 'discard')
+        local deckDiscard = _getDeck(deckDiscardTransform)
+        if deckDiscard then
+                local bounds = deckDiscard.getBoundsNormalized()
+                local collide = false
+                local fast = true
+                deckDiscard.setPosition({
+                    x = deckTransform.position.x,
+                    y = deckTransform.position.y + bounds.size.y / 2,
+                    z = deckTransform.position.z
+                }, collide, fast)
+                deckDiscard.setRotation(deckTransform.rotation)
+                Wait.time(function() deckDiscard.setNamed(deckAttributes.deckName) end, 1)
+                if deckDiscard.tag == 'Deck' then
+                    deckDiscard.shuffle()
+                end
+                deck = deckDiscard
+          end
+    end
+    return deck
 end
 
 --- Given a card name, which deck contains it?

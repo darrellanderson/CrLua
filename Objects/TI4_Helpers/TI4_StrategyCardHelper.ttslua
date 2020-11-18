@@ -363,7 +363,7 @@ function recomputeInfluence(includeFaceDown)
                     colorToVoteCounter[color] = object
                 end
             elseif tag == 'Card' then
-                if name == 'Representative Government' then
+                if name == 'Representative Government' or name == 'Representative Government (PoK)' then
                     if not object.is_face_down and not _deckHelper.isDiscard(guid) then
                         representativeGovernment = true
                         broadcastToAll('Representative Government active.', {0.1,0.5,0.1})

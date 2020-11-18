@@ -380,7 +380,7 @@ local _flagshipModifiers = {
 }
 
 local _unitModifiers = {
-    ['2RAM'] = {
+    ['2Ram'] = {
         leader = true, -- L1Z1X commander
         description = 'PLANETARY SHIELD does not prevent BOMBARDMENT',
         owner = OWNER.SELF,
@@ -599,11 +599,13 @@ local _unitModifiers = {
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
         apply = function(unitAttrs)
-            if attr.spaceCombat then
-                attr.spaceCombat.hit = attr.spaceCombat.hit - 2
-            end
-            if attr.groundCombat then
-                attr.groundCombat.hit = attr.groundCombat.hit - 2
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.spaceCombat then
+                    attr.spaceCombat.hit = attr.spaceCombat.hit - 2
+                end
+                if attr.groundCombat then
+                    attr.groundCombat.hit = attr.groundCombat.hit - 2
+                end
             end
         end
     },
@@ -673,34 +675,34 @@ local _unitModifiers = {
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,
         apply = function(unitAttrs, params)
-            bestAFB = false
-            bestBomb = false
-            bestSpc = false
             for unitType, attr in pairs(unitAttrs) do
+                local best = false
                 if attr.antiFighterBarrage and (params.myUnitTypeToCount[unitType] or 0) > 0 then
-                    if (not bestAFB) or (attr.antiFighterBarrage.hit < bestAFB.antiFighterBarrage.hit) then
-                        bestAFB = attr
+                    if (not best) or (attr.antiFighterBarrage.hit < best.antiFighterBarrage.hit) then
+                        best = attr
                     end
                 end
+                if best then
+                    best.antiFighterBarrage.extraDice = (best.antiFighterBarrage.extraDice or 0) + 1
+                end
+                local best = false
                 if attr.bombardment and (params.myUnitTypeToCount[unitType] or 0) > 0 then
-                    if (not bestBomb) or (attr.bombardment.hit < bestBomb.bombardment.hit) then
-                        bestBomb = attr
+                    if (not best) or (attr.bombardment.hit < best.bombardment.hit) then
+                        best = attr
                     end
                 end
+                if best then
+                    best.bombardment.extraDice = (best.bombardment.extraDice or 0) + 1
+                end
+                local best = false
                 if attr.spaceCannon and (params.myUnitTypeToCount[unitType] or 0) > 0 then
-                    if (not bestSpc) or (attr.spaceCannon.hit < bestSpc.spaceCannon.hit) then
-                        bestSpc = attr
+                    if (not best) or (attr.spaceCannon.hit < best.spaceCannon.hit) then
+                        best = attr
                     end
                 end
-            end
-            if bestAFB then
-                bestAFB.extraDice = (bestAFB.extraDice or 0) + 1
-            end
-            if bestBomb then
-                bestBomb.extraDice = (bestBomb.extraDice or 0) + 1
-            end
-            if bestSpc then
-                bestSpc.extraDice = (bestSpc.extraDice or 0) + 1
+                if best then
+                    best.spaceCannon.extraDice = (best.spaceCannon.extraDice or 0) + 1
+                end
             end
         end
     },
@@ -727,7 +729,7 @@ local _unitModifiers = {
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,
         apply = function(unitAttrs, params)
-            best = false
+            local best = false
             for unitType, attr in pairs(unitAttrs) do
                 if attr.spaceCombat and (params.myUnitTypeToCount[unitType] or 0) > 0 then
                     if (not best) or (attr.spaceCombat.hit < best.spaceCombat.hit) then
@@ -1100,7 +1102,7 @@ function getColorToUnitModifiers()
                 guidToPosition[guid] = object.getPosition()
             end
         end
-        local color = string.match(obect.getName(), '^Leader Sheet %((.*)%)$')
+        local color = string.match(object.getName(), '^Leader Sheet %((.*)%)$')
         if color then
             colorToLeaderSheet[color] = object
         end

@@ -1338,6 +1338,123 @@ end
 
 -------------------------------------------------------------------------------
 
+local function _splitDecks()
+    -- Get per-card info.
+    local cardNameToInfo = {}
+    local deckNameToSources = {}
+    for deckName, deckAttributes in pairs(DECKS) do
+        deckNameToSources[deckName] = {}
+        for source, cardNames in pairs(deckAttributes.cardNames) do
+            for _, cardName in ipairs(cardNames) do
+                cardNameToInfo[cardName] = {
+                    cardName = cardName,
+                    deckName = deckName,
+                    source = source
+                }
+            end
+            table.insert(deckNameToSources[deckName], source)
+        end
+    end
+    for deckName, sources in pairs(deckNameToSources) do
+        table.sort(deckNameToSources[deckName])  -- consistent order
+    end
+
+    -- Find cards.
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Card' then
+            local info = cardNameToInfo[object.getName()]
+            if info then
+                info.card = object
+            end
+        elseif object.tag == 'Deck' then
+            for _, entry in ipairs(object.getObjects()) do
+                local info = cardNameToInfo[entry.name]
+                if info then
+                    info.guid = entry.guid
+                    info.deck = object
+                end
+            end
+        end
+    end
+
+    -- Organize by deck/source.
+    local deckNameToSourceToInfos = {}
+    for cardName, info in pairs(cardNameToInfo) do
+        local sourceToInfos = deckNameToSourceToInfos[info.deckName]
+        if not sourceToInfos then
+            sourceToInfos = {}
+            deckNameToSourceToInfos[info.deckName] = sourceToInfos
+        end
+        local infos = sourceToInfos[info.source]
+        if not infos then
+            infos = {}
+            sourceToInfos[info.source] = infos
+        end
+        table.insert(infos, info)
+    end
+
+    -- Move cards.
+    for deckName, sourceToInfos in pairs(deckNameToSourceToInfos) do
+        local transform = _getTransform(DECKS[deckName], 'deck')
+        local pos = transform.position
+        pos.y = pos.y + 5
+        local rot = transform.rotation
+
+        -- Remove first, let that be the base pile (preserving deck name).
+        table.remove(deckNameToSources[deckName], 1)
+        rot.y = (rot.y + 90) % 360
+
+        for i, source in ipairs(deckNameToSources[deckName]) do
+            for _, info in ipairs(sourceToInfos[source]) do
+                if info.deck and info.deck.remainder then
+                    info.card = info.deck.remainder
+                    info.deck = nil
+                end
+                if info.card then
+                    info.card.setPosition({ x = pos.x, y = pos.y, z = pos.z })
+                    info.card.setRotation({ x = rot.x, y = rot.y, z = rot.z })
+                elseif info.deck then
+                    info.deck.takeObject({
+                        guid              = info.guid,
+                        position          = { x = pos.x, y = pos.y, z = pos.z },
+                        rotation          = { x = rot.x, y = rot.y, z = rot.z },
+                        smooth            = false,
+                    })
+                else
+                    print('missing "' .. info.cardName .. '"')
+                end
+                pos.y = pos.y + 0.1
+            end
+            rot.y = (rot.y + 90) % 360
+        end
+    end
+
+    -- Rename split decks.
+    local function delayedRename()
+        for deckName, sourceToInfos in pairs(deckNameToSourceToInfos) do
+            local pos = _getTransform(DECKS[deckName], 'deck').position
+            local hits = Physics.cast({
+                origin       = pos,
+                direction    = { x = 0, y = -1, z = 0 },
+                type         = 3,  -- box
+                size         = { x = 0.1, y = 10, z = 0.1 }
+            }) -- returns {{Vector point, Vector normal, float distance, Object hit_object}, ...}
+            for _, hit in ipairs(hits or {}) do
+                if hit.hit_object.tag == 'Deck' then
+                    local deck = hit.hit_object
+                    local cardName = deck.getObjects()[1].name
+                    local info = cardNameToInfo[cardName]
+                    if info and string.len(deck.getName()) == 0 then
+                        deck.setName(info.source .. ' ' .. info.deckName)
+                    end
+                end
+            end
+        end
+        print('split decks finished')
+    end
+    Wait.time(delayedRename, 5)
+end
+
 -- Helper to read deck positions based on deck locations (hard coded above).
 local function _reportDeckPositionsInParentSpace()
     local parentNameSet = {}
@@ -1453,6 +1570,7 @@ function onLoad(saveState)
     end
 
     -- Test methods.
+    self.addContextMenuItem('Split decks', _splitDecks, false)
     self.addContextMenuItem('Get locations', _reportDeckPositionsInParentSpace, false)
     self.addContextMenuItem('Discard cards', testDiscardCards, false)
     self.addContextMenuItem('Discard deck', testDiscardDeck, false)

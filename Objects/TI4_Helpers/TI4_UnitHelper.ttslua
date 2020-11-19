@@ -621,8 +621,15 @@ local _unitModifiers = {
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
         apply = function(unitAttrs, params)
-            if (params.myUnitTypeToCount['Mech'] or 0) > 0 then
-                -- Not FRANKEN friendly, what if not fragile?
+            -- In a Franken game, might have this mech but not fragile.
+            local hasFragile = false
+            for _, modifier in ipairs(params.myUnitModifiers) do
+                if modifier == 'Fragile' then
+                    hasFragile = true
+                    break
+                end
+            end
+            if hasFragile and (params.myUnitTypeToCount['Mech'] or 0) > 0 then
                 local attr = unitAttrs['Infantry']
                 attr.groundCombat.hit = attr.groundCombat.hit - 1
             end

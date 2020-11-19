@@ -1546,14 +1546,14 @@ function resetSnapPoints()
         if deckAttributes.transform.deck then
             table.insert(snapPoints, {
                 position = deckAttributes.transform.deck.position,
-                rotation = deckAttributes.transform.deck.position.rotation,
+                rotation = deckAttributes.transform.deck.rotation,
                 rotation_snap = true
             })
         end
         if deckAttributes.transform.discard then
             table.insert(snapPoints, {
                 position = deckAttributes.transform.discard.position,
-                rotation = deckAttributes.transform.discard.position.rotation,
+                rotation = deckAttributes.transform.discard.rotation,
                 rotation_snap = true
             })
         end
@@ -1567,7 +1567,7 @@ function resetSnapPoints()
                         y = p0.y + d.y * i,
                         z = p0.z + d.z * i,
                     },
-                    rotation = deckAttributes.transform.deck.position.rotation,
+                    rotation = deckAttributes.transform.deck.rotation,
                     rotation_snap = true
                 })
             end

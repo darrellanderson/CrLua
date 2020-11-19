@@ -1053,12 +1053,18 @@ function getColorToUnitModifiers()
     end
 
     -- Faction abilities.
+    local imperiaColor = false
+    local commandTokenNameToColor = {}
     for color, faction in pairs(_factionHelper.allFactions()) do
         for _, ability in ipairs(faction and faction.abilities or {}) do
             if _unitModifiers[ability] then
                 addModifier(color, ability)
             end
+            if ability == 'Imperia' then
+                imperiaColor = color
+            end
         end
+        commandTokenNameToColor[faction.tokenName .. ' Command Token'] = color
     end
 
     -- Cards/Franken tiles.  Add "anywhereOnTable" to ALL colors.
@@ -1097,6 +1103,8 @@ function getColorToUnitModifiers()
     local colorToLeaderSheet = {}
     local colorToAlliances = {}
     local colorToCommander = {}
+    local guidToCommandTokenColor = {}
+    local guidToCommandTokenPosition = {}
     for _, object in ipairs(getAllObjects()) do
         local name, unitModifier = getUnitModifier(object)
         if unitModifier then
@@ -1127,15 +1135,24 @@ function getColorToUnitModifiers()
                 colorToCommander[color] = name
             end
         end
-        local color = string.match(object.getName(), '^Leader Sheet %((.*)%)$')
+
+        local name = object.getName()
+        local color = string.match(name, '^Leader Sheet %((.*)%)$')
         if color then
             colorToLeaderSheet[color] = object
         end
-        local color = string.match(object.getName(), '^Alliance %((.*)%)$')
+
+        local color = string.match(name, '^Alliance %((.*)%)$')
         if color then
             local zoneColor = _zoneHelper.zoneFromPosition(object.getPosition())
             colorToAlliances[zoneColor] = colorToAlliances[zoneColor] or {}
             table.insert(colorToAlliances[zoneColor], color)
+        end
+
+        local color = commandTokenNameToColor[name]
+        if color then
+            guidToCommandTokenColor[object.getGUID()] = color
+            guidToCommandTokenPosition[object.getGUID()] = object.getPosition()
         end
     end
     local guidToZoneColor = _zoneHelper.zonesFromPositions(guidToPosition)
@@ -1162,6 +1179,19 @@ function getColorToUnitModifiers()
             end
         else
             addModifier(zoneColor, name)
+        end
+    end
+
+    if imperiaColor then
+        local guidToZoneColor = _zoneHelper.zonesFromPositions(guidToCommandTokenPosition)
+        for guid, zoneColor in pairs(guidToZoneColor) do
+            if zoneColor == imperiaColor then
+                local tokenColor = guidToCommandTokenColor[guid]
+                local commander = colorToCommander[tokenColor]
+                if tokenColor ~= imperiaColor and commander then
+                    addModifier(imperiaColor, commander)
+                end
+            end
         end
     end
 

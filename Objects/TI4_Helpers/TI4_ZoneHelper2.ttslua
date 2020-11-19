@@ -1,5 +1,6 @@
 --- Player zones.
 -- @author Darrell
+-- #include <~/CrLua/Objects/TI4_Helpers/TI4_ZoneHelper2>
 
 -- Users should copy this getHelperClient function, and use via:
 --
@@ -991,6 +992,8 @@ function onLoad(saveState)
         })
         _altHomeSystemPositions = json.altHomeSystemPositions
     end
+
+    drawBordersVectorLines(true)
 end
 
 function onSave()

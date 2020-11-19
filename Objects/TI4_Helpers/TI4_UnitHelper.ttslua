@@ -506,6 +506,19 @@ local _unitModifiers = {
         end
     },
 
+    ['Geoform'] = {
+        leader = LEADER.HERO,
+        description = 'SPACE CANNON 5(x3)',
+        owner = OWNER.SELF,
+        type = TYPE.MUTATE,
+        apply = function(unitAttrs)
+            unitAttrs['Geoform'] = {
+                spaceCannon = { hit = 5, dice = 3 },
+                unitCount = 1
+            }
+        end
+    },
+
     ['Morale Boost'] = {
         description = '+1 to all COMBAT rolls',
         owner = OWNER.SELF,
@@ -700,6 +713,28 @@ local _unitModifiers = {
                 end
             end
 
+        end
+    },
+
+    ['The Cavalry'] = {
+        description = 'One non-fighter ship gains the SUSTAIN DAMAGE, combat value, and ANTI-FIGHTER BARRAGE of the Nomad flagship (this modifier adds a new unit for AFB/space combat, remove the affected unit from normal setup)',
+        owner = OWNER.SELF,
+        type = TYPE.MUTATE,
+        apply = function(unitAttrs, params)
+            unitAttrs['The Cavalry'] = {
+                antiFighterBarrage = { hit = 8, dice = 3 },
+                spaceCombat = { hit = 7, dice = 2 },
+                unitCount = 1
+            }
+            for _, object in ipairs(getAllObjects()) do
+                if object.tag == 'Card' and object.getName() == 'Memoria II' then
+                    unitAttrs['The Cavalry'] = {
+                        antiFighterBarrage = { hit = 5, dice = 3 },
+                        spaceCombat = { hit = 5, dice = 2 },
+                        unitCount = 1
+                    }
+                end
+            end
         end
     },
 

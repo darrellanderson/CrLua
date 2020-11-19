@@ -616,6 +616,19 @@ local _unitModifiers = {
         end
     },
 
+    ['Shield Paling'] = {
+        description = 'Infantry on planet with mech are not FRAGILE',
+        owner = OWNER.SELF,
+        type = TYPE.ADJUST,
+        apply = function(unitAttrs, params)
+            if (params.myUnitTypeToCount['Mech'] or 0) > 0 then
+                -- Not FRANKEN friendly, what if not fragile?
+                local attr = unitAttrs['Infantry']
+                attr.groundCombat.hit = attr.groundCombat.hit - 1
+            end
+        end
+    },
+
     ['Ssruu'] = {
         leader = LEADER.AGENT, -- Yssaril agent
         description = 'Copy abilities from other agents',

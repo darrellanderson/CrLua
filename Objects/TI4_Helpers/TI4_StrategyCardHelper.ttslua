@@ -335,12 +335,17 @@ function recomputeInfluence(includeFaceDown)
         _lowerNameToInfluence = {}
         for lowerName, planet in pairs(_systemHelper.planets()) do
             if (planet.influence or 0) > 0 then
-                _lowerNameToInfluence[lowerName] = planet.influence
+                _lowerNameToInfluence[lowerName] = {
+                    influence = planet.influence
+                }
             end
         end
         for lowerName, attributes in pairs(_systemHelper.nonPlanetResourceInfluenceCards()) do
             if (attributes.influence or 0) > 0 then
-                _lowerNameToInfluence[lowerName] = attributes.influence
+                _lowerNameToInfluence[lowerName] = {
+                    influence = attributes.influence,
+                    requireFaceUp = attributes.requireFaceUp
+                }
             end
         end
     end
@@ -370,9 +375,12 @@ function recomputeInfluence(includeFaceDown)
                     end
                 elseif includeFaceDown or not object.is_face_down then
                     local influence = _lowerNameToInfluence[string.lower(name)]
+                    if influence and influence.requireFaceUp and object.is_face_down then
+                        influence = false
+                    end
                     if influence then
                         guidToPosition[guid] = object.getPosition()
-                        guidToInfluence[guid] = influence
+                        guidToInfluence[guid] = influence.influence
                     end
                 end
             end

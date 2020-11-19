@@ -1084,11 +1084,11 @@ function rollDiceForAbility(player, ability)
 
     local haveDice = false
     for unit_id, unit_stats in pairs(unitData) do
-        local unit_count = getUnitCount(unit_id) or 0
+        local unit_count = getUnitCount(unit_id) or unit_stats.unitCount or 0
         if unit_count > 0 and unit_stats[ability] then
             local abilityAttrs = unit_stats[ability]
             Roller.addDice({
-                diceColor = DICE_COLOR[unit_id],
+                diceColor = DICE_COLOR[unit_id] or 'White',
                 diceCount = abilityAttrs.dice * unit_count + (abilityAttrs.extraDice or 0),
                 hitValue = abilityAttrs.hit,
                 critCount = abilityAttrs.extraHitsOn and abilityAttrs.extraHitsOn.count,

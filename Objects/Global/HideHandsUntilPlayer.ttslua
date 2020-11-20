@@ -4,6 +4,17 @@ local function _hideHands()
     for _, color in ipairs(getSeatedPlayers()) do
         exclude[color] = true
     end
+    for _, color in ipairs(Player.getColors()) do
+        if color ~= 'Grey' and color ~= 'Black' then
+            local player = Player[color]
+            if player and player.getHandCount() > 0 then
+                if #(player.getHandObjects(1) or {}) == 0 then
+                    exclude[color] = true
+                end
+            end
+        end
+    end
+
     -- Get existing, remove any that should not be there.
     for _, object in ipairs(getAllObjects()) do
         color = object.tag == 'Fog' and string.match(object.getName(), '^HIDE_HAND_(.*)$')
@@ -15,6 +26,7 @@ local function _hideHands()
             end
         end
     end
+
     -- Add missing.
     for _, color in ipairs(_zoneHelper.zones()) do
         if not exclude[color] then
@@ -52,10 +64,5 @@ function onPlayerChangeColor(playerColor)
     if originalOnPlayerChangeColor then
         originalOnPlayerChangeColor(playerColor)
     end
-    local remove = 'HIDE_HAND_' .. playerColor
-    for _, object in ipairs(getAllObjects()) do
-        if object.tag == 'Fog' and object.getName() == remove then
-            destroyObject(object)
-        end
-    end
+    Wait.frames(_hideHands, 6)
 end

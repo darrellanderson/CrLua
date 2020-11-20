@@ -646,10 +646,46 @@ end
 -------------------------------------------------------------------------------
 
 function _readyCards()
+    local excludeNameSet = {}
+    local function exclude(itemOrItems)
+        if itemOrItems then
+            if type(itemOrItems) == 'string' then
+                excludeNameSet[itemOrItems] = true
+            elseif type(itemOrItems) == 'table' then
+                for _, item in ipairs(itemOrItems) do
+                    assert(type(item) == 'string')
+                    excludeNameSet[item] = true
+                end
+            else
+                error('bad type')
+            end
+        end
+    end
+    for _, faction in pairs(_factionHelper.allFactions()) do
+        exclude(faction.commander)
+        exclude(faction.hero)
+    end
+
     local inHandGuidSet = _zoneHelper.inHand()
+    local function isCandidate(object)
+        if object.tag ~= 'Card' then
+            return false
+        end
+        if not object.is_face_down then
+            return false
+        end
+        if inHandGuidSet[object.getGUID()] then
+            return false
+        end
+        if excludeNameSet[object.getName()] then
+            return false
+        end
+        return true
+    end
+
     local guidToPosition = {}
     for _, object in ipairs(getAllObjects()) do
-        if object.tag == 'Card' and object.is_face_down and not inHandGuidSet[object.getGUID()] then
+        if isCandidate(object) then
             guidToPosition[object.getGUID()] = object.getPosition()
         end
     end

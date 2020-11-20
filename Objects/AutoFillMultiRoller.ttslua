@@ -926,6 +926,7 @@ function autoFillCoroutine()
     local doClick = not params.altClick
     multiRoller.call('inject', {
         clickerColor = params.clickerColor,
+        vsColor = enemyColor,
         unitTypeToCount = fillUnitTypeToCount,
         plasmaScoring = plasmaScoring and true or false,
         antimassDeflectors = antimassDeflectors and true or false,

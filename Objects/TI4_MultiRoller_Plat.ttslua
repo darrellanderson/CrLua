@@ -5,7 +5,7 @@
 --[[
 Set unit counts by left/right click (or +/- buttons). Winnu flagship number of enemy non-fighter ships instead.
 
-Play unit modifier cards in your play area (laws anywhere on the table). Toggle PS to use plasma scoring on best unit. Toggle AMD to use anti-mass deflectors.
+Play unit modifier cards in your play area (laws anywhere on the table). Toggle PS to use plasma scoring on best unit.
 
 Click roll type in any unit's attributes.
 ]]
@@ -86,7 +86,7 @@ local DICE_COLOR = {
 }
 
 local _unitTypeToCount = {}
-local _antiMassDeflectors = false
+local _vsColor = false
 local _plasmaScoring = false
 
 local _allPossibleUnitAttrs = false
@@ -120,7 +120,7 @@ function onLoad(saveState)
     local helpMessage = {
         'Left click to add units, right click to subtract.',
         'Click a combat type to roll for ALL units.',
-        'Right click toggle non-roll attributes.'
+        --'Right click toggle non-roll attributes.'
     }
     self.createButton({
         click_function = 'doNothing',
@@ -213,7 +213,7 @@ function createUi()
             setUnitCount(unitType, count)
         end
         setPlasmaScoring(_plasmaScoring)
-        setAntiMassDeflectors(_antiMassDeflectors)
+        setVsColor(_vsColor)
         updateAbilities()
         updateColor()
     end
@@ -249,6 +249,8 @@ end
 
 function updateColor()
     local color = myColor()
+
+    -- Read the unit tint from a War Sun.
     local tint = false
     for _, object in ipairs(getAllObjects()) do
         if object.getName() == color .. ' War Sun' then
@@ -258,8 +260,19 @@ function updateColor()
     end
     tint = tint and ('#' .. Color.new(tint.r, tint.g, tint.b):toHex(false)) or color
 
+    -- Apply tints to unit images.
     for _, unitType in ipairs(UNIT_TYPES) do
         self.UI.setAttribute(unitType .. '.unitImage', 'color', tint)
+    end
+
+    -- Hide self and missing peers.
+    for _, color in ipairs(Player.getAvailableColors()) do
+        local id = "vsColor" .. color
+        if _zoneHelper.zoneAttributes(color) then
+            self.UI.show(id)
+        else
+            self.UI.hide(id)
+        end
     end
 end
 
@@ -383,6 +396,84 @@ function generateRollerXmlTable(unit_data)
             }
         }
     }
+
+    local colors = Player.getAvailableColors()
+    table.sort(colors)
+    local buttonsVsColor = {}
+    for _, color in ipairs(colors) do
+        table.insert(buttonsVsColor, {
+            tag = "ToggleButton",
+            attributes = {
+                id = "vsColor" .. color,
+                onValueChanged = "toggleVsColor",
+                class = "UIToggleHeavyBackground",
+                isOn = "false"
+            },
+            children = {
+                {
+                    tag = "Text",
+                    value = "Vs\n" .. color,
+                    attributes = {
+                        class = "userButtonText",
+                        fontSize = 280,
+                        color = color
+                    }
+                }
+            }
+        })
+    end
+    local buttonPlasmaScoring = {
+        tag = "ToggleButton",
+        attributes = {
+            id = "togglePlasmaScoring",
+            onValueChanged = "togglePlasmaScoring",
+            class = "UIToggleHeavyBackground",
+            isOn = "false"
+        },
+        children = {
+            {
+                tag = "Text",
+                value = "Plasma Scoring",
+                attributes = {
+                    class = "userButtonText",
+                    fontSize = 280
+                }
+            }
+        }
+    }
+    local buttonUpdate = {
+        tag = "Button",
+        attributes = {
+            onClick = "updateRoller",
+            class = "UIButtonHeavyBackground"
+        },
+        children = {
+            {
+                tag = "Text",
+                value = "Update",
+                attributes = {
+                    class = "userButtonText"
+                }
+            }
+        }
+    }
+    local buttonReset = {
+        tag = "Button",
+        attributes = {
+            onClick = "resetRoller",
+            class = "UIButtonHeavyBackground"
+        },
+        children = {
+            {
+                tag = "Text",
+                value = "Reset",
+                attributes = {
+                    class = "userButtonText"
+                }
+            }
+        }
+    }
+
     local containerLayoutXmlTable = {
         tag = "HorizontalLayout",
         attributes = {
@@ -405,81 +496,43 @@ function generateRollerXmlTable(unit_data)
             },
             {
                 tag = "Panel",
-                attributes = {
-                    class = "UILayoutLightBackground"
-                },
                 children = {
                     {
-                        tag = "VerticalLayout",
-                        attributes = {padding = "50 50 50 50", spacing = "50"},
+                        tag = "Panel",
+                        attributes = {
+                            height = math.floor(4/7*100) .. '%',
+                            --color = '#ff0000',
+                            rectAlignment = "UpperCenter",
+                        },
                         children = {
                             {
-                                tag = "ToggleButton",
+                                tag = 'GridLayout',
                                 attributes = {
-                                    id = "toggleAntiMassDeflectors",
-                                    onValueChanged = "toggleAntiMassDeflectors",
-                                    class = "UIToggleHeavyBackground",
-                                    isOn = "false"
+                                    padding = "25 0 0 0",
+                                    cellSize = '1037 830',
+                                    spacing = '50 50'
                                 },
-                                children = {
-                                    {
-                                        tag = "Text",
-                                        value = "Anti-Mass Deflectors",
-                                        attributes = {
-                                            class = "userButtonText"
-                                        }
-                                    }
-                                }
+                                children = buttonsVsColor
+                            }
+                        }
+                    },
+                    {
+                        tag = "Panel",
+                        attributes = {
+                            height = math.floor(3/7*100) .. '%',
+                            --color = '#00ff00',
+                            rectAlignment = "LowerCenter"
+                        },
+                        children = {
+                            tag = 'VerticalLayout',
+                            attributes = {
+                                padding = "25 0 0 0",
+                                spacing = "50"
                             },
-                            {
-                                tag = "ToggleButton",
-                                attributes = {
-                                    id = "togglePlasmaScoring",
-                                    onValueChanged = "togglePlasmaScoring",
-                                    class = "UIToggleHeavyBackground",
-                                    isOn = "false"
-                                },
-                                children = {
-                                    {
-                                        tag = "Text",
-                                        value = "Plasma Scoring",
-                                        attributes = {
-                                            class = "userButtonText"
-                                        }
-                                    }
-                                }
-                            },
-                            {
-                                tag = "Button",
-                                attributes = {
-                                    onClick = "updateRoller",
-                                    class = "UIButtonHeavyBackground"
-                                },
-                                children = {
-                                    {
-                                        tag = "Text",
-                                        value = "Update",
-                                        attributes = {
-                                            class = "userButtonText"
-                                        }
-                                    }
-                                }
-                            },
-                            {
-                                tag = "Button",
-                                attributes = {
-                                    onClick = "resetRoller",
-                                    class = "UIButtonHeavyBackground"
-                                },
-                                children = {
-                                    {
-                                        tag = "Text",
-                                        value = "Reset",
-                                        attributes = {
-                                            class = "userButtonText"
-                                        }
-                                    }
-                                }
+                            children = {
+                                buttonPlasmaScoring,
+                                buttonUpdate,
+                                buttonReset
                             }
                         }
                     }
@@ -549,8 +602,6 @@ function generateUnitXmlButton(unit_id, unit_stats, color)
             id = unit_id .. ".unitMainButton",
             class = "UIButtonLightBackground",
             onClick = "changeUnitCountXml",
-            onMouseEnter = "showChangeCountButtonsXml",
-            onMouseExit = "hideChangeCountButtonsXml",
         },
         children = {
             {
@@ -703,20 +754,6 @@ function changeUnitCountXml(player, value, id)
     end
 end
 
-function showChangeCountButtonsXml(player, value, id)
-    local unitIncrementId = string.match(id, "(.+)%.") .. ".unitCountIncrementText"
-    local unitDecrementId = string.match(id, "(.+)%.") .. ".unitCountDecrementText"
-    self.UI.show(unitIncrementId)
-    self.UI.show(unitDecrementId)
-end
-
-function hideChangeCountButtonsXml(player, value, id)
-    local unitIncrementId = string.match(id, "(.+)%.") .. ".unitCountIncrementText"
-    local unitDecrementId = string.match(id, "(.+)%.") .. ".unitCountDecrementText"
-    self.UI.hide(unitIncrementId)
-    self.UI.hide(unitDecrementId)
-end
-
 -------------------------------------------------------------------------------
 
 function setUnitCount(unit, count)
@@ -736,19 +773,9 @@ function setHitCount(unit, hits)
     self.UI.setValue(unit .. ".hitsCount", hits)
 end
 
-function setAntiMassDeflectors(value)
-    self.UI.setAttribute("toggleAntiMassDeflectors", "isOn", value)
-    _antiMassDeflectors = value
-end
-
 function setPlasmaScoring(value)
     self.UI.setAttribute("togglePlasmaScoring", "isOn", value)
     _plasmaScoring = value
-end
-
-function toggleAntiMassDeflectors()
-    setAntiMassDeflectors(not getAntiMassDeflectors())
-    updateAbilities()
 end
 
 function togglePlasmaScoring()
@@ -756,14 +783,30 @@ function togglePlasmaScoring()
     updateAbilities()
 end
 
-function getAntiMassDeflectors()
-    --return self.UI.getAttribute("toggleAntiMassDeflectors", "isOn")
-    return _antiMassDeflectors
-end
-
 function getPlasmaScoring()
     --return self.UI.getAttribute("togglePlasmaScoring", "isOn")
     return _plasmaScoring
+end
+
+function setVsColor(value)
+    local valueId = value and ('vsColor' .. value)
+    for _, color in ipairs(Player.getAvailableColors()) do
+        local otherId = 'vsColor' .. color
+        if valueId ~= otherId then
+            self.UI.setAttribute(otherId, "isOn", false)
+        end
+    end
+    if valueId then
+        self.UI.setAttribute(valueId, "isOn", true)
+    end
+    _vsColor = value
+end
+
+function toggleVsColor(player, value, id)
+    value = string.lower(value) == 'true'
+    local color = assert(string.match(id, '^vsColor(.*)$'))
+    setVsColor(value and color)
+    updateAbilities()
 end
 
 function updateRoller()
@@ -1161,8 +1204,11 @@ function getUnitData(force)
         unitTypeToCount[unitType] = getUnitCount(unitType)
     end
 
+    local colorToUnitModifiers = _unitHelper.getColorToUnitModifiers()
+
     local unitOverrides = _unitHelper.getColorToUnitOverrides()[color] or {}
-    local unitModifiers = _unitHelper.getColorToUnitModifiers()[color] or {}
+    local unitModifiers = colorToUnitModifiers[color] or {}
+    local opponentModifiers = _vsColor and colorToUnitModifiers[_vsColor] or {}
 
     -- Remove PS if not selected.
     if getPlasmaScoring() then
@@ -1229,8 +1275,8 @@ function getUnitData(force)
         myColor = color,
         myUnitModifiers = unitModifiers,
         myUnitTypeToCount = unitTypeToCount,
-        opponentColor = false,
-        opponentUnitModifiers = getAntiMassDeflectors() and { 'Antimass Deflectors' },
+        opponentColor = _vsColor,
+        opponentUnitModifiers = opponentModifiers,
         opponentUnitTypeToCount = false
     })
 
@@ -1238,7 +1284,6 @@ function getUnitData(force)
     for unitType, unitAttrs in pairs(_unitAttrs) do
         unitAttrs.name = unitAttrs.name or unitType
         unitAttrs.image = unitAttrs.image or unitType
-        --unitAttrs.image = 'MuaatButton'
     end
 
     return _unitAttrs
@@ -1250,9 +1295,9 @@ end
 function inject(params)
     assert(type(params) == 'table')
     assert(type(params.clickerColor) == 'string')
+    assert((not params.vsColor) or type(params.vsColor) == 'string')
     assert(type(params.unitTypeToCount) == 'table')
     assert(type(params.plasmaScoring) == 'boolean')
-    assert(type(params.antimassDeflectors) == 'boolean')
     assert((not params.rollType) or type(params.rollType) == 'string')
     assert((not params.extraModifiers) or type(params.extraModifiers) == 'table')
 
@@ -1272,7 +1317,7 @@ function inject(params)
     end
 
     setPlasmaScoring(params.plasmaScoring and true or false)
-    setAntiMassDeflectors(params.antimassDeflectors and true or false)
+    setVsColor(params.vsColor)
 
     updateAbilities()
 

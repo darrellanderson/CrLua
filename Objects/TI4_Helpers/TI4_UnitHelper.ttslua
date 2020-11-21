@@ -288,6 +288,38 @@ local _unitOverrides = {
 }
 
 local _flagshipModifiers = {
+    ['Arvicon Rex'] = {
+        description = '+2 flagship COMBAT against opponent with no token in your fleet pool',
+        owner = OWNER.SELF,
+        type = TYPE.ADJUST,
+        apply = function(unitAttrs, params)
+            local myColor = params.myColor
+            local vsColor = params.opponentColor
+            local haveToken = false
+            local faction = vsColor and _factionHelper.fromColor(vsColor)
+            if faction then
+                local tokenName = faction.tokenName .. ' Command Token'
+                local guidToPosition = {}
+                for _, object in ipairs(getAllObjects()) do
+                    if object.getName() == tokenName then
+                        guidToPosition[object.getGUID()] = object.getPosition()
+                    end
+                end
+                local guidToColor = _zoneHelper.zonesFromPositions(guidToPosition)
+                for guid, color in pairs(guidToColor) do
+                    if color == myColor then
+                        haveToken = true
+                        break
+                    end
+                end
+            end
+            if haveToken then
+                attr = unitAttrs['Flagship']
+                attr.spaceCombat.hit = attr.spaceCombat.hit - 2
+            end
+        end
+    },
+
     ["C'morran N'orr"] = {
         description = "+1 to all COMBAT rolls for other ships with the C'morran N'orr",
         owner = OWNER.SELF,
@@ -519,6 +551,40 @@ local _unitModifiers = {
         end
     },
 
+    ['Iconoclast'] = {
+        description = '+2 mech COMBAT rolls if opponent has fragment',
+        owner = OWNER.SELF,
+        type = TYPE.MUTATE,
+        apply = function(unitAttrs, params)
+            local vsColor = params.opponentColor
+            local hasFragment = false
+            if vsColor then
+                local guidToPosition = {}
+                for _, object in ipairs(getAllObjects()) do
+                    if object.tag == 'Card' and string.match(object.getName(), ' Relic Fragment ') then
+                        guidToPosition[object.getGUID()] = object.getPosition()
+                    end
+                end
+                local guidToColor = _zoneHelper.zonesFromPositions(guidToPosition)
+                for guid, color in pairs(guidToColor) do
+                    if color == vsColor then
+                        hasFragment = true
+                        break
+                    end
+                end
+            end
+            if hasFragment then
+                local attrs = unitAttrs['Mech'] or {}
+                if attrs.groundCombat then
+                    attrs.groundCombat.hit = attrs.groundCombat.hit - 2
+                end
+                if attrs.spaceCombat then
+                    attrs.spaceCombat.hit = attrs.spaceCombat.hit - 2
+                end
+            end
+        end
+    },
+
     ['Morale Boost'] = {
         description = '+1 to all COMBAT rolls',
         owner = OWNER.SELF,
@@ -538,6 +604,44 @@ local _unitModifiers = {
     ['Morale Boost (2)'] = { alias = 'Morale Boost' },
     ['Morale Boost (3)'] = { alias = 'Morale Boost' },
     ['Morale Boost (4)'] = { alias = 'Morale Boost' },
+
+    ['Mordred'] = {
+        description = '+2 mech COMBAT rolls if opponent has X/Y token',
+        owner = OWNER.SELF,
+        type = TYPE.MUTATE,
+        apply = function(unitAttrs, params)
+            local vsColor = params.opponentColor
+            local hasXY = false
+            if vsColor then
+                local tokenNameSet = {
+                    ['Valefar Assimilator X Token'] = true,
+                    ['Valefar Assimilator Y Token'] = true,
+                }
+                local guidToPosition = {}
+                for _, object in ipairs(getAllObjects()) do
+                    if tokenNameSet[object.getName()] then
+                        guidToPosition[object.getGUID()] = object.getPosition()
+                    end
+                end
+                local guidToColor = _zoneHelper.zonesFromPositions(guidToPosition)
+                for guid, color in pairs(guidToColor) do
+                    if color == vsColor then
+                        hasXY = true
+                        break
+                    end
+                end
+            end
+            if hasXY then
+                local attrs = unitAttrs['Mech'] or {}
+                if attrs.groundCombat then
+                    attrs.groundCombat.hit = attrs.groundCombat.hit - 2
+                end
+                if attrs.spaceCombat then
+                    attrs.spaceCombat.hit = attrs.spaceCombat.hit - 2
+                end
+            end
+        end
+    },
 
     ['Nebula Defence'] = {
         description = '+1 to SPACE COMBAT rolls (defender)',
@@ -694,6 +798,23 @@ local _unitModifiers = {
             end
             if best then
                 best.spaceCannon.extraDice = (best.spaceCannon.extraDice or 0) + 1
+            end
+        end
+    },
+
+    ['Supercharge'] = {
+        description = '+1 to all COMBAT rolls',
+        owner = OWNER.SELF,
+        type = TYPE.ADJUST,
+        tap = true,
+        apply = function(unitAttrs)
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.spaceCombat then
+                    attr.spaceCombat.hit = attr.spaceCombat.hit - 1
+                end
+                if attr.groundCombat then
+                    attr.groundCombat.hit = attr.groundCombat.hit - 1
+                end
             end
         end
     },
@@ -1130,6 +1251,7 @@ function getColorToUnitModifiers()
             return false
         end
 
+        -- Lookup the modifier.
         local name = object.getName()
         local unitModifier = _unitModifiers[name]
         if not unitModifier then
@@ -1140,6 +1262,7 @@ function getColorToUnitModifiers()
             unitModifier = _unitModifiers[unitModifier.alias]
         end
 
+        -- Verify tag.
         if unitModifier.tag then
             if object.tag ~= unitModifier.tag then
                 return false
@@ -1147,9 +1270,25 @@ function getColorToUnitModifiers()
         elseif not tagSet[object.tag] then
             return false
         end
+
+        -- Verify cards are face up.
         if object.tag == 'Card' and object.is_face_down then
             return false
         end
+
+        -- "tap" cards need to be rotated wrt zone.
+        if unitModifier.tap then
+            local zoneColor = _zoneHelper.zoneFromPosition(object.getPosition())
+            local zoneAttrs = zoneColor and _zoneHelper.zoneAttributes(zoneColor)
+            local rotation = zoneAttrs and zoneAttrs.rotation
+            if rotation then
+                local d = math.abs(object.getRotation().y - rotation.y)
+                if d < 25 or d > 155 then
+                    return false
+                end
+            end
+        end
+
         return name, unitModifier
     end
 

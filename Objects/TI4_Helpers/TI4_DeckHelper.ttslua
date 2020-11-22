@@ -804,22 +804,26 @@ function _processCardDiscardQueue()
     end
 
     if deckAttributes.shuffleOnDiscard then
-        if deckAttributes._waitShuffleId then
-            Wait.stop(deckAttributes._waitShuffleId)
-        end
-        local function delayedShuffle()
-            deckAttributes._waitShuffleId = nil
-            local transform = _getTransform(deckAttributes, 'discard')
-            if not transform then
-                transform = _getTransform(deckAttributes, 'deck')
-            end
-            local deck = _getDeck(transform)
-            if deck and deck.tag == 'Deck' then
-                deck.shuffle()
-            end
-        end
-        deckAttributes._waitShuffleId = Wait.time(delayedShuffle, 2)
+        _delayedShuffle(deckAttributes)
     end
+end
+
+function _delayedShuffle(deckAttributes)
+    if deckAttributes._waitShuffleId then
+        Wait.stop(deckAttributes._waitShuffleId)
+    end
+    local function delayedShuffle()
+        deckAttributes._waitShuffleId = nil
+        local transform = _getTransform(deckAttributes, 'discard')
+        if not transform then
+            transform = _getTransform(deckAttributes, 'deck')
+        end
+        local deck = _getDeck(transform)
+        if deck and deck.tag == 'Deck' then
+            deck.shuffle()
+        end
+    end
+    deckAttributes._waitShuffleId = Wait.time(delayedShuffle, 2)
 end
 
 function discardDeck(params)
@@ -968,6 +972,9 @@ function _verifyCardDrop(cardObject)
             local collide = false
             local fast = true
             cardObject.setRotationSmooth(rotation, collide, fast)
+            if deckAttributes.shuffleOnDiscard then
+                _delayedShuffle(deckAttributes)
+            end
             return  -- dropped in the expected deck area.
         end
     end

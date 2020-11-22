@@ -513,7 +513,7 @@ function SetupColor.transformHands()
                 position = position,
                 rotation = rotation,
                 scale    = SetupColor.HAND.ACTIVE.SCALE
-            })            
+            })
         else
             local nonPlayerIndex = (i - playerCount) - 1
             Player[color].setHandTransform({
@@ -1097,7 +1097,7 @@ function SetupFaction.unpack(faction, factionBox, zone, isFranken)
                 else
                     -- Do not lock too soon, infinite bag may still be getting set up.
                     if offset.lock then
-                        Wait.time(function() object.setLock(true) end, 3)
+                        Wait.time(function() object.setLock(true) end, 5)
                     end
                 end
             end
@@ -1598,8 +1598,18 @@ function unpackFactionCoroutine()
     SetupFaction.unpackOther(faction, factionBox, zoneAttributes)
     coroutine.yield(0)
 
-    -- Give earlier unpack steps a moment to finish.
-    yieldForSeconds(2.5)
+    -- Wait for home system to land before unpacking units.
+    -- Could wait for lock, but try to avoid non-time barriers.
+    local waitUntil = Time.time + 2
+    while Time.time < waitUntil or homeSystemTile.isSmoothMoving() do
+        coroutine.yield(0)
+    end
+
+    SetupFaction.unpackUnits(color, faction, homeSystemTile)
+    coroutine.yield(0)
+
+    -- Wait one more moment for tech cards to move.
+    yieldForSeconds(2)
 
     SetupFaction.unpackStartingTech(color, faction, zoneAttributes)
     coroutine.yield(0)
@@ -1618,16 +1628,6 @@ function unpackFactionCoroutine()
         coroutine.yield(0)
         tokenObject.translate({ x = 0, y = 1, z = 0 })
     end
-
-    -- Wait for home system to land before unpacking units.
-    -- Could wait for lock, but try to avoid non-time barriers.
-    local waitUntil = Time.time + 3
-    while Time.time < waitUntil do
-        coroutine.yield(0)
-    end
-
-    SetupFaction.unpackUnits(color, faction, homeSystemTile)
-    coroutine.yield(0)
 
     if faction.startMessage then
         _safeBroadcastToColor(faction.tokenName .. ': ' .. faction.startMessage, color, color)

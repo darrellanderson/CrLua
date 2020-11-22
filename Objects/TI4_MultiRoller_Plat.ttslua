@@ -1321,7 +1321,9 @@ function inject(params)
 
     updateAbilities()
 
-    rollDiceForAbility(false, params.rollType)
+    if params.rollType then
+        rollDiceForAbility(false, params.rollType)
+    end
 
     -- Require click handling absorb these this frame, otherwise lost.
     _injectExtraModifiers = false

@@ -404,6 +404,31 @@ function recomputeInfluence(includeFaceDown)
     return colorToInfluence
 end
 
+function resetAgendaTokens()
+    local resetNameSet = {
+        ['Any Whens?'] = 'Tile',
+        ['Any Afters?'] = 'Tile'
+    }
+    for _, color in ipairs(Player.getColors()) do
+        resetNameSet[color .. ' Player Votes'] = 'Counter'
+        resetNameSet['For:'] = 'Counter'
+        resetNameSet['Against:'] = 'Counter'
+    end
+    local voteCounters = {}
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        local tag = resetNameSet[name]
+        if tag and object.tag == tag then
+            if object.is_face_down then
+                object.flip()
+            end
+            if name == 'For:' or name == 'Against:' then
+                object.setValue(0)
+            end
+        end
+    end
+end
+
 --- Move the speaker agenda token to match the speaker token.
 function moveSpeakerAgendaToken()
     local speakerTokenName = 'Speaker Token'
@@ -796,6 +821,9 @@ end
 
 function _endStatusPhaseCoroutine()
     recomputeInfluence(true)
+    coroutine.yield(0)
+
+    resetAgendaTokens()
     coroutine.yield(0)
 
     moveSpeakerAgendaToken()

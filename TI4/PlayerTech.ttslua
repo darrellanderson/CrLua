@@ -72,11 +72,38 @@ CrLua.TI4.PlayerTech.TECHNOLOGIES = {
     ['Valkyrie Particle Weave'] = 'Valkyrie PW',
     ['War Sun'] = 'War Sun',
     ['Wormhole Generator'] = 'Wormhole Gen',
+    ['Wormhole Generator Ω'] = 'Wormhole Gen',
     ['X-89 Bacterial Weapon Ω'] = 'X-89 B.W.',
     ['X-89 Bacterial Weapon'] = 'X-89 B.W.',
     ['Yin Spinner'] = 'Yin Spin',
+
+    -- Codex
     ['????_REDACTED_????'] = 'Scenario Destroyer',
-    ['???_EXCEPTION_NO_ID_???'] = 'Scenario Tech'
+    ['???_EXCEPTION_NO_ID_???'] = 'Scenario Tech',
+
+    -- PoK
+    ['AI Development Algorithm'] = 'AI Dev Algo',
+    ['Bio-Stims'] = 'Bio-stims',
+    ['Dark Energy Tap'] = 'Dark Energy Tap',
+    ['Predictive Intelligence'] = 'Pred Intel',
+    ['Psychoarchaeology'] = 'Pyschoarch',
+    ['Scanlink Drone Network'] = 'Scanlink',
+    ['Self-Assembly Routines'] = 'Self-Assembly',
+    ['Sling Relay'] = 'Sling Relay',
+    ['Saturn Engine II'] = 'Sat Eng II',
+    ['Hel-Titan II'] = 'Hel-Titan II',
+    ['Aarie Hololattice'] = 'Aarie Holo',
+    ['Strike Wing Alpha II'] = 'String Wing II',
+    ['Crimson Legionnaire II'] = 'Crimson Legin II',
+    ['Genetic Recombination'] = 'Gene Recomb',
+    ['Temporal Command Suite'] = 'Temp Cmd Suite',
+    ['Memoria II'] = 'Memoria II',
+    ['Supercharge'] = 'Supercharge',
+    ['Pre-Fab Arcologies'] = 'Pre-Fab Arc',
+    ['Vortex'] = 'Vortex',
+    ['Dimensional Tear II'] = 'Dim Tear II',
+    ['Voidwatch'] = 'Voidwatch',
+    ['Aetherstream'] = 'Aetherstream',
 }
 
 local _factionHelper = CrLua.TTS.HelperClient.get('TI4_FACTION_HELPER')
@@ -150,8 +177,10 @@ function CrLua.TI4.PlayerTech.getCells(playerColorToTechs)
     end
     for _, player in ipairs(Player.getPlayers()) do
         local col = player.color and colorToColumn[player.color]
+        local faction = player.color and _factionHelper.fromColor(player.color)
+        local name = faction and faction.tokenName or player.color
         if col then
-            cells[col .. 3] = player.steam_name
+            cells[col .. 3] = name or '-'
         end
     end
     for color, techs in pairs(playerColorToTechs) do

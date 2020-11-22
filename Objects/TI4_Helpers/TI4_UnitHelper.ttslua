@@ -484,6 +484,17 @@ local _unitModifiers = {
         end
     },
 
+    ['Disable'] = {
+        description = 'Opponent PDS lose PLANETARY SHIELD and SPACE CANNON DEFENSE',
+        owner = OWNER.OPPONENT,
+        type = TYPE.MUTATE,
+        apply = function(unitAttrs)
+            local attr = unitAttrs['PDS']
+            attr.planetaryShield = nil
+            attr.spaceCannon = nil
+        end
+    },
+
     ['Experimental Battlestation'] = {
         description = 'One in or adjacent Space Dock gets SPACE CANNON 5x3',
         owner = OWNER.SELF,
@@ -1292,6 +1303,24 @@ function getColorToUnitModifiers()
         return name, unitModifier
     end
 
+    -- Get commander if unlocked (ok if tapped).
+    local function getCommander(object)
+        if not object.tag == 'Card' or object.is_face_down then
+            return false
+        end
+        if inHandGuidSet[object.getGUID()] then
+            return false
+        end
+        local name = object.getName()
+        local unitModifier = _unitModifiers[name]
+        if not unitModifier then
+            return false
+        end
+        if unitModifier.leader == LEADER.COMMANDER then
+            return name
+        end
+    end
+
     local guidToName = {}
     local guidToPosition = {}
     local colorToLeaderSheet = {}
@@ -1300,6 +1329,7 @@ function getColorToUnitModifiers()
     local guidToCommandTokenColor = {}
     local guidToCommandTokenPosition = {}
     for _, object in ipairs(getAllObjects()) do
+        -- Get unit modifiers.
         local name, unitModifier = getUnitModifier(object)
         if unitModifier then
             -- Tekklar Legion buffs non-Sardakk and penalizes Sardakk, BUT
@@ -1324,10 +1354,13 @@ function getColorToUnitModifiers()
                 guidToName[guid] = name
                 guidToPosition[guid] = object.getPosition()
             end
-            if unitModifier.leader == LEADER.COMMANDER then
-                local color = _zoneHelper.zoneFromPosition(object.getPosition())
-                colorToCommander[color] = name
-            end
+        end
+
+        -- Get commanders, if active.  They may also be present in the unit modifer set.
+        local commander = getCommander(object)
+        if commander then
+            local color = _zoneHelper.zoneFromPosition(object.getPosition())
+            colorToCommander[color] = name
         end
 
         local name = object.getName()

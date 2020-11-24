@@ -266,10 +266,12 @@ local function _warpToSystem(system)
         error('missing system guid ' .. system.guid)
     end
 
+    local zoneColor = _zoneHelper.zoneFromPosition(self.getPosition())
+
     local unitObjects = {}
     for _, unit in ipairs(_getUnitsInsideBuildArea()) do
         local unitObject = getObjectFromGUID(unit.guid)
-        if unitObject then
+        if (not unit.color or unit.color == zoneColor) and unitObject then
             table.insert(unitObjects, unitObject)
         end
     end
@@ -541,7 +543,7 @@ function getProduceConsumeItems()
     -- add faction abilities if available
     if playerColor then
         local playerFaction = _factionHelper.fromColor(playerColor)
-        
+
         if playerFaction then
             for _, factionAbility in ipairs(playerFaction.abilities) do
                 local abilityEffect = FACTION_EFFECTS[factionAbility]

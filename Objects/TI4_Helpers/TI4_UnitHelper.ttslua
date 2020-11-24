@@ -218,7 +218,7 @@ local _unitOverrides = {
     ['Watcher'] = { override = 'Mech' },
     ['Pride of Kenara'] = { override = 'Mech' },
     ['Shield Paling'] = { override = 'Mech' },
-    ['Annihilator'] = { override = 'Mech', bombardment = { dice = 1, hit = 8 } },
+    ['Annihilator'] = { override = 'Mech', bombardment = { dice = 1, hit = 8 } }, -- TODO: L1Z1X, add "bombardment.requireOffPlanet=true" attribute for harrow?
     ['Starlancer'] = { override = 'Mech' },
     ['Moll Terminus']  = { override = 'Mech' },
     ['Ember Colossus'] = { override = 'Mech' },

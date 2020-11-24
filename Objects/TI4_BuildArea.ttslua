@@ -62,6 +62,13 @@ local OBJECT_EFFECTS = {
     },
 }
 
+local FACTION_EFFECTS = {
+    ['Amalgamation'] = {
+        amalgamation = true,
+        fillUnitColor = true,
+    },
+}
+
 -------------------------------------------------------------------------------
 
 local _config = {
@@ -258,10 +265,12 @@ local function _warpToSystem(system)
         error('missing system guid ' .. system.guid)
     end
 
+    local zoneColor = _zoneHelper.zoneFromPosition(self.getPosition())
+
     local unitObjects = {}
     for _, unit in ipairs(_getUnitsInsideBuildArea()) do
         local unitObject = getObjectFromGUID(unit.guid)
-        if unitObject then
+        if (not unit.color or unit.color == zoneColor) and unitObject then
             table.insert(unitObjects, unitObject)
         end
     end
@@ -525,13 +534,41 @@ function getProduceConsumeItems()
         sarween = false,
         hegemonic = false,
         warmachine = false,
+        amalgamation = false,
     }
 
-    for _, unit in ipairs(_getUnitsInsideBuildArea()) do
-        if result.produceUnitNameToUnitWithCount[unit.unitType] then
-            unit.count = unit.count + result.produceUnitNameToUnitWithCount[unit.unitType].count
+    local unitsInBuildingArea = _getUnitsInsideBuildArea()
+
+    -- add faction abilities if available
+    if playerColor then
+        local playerFaction = _factionHelper.fromColor(playerColor)
+
+        if playerFaction then
+            for _, factionAbility in ipairs(playerFaction.abilities) do
+                local abilityEffect = FACTION_EFFECTS[factionAbility]
+                if abilityEffect then
+                    result.amalgamation = result.amalgamation or abilityEffect.amalgamation and {}
+
+                    -- Faction abilities may require a color on tokens
+                    if abilityEffect.fillUnitColor then
+                        unitsInBuildingArea = _unitHelper.fillUnitColors(unitsInBuildingArea)
+                    end
+                end
+            end
         end
-        result.produceUnitNameToUnitWithCount[unit.unitType] = unit
+    end
+
+    for _, unit in ipairs(unitsInBuildingArea) do
+        -- Count unit for building player if we're lacking any color info, or if unit color matches player color
+        if not playerColor or not unit.color or unit.color == playerColor then
+            if result.produceUnitNameToUnitWithCount[unit.unitType] then
+                unit.count = unit.count + result.produceUnitNameToUnitWithCount[unit.unitType].count
+            end
+            result.produceUnitNameToUnitWithCount[unit.unitType] = unit
+        -- If unit color doesn't match and amalgamation is active, count towards free units for the unit type
+        elseif result.amalgamation and playerColor and unit.color ~= playerColor then
+            result.amalgamation[unit.unitType] = (result.amalgamation[unit.unitType] or 0) + 1
+        end
     end
 
     local function addItem(name)
@@ -593,7 +630,10 @@ function getProduceConsumeResourcesAndCost(produceConsumeItems)
 
     for unitType, unit in pairs(produceConsumeItems.produceUnitNameToUnitWithCount) do
         local unitAttrs = _getUnitAttributes(unit.unitType)
-        result.cost = result.cost + math.ceil(unit.count * (unitAttrs.cost or 0))
+        -- If amalgamation is present, find how many units whose cost should be ignored.
+        local amalgamatedUnitsOfType = produceConsumeItems.amalgamation and produceConsumeItems.amalgamation[unit.unitType] or 0
+
+        result.cost = result.cost + math.ceil(math.max(unit.count - amalgamatedUnitsOfType, 0) * (unitAttrs.cost or 0))
         result.numUnits = result.numUnits + unit.count
     end
 
@@ -729,7 +769,6 @@ function drawBoundingBox()
                 end
             end
         end
-
 
     end
 

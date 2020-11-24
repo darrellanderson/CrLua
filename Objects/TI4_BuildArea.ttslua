@@ -631,8 +631,8 @@ function getProduceConsumeResourcesAndCost(produceConsumeItems)
         local unitAttrs = _getUnitAttributes(unit.unitType)
         -- If amalgamation is present, find how many units whose cost should be ignored.
         local amalgamatedUnitsOfType = produceConsumeItems.amalgamation and produceConsumeItems.amalgamation[unit.unitType] or 0
-        
-        result.cost = result.cost + math.ceil((unit.count - amalgamatedUnitsOfType) * (unitAttrs.cost or 0))
+
+        result.cost = result.cost + math.ceil(math.max(unit.count - amalgamatedUnitsOfType, 0) * (unitAttrs.cost or 0))
         result.numUnits = result.numUnits + unit.count
     end
 

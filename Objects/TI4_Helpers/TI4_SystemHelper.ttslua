@@ -301,7 +301,7 @@ local _systems = {
     ['c50660'] = { tile = 79, anomalies = { 'asteroid field' }, wormholes = { 'alpha' } },
     ['0d634a'] = { tile = 80, anomalies = { 'supernova' } },
     ['c64d41'] = { tile = 81, anomalies = { 'supernova' }, faction = 'muaat' },
-    ['e85105'] = { tile = 82, localY = 0.101, wormholes = { 'alpha', 'beta', 'gamma' }, planets = {
+    ['e85105'] = { tile = 82, localY = 0.101, faceUpWormholes = { 'gamma', 'alpha', 'beta' }, faceDownWormholes = { 'gamma' }, planets = {
         { name = 'Mallice', resources = 0, influence = 3, legendary = true, legendaryCard = 'Exterrix Headquarters', trait = 'cultural', position = { x = 0.35, z = 0.18 }, radius = 0.8 },
     }},
 
@@ -925,7 +925,7 @@ function _fillMissingSystemData(guid, system)
     if system.faceUpWormholes or system.faceDownWormholes then
         local systemObject = getObjectFromGUID(guid)
         if systemObject then
-            system.wormholes = system.is_face_down and system.faceDownWormholes or system.faceUpWormholes
+            system.wormholes = systemObject.is_face_down and system.faceDownWormholes or system.faceUpWormholes
         end
     end
 end

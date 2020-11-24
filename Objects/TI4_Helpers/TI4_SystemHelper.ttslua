@@ -573,6 +573,10 @@ function wormholes(playerColor)
             guids = {},
             connected = { 'delta' }
         },
+        ['gamma'] = {
+            guids = {},
+            connected = { 'gamma' }
+        },
     }
 
     local function addGuid(wormhole, guid)
@@ -602,6 +606,7 @@ function wormholes(playerColor)
         ['Alpha Wormhole Token'] = { 'alpha' },
         ['Beta Wormhole Token'] = { 'beta' },
         ['Hil Colish'] = { 'delta' },
+        ['Gamma Wormhole Token'] = { 'gamma' },
     }
 
     for _, object in ipairs(getAllObjects()) do
@@ -621,6 +626,15 @@ function wormholes(playerColor)
                 for _, wormhole in ipairs(nonSystemWormholes) do
                     addGuid(wormhole, guid)
                 end
+            end
+
+            if name == 'Ion Storm Wormhole Token' then
+                local wormholeSide = 'alpha'
+                if object.is_face_down then
+                    wormholeSide = 'beta'
+                end
+
+                addGuid(wormholeSide, guid)
             end
 
             if name == 'Wormhole Reconstruction' and (not object.is_face_down) and (not _deckHelper.isDiscard(guid)) then

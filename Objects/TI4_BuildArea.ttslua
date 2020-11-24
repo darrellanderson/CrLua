@@ -38,6 +38,9 @@ local OBJECT_EFFECTS = {
         requireFaceUp = true,
         hegemonic = true,
     },
+    ['AI Development Algorithm'] = {
+        aiDevelopmentAlgorithm = true
+    },
 
     -- Actions
     ['War Machine (1)'] = {
@@ -59,6 +62,13 @@ local OBJECT_EFFECTS = {
         anywhereInPlayerZone = true,
         requireFaceUp = true,
         warmachine = true,
+    },
+}
+
+local FACTION_EFFECTS = {
+    --faction abilities
+    ['Amalgamation'] = {
+        amalgamation = true,
     },
 }
 
@@ -490,8 +500,30 @@ function getProduceConsumeItems()
     CrLua.Log.d(TAG, 'getProduceConsumeItems')
     local playerColor = _data.playerColor
 
-    -- Get objects to consider.
     local inHandGuidSet = _zoneHelper.inHand()
+
+    -- Detect unit upgrades (AI Development Algorithm) and Alliance promissory notes
+
+    local playerAlliancePromissoryNotes = {}
+    local unitUpgrades = {}
+    for _, object in ipairs(getAllObjects()) do
+        if not inHandGuidSet[object.getGUID()] and not object.is_face_down and object.tag == 'Card'
+            and playerColor and _zoneHelper.zoneFromPosition(object.getPosition()) == playerColor then
+            local objectName = object.getName()
+
+            local colorMatch = string.match(objectName, '^Alliance %((%a+)%)$')
+            if colorMatch and colorMatch ~= playerColor then
+                playerAlliancePromissoryNotes[colorMatch] = true
+            end
+
+            if _unitHelper.isUnitUpgradeName(objectName) then
+                table.insert(unitUpgrades, objectName)
+            end
+        end
+    end
+
+    -- Get objects to consider.
+    
     local objects = CrLua.Table.join(_data.inside, {})
     local function useOutsizeBuildAreaObject(object)
         local objectEffects = OBJECT_EFFECTS[object.getName()]
@@ -508,7 +540,10 @@ function getProduceConsumeItems()
             return false
         end
         if objectEffects.anywhereInPlayerZone then
-            return playerColor and _zoneHelper.zoneFromPosition(object.getPosition()) == playerColor
+            local zoneColor = _zoneHelper.zoneFromPosition(object.getPosition())
+            local fromPlayer = playerColor and zoneColor == playerColor
+            local fromAlliance = objectEffects.viaAlliance and playerAlliancePromissoryNotes[zoneColor]
+            return fromPlayer or fromAlliance
         end
         return objectEffects.anywhereOnTable
     end
@@ -522,16 +557,53 @@ function getProduceConsumeItems()
         consumeObjectNameToCount = {},
         produceUnitNameToUnitWithCount = {},
         objectEffectsOverrides = {},
+        unitOverrides = {},
         sarween = false,
         hegemonic = false,
         warmachine = false,
+        aiDevelopmentAlgorithm = false,
+        amalgamation = false,
     }
 
-    for _, unit in ipairs(_getUnitsInsideBuildArea()) do
-        if result.produceUnitNameToUnitWithCount[unit.unitType] then
-            unit.count = unit.count + result.produceUnitNameToUnitWithCount[unit.unitType].count
+    local unitsInBuildingArea = _getUnitsInsideBuildArea()
+
+    -- add faction abilities
+    if playerColor then
+        local playerFaction = _factionHelper.fromColor(playerColor)
+        
+        if playerFaction then
+            for _, factionAbility in ipairs(playerFaction.abilities) do
+                local abilityEffect = FACTION_EFFECTS[factionAbility]
+                if abilityEffect then
+                    result.amalgamation = result.amalgamation or abilityEffect.amalgamation
+
+                    -- Faction abilities may require a color on tokens
+                    unitsInBuildingArea = _unitHelper.fillUnitColors(unitsInBuildingArea)
+                end
+            end
         end
-        result.produceUnitNameToUnitWithCount[unit.unitType] = unit
+    end
+
+    for _, unit in ipairs(unitsInBuildingArea) do
+        -- Count unit for building player if we're lacking any color info, or if unit color matches player color
+        if not playerColor or not unit.color or unit.color == playerColor then
+            if result.produceUnitNameToUnitWithCount[unit.unitType] then
+                unit.count = unit.count + result.produceUnitNameToUnitWithCount[unit.unitType].count
+            end
+            result.produceUnitNameToUnitWithCount[unit.unitType] = unit
+        -- If unit color doesn't match and amalgamation is active, create free-unit effects for the unit type
+        elseif result.amalgamation and playerColor and unit.color ~= playerColor then
+            local amalgamationForUnitType = result.unitOverrides['Amalgamation ' .. unit.unitType]
+            if not amalgamationForUnitType then
+                amalgamationForUnitType = {
+                    effectName = 'Amalgamation ' .. unit.unitType,
+                    unitTypes = { unit.unitType },
+                    freeCostUnits = 0,
+                }
+                result.unitOverrides['Amalgamation ' .. unit.unitType] = amalgamationForUnitType
+            end
+            amalgamationForUnitType.freeCostUnits = (amalgamationForUnitType.freeCostUnits or 0) + 1
+        end
     end
 
     local function addItem(name)
@@ -547,9 +619,16 @@ function getProduceConsumeItems()
             if objectEffects.objectEffectsOverrides then
                 result.objectEffectsOverrides = CrLua.Table.join(result.objectEffectsOverrides, objectEffects.objectEffectsOverrides)
             end
+            if objectEffects.unitOverrides then
+                objectEffects.unitOverrides.effectName = name
+                result.unitOverrides[name] = objectEffects.unitOverrides
+            end
             result.sarween = result.sarween or objectEffects.sarween
             result.hegemonic = result.hegemonic or objectEffects.hegemonic
             result.warmachine = result.warmachine or objectEffects.warmachine
+            if objectEffects.aiDevelopmentAlgorithm and not result.aiDevelopmentAlgorithm then
+                result.aiDevelopmentAlgorithm = #(unitUpgrades or {})
+            end
         end
     end
 
@@ -565,6 +644,34 @@ function getProduceConsumeItems()
 
     CrLua.Log.d(TAG, 'getProduceConsumeItems', result)
     return result
+end
+
+local function getUnitOverridesByUnitType(unitOverridesByEffect)
+    -- Map unit overrides to unit type
+    -- Make local copies of  data so we can modify it while processing
+    local unitOverridesByType = {}
+    for _, unitOverride in pairs(produceConsumeItems.unitOverrides or {}) do
+        local copiedUnitOverride = {
+            effectName = name,
+            unitTypes = unitOverride.unitTypes,
+            freeProductionUnits = unitOverride.freeProductionUnits,
+            freeCostUnits = unitOverride.freeCostUnits,
+            productionRateMultiplier = unitOverride.productionRateMultiplier,
+            costRateMultiplier = unitOverride.costRateMultiplier,
+        }
+
+        for _, type in ipairs(unitOverride.unitTypes) do
+            local overridesForUnitType = unitOverridesByType[type]
+            if not overridesForUnitType then
+                overridesForUnitType = {}
+                unitOverridesByType[type] = overridesForUnitType
+            end
+
+            table.insert(overridesForUnitType, copiedUnitOverride)
+        end
+    end
+
+    return unitOverridesByType
 end
 
 function getProduceConsumeResourcesAndCost(produceConsumeItems)
@@ -593,8 +700,41 @@ function getProduceConsumeResourcesAndCost(produceConsumeItems)
 
     for unitType, unit in pairs(produceConsumeItems.produceUnitNameToUnitWithCount) do
         local unitAttrs = _getUnitAttributes(unit.unitType)
-        result.cost = result.cost + math.ceil(unit.count * (unitAttrs.cost or 0))
-        result.numUnits = result.numUnits + unit.count
+        local costCount = unit.count or 0
+        local costRate = unitAttrs.cost or 0
+        local productionCount = unit.count or 0
+        local productionRate = 1.0
+
+        --TODO: This DOES NOT combine well. We need to apply the flat reduction AFTER any multiplicative reductions, choosing the best rate.
+        for _, unitOverride in ipairs(unitOverridesByType[unit.unitType] or {}) do
+            if unitOverride.freeCostUnits then
+                local initialCostCount = costCount
+                costCount = math.max(costCount - unitOverride.freeCostUnits, 0)
+
+                --preserve leftover cost reduction for the other units
+                unitOverride.freeCostUnits = unitOverride.freeCostUnits - (initialCostCount - costCount)
+            end
+            if unitOverride.freeProductionUnits then
+                local initialProductionCount = productionCount
+                productionCount = math.max(productionCount - unitOverride.freeProductionUnits, 0)
+
+                --preserve leftover production reduction for the other units
+                unitOverride.freeProductionUnits = unitOverride.freeProductionUnits - (initialProductionCount - productionCount)
+            end
+            if unitOverride.productionRateMultiplier then
+                productionRate = productionRate * unitOverride.productionRateMultiplier
+            end
+            if unitOverride.costRateMultiplier then
+                costRate = costRate * unitOverride.costRateMultiplier
+            end
+        end
+
+        result.cost = result.cost + math.ceil(costCount * (costRate or 0))
+        result.numUnits = result.numUnits + math.ceil(productionCount * productionRate)
+    end
+
+    if produceConsumeItems.aiDevelopmentAlgorithm then
+        result.cost = math.max(result.cost - produceConsumeItems.aiDevelopmentAlgorithm, 0)
     end
 
     -- If Hegemonic Trade Policy (swap resouce/influence values), replace
@@ -729,7 +869,6 @@ function drawBoundingBox()
                 end
             end
         end
-
 
     end
 

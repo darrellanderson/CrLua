@@ -471,6 +471,17 @@ local _unitModifiers = {
         end
     },
 
+    ['Brother Omar'] = {
+        description = 'Produce an additional Infantry for their cost; it doesn\'t count towards production limits.',
+        leader = LEADER.COMMANDER, -- Yin
+        owner = OWNER.SELF,
+        type = TYPE.ADJUST,
+        apply = function(unitAttrs)
+            -- We won't know production amount while applying modifiers, so tell the Build tool to handle it.
+            unitAttrs['Infantry'].extraUnitWhenProduced = true
+        end
+    },
+
     ['Bunker'] = {
         description = '-4 to all BOMBARDMENT rolls',
         owner = OWNER.ANY,
@@ -596,6 +607,17 @@ local _unitModifiers = {
         end
     },
 
+    ["M'aban"] = {
+        description = 'Produce an additional Fighter for their cost; it doesn\'t count towards production limits.',
+        leader = LEADER.COMMANDER, -- Naalu
+        owner = OWNER.SELF,
+        type = TYPE.ADJUST,
+        apply = function(unitAttrs)
+            -- We won't know production amount while applying modifiers, so tell the Build tool to handle it.
+            unitAttrs['Fighter'].extraUnitWhenProduced = true
+        end
+    },
+
     ['Morale Boost'] = {
         description = '+1 to all COMBAT rolls',
         owner = OWNER.SELF,
@@ -651,6 +673,16 @@ local _unitModifiers = {
                     attrs.spaceCombat.hit = attrs.spaceCombat.hit - 2
                 end
             end
+        end
+    },
+
+    ['Navarch Feng'] = {
+        description = 'You can produce your flagship without spending resources.',
+        leader = LEADER.COMMANDER, -- Nomad
+        owner = OWNER.SELF,
+        type = TYPE.ADJUST,
+        apply = function(unitAttrs) 
+            unitAttrs['Flagship'].cost = 0
         end
     },
 
@@ -845,6 +877,17 @@ local _unitModifiers = {
                 end
             end
 
+        end
+    },
+
+    ['That Which Molds Flesh'] = {
+        description = 'When producing Infantry and/or Fighters, up to 2 do not count against the production limit.',
+        leader = LEADER.COMMANDER, -- Vuil'Raith
+        owner = OWNER.SELF,
+        type = TYPE.CHOOSE,
+        apply = function(unitAttrs)
+            -- Because of Regulated Conscription and other commander abilities, this needs to be figured out with actual build amounts.
+            -- We don't know production quantity at this point, so let the Build Area Tool detect and figure this out.
         end
     },
 

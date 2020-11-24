@@ -1504,6 +1504,11 @@ function _init()
     end
 end
 
+function isUnitUpgradeName(name)
+    assert(type(name) == 'string')
+    return _unitOverrides[name] and _unitOverrides[name].upgrade and true or false
+end
+
 function isUnitName(name)
     assert(type(name) == 'string')
     return _objectNameToUnitData[name] and true or false

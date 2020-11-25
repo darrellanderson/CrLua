@@ -618,20 +618,35 @@ function getProduceConsumeItems()
         end
     end
 
-    if result.aiDevelopmentAlgorithm then
+    if result.aiDevelopmentAlgorithm and playerColor then
         -- Detect unit upgrades (AI Development Algorithm)
-        local unitUpgrades = {}
+        local unitUpgradeNameSet = {}
+        for _, name in ipairs(_unitHelper.getUnitUpgradeNames()) do
+            unitUpgradeNameSet[name] = true
+        end
+        local guidToPosition = {}
+        local function maybeAdd(object)
+            if object.tag ~= 'Card' then
+                return
+            elseif inHandGuidSet[object.getGUID()] then
+                return
+            elseif object.is_face_down then
+                return
+            elseif not unitUpgradeNameSet[object.getName()] then
+                return
+            end
+            guidToPosition[object.getGUID()] = object.getPosition()
+        end
         for _, object in ipairs(getAllObjects()) do
-            if not inHandGuidSet[object.getGUID()] and not object.is_face_down and object.tag == 'Card'
-                and playerColor and _zoneHelper.zoneFromPosition(object.getPosition()) == playerColor then
-                local objectName = object.getName()
-
-                if _unitHelper.isUnitUpgradeName(objectName) then
-                    table.insert(unitUpgrades, objectName)
-                end
+            maybeAdd(object)
+        end
+        local guidToColor = _zoneHelper.zonesFromPositions()
+        for guid, color in pairs(guidToColor) do
+            if color == playerColor then
+                local object = getObjectFromGUID(guid)
+                table.insert(unitUpgrades, object.getName())
             end
         end
-
         result.aiDevelopmentAlgorithm = #unitUpgrades
     end
 
@@ -1029,7 +1044,7 @@ function announce(items, resourcesAndCost)
     end
     if items.amalgamation then
         local amalgamated = {}
-        
+
         for unitType, consumedAmount in pairs(items.amalgamation) do
             local unitTypeProduced = items.produceUnitNameToUnitWithCount[unitType] and items.produceUnitNameToUnitWithCount[unitType].count or 0
 

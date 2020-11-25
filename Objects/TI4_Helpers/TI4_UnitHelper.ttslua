@@ -699,7 +699,7 @@ local _unitModifiers = {
         leader = LEADER.COMMANDER, -- Nomad
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
-        apply = function(unitAttrs) 
+        apply = function(unitAttrs)
             unitAttrs['Flagship'].cost = 0
         end
     },
@@ -1554,6 +1554,16 @@ end
 function isUnitName(name)
     assert(type(name) == 'string')
     return _objectNameToUnitData[name] and true or false
+end
+
+function getUnitUpgradeNames()
+    local result = {}
+    for name, override in pairs(_unitOverrides) do
+        if override.upgrade then
+            table.insert(result, name)
+        end
+    end
+    return result
 end
 
 --- Get all units on the table.  Unit data tables contain:

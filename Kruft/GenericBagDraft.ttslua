@@ -207,20 +207,22 @@ local DRAFT_RULES = {
     {
         -- Best systems
         bag = 'Blue Planet Tiles',
-        count = 1,
+        count = { -1, 2, 2, 2, 1, 1, 1, 1 },
         include = BEST_SYSTEMS,
     },
     {
-        -- Other systems
+        -- Not-best systems
         bag = 'Blue Planet Tiles',
-        count = 2,
+        count = { -1, 5, 4, 3, 3, 2, 1, 1 },
         exclude = BEST_SYSTEMS,
     },
     {
         bag = 'Red Anomaly Tiles',
-        count = 2
+        count = { -1, 2, 2, 3, 2, 2, 1, 1 }
     },
 }
+
+-- TODO: INCLUDE WORMHOLES, ASTEROIDS for SAAR, SUPERNOVA for MUAAT
 
 --- Draft!  This is a coroutine, can call coroutine.yield(0) to stall a frame
 -- giving TTS a moment to breath between moving objects.
@@ -237,7 +239,11 @@ function doDraftCoroutine()
         local bag = getBagByName(rule.bag)
         bag.shuffle()
         for _, draftBag in ipairs(draftBags) do
-            for _ = 1, rule.count do
+            local count = rule.count
+            if type(count) == 'table' then
+                count = count[_zoneHelper.getPlayerCount()]
+            end
+            for _ = 1, count do
                 local guid = false
                 if rule.include then
                     guid = getRandomRestrictedGuid(bag, rule.include, true)

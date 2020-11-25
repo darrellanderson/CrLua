@@ -218,7 +218,7 @@ local _unitOverrides = {
     ['Watcher'] = { override = 'Mech' },
     ['Pride of Kenara'] = { override = 'Mech' },
     ['Shield Paling'] = { override = 'Mech' },
-    ['Annihilator'] = { override = 'Mech', bombardment = { dice = 1, hit = 8 } },
+    ['Annihilator'] = { override = 'Mech', bombardment = { dice = 1, hit = 8 } }, -- TODO: L1Z1X, add "bombardment.requireOffPlanet=true" attribute for harrow?
     ['Starlancer'] = { override = 'Mech' },
     ['Moll Terminus']  = { override = 'Mech' },
     ['Ember Colossus'] = { override = 'Mech' },
@@ -520,6 +520,7 @@ local _unitModifiers = {
         description = '+1 die to a single GROUND COMBAT roll',
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,
+        toggleActive = true,
         apply = function(unitAttrs, params)
             local best = false
             for unitType, attr in pairs(unitAttrs) do
@@ -565,6 +566,7 @@ local _unitModifiers = {
         description = 'SPACE CANNON 5(x3)',
         owner = OWNER.SELF,
         type = TYPE.MUTATE,
+        toggleActive = true,
         apply = function(unitAttrs)
             unitAttrs['Geoform'] = {
                 spaceCannon = { hit = 5, dice = 3 },
@@ -764,6 +766,7 @@ local _unitModifiers = {
         description = '+2 to combat rolls',
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
+        toggleActive = true,
         apply = function(unitAttrs)
             for unitType, attr in pairs(unitAttrs) do
                 if attr.spaceCombat then
@@ -801,6 +804,7 @@ local _unitModifiers = {
         description = 'Copy abilities from other agents',
         owner = OWNER.SELF,
         type = TYPE.MUTATE,
+        toggleActive = true,
         apply = function(unitAttrs) end
     },
 
@@ -849,7 +853,7 @@ local _unitModifiers = {
         description = '+1 to all COMBAT rolls',
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
-        tap = true,
+        toggleActive = true,
         apply = function(unitAttrs)
             for unitType, attr in pairs(unitAttrs) do
                 if attr.spaceCombat then
@@ -918,6 +922,7 @@ local _unitModifiers = {
         description = '+1 die to a unit ability (anti-fighter barrage, bombardment, space cannon)',
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,
+        toggleActive = true,
         apply = function(unitAttrs, params)
             for unitType, attr in pairs(unitAttrs) do
                 local best = false
@@ -972,6 +977,7 @@ local _unitModifiers = {
         description = '+1 die to a single SPACE COMBAT roll',
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,
+        toggleActive = true,
         apply = function(unitAttrs, params)
             local best = false
             for unitType, attr in pairs(unitAttrs) do
@@ -1330,17 +1336,9 @@ function getColorToUnitModifiers()
             return false
         end
 
-        -- "tap" cards need to be rotated wrt zone.
-        if unitModifier.tap then
-            local zoneColor = _zoneHelper.zoneFromPosition(object.getPosition())
-            local zoneAttrs = zoneColor and _zoneHelper.zoneAttributes(zoneColor)
-            local rotation = zoneAttrs and zoneAttrs.rotation
-            if rotation then
-                local d = math.abs(object.getRotation().y - rotation.y)
-                if d < 25 or d > 155 then
-                    return false
-                end
-            end
+        -- "toggle active" card handling.
+        if unitModifier.toggleActive and not _isToggleActiveCardActive(object) then
+            return false
         end
 
         return name, unitModifier
@@ -1366,7 +1364,6 @@ function getColorToUnitModifiers()
 
     local guidToName = {}
     local guidToPosition = {}
-    local colorToLeaderSheet = {}
     local colorToAlliances = {}
     local colorToCommander = {}
     local guidToCommandTokenColor = {}
@@ -1400,16 +1397,11 @@ function getColorToUnitModifiers()
         end
 
         -- Get commanders, if active.  They may also be present in the unit modifer set.
+        local name = object.getName()
         local commander = getCommander(object)
         if commander then
             local color = _zoneHelper.zoneFromPosition(object.getPosition())
             colorToCommander[color] = name
-        end
-
-        local name = object.getName()
-        local color = string.match(name, '^Leader Sheet %((.*)%)$')
-        if color then
-            colorToLeaderSheet[color] = object
         end
 
         local color = string.match(name, '^Alliance %((.*)%)$')
@@ -1429,27 +1421,7 @@ function getColorToUnitModifiers()
     for guid, zoneColor in pairs(guidToZoneColor) do
         local name = guidToName[guid]
         local modifier = _unitModifiers[name]
-        local leaderSheet = modifier.leader and colorToLeaderSheet[zoneColor]
-        if leaderSheet then
-            -- Ignore leaders on the leader sheet.
-            local bounds = leaderSheet.getBounds()
-            local bb = {
-                min = {
-                    x = bounds.center.x - bounds.size.x / 2,
-                    z = bounds.center.z - bounds.size.z / 2,
-                },
-                max = {
-                    x = bounds.center.x + bounds.size.x / 2,
-                    z = bounds.center.z + bounds.size.z / 2,
-                }
-            }
-            local p = guidToPosition[guid]
-            if p.x > bb.min.x and p.x < bb.max.x and p.z > bb.min.z and p.z < bb.max.z then
-                addModifier(zoneColor, name)
-            end
-        else
-            addModifier(zoneColor, name)
-        end
+        addModifier(zoneColor, name)
     end
 
     if imperiaColor then
@@ -1735,6 +1707,95 @@ end
 
 -------------------------------------------------------------------------------
 
+local TOGGLE_ACTIVE_STATE = {
+    idle = {
+        label = 'Idle',
+        buttonColor = { r = 1, g = 1, b = 1 },
+        textColor = { r = 0, g = 0, b = 0 },
+    },
+    active = {
+        label = 'Active',
+        buttonColor = { r = 1, g = 0, b = 0 },
+        textColor = { r = 0, g = 0, b = 0 },
+    }
+}
+
+function _isToggleActiveCard(object)
+    if object.tag == 'Card' then
+        local modifier = _unitModifiers[object.getName()]
+        return modifier and modifier.toggleActive
+    end
+end
+
+function _isToggleActiveCardActive(object)
+    local buttons = object.getButtons()
+    local button = buttons and #buttons > 0 and buttons[1]
+    return button and button.label == TOGGLE_ACTIVE_STATE.active.label
+end
+
+function _onToggleActiveCard(buttonContainer, clickerColor, altClick)
+    local buttons = buttonContainer.getButtons()
+    local button = buttons and #buttons > 0 and buttons[1]
+    if button then
+        if _isToggleActiveCardActive(buttonContainer) then
+            button.label = TOGGLE_ACTIVE_STATE.idle.label
+            button.color = TOGGLE_ACTIVE_STATE.idle.buttonColor
+            button.font_color = TOGGLE_ACTIVE_STATE.idle.textColor
+        else
+            button.label = TOGGLE_ACTIVE_STATE.active.label
+            button.color = TOGGLE_ACTIVE_STATE.active.buttonColor
+            button.font_color = TOGGLE_ACTIVE_STATE.active.textColor
+        end
+        buttonContainer.editButton(button)
+    end
+end
+
+function _applyToggleActiveCard(object)
+    local scale = object.getScale()
+    local iscale = {
+        x = scale.x,  -- what is going on here??
+        y = 1,
+        z = 1/scale.z,
+    }
+    local bounds = object.getBoundsNormalized()
+    local pos = {
+        x = 0,
+        y = 1,
+        z = (bounds.size.z / scale.z) / 2
+    }
+    object.clearButtons()
+    object.createButton({
+        click_function = '_onToggleActiveCard',
+        function_owner = self,
+        label          = TOGGLE_ACTIVE_STATE.idle.label,
+        position       = pos,
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = iscale,
+        width          = 650,
+        height         = 250,
+        font_size      = 200,
+        color          = TOGGLE_ACTIVE_STATE.idle.buttonColor,
+        font_color     = TOGGLE_ACTIVE_STATE.idle.textColor,
+        tooltip        = 'Toggle active'
+    })
+end
+
+function _applyToggleActiveCards()
+    for _, object in ipairs(getAllObjects()) do
+        if _isToggleActiveCard(object) then
+            _applyToggleActiveCard(object)
+        end
+    end
+end
+
+function onObjectSpawn(object)
+    if _isToggleActiveCard(object) then
+        _applyToggleActiveCard(object)
+    end
+end
+
+-------------------------------------------------------------------------------
+
 function onLoad(saveState)
     self.setColorTint({ r = 0.25, g = 0.25, b = 0.25 })
     self.setScale({ x = 2, y = 0.01, z = 2 })
@@ -1762,6 +1823,9 @@ function onLoad(saveState)
 
     -- More complicated unit finding initialization.
     _init()
+
+    -- Make toggle cards toggle-able.
+    Wait.frames(_applyToggleActiveCards, 3)
 end
 
 function _verifyTables()

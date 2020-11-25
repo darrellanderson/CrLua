@@ -890,6 +890,9 @@ function setup(params)
     assert(type(params) == 'table')
     assert(type(params.playerCount) == 'number')
     assert(not params.extraRings or type(params.extraRings) == 'number')
+    assert(not params.includePoK or type(params.includePoK) == 'boolean')
+
+    setPoK(params.includePoK or false)
 
     table.insert(_setupQueue, params)
     startLuaCoroutine(self, 'setupCoroutine')

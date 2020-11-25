@@ -66,9 +66,9 @@ local OBJECT_EFFECTS = {
 }
 
 local FACTION_EFFECTS = {
-    --faction abilities
     ['Amalgamation'] = {
         amalgamation = true,
+        fillUnitColor = true,
     },
 }
 
@@ -268,10 +268,12 @@ local function _warpToSystem(system)
         error('missing system guid ' .. system.guid)
     end
 
+    local zoneColor = _zoneHelper.zoneFromPosition(self.getPosition())
+
     local unitObjects = {}
     for _, unit in ipairs(_getUnitsInsideBuildArea()) do
         local unitObject = getObjectFromGUID(unit.guid)
-        if unitObject then
+        if (not unit.color or unit.color == zoneColor) and unitObject then
             table.insert(unitObjects, unitObject)
         end
     end
@@ -567,18 +569,20 @@ function getProduceConsumeItems()
 
     local unitsInBuildingArea = _getUnitsInsideBuildArea()
 
-    -- add faction abilities
+    -- add faction abilities if available
     if playerColor then
         local playerFaction = _factionHelper.fromColor(playerColor)
-        
+
         if playerFaction then
             for _, factionAbility in ipairs(playerFaction.abilities) do
                 local abilityEffect = FACTION_EFFECTS[factionAbility]
                 if abilityEffect then
-                    result.amalgamation = result.amalgamation or abilityEffect.amalgamation
+                    result.amalgamation = result.amalgamation or abilityEffect.amalgamation and {}
 
                     -- Faction abilities may require a color on tokens
-                    unitsInBuildingArea = _unitHelper.fillUnitColors(unitsInBuildingArea)
+                    if abilityEffect.fillUnitColor then
+                        unitsInBuildingArea = _unitHelper.fillUnitColors(unitsInBuildingArea)
+                    end
                 end
             end
         end
@@ -591,18 +595,9 @@ function getProduceConsumeItems()
                 unit.count = unit.count + result.produceUnitNameToUnitWithCount[unit.unitType].count
             end
             result.produceUnitNameToUnitWithCount[unit.unitType] = unit
-        -- If unit color doesn't match and amalgamation is active, create free-unit effects for the unit type
+        -- If unit color doesn't match and amalgamation is active, count towards free units for the unit type
         elseif result.amalgamation and playerColor and unit.color ~= playerColor then
-            local amalgamationForUnitType = result.unitOverrides['Amalgamation ' .. unit.unitType]
-            if not amalgamationForUnitType then
-                amalgamationForUnitType = {
-                    effectName = 'Amalgamation ' .. unit.unitType,
-                    unitTypes = { unit.unitType },
-                    freeCostUnits = 0,
-                }
-                result.unitOverrides['Amalgamation ' .. unit.unitType] = amalgamationForUnitType
-            end
-            amalgamationForUnitType.freeCostUnits = (amalgamationForUnitType.freeCostUnits or 0) + 1
+            result.amalgamation[unit.unitType] = (result.amalgamation[unit.unitType] or 0) + 1
         end
     end
 
@@ -731,6 +726,11 @@ function getProduceConsumeResourcesAndCost(produceConsumeItems)
 
         result.cost = result.cost + math.ceil(costCount * (costRate or 0))
         result.numUnits = result.numUnits + math.ceil(productionCount * productionRate)
+        -- If amalgamation is present, find how many units whose cost should be ignored.
+        local amalgamatedUnitsOfType = produceConsumeItems.amalgamation and produceConsumeItems.amalgamation[unit.unitType] or 0
+
+        result.cost = result.cost + math.ceil(math.max(unit.count - amalgamatedUnitsOfType, 0) * (unitAttrs.cost or 0))
+        result.numUnits = result.numUnits + unit.count
     end
 
     if produceConsumeItems.aiDevelopmentAlgorithm then

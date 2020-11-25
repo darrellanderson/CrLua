@@ -38,6 +38,9 @@ local OBJECT_EFFECTS = {
         requireFaceUp = true,
         hegemonic = true,
     },
+    ['AI Development Algorithm'] = {
+        aiDevelopmentAlgorithm = true
+    },
 
     -- Actions
     ['War Machine (1)'] = {
@@ -209,6 +212,19 @@ function _getUnitAttributes(unitType)
         return _unitAttributes[unitType]
     end
 
+    _updateUnitAttributes()
+
+    return _unitAttributes[unitType]
+end
+
+local function _updateUnitAttributes(produceUnitNameToUnitWithCount)
+    assert(not produceUnitNameToUnitWithCount or type(produceUnitNameToUnitWithCount) == 'table')
+
+    local unitTypeToCount = {}
+    for unitType, unit in pairs(produceUnitNameToUnitWithCount or {}) do
+        unitTypeToCount[unitType] = unit.count
+    end
+
     local color = getPlayerColor()
 
     local unitOverrides = _unitHelper.getColorToUnitOverrides()[color] or {}
@@ -222,7 +238,7 @@ function _getUnitAttributes(unitType)
         unitAttrs = assert(unitAttrs),
         myColor = color or 'Grey',
         myUnitModifiers = unitModifiers,
-        myUnitTypeToCount = {},
+        myUnitTypeToCount = unitTypeToCount or {},
         opponentColor = false,
         opponentUnitModifiers = false,
         opponentUnitTypeToCount = false
@@ -230,8 +246,8 @@ function _getUnitAttributes(unitType)
 
     _unitAttributes = unitAttrs
     _unitAttributesLastUpdateTime = Time.time
-    return _unitAttributes[unitType]
 end
+
 
 function _getProduction()
     local spaceDock = _getUnitAttributes('Space Dock')
@@ -534,6 +550,7 @@ function getProduceConsumeItems()
         sarween = false,
         hegemonic = false,
         warmachine = false,
+        aiDevelopmentAlgorithm = false,
         amalgamation = false,
     }
 
@@ -587,6 +604,7 @@ function getProduceConsumeItems()
             result.sarween = result.sarween or objectEffects.sarween
             result.hegemonic = result.hegemonic or objectEffects.hegemonic
             result.warmachine = result.warmachine or objectEffects.warmachine
+            result.aiDevelopmentAlgorithm = result.aiDevelopmentAlgorithm or objectEffects.aiDevelopmentAlgorithm
         end
     end
 
@@ -598,6 +616,23 @@ function getProduceConsumeItems()
         else
             addItem(object.getName())
         end
+    end
+
+    if result.aiDevelopmentAlgorithm then
+        -- Detect unit upgrades (AI Development Algorithm)
+        local unitUpgrades = {}
+        for _, object in ipairs(getAllObjects()) do
+            if not inHandGuidSet[object.getGUID()] and not object.is_face_down and object.tag == 'Card'
+                and playerColor and _zoneHelper.zoneFromPosition(object.getPosition()) == playerColor then
+                local objectName = object.getName()
+
+                if _unitHelper.isUnitUpgradeName(objectName) then
+                    table.insert(unitUpgrades, objectName)
+                end
+            end
+        end
+
+        result.aiDevelopmentAlgorithm = #unitUpgrades
     end
 
     CrLua.Log.d(TAG, 'getProduceConsumeItems', result)
@@ -628,13 +663,20 @@ function getProduceConsumeResourcesAndCost(produceConsumeItems)
         end
     end
 
+    _updateUnitAttributes(produceConsumeItems.produceUnitNameToUnitWithCount)
+
     for unitType, unit in pairs(produceConsumeItems.produceUnitNameToUnitWithCount) do
         local unitAttrs = _getUnitAttributes(unit.unitType)
         -- If amalgamation is present, find how many units whose cost should be ignored.
         local amalgamatedUnitsOfType = produceConsumeItems.amalgamation and produceConsumeItems.amalgamation[unit.unitType] or 0
+        local productionConsumed = math.ceil(unit.count * (unitAttrs.productionConsumed or 1)) - (unitAttrs.freeProduction or 0)
 
         result.cost = result.cost + math.ceil(math.max(unit.count - amalgamatedUnitsOfType, 0) * (unitAttrs.cost or 0))
-        result.numUnits = result.numUnits + unit.count
+        result.numUnits = result.numUnits + productionConsumed
+    end
+
+    if produceConsumeItems.aiDevelopmentAlgorithm then
+        result.cost = math.max(result.cost - produceConsumeItems.aiDevelopmentAlgorithm, 0)
     end
 
     -- If Hegemonic Trade Policy (swap resouce/influence values), replace
@@ -984,6 +1026,27 @@ function announce(items, resourcesAndCost)
     end
     if tradegoods > 0 then
         table.insert(consume, tradegoods .. ' tradegood' .. (tradegoods > 1 and 's' or ''))
+    end
+    if items.amalgamation then
+        local amalgamated = {}
+        
+        for unitType, consumedAmount in pairs(items.amalgamation) do
+            local unitTypeProduced = items.produceUnitNameToUnitWithCount[unitType] and items.produceUnitNameToUnitWithCount[unitType].count or 0
+
+            if consumedAmount and consumedAmount > 0 then
+                local leftoverAmalgamation = consumedAmount - unitTypeProduced
+                if leftoverAmalgamation > 0 then
+                    table.insert(amalgamated, unitTypeProduced .. 'x ' .. unitType .. ' consumed (' .. leftoverAmalgamation .. ' leftover)')
+                else
+                    table.insert(amalgamated, consumedAmount .. 'x ' .. unitType .. ' consumed')
+                end
+            end
+        end
+
+        table.insert(consume, 'Amalgamation: ' .. table.concat(amalgamated, '; '))
+    end
+    if items.aiDevelopmentAlgorithm then
+        table.insert(consume, 'AI Development Algorithm (' .. items.aiDevelopmentAlgorithm .. ')' )
     end
 
     local message = table.concat({

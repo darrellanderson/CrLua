@@ -471,6 +471,25 @@ local _unitModifiers = {
         end
     },
 
+    ['Brother Omar'] = {
+        description = 'Produce an additional Infantry for their cost; it doesn\'t count towards production limits.',
+        leader = LEADER.COMMANDER, -- Yin
+        owner = OWNER.SELF,
+        type = TYPE.ADJUST,
+        apply = function(unitAttrs)
+            local currentCost = unitAttrs['Infantry'].cost
+            local currentProductionConsumed = unitAttrs['Infantry'].productionConsumed or 1
+            local currentUnitsPerResource = math.floor(0.5 + (1.0 / currentCost)) --simulate math.round
+
+            local newUnitsPerResource = currentUnitsPerResource + 1
+            local newCost = 1.0 / newUnitsPerResource
+            local newProductionConsumed = (newCost / currentCost) * currentProductionConsumed
+
+            unitAttrs['Infantry'].cost = newCost
+            unitAttrs['Infantry'].productionConsumed = newProductionConsumed
+        end
+    },
+
     ['Bunker'] = {
         description = '-4 to all BOMBARDMENT rolls',
         owner = OWNER.ANY,
@@ -598,6 +617,25 @@ local _unitModifiers = {
         end
     },
 
+    ["M'aban"] = {
+        description = 'Produce an additional Fighter for their cost; it doesn\'t count towards production limits.',
+        leader = LEADER.COMMANDER, -- Naalu
+        owner = OWNER.SELF,
+        type = TYPE.ADJUST,
+        apply = function(unitAttrs, params)
+            local currentCost = unitAttrs['Fighter'].cost or 0.5
+            local currentProductionConsumed = unitAttrs['Fighter'].productionConsumed or 1
+            local currentUnitsPerResource = math.floor(0.5 + (1.0 / currentCost)) --simulate math.round
+
+            local newUnitsPerResource = currentUnitsPerResource + 1
+            local newCost = 1.0 / newUnitsPerResource
+            local newProductionConsumed = (newCost / currentCost) * currentProductionConsumed
+
+            unitAttrs['Fighter'].cost = newCost
+            unitAttrs['Fighter'].productionConsumed = newProductionConsumed
+        end
+    },
+
     ['Morale Boost'] = {
         description = '+1 to all COMBAT rolls',
         owner = OWNER.SELF,
@@ -653,6 +691,16 @@ local _unitModifiers = {
                     attrs.spaceCombat.hit = attrs.spaceCombat.hit - 2
                 end
             end
+        end
+    },
+
+    ['Navarch Feng'] = {
+        description = 'You can produce your flagship without spending resources.',
+        leader = LEADER.COMMANDER, -- Nomad
+        owner = OWNER.SELF,
+        type = TYPE.ADJUST,
+        apply = function(unitAttrs) 
+            unitAttrs['Flagship'].cost = 0
         end
     },
 
@@ -722,7 +770,7 @@ local _unitModifiers = {
     ['Regulated Conscription'] = {
         description = 'Fighters and infantry cost 1 each',
         owner = OWNER.SELF,
-        type = TYPE.ADJUST,
+        type = TYPE.MUTATE, -- set cost before additional adjustments
         apply = function(unitAttrs)
             unitAttrs['Fighter'].cost = 1
             unitAttrs['Infantry'].cost = 1
@@ -852,6 +900,28 @@ local _unitModifiers = {
         end
     },
 
+    ['That Which Molds Flesh'] = {
+        description = 'When producing Infantry and/or Fighters, up to 2 do not count against the production limit.',
+        leader = LEADER.COMMANDER, -- Vuil'Raith
+        owner = OWNER.SELF,
+        type = TYPE.CHOOSE,
+        apply = function(unitAttrs, params)
+            local bonusRemaining = 2
+            for _, unitType in ipairs({'Infantry', 'Fighter'}) do
+                local unitTypeAttrs = unitAttrs[unitType]
+                local produceAmount = (params.myUnitTypeToCount[unitType] or 0)
+                local productionConsumed = math.ceil(produceAmount * (unitTypeAttrs.productionConsumed or 1))
+
+                if productionConsumed > 0 then
+                    local applyBonusAmount = math.min(productionConsumed, bonusRemaining)
+                    bonusRemaining = bonusRemaining - applyBonusAmount
+
+                    unitTypeAttrs.freeProduction = applyBonusAmount
+                end
+            end
+        end
+    },
+
     ['The Cavalry'] = {
         description = 'One non-fighter ship gains the SUSTAIN DAMAGE, combat value, and ANTI-FIGHTER BARRAGE of the Nomad flagship (this modifier adds a new unit for AFB/space combat, remove the affected unit from normal setup)',
         owner = OWNER.SELF,
@@ -875,7 +945,7 @@ local _unitModifiers = {
     },
 
     ['Trrakan Aun Zulok'] = {
-        leader = LEADER.COMMANDER, -- Strike Wing
+        leader = LEADER.COMMANDER, -- Argent Flight
         description = '+1 die to a unit ability (anti-fighter barrage, bombardment, space cannon)',
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,
@@ -1474,6 +1544,11 @@ function _init()
             }
         end
     end
+end
+
+function isUnitUpgradeName(name)
+    assert(type(name) == 'string')
+    return _unitOverrides[name] and _unitOverrides[name].upgrade and true or false
 end
 
 function isUnitName(name)

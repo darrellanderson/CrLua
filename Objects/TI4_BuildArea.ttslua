@@ -618,7 +618,7 @@ function getProduceConsumeItems()
         end
     end
 
-    if result.aiDevelopmentAlgorithm and playerColor then
+    if result.aiDevelopmentAlgorithm then
         -- Detect unit upgrades (AI Development Algorithm)
         local unitUpgradeNameSet = {}
         for _, name in ipairs(_unitHelper.getUnitUpgradeNames()) do
@@ -641,6 +641,7 @@ function getProduceConsumeItems()
             maybeAdd(object)
         end
         local guidToColor = _zoneHelper.zonesFromPositions()
+        local unitUpgrades = {}
         for guid, color in pairs(guidToColor) do
             if color == playerColor then
                 local object = getObjectFromGUID(guid)

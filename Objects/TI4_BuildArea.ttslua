@@ -620,32 +620,34 @@ function getProduceConsumeItems()
 
     if result.aiDevelopmentAlgorithm then
         -- Detect unit upgrades (AI Development Algorithm)
-        local unitUpgradeNameSet = {}
-        for _, name in ipairs(_unitHelper.getUnitUpgradeNames()) do
-            unitUpgradeNameSet[name] = true
-        end
-        local guidToPosition = {}
-        local function maybeAdd(object)
-            if object.tag ~= 'Card' then
-                return
-            elseif inHandGuidSet[object.getGUID()] then
-                return
-            elseif object.is_face_down then
-                return
-            elseif not unitUpgradeNameSet[object.getName()] then
-                return
-            end
-            guidToPosition[object.getGUID()] = object.getPosition()
-        end
-        for _, object in ipairs(getAllObjects()) do
-            maybeAdd(object)
-        end
-        local guidToColor = _zoneHelper.zonesFromPositions()
         local unitUpgrades = {}
-        for guid, color in pairs(guidToColor) do
-            if color == playerColor then
-                local object = getObjectFromGUID(guid)
-                table.insert(unitUpgrades, object.getName())
+        if playerColor then
+            local unitUpgradeNameSet = {}
+            for _, name in ipairs(_unitHelper.getUnitUpgradeNames()) do
+                unitUpgradeNameSet[name] = true
+            end
+            local guidToPosition = {}
+            local function maybeAdd(object)
+                if object.tag ~= 'Card' then
+                    return
+                elseif inHandGuidSet[object.getGUID()] then
+                    return
+                elseif object.is_face_down then
+                    return
+                elseif not unitUpgradeNameSet[object.getName()] then
+                    return
+                end
+                guidToPosition[object.getGUID()] = object.getPosition()
+            end
+            for _, object in ipairs(getAllObjects()) do
+                maybeAdd(object)
+            end
+            local guidToColor = _zoneHelper.zonesFromPositions()
+            for guid, color in pairs(guidToColor) do
+                if color == playerColor then
+                    local object = getObjectFromGUID(guid)
+                    table.insert(unitUpgrades, object.getName())
+                end
             end
         end
         result.aiDevelopmentAlgorithm = #unitUpgrades

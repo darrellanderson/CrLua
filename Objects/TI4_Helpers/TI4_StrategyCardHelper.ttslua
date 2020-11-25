@@ -30,6 +30,17 @@ function getHelperClient(helperObjectName)
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
 
+local function copyTable(t)
+    if t and type(t) == 'table' then
+        local copy = {}
+        for k, v in pairs(t) do
+            copy[k] = type(v) == 'table' and copyTable(v) or v
+        end
+        t = copy
+    end
+    return t
+end
+
 local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
@@ -61,7 +72,6 @@ local STRATEGY_CARD_INITIATIVE = {
 
 local STRATEGY_CARD_SHEET_NAME = 'Strategy Card Mat'
 
-local _lowerNameToInfluence = false
 local _guidToParameters = {}  -- strategy cards
 local _strategyCardSheetGuid = false
 local _allocatedTokenGuidToColor = {}  -- unassigned command tokens
@@ -330,30 +340,8 @@ end
 function recomputeInfluence(includeFaceDown)
     assert(not includeFaceDown or type(includeFaceDown) == 'boolean')
 
-    -- Cache from lower name to influence value.
-    if not _lowerNameToInfluence then
-        _lowerNameToInfluence = {}
-        for lowerName, planet in pairs(_systemHelper.planets()) do
-            if (planet.influence or 0) > 0 then
-                _lowerNameToInfluence[lowerName] = {
-                    influence = planet.influence
-                }
-            end
-        end
-        for lowerName, attributes in pairs(_systemHelper.nonPlanetResourceInfluenceCards()) do
-            if (attributes.influence or 0) > 0 then
-                _lowerNameToInfluence[lowerName] = {
-                    influence = attributes.influence,
-                    requireFaceUp = attributes.requireFaceUp
-                }
-            end
-        end
-    end
-
     local colorToVoteCounter = {}
     local representativeGovernment = false
-    local guidToPosition = {}
-    local guidToInfluence = {}
 
     local inHandGuidSet = _zoneHelper.inHand()
     for _, object in ipairs(getAllObjects()) do
@@ -373,24 +361,25 @@ function recomputeInfluence(includeFaceDown)
                         representativeGovernment = true
                         broadcastToAll('Representative Government active.', {0.1,0.5,0.1})
                     end
-                elseif includeFaceDown or not object.is_face_down then
-                    local influence = _lowerNameToInfluence[string.lower(name)]
-                    if influence and influence.requireFaceUp and object.is_face_down then
-                        influence = false
-                    end
-                    if influence then
-                        guidToPosition[guid] = object.getPosition()
-                        guidToInfluence[guid] = influence.influence
-                    end
                 end
             end
         end
     end
 
-    local guidToColor = _zoneHelper.zonesFromPositions(guidToPosition)
+    local colorToResInfCards = _systemHelper.getColorToResInfCards(includeFaceDown)
+    local colorToResInfModifiers = _systemHelper.getColorToResInfModifiers()
     local colorToInfluence = {}
-    for guid, color in pairs(guidToColor) do
-        colorToInfluence[color] = (colorToInfluence[color] or 0) + (guidToInfluence[guid] or 0)
+    for color, cards in pairs(colorToResInfCards) do
+        local modifiers = colorToResInfModifiers[color] or {}
+        cards = _systemHelper.applyResInfModifiers({
+            cards = copyTable(cards),  -- copy otherwise cross-script error
+            modifiers = modifiers,
+        })
+        local influence = 0
+        for _, card in ipairs(cards) do
+            influence = influence + (card.influence or 0)
+        end
+        colorToInfluence[color] = influence
     end
 
     for color, voteCounter in pairs(colorToVoteCounter) do

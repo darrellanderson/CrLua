@@ -29,6 +29,17 @@ local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
+local function copyTable(t)
+    if t and type(t) == 'table' then
+        local copy = {}
+        for k, v in pairs(t) do
+            copy[k] = type(v) == 'table' and copyTable(v) or v
+        end
+        t = copy
+    end
+    return t
+end
+
 -- Systems table, from guid to systems.
 --
 -- System attributes:
@@ -452,6 +463,33 @@ local _nonPlanetResourceInfluenceCards = {
   { name = 'Ul the Progenitor', resources = 3, influence = 3, requireFaceUp = true },
 }
 
+local LEADER = {
+    AGENT = 'agent',
+    COMMANDER = 'commander',
+    HERO = 'hero'
+}
+
+local _resInfModifiers = {
+    ['Elder Qanoj'] = {
+        description = '',
+        leader = LEADER.COMMANDER,
+        apply = function(resInfCards)
+            local planetNameSet = {}
+            for _, system in pairs(_systems) do
+                for _, planet in ipairs(system.planets or {}) do
+                    planetNameSet[planet.name] = true
+                end
+            end
+            for _, resInfCard in ipairs(resInfCards) do
+                if planetNameSet[resInfCard.name] then
+                    -- Technically this adds a *vote* and not influence.
+                    resInfCard.influence = resInfCard.influence + 1
+                end
+            end
+        end
+    }
+}
+
 local LOCAL_DISTANCE_TO_PLANET = 1.1
 local LOCAL_PLANET_RADIUS = 0.8
 local LOCAL_SYSTEM_TILE_RADIUS = 2.26
@@ -648,6 +686,7 @@ function wormholes(playerColor)
 end
 
 --- Get non-planet items that affect resources and/or influence.
+-- DEPRECATED.  PLEASE USE getColorToResInfCards, getColorToResInfModifiers, applyResInfModifiers.
 -- @return table: map from LOWERCASE object name to {name,resources,influence} table.
 function nonPlanetResourceInfluenceCards()
     local result = {}
@@ -657,6 +696,144 @@ function nonPlanetResourceInfluenceCards()
     return result
 end
 
+--- Get resource/influence cards.
+-- @param includeFaceDown (boolean): include face down cards.
+-- @return table: map from color list of { name, res, inf } tables.
+function getColorToResInfCards(includeFaceDown)
+    assert((not includeFaceDown) or type(includeFaceDown) == 'boolean')
+
+    local cardToValues = {}
+    for _, system in pairs(_systems) do
+        for _, planet in ipairs(system.planets or {}) do
+            cardToValues[planet.name] = { -- only res/inf fields
+                name = planet.name,
+                resources = planet.resources or 0,
+                influence = planet.influence or 0
+            }
+        end
+    end
+    for _, entry in ipairs(_nonPlanetResourceInfluenceCards) do
+        cardToValues[entry.name] = entry
+    end
+
+    local guidToPosition = {}
+    local guidToValues = {}
+    local inHandGuidSet = _zoneHelper.inHand()
+    local function getValues(object)
+        if object.tag ~= 'Card' then
+            return false
+        elseif inHandGuidSet[object.getGUID()] then
+            return false
+        end
+        local values = cardToValues[object.getName()]
+        if not values then
+            return false
+        end
+        if object.is_face_down then
+            if values.requireFaceUp or (not includeFaceDown) then
+                return false
+            end
+        end
+        return values
+    end
+    for _, object in ipairs(getAllObjects()) do
+        local values = getValues(object)
+        if values then
+            local guid = object.getGUID()
+            guidToPosition[guid] = object.getPosition()
+            guidToValues[guid] = values
+        end
+    end
+
+    local colorToResInfCards = {}
+    for _, color in ipairs(_zoneHelper.zones()) do
+        colorToResInfCards[color] = {}
+    end
+    local guidToColor = _zoneHelper.zonesFromPositions(guidToPosition)
+    for guid, color in pairs(guidToColor) do
+        local values = guidToValues[guid]
+        local entry = colorToResInfCards[color]
+        table.insert(entry, values)
+    end
+    return colorToResInfCards
+end
+
+--- Get non-trivial modifiers.
+-- @return table: map from color to list of modifier names.
+function getColorToResInfModifiers()
+    local colorToCommander = {}
+    local colorToAlliance = {}
+    local guidToPosition = {}
+    local guidToName = {}
+    local inHandGuidSet = _zoneHelper.inHand()
+    for _, object in ipairs(getAllObjects()) do
+        local guid = object.getGUID()
+        if object.tag == 'Card' and not inHandGuidSet[guid] then
+            local name = object.getName()
+            local modifier = _resInfModifiers[name]
+            if modifier then
+                local position = object.getPosition()
+                guidToPosition[guid] = position
+                guidToName[guid] = name
+                if modifier.leader == LEADER.COMMANDER then
+                    local color = _zoneHelper.zoneFromPosition(position)
+                    if color then
+                        colorToCommander[color] = name
+                    end
+                end
+            end
+            local allianceColor = string.match(name, '^Alliance %((.*)%)$')
+            if allianceColor then
+                local position = object.getPosition()
+                local color = _zoneHelper.zoneFromPosition(position)
+                if color then
+                    colorToAlliance[color] = allianceColor
+                end
+            end
+        end
+    end
+
+    local colorToResInfModifiers = {}
+    for _, color in ipairs(_zoneHelper.zones()) do
+        colorToResInfModifiers[color] = {}
+    end
+    local guidToColor = _zoneHelper.zonesFromPositions(guidToPosition)
+    for guid, color in pairs(guidToColor) do
+        local name = guidToName[guid]
+        local entry = colorToResInfModifiers[color]
+        table.insert(entry, name)
+    end
+
+    -- Apply alliances.
+    for color, allianceColor in pairs(colorToAlliance) do
+        local commander = colorToCommander[allianceColor]
+        if commander then
+            local entry = colorToResInfModifiers[color]
+            table.insert(entry, commander)
+        end
+    end
+
+    return colorToResInfModifiers
+end
+
+--- Compute resource/influcence.
+-- @return {resource=#,influence=#} table.
+function applyResInfModifiers(params)
+    assert(type(params) == 'table')
+    assert(type(params.cards) == 'table')
+    assert(type(params.modifiers) == 'table')
+
+    local cards = copyTable(params.cards)  -- do not modify in place
+    for _, modifier in ipairs(params.modifiers) do
+        assert(type(modifier) == 'string')
+        local modifier = _resInfModifiers[modifier]
+        if modifier then
+            modifier.apply(cards)
+        end
+    end
+    return cards
+end
+
 --- Let homebrew add custom systems via runtime injection.
 -- @param system: system table.
 function injectSystem(system)
@@ -664,16 +841,6 @@ function injectSystem(system)
 
     -- Unclear if the systems are shared with the caller, make a copy to be
     -- sure any later mutations to the caller's version does not change this.
-    local function copyTable(t)
-        if t and type(t) == 'table' then
-            local copy = {}
-            for k, v in pairs(t) do
-                copy[k] = type(v) == 'table' and copyTable(v) or v
-            end
-            t = copy
-        end
-        return t
-    end
     system = copyTable(system)
 
     local guid = system.guid
@@ -687,6 +854,19 @@ function injectSystem(system)
     system.guid = nil  -- force rebuild of any auto-generated fields
     system._homebrew = true
     _systems[guid] = system
+end
+
+function injectResourceInfluenceModifier(params)
+    assert(type(params.name) == 'string', 'bad name')
+    assert((not params.resource) or type(params.resource) == 'number', 'bad resource')
+    assert((not params.influence) or type(params.influence) == 'number', 'bad influence')
+    for i, entry in ipairs(_nonPlanetResourceInfluenceCards) do
+        if entry.name == params.name then
+            _nonPlanetResourceInfluenceCards[i] = params
+            return
+        end
+    end
+    table.insert(_nonPlanetResourceInfluenceCards, params)
 end
 
 function verifyAllSystems()

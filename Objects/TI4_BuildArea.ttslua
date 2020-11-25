@@ -238,7 +238,7 @@ local function _updateUnitAttributes(produceUnitNameToUnitWithCount)
         unitAttrs = assert(unitAttrs),
         myColor = color or 'Grey',
         myUnitModifiers = unitModifiers,
-        myUnitTypeToCount = unitTypeToCount,
+        myUnitTypeToCount = unitTypeToCount or {},
         opponentColor = false,
         opponentUnitModifiers = false,
         opponentUnitTypeToCount = false
@@ -516,7 +516,7 @@ function getProduceConsumeItems()
     local playerColor = _data.playerColor
 
     -- Get objects to consider.
-    local inHandGuidSet = _zoneHelper.inHand()    
+    local inHandGuidSet = _zoneHelper.inHand()
     local objects = CrLua.Table.join(_data.inside, {})
     local function useOutsizeBuildAreaObject(object)
         local objectEffects = OBJECT_EFFECTS[object.getName()]
@@ -533,8 +533,7 @@ function getProduceConsumeItems()
             return false
         end
         if objectEffects.anywhereInPlayerZone then
-            local zoneColor = _zoneHelper.zoneFromPosition(object.getPosition())
-            return playerColor and zoneColor == playerColor
+            return playerColor and _zoneHelper.zoneFromPosition(object.getPosition()) == playerColor
         end
         return objectEffects.anywhereOnTable
     end
@@ -1004,7 +1003,6 @@ function announce(items, resourcesAndCost)
     assert(type(items) == 'table' and type(resourcesAndCost) == 'table')
     CrLua.Log.d(TAG, 'announce')
     local produce = {}
-    local amalgamated = {}
     for unitType, unit in pairs(items.produceUnitNameToUnitWithCount) do
         if unit.count > 1 then
             if unitType ~= 'Infantry' then
@@ -1030,6 +1028,8 @@ function announce(items, resourcesAndCost)
         table.insert(consume, tradegoods .. ' tradegood' .. (tradegoods > 1 and 's' or ''))
     end
     if items.amalgamation then
+        local amalgamated = {}
+        
         for unitType, consumedAmount in pairs(items.amalgamation) do
             local unitTypeProduced = items.produceUnitNameToUnitWithCount[unitType] and items.produceUnitNameToUnitWithCount[unitType].count or 0
 

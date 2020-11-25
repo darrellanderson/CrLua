@@ -212,6 +212,19 @@ function _getUnitAttributes(unitType)
         return _unitAttributes[unitType]
     end
 
+    _updateUnitAttributes()
+
+    return _unitAttributes[unitType]
+end
+
+local function _updateUnitAttributes(produceUnitNameToUnitWithCount)
+    assert(not produceUnitNameToUnitWithCount or type(produceUnitNameToUnitWithCount) == 'table')
+
+    local unitTypeToCount = {}
+    for unitType, unit in pairs(produceUnitNameToUnitWithCount or {}) do
+        unitTypeToCount[unitType] = unit.count
+    end
+
     local color = getPlayerColor()
 
     local unitOverrides = _unitHelper.getColorToUnitOverrides()[color] or {}
@@ -225,7 +238,7 @@ function _getUnitAttributes(unitType)
         unitAttrs = assert(unitAttrs),
         myColor = color or 'Grey',
         myUnitModifiers = unitModifiers,
-        myUnitTypeToCount = {},
+        myUnitTypeToCount = unitTypeToCount,
         opponentColor = false,
         opponentUnitModifiers = false,
         opponentUnitTypeToCount = false
@@ -233,8 +246,8 @@ function _getUnitAttributes(unitType)
 
     _unitAttributes = unitAttrs
     _unitAttributesLastUpdateTime = Time.time
-    return _unitAttributes[unitType]
 end
+
 
 function _getProduction()
     local spaceDock = _getUnitAttributes('Space Dock')
@@ -651,13 +664,16 @@ function getProduceConsumeResourcesAndCost(produceConsumeItems)
         end
     end
 
+    _updateUnitAttributes(produceConsumeItems.produceUnitNameToUnitWithCount)
+
     for unitType, unit in pairs(produceConsumeItems.produceUnitNameToUnitWithCount) do
         local unitAttrs = _getUnitAttributes(unit.unitType)
         -- If amalgamation is present, find how many units whose cost should be ignored.
         local amalgamatedUnitsOfType = produceConsumeItems.amalgamation and produceConsumeItems.amalgamation[unit.unitType] or 0
+        local productionConsumed = math.ceil(unit.count * (unitAttrs.productionConsumed or 1)) - (unitAttrs.freeProduction or 0)
 
         result.cost = result.cost + math.ceil(math.max(unit.count - amalgamatedUnitsOfType, 0) * (unitAttrs.cost or 0))
-        result.numUnits = result.numUnits + unit.count
+        result.numUnits = result.numUnits + productionConsumed
     end
 
     if produceConsumeItems.aiDevelopmentAlgorithm then

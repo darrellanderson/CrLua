@@ -477,8 +477,16 @@ local _unitModifiers = {
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
         apply = function(unitAttrs)
-            -- We won't know production amount while applying modifiers, so tell the Build tool to handle it.
-            unitAttrs['Infantry'].extraUnitWhenProduced = true
+            local currentCost = unitAttrs['Infantry'].cost
+            local currentProductionConsumed = unitAttrs['Infantry'].productionConsumed or 1
+            local currentUnitsPerResource = math.floor(0.5 + (1.0 / currentCost)) --simulate math.round
+
+            local newUnitsPerResource = currentUnitsPerResource + 1
+            local newCost = 1.0 / newUnitsPerResource
+            local newProductionConsumed = (newCost / currentCost) * currentProductionConsumed
+
+            unitAttrs['Infantry'].cost = newCost
+            unitAttrs['Infantry'].productionConsumed = newProductionConsumed
         end
     },
 
@@ -614,9 +622,17 @@ local _unitModifiers = {
         leader = LEADER.COMMANDER, -- Naalu
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
-        apply = function(unitAttrs)
-            -- We won't know production amount while applying modifiers, so tell the Build tool to handle it.
-            unitAttrs['Fighter'].extraUnitWhenProduced = true
+        apply = function(unitAttrs, params)
+            local currentCost = unitAttrs['Fighter'].cost or 0.5
+            local currentProductionConsumed = unitAttrs['Fighter'].productionConsumed or 1
+            local currentUnitsPerResource = math.floor(0.5 + (1.0 / currentCost)) --simulate math.round
+
+            local newUnitsPerResource = currentUnitsPerResource + 1
+            local newCost = 1.0 / newUnitsPerResource
+            local newProductionConsumed = (newCost / currentCost) * currentProductionConsumed
+
+            unitAttrs['Fighter'].cost = newCost
+            unitAttrs['Fighter'].productionConsumed = newProductionConsumed
         end
     },
 
@@ -754,7 +770,7 @@ local _unitModifiers = {
     ['Regulated Conscription'] = {
         description = 'Fighters and infantry cost 1 each',
         owner = OWNER.SELF,
-        type = TYPE.ADJUST,
+        type = TYPE.MUTATE, -- set cost before additional adjustments
         apply = function(unitAttrs)
             unitAttrs['Fighter'].cost = 1
             unitAttrs['Infantry'].cost = 1
@@ -889,9 +905,20 @@ local _unitModifiers = {
         leader = LEADER.COMMANDER, -- Vuil'Raith
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,
-        apply = function(unitAttrs)
-            -- Because of Regulated Conscription and other commander abilities, this needs to be figured out with actual build amounts.
-            -- We don't know production quantity at this point, so let the Build Area Tool detect and figure this out.
+        apply = function(unitAttrs, params)
+            local bonusRemaining = 2
+            for _, unitType in ipairs({'Infantry', 'Fighter'}) do
+                local unitTypeAttrs = unitAttrs[unitType]
+                local produceAmount = (params.myUnitTypeToCount[unitType] or 0)
+                local productionConsumed = math.ceil(produceAmount * (unitTypeAttrs.productionConsumed or 1))
+
+                if productionConsumed > 0 then
+                    local applyBonusAmount = math.min(productionConsumed, bonusRemaining)
+                    bonusRemaining = bonusRemaining - applyBonusAmount
+
+                    unitTypeAttrs.freeProduction = applyBonusAmount
+                end
+            end
         end
     },
 
@@ -918,7 +945,7 @@ local _unitModifiers = {
     },
 
     ['Trrakan Aun Zulok'] = {
-        leader = LEADER.COMMANDER, -- Strike Wing
+        leader = LEADER.COMMANDER, -- Argent Flight
         description = '+1 die to a unit ability (anti-fighter barrage, bombardment, space cannon)',
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,

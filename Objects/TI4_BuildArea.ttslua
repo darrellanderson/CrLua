@@ -39,7 +39,6 @@ local OBJECT_EFFECTS = {
         hegemonic = true,
     },
     ['AI Development Algorithm'] = {
-        requireFaceUp = true,
         aiDevelopmentAlgorithm = true
     },
 
@@ -597,12 +596,22 @@ function getProduceConsumeItems()
         end
     end
 
-    if result.aiDevelopmentAlgorithm and playerColor then
+    for object, _ in pairs(objects) do
+        if object.tag == 'Deck' then
+            for _, entry in ipairs(object.getObjects()) do
+                addItem(entry.name)
+            end
+        else
+            addItem(object.getName())
+        end
+    end
+
+    if result.aiDevelopmentAlgorithm then
         -- Detect unit upgrades (AI Development Algorithm)
         local unitUpgrades = {}
         for _, object in ipairs(getAllObjects()) do
             if not inHandGuidSet[object.getGUID()] and not object.is_face_down and object.tag == 'Card'
-                and _zoneHelper.zoneFromPosition(object.getPosition()) == playerColor then
+                and playerColor and _zoneHelper.zoneFromPosition(object.getPosition()) == playerColor then
                 local objectName = object.getName()
 
                 if _unitHelper.isUnitUpgradeName(objectName) then
@@ -612,16 +621,6 @@ function getProduceConsumeItems()
         end
 
         result.aiDevelopmentAlgorithm = #unitUpgrades
-    end
-
-    for object, _ in pairs(objects) do
-        if object.tag == 'Deck' then
-            for _, entry in ipairs(object.getObjects()) do
-                addItem(entry.name)
-            end
-        else
-            addItem(object.getName())
-        end
     end
 
     CrLua.Log.d(TAG, 'getProduceConsumeItems', result)
@@ -989,6 +988,7 @@ function announce(items, resourcesAndCost)
     assert(type(items) == 'table' and type(resourcesAndCost) == 'table')
     CrLua.Log.d(TAG, 'announce')
     local produce = {}
+    local amalgamated = {}
     for unitType, unit in pairs(items.produceUnitNameToUnitWithCount) do
         if unit.count > 1 then
             if unitType ~= 'Infantry' then
@@ -1012,6 +1012,25 @@ function announce(items, resourcesAndCost)
     end
     if tradegoods > 0 then
         table.insert(consume, tradegoods .. ' tradegood' .. (tradegoods > 1 and 's' or ''))
+    end
+    if items.amalgamation then
+        for unitType, consumedAmount in pairs(items.amalgamation) do
+            local unitTypeProduced = items.produceUnitNameToUnitWithCount[unitType] and items.produceUnitNameToUnitWithCount[unitType].count or 0
+
+            if consumedAmount and consumedAmount > 0 then
+                local leftoverAmalgamation = consumedAmount - unitTypeProduced
+                if leftoverAmalgamation > 0 then
+                    table.insert(amalgamated, unitTypeProduced .. 'x ' .. unitType .. ' consumed (' .. leftoverAmalgamation .. ' leftover)')
+                else
+                    table.insert(amalgamated, consumedAmount .. 'x ' .. unitType .. ' consumed')
+                end
+            end
+        end
+
+        table.insert(consume, 'Amalgamation: ' .. table.concat(amalgamated, '; '))
+    end
+    if items.aiDevelopmentAlgorithm then
+        table.insert(consume, 'AI Development Algorithm (' .. items.aiDevelopmentAlgorithm .. ')' )
     end
 
     local message = table.concat({

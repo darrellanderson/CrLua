@@ -1315,19 +1315,21 @@ function getColorToUnitModifiers()
         allModifiersSet[name] = true
     end
 
+    -- Add commanders (including Alliance and Imperia sharing).
+    local colorToCommanders = _factionHelper.getColorToCommanders()
+    for color, commanders in pairs(colorToCommanders) do
+        for _, commander in ipairs(commanders) do
+            addModifier(color, commander)
+        end
+    end
+
     -- Faction abilities.
-    local imperiaColor = false
-    local commandTokenNameToColor = {}
     for color, faction in pairs(_factionHelper.allFactions()) do
         for _, ability in ipairs(faction and faction.abilities or {}) do
             if _unitModifiers[ability] then
                 addModifier(color, ability)
             end
-            if ability == 'Imperia' then
-                imperiaColor = color
-            end
         end
-        commandTokenNameToColor[faction.tokenName .. ' Command Token'] = color
     end
 
     -- Cards/Franken tiles.  Add "anywhereOnTable" to ALL colors.
@@ -1371,30 +1373,8 @@ function getColorToUnitModifiers()
         return name, unitModifier
     end
 
-    -- Get commander if unlocked (ok if tapped).
-    local function getCommander(object)
-        if not object.tag == 'Card' or object.is_face_down then
-            return false
-        end
-        if inHandGuidSet[object.getGUID()] then
-            return false
-        end
-        local name = object.getName()
-        local unitModifier = _unitModifiers[name]
-        if not unitModifier then
-            return false
-        end
-        if unitModifier.leader == LEADER.COMMANDER then
-            return name
-        end
-    end
-
     local guidToName = {}
     local guidToPosition = {}
-    local colorToAlliances = {}
-    local colorToCommander = {}
-    local guidToCommandTokenColor = {}
-    local guidToCommandTokenPosition = {}
     for _, object in ipairs(getAllObjects()) do
         -- Get unit modifiers.
         local name, unitModifier = getUnitModifier(object)
@@ -1422,46 +1402,12 @@ function getColorToUnitModifiers()
                 guidToPosition[guid] = object.getPosition()
             end
         end
-
-        -- Get commanders, if active.  They may also be present in the unit modifer set.
-        local name = object.getName()
-        local commander = getCommander(object)
-        if commander then
-            local color = _zoneHelper.zoneFromPosition(object.getPosition())
-            colorToCommander[color] = name
-        end
-
-        local color = string.match(name, '^Alliance %((.*)%)$')
-        if color then
-            local zoneColor = _zoneHelper.zoneFromPosition(object.getPosition())
-            colorToAlliances[zoneColor] = colorToAlliances[zoneColor] or {}
-            table.insert(colorToAlliances[zoneColor], color)
-        end
-
-        local color = commandTokenNameToColor[name]
-        if color then
-            guidToCommandTokenColor[object.getGUID()] = color
-            guidToCommandTokenPosition[object.getGUID()] = object.getPosition()
-        end
     end
     local guidToZoneColor = _zoneHelper.zonesFromPositions(guidToPosition)
     for guid, zoneColor in pairs(guidToZoneColor) do
         local name = guidToName[guid]
         local modifier = _unitModifiers[name]
         addModifier(zoneColor, name)
-    end
-
-    if imperiaColor then
-        local guidToZoneColor = _zoneHelper.zonesFromPositions(guidToCommandTokenPosition)
-        for guid, zoneColor in pairs(guidToZoneColor) do
-            if zoneColor == imperiaColor then
-                local tokenColor = guidToCommandTokenColor[guid]
-                local commander = colorToCommander[tokenColor]
-                if tokenColor ~= imperiaColor and commander then
-                    addModifier(imperiaColor, commander)
-                end
-            end
-        end
     end
 
     local colorToUnitModifiers = {}
@@ -1476,13 +1422,6 @@ function getColorToUnitModifiers()
                         table.insert(entry, other)
                     end
                 end
-            end
-        end
-        -- Alliance copies unlocked commander(s).
-        for _, alliance in ipairs(colorToAlliances[color] or {}) do
-            local commander = colorToCommander[alliance]
-            if commander then
-                table.insert(entry, commander)
             end
         end
         colorToUnitModifiers[color] = entry

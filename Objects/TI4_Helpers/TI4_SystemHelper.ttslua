@@ -472,7 +472,7 @@ local LEADER = {
 local _resInfModifiers = {
     ['Elder Qanoj'] = {
         description = '',
-        leader = LEADER.COMMANDER,
+        leader = LEADER.COMMANDER, -- Xxcha
         apply = function(resInfCards)
             local planetNameSet = {}
             for _, system in pairs(_systems) do
@@ -761,55 +761,53 @@ end
 --- Get non-trivial modifiers.
 -- @return table: map from color to list of modifier names.
 function getColorToResInfModifiers()
-    local colorToCommander = {}
-    local colorToAlliance = {}
     local guidToPosition = {}
     local guidToName = {}
     local inHandGuidSet = _zoneHelper.inHand()
     for _, object in ipairs(getAllObjects()) do
         local guid = object.getGUID()
-        if object.tag == 'Card' and not inHandGuidSet[guid] then
+        if object.tag == 'Card' and (not inHandGuidSet[guid]) and (not object.is_face_down) then
             local name = object.getName()
             local modifier = _resInfModifiers[name]
             if modifier then
                 local position = object.getPosition()
                 guidToPosition[guid] = position
                 guidToName[guid] = name
-                if modifier.leader == LEADER.COMMANDER then
-                    local color = _zoneHelper.zoneFromPosition(position)
-                    if color then
-                        colorToCommander[color] = name
-                    end
-                end
-            end
-            local allianceColor = string.match(name, '^Alliance %((.*)%)$')
-            if allianceColor then
-                local position = object.getPosition()
-                local color = _zoneHelper.zoneFromPosition(position)
-                if color then
-                    colorToAlliance[color] = allianceColor
-                end
             end
         end
     end
 
     local colorToResInfModifiers = {}
+    local function addModifier(color, modifier)
+        local entry = colorToResInfModifiers[color]
+        if not entry then
+            entry = {}
+            colorToResInfModifiers[color] = entry
+        end
+        for _, value in ipairs(entry) do
+            if value == modifier then
+                return
+            end
+        end
+        table.insert(entry, modifier)
+    end
+
     for _, color in ipairs(_zoneHelper.zones()) do
         colorToResInfModifiers[color] = {}
     end
     local guidToColor = _zoneHelper.zonesFromPositions(guidToPosition)
     for guid, color in pairs(guidToColor) do
         local name = guidToName[guid]
-        local entry = colorToResInfModifiers[color]
-        table.insert(entry, name)
+        addModifier(color, name)
     end
 
-    -- Apply alliances.
-    for color, allianceColor in pairs(colorToAlliance) do
-        local commander = colorToCommander[allianceColor]
-        if commander then
-            local entry = colorToResInfModifiers[color]
-            table.insert(entry, commander)
+    -- Apply alliances, imperia.
+    local colorToCommanders = _factionHelper.getColorToCommanders()
+    for color, commanders in pairs(colorToCommanders) do
+        for _, commander in ipairs(commanders) do
+            if _resInfModifiers[commander] then
+                addModifier(color, commander)
+            end
         end
     end
 

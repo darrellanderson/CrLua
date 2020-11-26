@@ -1,5 +1,6 @@
 --- Faction attributes.
 -- @author Darrell
+-- #include <~/CrLua/Objects/TI4_Helpers/TI4_FactionHelper>
 --
 -- Get faction tables with:
 -- - factionName string, matches a key in the faction attributes table.
@@ -654,6 +655,109 @@ function fromTokenName(tokenName)
         _maybeUpdateFactions()
         return _tokenNameToFaction[tokenName]
     end
+end
+
+--- Return map from player color to list of commander names.
+function getColorToCommanders()
+    local commanderNameSet = {}  -- some may still be face down!
+    local colorToFactionCommander = {}
+    local commandTokenNameToColor = {}
+    local allianceCardNameToColor = {}
+    local imperiaColorSet = false
+    for color, faction in pairs(allFactions()) do
+        if faction.commander then
+            commanderNameSet[faction.commander] = true
+            colorToFactionCommander[color] = faction.commander
+        end
+        commandTokenNameToColor[faction.tokenName .. ' Command Token'] = color
+        allianceCardNameToColor['Alliance (' .. color .. ')'] = color
+        for _, ability in ipairs(faction.abilities or {}) do
+            if ability == 'Imperia' then
+                imperiaColorSet = imperiaColorSet or {}
+                imperiaColorSet[color] = true
+            end
+        end
+    end
+
+    -- If not using imperia do not bother finding command tokens.
+    if not imperiaColorSet then
+        commandTokenNameToColor = {}
+    end
+
+    -- Find alliance cards and command tokens (for imperia).
+    local availableCommanderNameSet = {}
+    local guidToAllianceColor = {}
+    local guidToCommandTokenColor = {}
+    local guidToPosition = {}
+    local inHandGuidSet = _zoneHelper.inHand()
+    for _, object in ipairs(getAllObjects()) do
+        local guid = object.getGUID()
+        if not inHandGuidSet[guid] then
+            local name = object.getName()
+            if commanderNameSet[name] and (not object.is_face_down) then
+                availableCommanderNameSet[name] = true
+            end
+            local color = (object.tag == 'Card') and (not object.is_face_down) and allianceCardNameToColor[name]
+            if color then
+                guidToAllianceColor[guid] = color
+                guidToPosition[guid] = object.getPosition()
+            end
+            local color = commandTokenNameToColor[name]
+            if color then
+                guidToCommandTokenColor[guid] = color
+                guidToPosition[guid] = object.getPosition()
+            end
+        end
+    end
+    local guidToZoneColor = _zoneHelper.zonesFromPositions(guidToPosition)
+
+    local colorToCommanders = {}
+    local function addCommanderIfUnlocked(color, commander)
+        assert(type(color) == 'string' and type(commander) == 'string')
+        if not availableCommanderNameSet[commander] then
+            return  -- locked
+        end
+        local commanders = colorToCommanders[color]
+        if not commanders then
+            commanders = {}
+            colorToCommanders[color] = commanders
+        end
+        for _, entry in ipairs(commanders) do
+            if entry == commander then
+                return  -- already have this one
+            end
+        end
+        table.insert(commanders, commander)
+    end
+
+    -- Add native.
+    for color, commander in pairs(colorToFactionCommander) do
+        addCommanderIfUnlocked(color, commander)
+    end
+
+    -- Add alliances.
+    for guid, allianceColor in pairs(guidToAllianceColor) do
+        local zoneColor = guidToZoneColor[guid]
+        if zoneColor and (zoneColor ~= allianceColor) then
+            local commander = colorToFactionCommander[allianceColor]
+            if commander then
+                addCommanderIfUnlocked(zoneColor, commander)
+            end
+        end
+    end
+
+    -- Add Imperia.
+    for guid, commandTokenColor in pairs(guidToCommandTokenColor) do
+        local zoneColor = guidToZoneColor[guid]
+        if zoneColor and (zoneColor ~= commandTokenColor) and imperiaColorSet[zoneColor] then
+            local commander = colorToFactionCommander[commandTokenColor]
+            if commander then
+                addCommanderIfUnlocked(zoneColor, commander)
+            end
+        end
+    end
+
+    return colorToCommanders
 end
 
 -------------------------------------------------------------------------------

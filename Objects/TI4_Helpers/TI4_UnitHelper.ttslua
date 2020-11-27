@@ -62,25 +62,26 @@ local LEADER = {
 -- - capacity number.
 -- - cost number : cost per unit.
 -- - disablePlanetaryShield boolean.
--- - groundCombat {dice=#,hit=#,anyPlanet} table.
+-- - groundCombat {dice=#,hit=#,anyPlanet=boolean,requireGround=boolean} table.
 -- - move number.
 -- - name string : unit name when base unit is replaced (faction or unit upgrade).
 -- - override string : base unit type if this is a faction override.
 -- - planetaryShield boolean.
 -- - spaceCannon {dice=#,hit=#,range=#,extraDice=#} table.
--- - spaceCombat {dice=#,hit=#,extraHitsOn={count=#,value=#},diceAsCount=boolean}.
+-- - spaceCombat {dice=#,hit=#,extraHitsOn={count=#,value=#},diceAsCount=boolean,requireSpace=boolean}.
 -- - sustainDamage boolean.
 -- - unitLimit number : at most N units roll dice (Experimental Battlestation).
 -- - upgrade string : base unit type if this is a unit upgrade technology.
 --
--- The groundCombat.anyPlanet means unit participates in ground combat for any
--- planet in the system (e.g. Naalu fighters with the flagship).
+-- The groundCombat ".anyPlanet" means unit participates in ground combat for any
+-- planet in the system (e.g. Naalu fighters with the flagship).  ".requireGround"
+-- means the unit must be on a planet and not merely near one to count.
 --
--- The spaceCombat.extraHitsOn attribute is for expressing Jol-Nar's flagship,
+-- The spaceCombat ".extraHitsOn" attribute is for expressing Jol-Nar's flagship,
 -- which gets 2 additional hits on a 9 or 10, extraHitsOn={count=2,value=9}.
---
--- spaceCombat.diceAsCount is an awkward way for Winnu flagship to signal the
--- dice number is non-standard, and should override unit count for MultiRoller.
+-- ".diceAsCount" is an awkward way for Winnu flagship to signal the dice
+-- number is non-standard, and should override unit count for MultiRoller.
+-- ".requireSpace" means the unit must not be on a planet to count.
 --
 local _unitTypes = {
     ['Carrier'] = {
@@ -200,14 +201,14 @@ local _unitOverrides = {
     ["Y'sia Y'ssrila"] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 5 }, move = 2 },
     ['[0.0.1]'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 5 }, capacity = 5 },
         -- PoK flagships
-    ['Quetzecoatl'] = { override = 'Flagship', spaceCombat = {dice = 2, hit = 7 } },
-    ['The Terror Between'] = { override = 'Flagship', spaceCombat = {dice = 2, hit = 5 }, bombardment = {dice = 1, hit = 5, extraDice = 0 } },
-    ['Dynamo'] = { override = 'Flagship', spaceCombat = {dice = 2, hit = 5 } },
+    ['Quetzecoatl'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 7 } },
+    ['The Terror Between'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 5 }, bombardment = { dice = 1, hit = 5, extraDice = 0 } },
+    ['Dynamo'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 5 } },
     ['Arvicon Rex'] = { override = 'Flagship', spaceCombat = {dice = 2, hit = 5 } },
-    ['Visz El Vir'] = { override = 'Flagship', spaceCombat = {dice = 2, hit = 9 }, capacity = 4 },
+    ['Visz El Vir'] = { override = 'Flagship', spaceCombat = {  dice = 2, hit = 9 }, capacity = 4 },
     ['Memoria I'] = { override = 'Flagship', antiFighterBarrage = { dice = 3, hit = 8 }, spaceCombat = { dice = 2, hit = 7 } },
     ['Memoria II'] = { upgrade = 'Flagship', antiFighterBarrage = { dice = 3, hit = 5 }, spaceCombat = { dice = 2, hit = 5 }, capacity = 6 },
-    ['Ouranos'] = { override = 'Flagship', spaceCombat = {dice = 2, hit = 7 } },
+    ['Ouranos'] = { override = 'Flagship', spaceCombat = { dice = 2, hit = 7 } },
 
     -- PoK Mechs
     ['Letani Behemoth'] = { override = 'Mech', production = 2, planetaryShield = true },
@@ -223,7 +224,7 @@ local _unitOverrides = {
     ['Moll Terminus']  = { override = 'Mech' },
     ['Ember Colossus'] = { override = 'Mech' },
     ['Iconoclast'] = { override = 'Mech' },
-    ['Eidolon'] = { override = 'Mech', spaceCombat = {dice = 2, hit = 8 }, groundCombat = { dice = 2, hit = 6} },
+    ['Eidolon'] = { override = 'Mech', spaceCombat = {dice = 2, hit = 8, requireSpace = true }, groundCombat = { dice = 2, hit = 6, requireGround = true } },
     ['Mordred'] = { override = 'Mech' },
     ['Quantum Manipulator'] = { override = 'Mech' },
     ['Scavenger Zeta'] = { override = 'Mech' },
@@ -231,7 +232,7 @@ local _unitOverrides = {
     ['ZS Thunderbolt M2'] = { override = 'Mech' },
     ['Hecatoncheires'] = { override = 'Mech' },
     ['Reclaimer'] = { override = 'Mech' },
-    ['Indomitus'] = { override = 'Mech', spaceCannon = { dice = 1, hit = 8, range = 1} },
+    ['Indomitus'] = { override = 'Mech', spaceCannon = { dice = 1, hit = 8, range = 1 } },
     ["Moyin's Ashes"] = { override = 'Mech' },
     ['Blackshade Infiltrator'] = { override = 'Mech' },
 

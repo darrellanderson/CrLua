@@ -417,6 +417,14 @@ local _flagshipModifiers = {
     },
 }
 
+-- Attributes:
+-- - description: string
+-- - leader: optional LEADER.X value
+-- - owner: OWNER.X value
+-- - type: TYPE.X value
+-- - apply: function(unitAttrs, params)
+-- - allowFaceDown: optional boolean, if true detect even if face down
+-- - toggleActive: optional boolean, if true add "idle/active" button
 local _unitModifiers = {
     ['2Ram'] = {
         leader = LEADER.COMMANDER, -- L1Z1X
@@ -513,6 +521,34 @@ local _unitModifiers = {
             attr.spaceCannon = nil
         end
     },
+
+    -- Is this necessary?  Roller differentiates ground vs space so really only
+    -- sustain damage is relevant.  Let players manage this one.
+    -- ['Eidolon'] = {
+    --     description = 'Flip card to switch between ground/space',
+    --     allowFaceDown = true,
+    --     owner = OWNER.SELF,
+    --     type = TYPE.MUTATE,
+    --     apply = function(unitAttrs, params)
+    --         local zGrav = false
+    --         for _, object in ipairs(getAllObjects()) do
+    --             if object.tag == 'Card' and object.getName() == 'Eidolon' then
+    --                 local zoneColor = _zoneHelper.zoneFromPosition(object.getPosition())
+    --                 if zoneColor == params.myColor then
+    --                     zGrav = true
+    --                     break
+    --                 end
+    --             end
+    --         end
+    --         local attr = unitAttrs['Mech']
+    --         if zGrav then
+    --             attr.groundGombat = nil
+    --             attr.sustainDamage = nil
+    --         else
+    --             attr.spaceCombat = nil
+    --         end
+    --     end
+    -- },
 
     ['Experimental Battlestation'] = {
         description = 'One in or adjacent Space Dock gets SPACE CANNON 5x3',
@@ -1361,7 +1397,7 @@ function getColorToUnitModifiers()
         end
 
         -- Verify cards are face up.
-        if object.tag == 'Card' and object.is_face_down then
+        if object.tag == 'Card' and object.is_face_down and (not unitModifier.allowFaceDown) then
             return false
         end
 

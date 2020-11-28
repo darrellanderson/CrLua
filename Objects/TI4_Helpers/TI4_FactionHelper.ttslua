@@ -1128,17 +1128,18 @@ end
 
 -------------------------------------------------------------------------------
 
-local _purgeBagObject = nil
+local _purgeBagGuid = nil
 function getPurgeBag()
-    if _purgeBagObject then
-        return _purgeBagObject
+    local purgeBagObject = getObjectFromGUID(_purgeBagGuid)
+    if purgeBagObject then
+        return purgeBagObject
     end
 
     local purgeBagName = 'Purge Bag'
     for _, object in ipairs(getAllObjects()) do
         if object.tag == 'Bag' and string.match(object.getName(), '^' .. purgeBagName .. '$') then
-            _purgeBagObject = object
-            return _purgeBagObject
+            _purgeBagGuid = object.getGUID()
+            return object
         end
     end
 

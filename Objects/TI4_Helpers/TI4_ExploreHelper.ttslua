@@ -149,17 +149,18 @@ function explorePlanet(tileGUID, planetName)
     broadcastToAll('Exploring Planet: ' .. planetName)
 end
 
-local _frontierTokenBagObject = nil
+local _frontierTokenBagGuid = nil
 function getFrontierTokenBag()
-    if _frontierTokenBagObject then
-        return _frontierTokenBagObject
+    local frontierTokenBagObject = getObjectFromGUID(_frontierTokenBagGuid)
+    if frontierTokenBagObject then
+        return frontierTokenBagObject
     end
 
     local frontierTokenBagName = 'Frontier Tokens Bag'
     for _, object in ipairs(getAllObjects()) do
         if object.tag == 'Bag' and string.match(object.getName(), '^' .. frontierTokenBagName .. '$') then
-            _frontierTokenBagObject = object
-            return _frontierTokenBagObject
+            _frontierTokenBagGuid = object.getGUID()
+            return object
         end
     end
 

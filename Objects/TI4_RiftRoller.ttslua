@@ -277,10 +277,10 @@ function findGlobalPosWithLocalDirection(spawn_object, angle)
     local posY = oPos.y + heightOffset
     local posZ = oPos.z + math.cos( math.rad(angle+oRot.y) ) * distance
     return {x=posX, y=posY, z=posZ}
-    end
+end
 
-    --Gets a random rotation vector
-    function randomRotation()
+--Gets a random rotation vector
+function randomRotation()
     --Credit for this function goes to Revinor (forums)
     --Get 3 random numbers
     local u1 = math.random();

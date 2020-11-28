@@ -538,6 +538,18 @@ function systemFromPosition(position)
     end
 end
 
+-- Get systems at positions
+-- @param Map of arbitrary key to {xyz} position
+-- @return Map of same arbitrary key to system attributes or false
+function systemsFromPositions(keysToPositions)
+    local keysToSystems = {}
+    for key, position in pairs(keysToPositions) do
+        keysToSystems[key] = systemFromPosition(position) or false
+    end
+
+    return keysToSystems
+end
+
 --- Get system with the given tile number.
 -- @param tile (number).
 -- @return system table.
@@ -644,7 +656,9 @@ function wormholes(playerColor)
         ['Alpha Wormhole Token'] = { 'alpha' },
         ['Beta Wormhole Token'] = { 'beta' },
         ['Hil Colish'] = { 'delta' },
-        ['Gamma Wormhole Token'] = { 'gamma' },
+        ['Gamma Wormhole Token - Nexus Sovereignty'] = { 'gamma' },
+        ['Gamma Wormhole Token - Frontier'] = { 'gamma' },
+        ['Gamma Wormhole Token - Cultural'] = { 'gamma' },
     }
 
     for _, object in ipairs(getAllObjects()) do
@@ -666,7 +680,7 @@ function wormholes(playerColor)
                 end
             end
 
-            if name == 'Ion Storm Wormhole Token' then
+            if name == 'Ion Storm Token' then
                 local wormholeSide = 'alpha'
                 if object.is_face_down then
                     wormholeSide = 'beta'
@@ -1200,6 +1214,16 @@ function hexToPosition(hex)
     local x = (_M.f0 * q + _M.f1 * r) * _LAYOUT.size.x
     local z = (_M.f2 * q + _M.f3 * r) * _LAYOUT.size.z
     return { x = x + _LAYOUT.origin.x, y = 0, z = z + _LAYOUT.origin.z }
+end
+
+-- Bulk hexToPosition
+function hexesToPosition(guidToHex)
+    assert(type(guidToHex) == 'table')
+    local result = {}
+    for guid, hex in pairs(guidToHex) do
+        result[guid] = hexToPosition(hex)
+    end
+    return result
 end
 
 --- Get clockwise winding corners about a hex.

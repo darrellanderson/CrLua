@@ -884,6 +884,8 @@ function updateFactions()
 
     local flagshipSet = {}
     local abilitySet = {}
+    local commanderSet = {}
+    local heroSet = {}
     local guidToName = {}
     local guidToPosition = {}
     if _state.frankenEnabled then
@@ -891,6 +893,12 @@ function updateFactions()
             flagshipSet[faction.flagship] = true
             for _, ability in ipairs(faction.abilities) do
                 abilitySet[ability] = true
+            end
+            if faction.commander then
+                commanderSet[faction.commander] = true
+            end
+            if faction.hero then
+                heroSet[faction.hero] = true
             end
         end
     end
@@ -1016,7 +1024,7 @@ function updateFactions()
         end
     end
 
-    -- If franken is enabled, reset flagship and abilities based on franken tiles.
+    -- If franken is enabled, reset flagship, abilities, etc based on franken tiles.
     if _state.frankenEnabled then
         local guidToColor = _zoneHelper.zonesFromPositions(guidToPosition)
         for color, faction in pairs(_colorToFaction) do
@@ -1030,6 +1038,10 @@ function updateFactions()
                         faction.flagship = name
                     elseif abilitySet[name] then
                         table.insert(faction.abilities, name)
+                    elseif commanderSet[name] then
+                        faction.commander = name
+                    elseif heroSet[name] then
+                        faction.hero = name
                     end
                 end
             end

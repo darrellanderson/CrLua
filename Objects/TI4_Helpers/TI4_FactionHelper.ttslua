@@ -882,6 +882,7 @@ function updateFactions()
         factionLowerToFactionName[string.lower(factionName)] = factionName
     end
 
+    local frankenSet = {}
     local flagshipSet = {}
     local abilitySet = {}
     local commanderSet = {}
@@ -890,14 +891,18 @@ function updateFactions()
     local guidToPosition = {}
     if _state.frankenEnabled then
         for _, faction in pairs(_factionAttributes) do
+            frankenSet[faction.flagship] = true
             flagshipSet[faction.flagship] = true
             for _, ability in ipairs(faction.abilities) do
+                frankenSet[ability] = true
                 abilitySet[ability] = true
             end
             if faction.commander then
+                frankenSet[faction.commander] = true
                 commanderSet[faction.commander] = true
             end
             if faction.hero then
+                frankenSet[faction.hero] = true
                 heroSet[faction.hero] = true
             end
         end
@@ -928,7 +933,7 @@ function updateFactions()
             factionSheetGuidToFactionName[guid] = factionName
         end
 
-        if _state.frankenEnabled and object.tag == 'Tile' and (flagshipSet[name] or abilitySet[name]) then
+        if _state.frankenEnabled and object.tag == 'Tile' and frankenSet[name] then
             guidToName[guid] = name
             guidToPosition[guid] = object.getPosition()
         end

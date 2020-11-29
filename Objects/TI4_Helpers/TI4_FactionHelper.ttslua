@@ -1223,6 +1223,8 @@ function reportFactions()
                 'flagship={' .. (faction.flagship or '-') .. '}',
                 'abilities={' .. table.concat(faction.abilities or {}, ', ') .. '}',
                 'units={' .. table.concat(faction.units or {}, ', ') .. '}',
+                'commander={' .. (faction.commander or '-') .. '}',
+                'hero={' .. (faction.hero or '-') .. '}',
             }, ' '))
         end
     end

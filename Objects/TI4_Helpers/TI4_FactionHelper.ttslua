@@ -887,8 +887,6 @@ function updateFactions()
     local abilitySet = {}
     local commanderSet = {}
     local heroSet = {}
-    local guidToName = {}
-    local guidToPosition = {}
     if _state.frankenEnabled then
         for _, faction in pairs(_factionAttributes) do
             frankenSet[faction.flagship] = true
@@ -912,8 +910,13 @@ function updateFactions()
     -- faction name), and command token bags (indexed by "token faction" name,
     -- which may differ slightly from the faction sheet faction name).
     local colorToCommandSheet = {}
+    local colorToLeaderSheet = {}
     local factionSheetGuidToFactionSheet = {}
     local factionSheetGuidToFactionName = {}
+    local guidToName = {}
+    local guidToPosition = {}
+    local commanderGuidToPosition = {}
+    local heroGuidToPosition = {}
     for _, object in ipairs(getAllObjects()) do
         local name = object.getName()
         local guid = object.getGUID()
@@ -922,6 +925,12 @@ function updateFactions()
         local color = string.match(name, '^Command Sheet %((%a+)%)$')
         if color then
             colorToCommandSheet[color] = object
+        end
+
+        -- "Leader Sheet (COLOR)"
+        local color = string.match(name, '^Leader Sheet %((%a+)%)$')
+        if color then
+            colorToLeaderSheet[color] = object
         end
 
         -- "FACTION Sheet" (only accept if FACTION in whitelist!)
@@ -933,9 +942,18 @@ function updateFactions()
             factionSheetGuidToFactionName[guid] = factionName
         end
 
-        if _state.frankenEnabled and object.tag == 'Tile' and frankenSet[name] then
-            guidToName[guid] = name
-            guidToPosition[guid] = object.getPosition()
+        -- Pick up any Franken abilities.
+        if _state.frankenEnabled then
+            if object.tag == 'Tile' and frankenSet[name] then
+                guidToName[guid] = name
+                guidToPosition[guid] = object.getPosition()
+            end
+            if (object.tag == 'Tile' or object.tag == 'Card') and commanderSet[name] then
+                commanderGuidToPosition[guid] = object.getPosition()
+            end
+            if (object.tag == 'Tile' or object.tag == 'Card') and heroSet[name] then
+                heroGuidToPosition[guid] = object.getPosition()
+            end
         end
     end
 
@@ -1031,6 +1049,25 @@ function updateFactions()
 
     -- If franken is enabled, reset flagship, abilities, etc based on franken tiles.
     if _state.frankenEnabled then
+        local function getLeader(color, guidToPosition)
+            local leaderSheet = colorToLeaderSheet[color]
+            if not leaderSheet then
+                return nil
+            end
+            local p0 = leaderSheet.getPosition()
+            local best = nil
+            local bestDSq = false
+            for guid, p1 in ipairs(guidToPosition) do
+                local p1 = object.getPosition()
+                local dSq = (p0.x - p1.x) ^ 2 + (p0.z - p1.z) ^ 2
+                if (not bestDSq) or dSq < bestDSq then
+                    best = guid
+                    bestDSq = dSq
+                end
+            end
+            local leaderObject = getObjectFromGUID(best)
+            return leaderObject and leaderObject.getName() or nil
+        end
         local guidToColor = _zoneHelper.zonesFromPositions(guidToPosition)
         for color, faction in pairs(_colorToFaction) do
             faction.flagship = '?'
@@ -1043,13 +1080,12 @@ function updateFactions()
                         faction.flagship = name
                     elseif abilitySet[name] then
                         table.insert(faction.abilities, name)
-                    elseif commanderSet[name] then
-                        faction.commander = name
-                    elseif heroSet[name] then
-                        faction.hero = name
                     end
                 end
             end
+            -- Leaders.
+            faction.commander = getLeader(color, commanderGuidToPosition)
+            faction.hero = getLeader(color, heroGuidToPosition)
         end
     end
 end

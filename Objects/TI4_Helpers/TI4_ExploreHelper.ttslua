@@ -149,6 +149,24 @@ function explorePlanet(tileGUID, planetName)
     broadcastToAll('Exploring Planet: ' .. planetName)
 end
 
+local _frontierTokenBagGuid = nil
+function getFrontierTokenBag()
+    local frontierTokenBagObject = getObjectFromGUID(_frontierTokenBagGuid)
+    if frontierTokenBagObject then
+        return frontierTokenBagObject
+    end
+
+    local frontierTokenBagName = 'Frontier Tokens Bag'
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Bag' and string.match(object.getName(), '^' .. frontierTokenBagName .. '$') then
+            _frontierTokenBagGuid = object.getGUID()
+            return object
+        end
+    end
+
+    assert(false, 'Unable to locate bag with name "' .. frontierTokenBagName .. '"')
+end
+
 function exploreFrontier(token)
     local tokenPos = token.getPosition()
     local tokenRot = token.getRotation()
@@ -165,8 +183,11 @@ function exploreFrontier(token)
         frontierDeck.setPosition({tokenPos.x, tokenPos.y + 1, tokenPos.z})
         frontierDeck.setRotation({tokenRot.x, tokenRot.y, 0})
     end
+
+    local frontierTokenBag = assert(getFrontierTokenBag())
+    frontierTokenBag.putObject(token)
+
     broadcastToAll('Exploring Frontier Token')
-    token.destruct()
 end
 
 function checkCardForToken(object_spawned, tileGUID, planetName)
@@ -209,4 +230,93 @@ end
 
 function isFrontierToken(object)
     return object.tag == 'Generic' and object.getName() == 'Frontier Token'
+end
+
+function getAllFrontierTokens()
+    local frontierTokens = {}
+
+    for _, object in ipairs(getAllObjects()) do
+        if isFrontierToken(object) then
+            table.insert(frontierTokens, object)
+        end
+    end
+
+    return frontierTokens
+end
+
+-------------------------------------------------------------------------------
+
+-- Default position is slightly right of center
+local DEFAULT_FRONTIER_TOKEN_POSITION = { x = -1, y = 0, z = 0 }
+
+function systemShouldGetFrontierToken(system)
+    if system.planets and #system.planets > 0 then
+        return false
+    end
+    if system.hyperlane == true then
+        return false
+    end
+
+    return true
+end
+
+function _placeFrontierTokensCoroutine()
+    local frontierTokenBag = assert(getFrontierTokenBag())
+
+    local guidToSystem = _systemHelper.systems()
+    local emptySystemGuidToTokenPositions = {}
+    local emptySystemGuidToPosition = {}
+    local frontierTokenObjectsToPosition = {}
+    for _, object in ipairs(getAllObjects()) do
+        local system = guidToSystem[object.getGUID()]
+        -- Collect all system tiles that are 'empty', along with the position a frontier token would go
+        if system and systemShouldGetFrontierToken(system) then
+            local tokenPosition = object.positionToWorld(DEFAULT_FRONTIER_TOKEN_POSITION)
+            emptySystemGuidToPosition[object.getGUID()] = object.getPosition()
+            emptySystemGuidToTokenPositions[object.getGUID()] = tokenPosition
+        -- Collect all current frontier token positions
+        elseif isFrontierToken(object) then
+            frontierTokenObjectsToPosition[object.getGUID()] = object.getPosition()
+        end
+    end
+    coroutine.yield(0)
+
+    -- Find set of hex coordinates containing frontier tokens
+    local frontierTokenGuidToHex = _systemHelper.hexesFromPositions(frontierTokenObjectsToPosition)
+    local hexesWithFrontierTokens = {}
+    for _, hex in pairs(frontierTokenGuidToHex) do
+        hexesWithFrontierTokens[hex] = true
+    end
+
+    -- Empty systems to hex coordinates
+    local emptySystemGuidToHex = _systemHelper.hexesFromPositions(emptySystemGuidToPosition)
+
+    -- For each empty system, if it's hex coordinate doesn't have a frontier token then place a new one.
+    for systemGuid, tokenPosition in pairs(emptySystemGuidToTokenPositions) do
+        if emptySystemGuidToHex[systemGuid] and not hexesWithFrontierTokens[emptySystemGuidToHex[systemGuid]] then
+            frontierTokenBag.takeObject({
+                position = { x = tokenPosition.x, y = tokenPosition.y + 3, z = tokenPosition.z },
+                smooth   = true,
+            })
+
+            coroutine.yield(0)
+        end
+    end
+
+    return 1
+end
+
+function placeFrontierTokens()
+    startLuaCoroutine(self, '_placeFrontierTokensCoroutine')
+end
+
+function retrieveFrontierTokens()
+    local frontierTokenBag = assert(getFrontierTokenBag())
+
+    -- Grab all frontier tokens, from everywhere.
+    for _, object in ipairs(getAllObjects()) do
+        if isFrontierToken(object) then
+            frontierTokenBag.putObject(object)
+        end
+    end
 end

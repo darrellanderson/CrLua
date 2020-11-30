@@ -459,13 +459,20 @@ end
 
 -------------------------------------------------------------------------------
 
-function _returnCommandTokens()
+function _returnCommandTokens(factionTokenName)
+    assert(not factionTokenName or type(factionTokenName) == 'string')
+
     -- Precompute names for straight string equality checks.
     local tokenNameSet = {}
     local bagNameSet = {}
-    for _, faction in pairs(_factionHelper.allFactions()) do
-        tokenNameSet[faction.tokenName .. ' Command Token'] = true
-        bagNameSet[faction.tokenName .. ' Command Tokens Bag'] = true
+    if factionTokenName then
+        tokenNameSet[factionTokenName .. ' Command Token'] = true
+        bagNameSet[factionTokenName .. ' Command Tokens Bag'] = true
+    else
+        for _, faction in pairs(_factionHelper.allFactions()) do
+            tokenNameSet[faction.tokenName .. ' Command Token'] = true
+            bagNameSet[faction.tokenName .. ' Command Tokens Bag'] = true
+        end
     end
 
     local zoneExceptionObjectNameSet = {
@@ -518,12 +525,14 @@ function _returnCommandTokens()
     end
 
     -- Put tokens.
+    local putCount = 0
     for _, commandToken in ipairs(commandTokens) do
         local guid = commandToken.getGUID()
         local bag = tokenNameToBag[commandToken.getName()]
         if shouldPut(commandToken) and bag then
             _putTokenGuidSet[guid] = true
             bag.putObject(commandToken)
+            putCount = putCount + 1
         end
         coroutine.yield(0)
     end
@@ -540,7 +549,11 @@ function _returnCommandTokens()
     end
     _putTokenGuidSet = {}
 
-    broadcastToAll('Returned Command Tokens.')
+    if factionTokenName then
+        broadcastToAll('Returned ' .. putCount .. 'x ' .. factionTokenName .. ' Command Tokens.')
+    else
+        broadcastToAll('Returned Command Tokens.')
+    end
 end
 
 -------------------------------------------------------------------------------
@@ -839,6 +852,24 @@ end
 
 function endStatusPhase()
     startLuaCoroutine(self, '_endStatusPhaseCoroutine')
+end
+
+local _returnCommandTokensFactionQueue = {}
+
+function _returnCommandTokensForFactionCoroutine()
+    local factionTokenName = assert(table.remove(_returnCommandTokensFactionQueue))
+
+    _returnCommandTokens(factionTokenName)
+    coroutine.yield(0)
+
+    return 1
+end
+
+function returnCommandTokensForFaction(factionTokenName)
+    assert(type(factionTokenName) == 'string')
+
+    table.insert(_returnCommandTokensFactionQueue, factionTokenName)
+    startLuaCoroutine(self, '_returnCommandTokensForFactionCoroutine')
 end
 
 -------------------------------------------------------------------------------

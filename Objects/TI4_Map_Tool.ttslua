@@ -41,6 +41,7 @@ end
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 local _deckHelper = getHelperClient('TI4_DECK_HELPER')
+local _exploreHelper = getHelperClient('TI4_EXPLORE_HELPER')
 
 local INPUT_LABEL_MAP_STRING = "Enter map string or press 'save' to save the current map"
 local SLICE_DATALABEL_NAME = "slice_data_label"
@@ -224,6 +225,15 @@ function createInputs()
         width          = buttonWidthMajor,
         height         = buttonHeightMajor,
         font_size      = fontSizeMajor,
+    })
+    self.createButton({
+        click_function = 'onButtonPlaceFrontier',
+        function_owner = self,
+        label          = 'Place\nFrontier Tokens',
+        position       = {x=majorX, y=buttonY, z=0.33},
+        width          = buttonWidthMajor,
+        height         = buttonHeightMajor,
+        font_size      = fontSizeMinor,
     })
     self.createButton({
         click_function = 'onButtonDrawLines',
@@ -686,7 +696,7 @@ function placeCardsCoroutine()
                 coroutine.yield(0)
             end
         else
-            broadcastToAll('Missing card for "' .. planet.name .. '"', 'Red')
+            broadcastToAll('Missing card for "' .. planetName .. '"', 'Red')
         end
     end
 
@@ -786,6 +796,9 @@ function returnCardsCoroutine()
         end
         coroutine.yield(0)
     end
+
+    _exploreHelper.retrieveFrontierTokens()
+    
     return 1
 end
 
@@ -1092,6 +1105,10 @@ function getSystemPositionsStartingAtOriginIterator(dy)
     local origin = { x = 0, y = getTableY() + (dy or 0), z = 0 }
     local rotation = { x = 0, y = 0, z = 0 }
     return spiral_hex_iterator(origin, rotation)
+end
+
+function onButtonPlaceFrontier()
+    _exploreHelper.placeFrontierTokens()
 end
 
 -------------------------------------------------------------------------------

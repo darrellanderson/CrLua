@@ -32,6 +32,10 @@ function getHelperClient(helperObjectName)
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
+local _strategyCardHelper = getHelperClient('TI4_STRATEGY_CARD_HELPER')
+local _exploreHelper = getHelperClient('TI4_EXPLORE_HELPER')
+local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
+local _unitHelper = getHelperClient('TI4_UNIT_HELPER')
 
 -- Per-faction attributes.  This helper will also add the following fields:
 -- - color (string) or nil if not in use.
@@ -50,7 +54,7 @@ local _factionAttributes = {
         abilities = { 'Mitosis' },
         units = { 'Letani Warrior I', 'Letani Warrior II', 'Letani Behemoth' },
         commander = 'Dirzuga Rophal',
-        hero = 'Letania Miasmiala'
+        hero = 'Letani Miasmiala'
     },
 
     ['The Barony Of Letnev'] = {
@@ -1175,6 +1179,791 @@ function tintTokens(params)
     end
 end
 
+-------------------------------------------------------------------------------
+
+local _animatingGuids = {}
+function onObjectPickUp(_, pickedUpObject)
+    assert(type(pickedUpObject) == 'userdata')
+
+    _animatingGuids[pickedUpObject.getGUID()] = nil
+end
+
+function onObjectDestroy(dyingObject)
+    _animatingGuids[dyingObject.getGUID()] = nil
+end
+
+
+local _purgeBagGuid = nil
+function getPurgeBag()
+    local purgeBagObject = getObjectFromGUID(_purgeBagGuid)
+    if purgeBagObject then
+        return purgeBagObject
+    end
+
+    local purgeBagName = 'Purge Bag'
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Bag' and string.match(object.getName(), '^' .. purgeBagName .. '$') then
+            _purgeBagGuid = object.getGUID()
+            return object
+        end
+    end
+
+    assert(false, 'Unable to locate bag with name "' .. purgeBagName .. '"')
+end
+
+local _factionCardNameToAbilityFunc = false
+local _purgeCardQueue = {}
+
+function purgeCard(cardObject)
+    assert(cardObject.tag == 'Card')
+
+    local inHandGuidSet = _zoneHelper.inHand()
+    assert(not inHandGuidSet[cardObject.getGUID()], 'Cannot purge cards that are in a player\'s hand.')
+
+    local purgeBagObject = assert(getPurgeBag())
+
+    --TODO: Maybe deck related stuff? Object deletion checks? Card locked stuff?
+
+    purgeBagObject.putObject(cardObject)
+    broadcastToAll('PURGING card \'' .. cardObject.getName() .. '\'')
+end
+
+local function _heroCardCanBeUsed(cardObject, usingColor)
+    if cardObject.tag ~= 'Card' then
+        print('Cannot use ' .. cardObject.getName() .. '. Hero abilities can only be used from cards.')
+        return false
+    end
+
+    if cardObject.is_face_down then
+        print('Cannot use ' .. cardObject.getName() .. '. Card is facedown; did you unlock it?')
+        return false
+    end
+
+    local inHandGuidSet = _zoneHelper.inHand()
+    if inHandGuidSet[cardObject.getGUID()] then
+        print('Cannot use ' .. cardObject.getName() .. '. Hero cards cannot be used while in your hand.')
+        return false
+    end
+
+    local factionColor = false
+    for color, faction in pairs(allFactions(false)) do
+        if faction.hero == cardObject.getName() then
+            factionColor = color
+            break
+        end
+    end
+    if not factionColor then
+        print('Cannot use ' .. cardObject.getName() .. '. No seated faction has this Hero.')
+        return false
+    end
+
+    if factionColor ~= usingColor and usingColor ~= 'Black' then
+        print('Cannot use ' .. cardObject.getName() .. '. ' .. usingColor .. ' cannot use ' .. factionColor .. '\'s Hero card.')
+        return false
+    end
+
+    -- Any other technical conditions that would prevent us from purging the card or executing the ability?
+    -- Any other gameplay situations that should prevent the Hero card from being used?
+
+    return true
+end
+
+local function _purgeHeroCard(owningObject, clickingColor)
+    if not _heroCardCanBeUsed(owningObject, clickingColor) then
+        -- Function will print why card cannot be used
+        return
+    end
+
+    purgeCard(owningObject)
+end
+
+-- Hero
+-- Faction: Federation of Sol
+-- Card Name: Jace X, 4th Air Legion
+-- Ability Name: Helio Command Array
+-- Ability Text:
+-- ACTION: Remove each of your command tokens from the game board
+-- and return them to your reinforcements. Then, purge this card.
+local function _jacexHeroAbility(owningObject, clickingColor)
+    if not _heroCardCanBeUsed(owningObject, clickingColor) then
+        -- Function will print why card cannot be used
+        return
+    end
+
+    local factionTokenName = false
+    for _, faction in pairs(allFactions(false)) do
+        if faction.hero == owningObject.getName() then
+            factionTokenName = faction.tokenName
+            break
+        end
+    end
+
+    assert(factionTokenName, 'Trying to invoke Jace X Hero Ability, but no faction with "Jace X, 4th Air Legion" is at the table.')
+
+    _strategyCardHelper.returnCommandTokensForFaction(factionTokenName)
+
+    if owningObject.tag == 'Card' then
+        purgeCard(owningObject)
+    end
+end
+
+local _procynHeroAbilityOwningObjectQueue = {}
+function _procynHeroAbilityCoroutine()
+    local owningObject = assert(table.remove(_procynHeroAbilityOwningObjectQueue))
+
+    -- Purge card before any wait loops
+    if owningObject.tag == 'Card' then
+        purgeCard(owningObject)
+    end
+
+    -- Place frontier tokens on systems that need one
+    _exploreHelper.placeFrontierTokens()
+
+    -- Wait for frontier tokens to land before exploring them.
+    local waitUntil = Time.time + 3
+    while Time.time < waitUntil do
+        coroutine.yield(0)
+    end
+
+    --Find faction owning this hero ability (and it's color)
+    local factionTokenName = false
+    local factionColor = false
+    for color, faction in pairs(allFactions(false)) do
+        if faction.hero == owningObject.getName() then
+            factionTokenName = faction.tokenName
+            factionColor = color
+            break
+        end
+    end
+    assert(factionTokenName and factionColor, 'Multiverse Shift: Placed Frontier Tokens, but cannot explore them with missing owning faction.')
+
+    --Map frontier tokens to system they're sitting on
+    local frontierTokens = _exploreHelper.getAllFrontierTokens()
+    local frontierTokenGuidToPosition = {}
+    for _, token in ipairs(frontierTokens) do
+        frontierTokenGuidToPosition[token.getGUID()] = token.getPosition()
+    end
+    coroutine.yield(0)
+
+    local frontierTokenGuidToSystem = _systemHelper.systemsFromPositions(frontierTokenGuidToPosition)
+    coroutine.yield(0)
+
+    --Find all units
+    local allUnits = _unitHelper.getUnits()
+    coroutine.yield(0)
+
+    --Filter down to owning faction ships
+    --NOTE: Can skip units lacking faction/color; they'll be alongside other units.
+    local factionShipToPosition = {}
+    for _, unit in ipairs(allUnits) do
+        if unit.unitType ~= 'Infantry' and unit.unitType ~= 'Mech' and unit.unitType ~= 'Space Dock' and unit.unitType ~= 'PDS' then --ships only
+            if (unit.factionTokenName and unit.factionTokenName == factionTokenName) or (unit.color and unit.color == factionColor) then
+                factionShipToPosition[unit.guid] = unit.position
+            end
+        end
+    end
+
+    --Find each system containing owning faction ship
+    local shipToSystem = _systemHelper.systemsFromPositions(factionShipToPosition)
+    local systemsWithFactionShipsSet = {}
+    for ship, system in pairs(shipToSystem) do
+        if system then
+            systemsWithFactionShipsSet[system.guid] = true
+        end
+    end
+    coroutine.yield(0)
+
+    --For each system containing a frontier token AND owning faction ship, highlight the system tile
+    local explorableTokenGuidToSystemGuid = {}
+    local systemsToExplore = false
+    for tokenGuid, system in pairs(frontierTokenGuidToSystem) do
+        if system and systemsWithFactionShipsSet[system.guid] then
+            explorableTokenGuidToSystemGuid[tokenGuid] = system.guid
+            systemsToExplore = true
+
+            -- Blinking system tiles are tied to the frontier token, NOT the system tile object.
+            _animatingGuids[tokenGuid] = true
+        end
+    end
+
+    -- While there are still systems to explore, blink those system tiles with the player color (2 minute timeout)
+    local timeout = Time.time + 120
+    while Time.time < timeout and systemsToExplore do
+        systemsToExplore = false
+        for tokenGuid, systemGuid in pairs(explorableTokenGuidToSystemGuid) do
+            -- See if token is still on table
+            local systemObject = getObjectFromGUID(systemGuid)
+            if systemObject and _animatingGuids[tokenGuid] and getObjectFromGUID(tokenGuid) then
+                systemObject.highlightOn(factionColor, 1)
+                systemsToExplore = true
+            elseif not systemObject or not getObjectFromGUID(tokenGuid) then
+                _animatingGuids[tokenGuid] = nil
+            end
+        end
+
+        -- Wait 2 seconds before repeating (1 sec on, 1 sec off)
+        local blinkWait = Time.time + 2
+        while Time.time < blinkWait do
+            coroutine.yield(0)
+        end
+    end
+
+    -- Ensure we're not tracking frontier tokens anymore
+    for tokenGuid, _ in pairs(explorableTokenGuidToSystemGuid) do
+        _animatingGuids[tokenGuid] = nil
+    end
+
+    return 1
+end
+
+-- Hero
+-- Faction: The Empyrean
+-- Card Name: Conservator Procyon
+-- Ability Name: Multiverse Shift
+-- Ability Text:
+-- ACTION: Place 1 frontier token in each system that does not contain any
+-- planets and does not already have a frontier token. Then, explore each
+-- frontier token that is in a system that contains 1 or more of your ships.
+-- Then, purge this card.
+local function _procynHeroAbility(owningObject, clickingColor) --Empyrean Hero
+    if not _heroCardCanBeUsed(owningObject, clickingColor) then
+        -- Function will print why card cannot be used
+        return
+    end
+
+    table.insert(_procynHeroAbilityOwningObjectQueue, owningObject)
+    startLuaCoroutine(self, '_procynHeroAbilityCoroutine')
+end
+
+local _carrionHeroAbilityOwningObjectQueue = {}
+local _diceToBeRolled = {}
+function _carrionHeroAbilityCoroutine()
+    local owningObject = assert(table.remove(_carrionHeroAbilityOwningObjectQueue))
+    if #_diceToBeRolled > 0 then
+        print('Remove previously devoured ships before re-using Dimensional Anchor.')
+        return 1
+    end
+    
+    --Find faction owning this hero ability (and it's color)
+    local factionTokenName = false
+    local factionColor = false
+    for color, faction in pairs(allFactions(false)) do
+        if faction.hero == owningObject.getName() then
+            factionTokenName = faction.tokenName
+            factionColor = color
+            break
+        end
+    end
+    assert(factionTokenName and factionColor, 'Dimensional Anchor: Trying to invoke Hero Ability, but no faction with "It Feeds on Carrion" is at the table.')
+
+    --Find each dimensional tear token
+    local dimensionalTearName = "Vuil'raith Cabal Gravity Rift Token"
+    local dimTokenToPosition = {}
+    local anyDimensionalTears = false
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Tile' and string.match(object.getName(), '^' .. dimensionalTearName .. '$') then
+            dimTokenToPosition[object.getGUID()] = object.getPosition()
+            anyDimensionalTears = true
+        end
+    end
+    coroutine.yield(0)
+
+    if not anyDimensionalTears then
+        print('Dimensional Anchor: No Dimensional Tear tokens found on the table. Won\'t use Hero Ability.')
+        return 1
+    end
+
+    --Find hex those tokens are on
+    local dimensionalTearToHex = _systemHelper.hexesFromPositions(dimTokenToPosition)
+
+    --Find set of hexes adjacent to above (including wormholes)
+    local hexToNeighboringHexes = {}
+    for _, hex in pairs(dimensionalTearToHex) do
+        local directlyAdjacentHexes = _systemHelper.hexNeighbors(hex)
+        local wormholeAdjacentHexes = _systemHelper.hexAdjacentWormholes({hex = hex, playerColor = factionColor})
+
+        local neighboringHexSet = {}
+        for _, adjHex in ipairs(directlyAdjacentHexes) do
+            neighboringHexSet[adjHex] = true
+        end
+        for _, adjHex in ipairs(wormholeAdjacentHexes) do
+            neighboringHexSet[adjHex] = true
+        end
+
+        local neighboringHexes = {}
+        for adjHex, _ in pairs(neighboringHexSet) do
+            table.insert(neighboringHexes, adjHex)
+        end
+
+        hexToNeighboringHexes[hex] = neighboringHexes
+
+        coroutine.yield(0)
+    end
+
+    -- Get map of hex to system tile. Used to confirm a hex is actually placed on the table.
+    -- (neighboring hexes can be computed from math, regardless of the presence of a system tile)
+    local allHexesAsMap = {}
+    for _, hex in pairs(dimensionalTearToHex) do
+        allHexesAsMap[hex] = hex
+        for _, adjHex in ipairs(hexToNeighboringHexes[hex]) do
+            allHexesAsMap[adjHex] = adjHex
+        end
+    end
+
+    local allHexesToPosition = _systemHelper.hexesToPosition(allHexesAsMap)
+    local allHexesToSystemTiles = _systemHelper.systemsFromPositions(allHexesToPosition)
+    coroutine.yield(0)
+
+    --Find all units on those hexes
+    local opponentShipToHex = {}
+    local unitByGuid = {}
+    local allUnits = _unitHelper.getUnits()
+    for _, unit in ipairs(allUnits) do
+        if unit.unitType ~= 'Infantry' and unit.unitType ~= 'Mech' and unit.unitType ~= 'Fighter' and unit.unitType ~= 'Space Dock' and unit.unitType ~= 'PDS' then --non-fighter ships only
+            if (unit.factionTokenName and unit.factionTokenName ~= factionTokenName) or (unit.color and unit.color ~= factionColor) then
+                opponentShipToHex[unit.guid] = unit.hex
+                unitByGuid[unit.guid] = unit
+            end
+        end
+    end
+
+    local anchoredShipsCount = 0
+    local systemToAnchoredShips = {}
+    for shipGuid, hex in pairs(opponentShipToHex) do
+        local system = allHexesToSystemTiles[hex]
+        if system then
+            local systemShips = systemToAnchoredShips[system]
+            if not systemShips then
+                systemShips = {}
+                systemToAnchoredShips[system] = systemShips
+            end
+
+            table.insert(systemShips, shipGuid)
+            anchoredShipsCount = anchoredShipsCount + 1
+        end
+    end
+
+    if anchoredShipsCount == 0 then
+        print('Dimensional Anchor: No non-fighter ships adjacent to Dimensional Tear systems. Won\'t use Hero Ability.')
+        return 1
+    end
+
+    -- Safe to commit to acting at this point, so purge the Hero card.
+    if owningObject.tag == 'Card' then
+        purgeCard(owningObject)
+    end
+
+    -- Function spawns dice for each ship, sets a dice cleanup on a 2 minute timeout,
+    -- and prints a guide for the dice color for auditability.
+    local function _prepareDice(systemToAnchoredShips)
+        -- Data and methods for dice handling copied from multiroller.
+
+        local dieType = "Die_10"
+        local removalDelay = 5
+        local radialOffset = 1.2
+        local heightOffset = 5
+        local dieSize = 1
+
+        --Finds a position, rotated around the Y axis, using distance you want + angle
+        --oPos is object pos, oRot=object rotation, distance = how far, angle = angle in degrees
+        local function _findGlobalPosWithLocalDirection(spawn_object, angle)
+            local object, distance = spawn_object, radialOffset * self.getScale().x
+            local oPos, oRot = object.getPosition(), object.getRotation()
+            local posX = oPos.x + math.sin( math.rad(angle+oRot.y) ) * distance
+            local posY = oPos.y + heightOffset
+            local posZ = oPos.z + math.cos( math.rad(angle+oRot.y) ) * distance
+            return {x=posX, y=posY, z=posZ}
+        end
+
+        --Gets a random rotation vector
+        local function _randomRotation()
+            --Credit for this function goes to Revinor (forums)
+            --Get 3 random numbers
+            local u1 = math.random();
+            local u2 = math.random();
+            local u3 = math.random();
+            --Convert them into quats to avoid gimbal lock
+            local u1sqrt = math.sqrt(u1);
+            local u1m1sqrt = math.sqrt(1-u1);
+            local qx = u1m1sqrt *math.sin(2*math.pi*u2);
+            local qy = u1m1sqrt *math.cos(2*math.pi*u2);
+            local qz = u1sqrt *math.sin(2*math.pi*u3);
+            local qw = u1sqrt *math.cos(2*math.pi*u3);
+            --Apply rotation
+            local ysqr = qy * qy;
+            local t0 = -2.0 * (ysqr + qz * qz) + 1.0;
+            local t1 = 2.0 * (qx * qy - qw * qz);
+            local t2 = -2.0 * (qx * qz + qw * qy);
+            local t3 = 2.0 * (qy * qz - qw * qx);
+            local t4 = -2.0 * (qx * qx + ysqr) + 1.0;
+            --Correct
+            if t2 > 1.0 then t2 = 1.0 end
+            if t2 < -1.0 then ts = -1.0 end
+            --Convert back to X/Y/Z
+            local xr = math.asin(t2);
+            local yr = math.atan2(t3, t4);
+            local zr = math.atan2(t1, t0);
+            --Return result
+            return {math.deg(xr),math.deg(yr),math.deg(zr)}
+        end
+
+        -- Use different color dice for manual auditability; copy from Multiroller
+        local unitTypeToDiceColor = {
+            ["Dreadnought"] = "Purple",
+            ["Flagship"] = "Black",
+            ["Destroyer"] = "Red",
+            ["War Sun"] = "Orange",
+            ["Carrier"] = "Blue",
+            ["Fighter"] = "Teal",
+            ["Infantry"] = "Green",
+            ["Cruiser"] = "Brown",
+            ["PDS"] = "Orange",
+            ["Space Dock"] = "Yellow",
+            ["Mech"] = "Pink"
+        }
+        
+        local diceToShip = {}
+        local unitTypesUsed = {}
+        _diceToBeRolled = {}
+
+        -- Spawn a die for each ship, around the system tile the ship is on.
+        for system, ships in pairs(systemToAnchoredShips) do
+            local shipCount = #ships
+            local angleStep = (360 / shipCount)
+
+            local systemObject = getObjectFromGUID(system.guid)
+
+            for i, ship in ipairs(ships) do
+                local shipAttrs = unitByGuid[ship]
+
+                local dieObject = spawnObject({
+                    type=dieType,
+                    position = _findGlobalPosWithLocalDirection(systemObject, angleStep*(i-1)),
+                    rotation = _randomRotation(), scale={dieSize,dieSize,dieSize},
+                    callback_function = function(obj) --GUID is not available right away
+                        diceToShip[obj.getGUID()] = ship
+                        table.insert(_diceToBeRolled, obj.getGUID())
+                     end,
+                })
+                dieObject.setLock(true)
+                dieObject.setColorTint(stringColorToRGB(unitTypeToDiceColor[shipAttrs.unitType]))
+
+                unitTypesUsed[shipAttrs.unitType] = true
+            end
+        end
+
+        -- Print guide showing the dice color for each ship.
+        print('DICE COLOR GUIDE')
+        for unitType, color in pairs(unitTypeToDiceColor) do
+            if unitTypesUsed[unitType] then
+                print('* ' .. unitType .. ': ' .. color)
+            end
+        end
+
+        -- Remove dice from board no matter what after 2 minutes
+        local function destroyDice()
+            for _, die in ipairs(_diceToBeRolled) do
+                local dieObject = getObjectFromGUID(die)
+                if dieObject then
+                    destroyObject(dieObject)
+                end
+            end
+            _diceToBeRolled = {}
+        end
+        Wait.time(destroyDice, 120)
+
+        return diceToShip
+    end
+
+    -- For each system, do rolls. Track results, print them by system+unitType.
+    -- eg. 'Bereg / Lirta IV: Cruiser has 1 capture (2#, 4, 9); Dreadnought has 0 captures (6).'
+    local diceToShip = _prepareDice(systemToAnchoredShips)
+
+    -- Wait for all dice to spawn and receive a GUID
+    local diceToShipCount = 0
+    while diceToShipCount < anchoredShipsCount do
+        coroutine.yield(0)
+
+        diceToShipCount = 0
+        for die, _ in pairs(diceToShip) do
+            diceToShipCount = diceToShipCount + 1
+        end
+    end
+    
+
+    -- Start rolling dice.
+    -- Separate coroutine, so 'self' can animate hexes while the dice are being rolled.
+    startLuaCoroutine(self, 'dimensionalanchor_rollDiceCoroutine')
+
+    -- Function checks if dice are all still, and if they are maps their values to the ship they rolled for.
+    -- If dice are NOT still, just return an object with "waitingOnResults = true"
+    local function _processRollResults(diceToShip)
+        --wait for all dice to be settled
+        local allRest = true
+        for die, _ in pairs(diceToShip) do
+            local dieObject = getObjectFromGUID(die)
+            if dieObject ~= nil and dieObject.resting == false then
+                allRest = false
+            end
+        end
+
+        if not allRest then
+            return { waitingOnResults = true }
+        end
+
+        local shipToResult = {}
+
+        for die, ship in pairs(diceToShip) do
+            local dieObject = getObjectFromGUID(die)
+            if dieObject then
+                shipToResult[ship] = dieObject.getValue()
+            end
+        end
+
+        return { waitingOnResults = false, shipToResult = shipToResult }
+    end
+
+    -- For blinking hexes.
+    -- blinkMode == 0: Set a highlight on hexes containing dimensional tear tokens
+    -- blinkMode == 1: Set a highlight only on hexes adjacent to dimensional tear tokens
+    -- blinkMode == 2: Do nothing (let highlights fade)
+    local function _setHexBlinkMode(dimTearHexToNeighboringHexes, allHexesToSystemTiles, blinkMode, blinkDuration)
+        if blinkMode > 1 then
+            return
+        end
+
+        if blinkMode == 0 then
+            for hex, _ in pairs(dimTearHexToNeighboringHexes) do
+                local system = allHexesToSystemTiles[hex]
+                if system and not system.hyperlane then
+                    local systemObject = getObjectFromGUID(system.guid)
+                    if systemObject then
+                        systemObject.highlightOn(factionColor, blinkDuration)
+                    end
+                end
+            end
+        end
+
+        if blinkMode == 1 then
+            for _, adjHexes in pairs(dimTearHexToNeighboringHexes) do
+                for _, hex in ipairs(adjHexes) do
+                    local system = allHexesToSystemTiles[hex]
+                    if system and not system.hyperlane then
+                        local systemObject = getObjectFromGUID(system.guid)
+                        if systemObject then
+                            systemObject.highlightOn(factionColor, blinkDuration)
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- Check for results,
+    -- and trigger system tile highlighting until results are ready
+    local rollResults = { waitingOnResults = true }
+    local rollTimeout = Time.time + 10
+    local rollMinimumWait = Time.time + 3
+    local blinkMode = 2 -- 0 = dim tear hexes; 1 = adj hexes; 2 = no hexes
+    local blinkTransitionTime = 0
+    while (rollResults.waitingOnResults or Time.time < rollMinimumWait) and Time.time < rollTimeout do
+        -- Animation 1: Alternating dimensional tear and adjacent hex blinking
+        --blinkMode = (blinkMode + 1) % 3
+        --blinkTransitionTime = Time.time + 0.25 + (blinkMode == 2 and 0.25 or 0)
+        --_setHexBlinkMode(hexToNeighboringHexes, allHexesToSystemTiles, blinkMode, 0.5)
+
+        -- Animation 2: Highlight all relevant hexes, then just the dimensional tear ones.
+        -- Gives the impression of ships being sucked towards the dimensional tears
+        blinkTransitionTime = Time.time + 1.5
+        _setHexBlinkMode(hexToNeighboringHexes, allHexesToSystemTiles, 0, 1)
+        _setHexBlinkMode(hexToNeighboringHexes, allHexesToSystemTiles, 1, 0.5)
+
+        -- Animation 3: Highlight all on, then all off. Simplest visually. Probably best from a gameplay
+        -- perspective and sticking to the "soul" of the physical game. But less cool, and less obvious why a
+        -- a system is adjacent when it's a random wormhole token or something across the board.
+        --blinkTransitionTime = Time.time + 2
+        --_setHexBlinkMode(hexToNeighboringHexes, allHexesToSystemTiles, 0, 1)
+        --_setHexBlinkMode(hexToNeighboringHexes, allHexesToSystemTiles, 1, 1)
+
+        while blinkTransitionTime > Time.time do
+            coroutine.yield(0)
+        end
+
+        rollResults = _processRollResults(diceToShip)
+        coroutine.yield(0)
+    end
+
+    -- Get results
+    local shipToResult = rollResults.shipToResult
+
+    -- Print results
+    for system, ships in pairs(systemToAnchoredShips) do
+        local unitTypeToResultRolls = {}
+
+        for _, ship in ipairs(ships) do
+            local shipAttrs = assert(unitByGuid[ship])
+            local descriptiveUnitType = shipAttrs.unitType
+            if shipAttrs.factionTokenName then
+                descriptiveUnitType = shipAttrs.factionTokenName .. '\'s ' .. descriptiveUnitType
+            elseif shipAttrs.color then
+                descriptiveUnitType = shipAttrs.color .. ' ' .. descriptiveUnitType
+            end
+
+            local resultsForType = unitTypeToResultRolls[descriptiveUnitType]
+            if not resultsForType then
+                resultsForType = {}
+                unitTypeToResultRolls[descriptiveUnitType] = resultsForType
+            end
+
+            table.insert(resultsForType, assert(shipToResult[ship]))
+        end
+
+        print('Results for ' .. system.string .. ':')
+        for unitType, results in pairs(unitTypeToResultRolls) do
+            local resultString = ''
+            local first = true
+            for _, result in ipairs(results) do
+                if not first then
+                    resultString  = resultString .. ', '
+                end
+
+                resultString = resultString .. result
+                if result < 4 then
+                    resultString = resultString .. '#'
+                end
+
+                first = false
+            end
+
+            print('* ' .. unitType .. ': ' .. resultString)
+        end
+    end
+    
+    -- Create list of dying ships.
+    -- Only includes ships whose roll was 1-3 (failing)
+    local dyingShips = {}
+    for ship, result in pairs(shipToResult) do
+        if result < 4 then
+            local shipObject = getObjectFromGUID(ship)
+            if shipObject then
+                table.insert(dyingShips, ship)
+                _animatingGuids[ship] = true
+            end
+        end
+    end
+
+    -- Loop and highlight dead ships until they're removed from their hex.
+    local anchoredUnitsUnmoved = true
+    local anchoredUnitsTimeout = Time.time + 120
+    while Time.time < anchoredUnitsTimeout and anchoredUnitsUnmoved do
+        anchoredUnitsUnmoved = false
+
+        local currentTileToDeathTile = {}
+        local shipStateToPosition = {}
+
+        for _, ship in ipairs(dyingShips) do
+            if _animatingGuids[ship] then
+                local shipObject = getObjectFromGUID(ship)
+                if shipObject then
+                    anchoredUnitsUnmoved = true
+                    shipObject.highlightOn(factionColor, 0.75)
+                else
+                    _animatingGuids[ship] = nil
+                end
+            end
+        end
+
+        -- Wait 2 seconds before repeating (1 sec on, 1 sec off)
+        local blinkWait = Time.time + 1.5
+        while Time.time < blinkWait do
+            coroutine.yield(0)
+        end
+    end
+
+    -- Stop tracking all GUIDs from this animation
+    for _, ship in ipairs(dyingShips) do
+        _animatingGuids[ship] = nil
+    end
+
+    -- At this point, all dying ships have been handled. Destroy dice.
+    for _, die in ipairs(_diceToBeRolled) do
+        local dieObject = getObjectFromGUID(die)
+        if dieObject then
+            destroyObject(dieObject)
+        end
+    end
+    _diceToBeRolled = {}
+
+    return 1
+end
+
+function dimensionalanchor_rollDiceCoroutine()
+    assert(_diceToBeRolled and type(_diceToBeRolled) == 'table')
+
+    local waitToStart = Time.time + 1.5
+    while Time.time < waitToStart do
+        coroutine.yield(0)
+    end
+
+    for _, die in ipairs(_diceToBeRolled) do
+        local dieObject = getObjectFromGUID(die)
+        if dieObject then
+            dieObject.setLock(false)
+            dieObject.randomize()
+            local rollDelay = Time.time + 0.25
+            while Time.time < rollDelay do
+                coroutine.yield(0)
+            end
+        end
+    end
+
+    return 1
+end
+
+-- Hero
+-- Faction: The Vuil'Raith Cabal
+-- Card Name: It Feeds on Carrion
+-- Ability Name: Dimensional Anchor
+-- Ability Text:
+-- ACTION: Each other player rolls a die for each of their non-fighter ships
+-- that are in or adjacent to a system that contains a dimensional tear; on
+-- a 1-3, capture that unit. If this causes a player's ground forces or fighters
+-- to be removed, also capture those units. Then, purge this card.
+local function _carrionHeroAbility(owningObject, clickingColor) --Vuil'Raith Hero
+    if not _heroCardCanBeUsed(owningObject, clickingColor) then
+        -- Function will print why card cannot be used
+        return
+    end
+
+    table.insert(_carrionHeroAbilityOwningObjectQueue, owningObject)
+    startLuaCoroutine(self, '_carrionHeroAbilityCoroutine')
+end
+
+local function _applyContextMenuItems(card)
+    assert(card.tag == 'Card')
+
+    local factionCardAbilityFunc = _factionCardNameToAbilityFunc and _factionCardNameToAbilityFunc[card.getName()] or false
+
+    if factionCardAbilityFunc then
+        card.addContextMenuItem(factionCardAbilityFunc.name, function(clickingColor) factionCardAbilityFunc.method(card, clickingColor) end, false)
+    end
+
+    local colorToFactions = allFactions(false)
+    for _, faction in pairs(colorToFactions) do
+        if faction.hero == card.getName() then
+            -- Most heroes are manually handled, and even the automated ones could be manually handled.
+            -- Offer a simple Purge option on all faction hero cards.
+            card.addContextMenuItem("Purge", function(clickingColor) _purgeHeroCard(card, clickingColor) end, false)
+        end
+    end
+end
+
+function onObjectSpawn(object)
+    if object and object.tag == 'Card' then
+        _applyContextMenuItems(object)
+    end
+end
+
 function onLoad(saveState)
     self.setColorTint({ r = 0.25, g = 0.25, b = 0.25 })
     self.setScale({ x = 2, y = 0.01, z = 2 })
@@ -1199,6 +1988,20 @@ function onLoad(saveState)
     for factionName, attributes in pairs(_factionAttributes) do
         attributes.name = factionName
     end
+
+    _factionCardNameToAbilityFunc = {}
+    _factionCardNameToAbilityFunc['Jace X, 4th Air Legion'] = { name = 'Helio Cmd. Array', method = _jacexHeroAbility }
+    _factionCardNameToAbilityFunc['Conservator Procyon'] = { name = 'Multiverse Shift', method = _procynHeroAbility }
+    _factionCardNameToAbilityFunc['It Feeds on Carrion'] = { name = 'Dimensional Anchor', method = _carrionHeroAbility }
+    
+    local function delayedApplyContextMenuItems()
+        for _, object in ipairs(getAllObjects()) do
+            if object.tag == 'Card' then
+                _applyContextMenuItems(object)
+            end
+        end
+    end
+    Wait.frames(delayedApplyContextMenuItems, 7)
 end
 
 function onSave()

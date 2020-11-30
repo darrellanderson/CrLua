@@ -1202,7 +1202,7 @@ function getPurgeBag()
 
     local purgeBagName = 'Purge Bag'
     for _, object in ipairs(getAllObjects()) do
-        if object.tag == 'Bag' and string.match(object.getName(), '^' .. purgeBagName .. '$') then
+        if object.tag == 'Bag' and object.getName() == purgeBagName then
             _purgeBagGuid = object.getGUID()
             return object
         end
@@ -1443,7 +1443,7 @@ function _carrionHeroAbilityCoroutine()
         print('Remove previously devoured ships before re-using Dimensional Anchor.')
         return 1
     end
-    
+
     --Find faction owning this hero ability (and it's color)
     local factionTokenName = false
     local factionColor = false
@@ -1461,7 +1461,7 @@ function _carrionHeroAbilityCoroutine()
     local dimTokenToPosition = {}
     local anyDimensionalTears = false
     for _, object in ipairs(getAllObjects()) do
-        if object.tag == 'Tile' and string.match(object.getName(), '^' .. dimensionalTearName .. '$') then
+        if object.tag == 'Tile' and object.getName() == dimensionalTearName then
             dimTokenToPosition[object.getGUID()] = object.getPosition()
             anyDimensionalTears = true
         end
@@ -1621,7 +1621,7 @@ function _carrionHeroAbilityCoroutine()
             ["Space Dock"] = "Yellow",
             ["Mech"] = "Pink"
         }
-        
+
         local diceToShip = {}
         local unitTypesUsed = {}
         _diceToBeRolled = {}
@@ -1689,7 +1689,7 @@ function _carrionHeroAbilityCoroutine()
             diceToShipCount = diceToShipCount + 1
         end
     end
-    
+
 
     -- Start rolling dice.
     -- Separate coroutine, so 'self' can animate hexes while the dice are being rolled.
@@ -1838,7 +1838,7 @@ function _carrionHeroAbilityCoroutine()
             print('* ' .. unitType .. ': ' .. resultString)
         end
     end
-    
+
     -- Create list of dying ships.
     -- Only includes ships whose roll was 1-3 (failing)
     local dyingShips = {}
@@ -1993,7 +1993,7 @@ function onLoad(saveState)
     _factionCardNameToAbilityFunc['Jace X, 4th Air Legion'] = { name = 'Helio Cmd. Array', method = _jacexHeroAbility }
     _factionCardNameToAbilityFunc['Conservator Procyon'] = { name = 'Multiverse Shift', method = _procynHeroAbility }
     _factionCardNameToAbilityFunc['It Feeds on Carrion'] = { name = 'Dimensional Anchor', method = _carrionHeroAbility }
-    
+
     local function delayedApplyContextMenuItems()
         for _, object in ipairs(getAllObjects()) do
             if object.tag == 'Card' then

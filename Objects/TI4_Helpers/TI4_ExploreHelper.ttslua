@@ -115,7 +115,7 @@ function explorePlanet(tileGUID, planetName)
     local tilePos = false
     local planetPos = false
     local tileRot = false
-    
+
     local traitMap = {
         ['cultural'] = 'Cultural Exploration',
         ['hazardous'] = 'Hazardous Exploration',
@@ -158,7 +158,7 @@ function getFrontierTokenBag()
 
     local frontierTokenBagName = 'Frontier Tokens Bag'
     for _, object in ipairs(getAllObjects()) do
-        if object.tag == 'Bag' and string.match(object.getName(), '^' .. frontierTokenBagName .. '$') then
+        if object.tag == 'Bag' and object.getName() == frontierTokenBagName then
             _frontierTokenBagGuid = object.getGUID()
             return object
         end

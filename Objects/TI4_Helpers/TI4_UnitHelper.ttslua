@@ -806,7 +806,7 @@ local _unitModifiers = {
 
     ['Regulated Conscription'] = {
         description = 'Fighters and infantry cost 1 each',
-        owner = OWNER.SELF,
+        owner = OWNER.ANY,
         type = TYPE.MUTATE, -- set cost before additional adjustments
         apply = function(unitAttrs)
             unitAttrs['Fighter'].cost = 1

@@ -865,6 +865,7 @@ local _unitModifiers = {
         description = '+1 die to a unit ability (anti-fighter barrage, bombardment, space cannon)',
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,
+        excludeFaction = 'The Nomad',
         apply = function(unitAttrs, params)
             best = false
             for unitType, attr in pairs(unitAttrs) do
@@ -923,6 +924,7 @@ local _unitModifiers = {
         description = '+1 to GROUND COMBAT rolls for attacker, -1 to Sardakk if opponent owns',  -- -1 to Sardakk if other player has it
         owner = OWNER.ANY,
         type = TYPE.ADJUST,
+        excludeFaction = "The Sardakk N'orr",
         apply = function(unitAttrs, params)
             -- Get faction from color, which is ultimately derived from the faction sheet.
             -- This is Franken friendly, as Franken faction sheet matches promissory note.
@@ -963,6 +965,7 @@ local _unitModifiers = {
         description = 'One non-fighter ship gains the SUSTAIN DAMAGE, combat value, and ANTI-FIGHTER BARRAGE of the Nomad flagship (this modifier adds a new unit for AFB/space combat, remove the affected unit from normal setup)',
         owner = OWNER.SELF,
         type = TYPE.MUTATE,
+        excludeFaction = 'The Argent Flight',
         apply = function(unitAttrs, params)
             unitAttrs['The Cavalry'] = {
                 antiFighterBarrage = { hit = 8, dice = 3 },
@@ -976,6 +979,23 @@ local _unitModifiers = {
                         spaceCombat = { hit = 5, dice = 2 },
                         unitCount = 1
                     }
+                end
+            end
+        end
+    },
+
+    ['The Crown of Thalnos'] = {
+        description = 'Apply +1 to COMBAT rolls, player must destroy any units that do not produce at least one hit',
+        owner = OWNER.SELF,
+        type = TYPE.ADJUST,
+        toggleActive = true,
+        apply = function(unitAttrs)
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.spaceCombat then
+                    attr.spaceCombat.hit = attr.spaceCombat.hit - 1
+                end
+                if attr.groundCombat then
+                    attr.groundCombat.hit = attr.groundCombat.hit - 1
                 end
             end
         end
@@ -1407,6 +1427,16 @@ function getColorToUnitModifiers()
             return false
         end
 
+        -- Faction promissory notes might be face up in the owner player's
+        -- area with a "for sale" sign.  Do not count those.
+        if unitModifier.excludeFaction then
+            local color = _zoneHelper.zoneFromPosition(object.getPosition())
+            local faction = color and _factionHelper.fromColor(color)
+            if faction and faction.name == unitModifier.excludeFaction then
+                return false
+            end
+        end
+
         return name, unitModifier
     end
 
@@ -1416,20 +1446,16 @@ function getColorToUnitModifiers()
         -- Get unit modifiers.
         local name, unitModifier = getUnitModifier(object)
         if unitModifier then
-            -- Tekklar Legion buffs non-Sardakk and penalizes Sardakk, BUT
-            -- players expect Sardakk to be able to have it face up on the
-            -- table with a "for sale" sign.  Only add when not in Sarakk zone.
+            -- Tekklar Legion debuffs Sardakk when played by others.
             if name == 'Tekklar Legion' then
+                local sardakk = _factionHelper.fromTokenName("Sardakk N'orr")
                 local color = _zoneHelper.zoneFromPosition(object.getPosition())
-                local faction = color and _factionHelper.fromColor(color)
-                if faction and faction.name ~= "The Sardakk N'orr" then
-                    addModifier(color, name)
-                    local sardakk = _factionHelper.fromTokenName("Sardakk N'orr")
-                    if sardakk and sardakk.color then
-                        addModifier(sardakk.color, name)
-                    end
+                if sardakk and sardakk.color and sardakk.color ~= color then
+                    addModifier(sardakk.color, name)
                 end
-            elseif _unitModifiers[name].owner == OWNER.ANY then
+            end
+
+            if _unitModifiers[name].owner == OWNER.ANY then
                 for _, color in ipairs(_zoneHelper.zones()) do
                     addModifier(color, name)
                 end

@@ -709,6 +709,59 @@ function autoFillCoroutine()
     end
     coroutine.yield(0)
 
+    -- Apply any require{Ground|Space} attributes.
+    if autofillTypeAttributes == AUTOFILL_TYPE.SPACE_COMBAT then
+        local warnUnitSet = {}
+        local keep = {}
+        for _, unit in ipairs(selfUnitsInHex) do
+            local attrs = unitTypeToAttrs[unit.unitType] or {}
+            if attrs.spaceCombat and attrs.spaceCombat.requireSpace then
+                if not warnUnitSet[unit.unitType] then
+                    warnUnitSet[unit.unitType] = true
+                    local name = attrs.name or unitType
+                    printToAll('Place ' .. name .. ' in space for space combat.', params.clickerColor)
+                end
+                local p = _systemHelper.planetFromPosition({
+                    systemGuid = system.guid,
+                    position = unit.position,
+                    exact = true
+                })
+                if not p then
+                    table.insert(keep, unit)  -- not on a planet
+                end
+            else
+                table.insert(keep, unit)
+            end
+        end
+        selfUnitsInHex = keep
+        selfUnitTypeToCount = _unitHelper.getUnitTypeToCount(selfUnitsInHex)
+    elseif autofillTypeAttributes == AUTOFILL_TYPE.GROUND_COMBAT then
+        local warnUnitSet = {}
+        local keep = {}
+        for _, unit in ipairs(selfUnitsInHex) do
+            local attrs = unitTypeToAttrs[unit.unitType] or {}
+            if attrs.groundCombat and attrs.groundCombat.requireGround then
+                if not warnUnitSet[unit.unitType] then
+                    warnUnitSet[unit.unitType] = true
+                    local name = attrs.name or unitType
+                    printToAll('Place ' .. name .. ' on a planet for ground combat.', params.clickerColor)
+                end
+                local p = _systemHelper.planetFromPosition({
+                    systemGuid = system.guid,
+                    position = unit.position,
+                    exact = true
+                })
+                if p then
+                    table.insert(keep, unit)  -- on the planet
+                end
+            else
+                table.insert(keep, unit)
+            end
+        end
+        selfUnitsInHex = keep
+        selfUnitTypeToCount = _unitHelper.getUnitTypeToCount(selfUnitsInHex)
+    end
+
     -- Apply any per-unit limits (Experimental Battlestation).
     local function applyUnitLimit(unitLimit, inHex, adjHex)
         local avail = unitLimit

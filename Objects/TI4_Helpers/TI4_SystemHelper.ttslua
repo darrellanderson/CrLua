@@ -538,13 +538,52 @@ function systemFromPosition(position)
     end
 end
 
--- Get systems at positions
+-- Get systems at positions. Does NOT use ray-casting like "systemFromPosition".
 -- @param Map of arbitrary key to {xyz} position
 -- @return Map of same arbitrary key to system attributes or false
 function systemsFromPositions(keysToPositions)
+    assert(type(keysToPositions) == 'table')
+
+    -- Fill in extra system data
+    local systems = systems()
+
+    -- Get position of each system
+    local systemGuidToPosition = {}
+    for _, object in ipairs(getAllObjects()) do
+        local guid = object.getGUID()
+        if systems[guid] then
+            systemGuidToPosition[guid] = object.getPosition()
+        end
+    end
+
+    -- Get hex of each system
+    local systemGuidToHexes = hexesFromPositions(systemGuidToPosition)
+    -- Build reverse map (of system GUID to hex)
+    local systemHexToGuid = {}
+    for systemGuid, hex in pairs(systemGuidToHexes) do
+        if hex then
+            -- Warn (without failing) when a system already occupies this hex position (meaning the tiles are overlapping).
+            if systemHexToGuid[hex] then
+                print('WARNING: System tiles are overlapping at hex coordinate ' .. hex .. ' (' .. _systems[systemGuid].string .. ' and ' .. _systems[systemHexToGuid[hex]].string .. '). Some functions may be affected.')
+            else
+                systemHexToGuid[hex] = systemGuid
+            end
+        end
+    end
+
+    -- Get hex of each input key
+    local inputKeyToHexes = hexesFromPositions(keysToPositions)
+
+    -- Get system for each input key, using hex coordinate maps as a bridge
     local keysToSystems = {}
-    for key, position in pairs(keysToPositions) do
-        keysToSystems[key] = systemFromPosition(position) or false
+    for inputKey, hex in pairs(inputKeyToHexes) do
+        local systemGuid = systemHexToGuid[hex]
+
+        if systemGuid then
+            keysToSystems[inputKey] = assert(systems[systemGuid])
+        else
+            keysToSystems[inputKey] = false
+        end
     end
 
     return keysToSystems

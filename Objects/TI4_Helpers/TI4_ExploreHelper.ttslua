@@ -260,41 +260,54 @@ function systemShouldGetFrontierToken(system)
     return true
 end
 
-function placeFrontierTokens()
+function _placeFrontierTokensCoroutine()
     local frontierTokenBag = assert(getFrontierTokenBag())
 
     local guidToSystem = _systemHelper.systems()
-    local emptySystemObjects = {}
+    local emptySystemGuidToTokenPositions = {}
+    local emptySystemGuidToPosition = {}
     local frontierTokenObjectsToPosition = {}
     for _, object in ipairs(getAllObjects()) do
         local system = guidToSystem[object.getGUID()]
-        -- Collect all system tiles that are 'empty'
+        -- Collect all system tiles that are 'empty', along with the position a frontier token would go
         if system and systemShouldGetFrontierToken(system) then
-            table.insert(emptySystemObjects, object)
-        -- Collect all current frontier tokens
+            local tokenPosition = object.positionToWorld(DEFAULT_FRONTIER_TOKEN_POSITION)
+            emptySystemGuidToPosition[object.getGUID()] = object.getPosition()
+            emptySystemGuidToTokenPositions[object.getGUID()] = tokenPosition
+        -- Collect all current frontier token positions
         elseif isFrontierToken(object) then
             frontierTokenObjectsToPosition[object.getGUID()] = object.getPosition()
         end
     end
+    coroutine.yield(0)
 
-    -- Find set of system tiles containing frontier tokens
-    local frontierTokenObjectsToSystem = _systemHelper.systemsFromPositions(frontierTokenObjectsToPosition)
-    local frontierContainingSystems = {}
-    for frontierTokenObject, systemTile in pairs(frontierTokenObjectsToSystem) do
-        if systemTile then
-            frontierContainingSystems[systemTile.guid] = true
-        end
+    -- Find set of hex coordinates containing frontier tokens
+    local frontierTokenGuidToHex = _systemHelper.hexesFromPositions(frontierTokenObjectsToPosition)
+    local hexesWithFrontierTokens = {}
+    for _, hex in pairs(frontierTokenGuidToHex) do
+        hexesWithFrontierTokens[hex] = true
     end
 
-    for _, emptySystemObject in ipairs(emptySystemObjects) do
-        if not frontierContainingSystems[emptySystemObject.getGUID()] then
-            local tilePlacementPos = emptySystemObject.positionToWorld(DEFAULT_FRONTIER_TOKEN_POSITION)
+    -- Empty systems to hex coordinates
+    local emptySystemGuidToHex = _systemHelper.hexesFromPositions(emptySystemGuidToPosition)
+
+    -- For each empty system, if it's hex coordinate doesn't have a frontier token then place a new one.
+    for systemGuid, tokenPosition in pairs(emptySystemGuidToTokenPositions) do
+        if emptySystemGuidToHex[systemGuid] and not hexesWithFrontierTokens[emptySystemGuidToHex[systemGuid]] then
             frontierTokenBag.takeObject({
-                position = { x = tilePlacementPos.x, y = tilePlacementPos.y + 3, z = tilePlacementPos.z },
+                position = { x = tokenPosition.x, y = tokenPosition.y + 3, z = tokenPosition.z },
                 smooth   = true,
             })
+
+            coroutine.yield(0)
         end
     end
+
+    return 1
+end
+
+function placeFrontierTokens()
+    startLuaCoroutine(self, '_placeFrontierTokensCoroutine')
 end
 
 function retrieveFrontierTokens()

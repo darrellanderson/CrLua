@@ -2093,7 +2093,18 @@ function onLoad(saveState)
     end
     self.setInvisibleTo(invisibleTo)
 
+    local saveState = saveState and string.len(saveState) > 0 and JSON.decode(saveState)
+    if saveState then
+        _includePoK = saveState._includePoK
+    end
+
     self.addContextMenuItem('Fix unit scale', fixUnitScale, false)
+end
+
+function onSave()
+    return JSON.encode({
+        _includePoK = _includePoK
+    })
 end
 
 -------------------------------------------------------------------------------

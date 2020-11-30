@@ -41,7 +41,7 @@ local DECKS = {
             }
         },
         cardNames = {
-            base = {
+            ['Base'] = {
                 'Corner the Market',
                 'Develop Weaponry',
                 'Diversify Research',
@@ -53,7 +53,7 @@ local DECKS = {
                 'Negotiate Trade Routes',
                 'Sway the Council',
             },
-            pok = {
+            ['PoK'] = {
                 'Amass Wealth',
                 'Build Defenses',
                 'Discover Lost Outposts',
@@ -81,7 +81,7 @@ local DECKS = {
             }
         },
         cardNames = {
-            base = {
+            ['Base'] = {
                 'Centralize Galactic Trade',
                 'Conquer the Weak',
                 'Form Galactic Brain Trust',
@@ -93,7 +93,7 @@ local DECKS = {
                 'Subdue the Galaxy',
                 'Unify the Colonies',
             },
-            pok = {
+            ['PoK'] = {
                 'Achieve Supremacy',
                 'Become a Legend',
                 'Command an Armada',
@@ -139,7 +139,7 @@ local DECKS = {
                 'Turn Their Fleets to Dust',
                 'Unveil Flagship',
             },
-            pok = {
+            ['PoK'] = {
                 'Defy Space and Time',
                 'Stake Your Claim',
                 'Strengthen Bonds',
@@ -228,7 +228,7 @@ local DECKS = {
                 'Wormhole Reconstruction',
                 'Wormhole Research',
             },
-            pok = {
+            ['PoK'] = {
                 'Clandestine Operations',
                 'Galactic Crisis Pact',
                 'Armed Forces Standardization',
@@ -258,7 +258,7 @@ local DECKS = {
             }
         },
         cardNames = {
-            base = {
+            ['Base'] = {
                 'Ancient Burial Sites',
                 'Assassinate Representative',
                 'Bribery',
@@ -340,7 +340,7 @@ local DECKS = {
                 'War Effort',
                 'Warfare Rider',
             },
-            codex1 = {
+            ['Codex 1'] = {
                 'Hack Election',
                 'Harness Energy',
                 'Blitz',
@@ -362,7 +362,7 @@ local DECKS = {
                 'Counterstroke',
                 'Ghost Squad',
             },
-            pok = {
+            ['PoK'] = {
                 'Exploration Probe',
                 'Nav Suite',
                 'Archaeological Expedition',
@@ -409,7 +409,7 @@ local DECKS = {
             }
         },
         cardNames = {
-            pok = {
+            ['PoK'] = {
                 'Industrial Relic Fragment (1)',
                 'Industrial Relic Fragment (2)',
                 'Industrial Relic Fragment (3)',
@@ -446,7 +446,7 @@ local DECKS = {
             }
         },
         cardNames = {
-            pok = {
+            ['PoK'] = {
                 'Hazardous Relic Fragment (1)',
                 'Hazardous Relic Fragment (2)',
                 'Hazardous Relic Fragment (3)',
@@ -483,7 +483,7 @@ local DECKS = {
             }
         },
         cardNames = {
-            pok = {
+            ['PoK'] = {
                 'Cultural Relic Fragment (1)',
                 'Cultural Relic Fragment (2)',
                 'Cultural Relic Fragment (3)',
@@ -520,7 +520,7 @@ local DECKS = {
             }
         },
         cardNames = {
-            pok = {
+            ['PoK'] = {
                 'Unknown Relic Fragment (1)',
                 'Unknown Relic Fragment (2)',
                 'Unknown Relic Fragment (3)',
@@ -551,7 +551,7 @@ local DECKS = {
             }
         },
         cardNames = {
-            pok = {
+            ['PoK'] = {
                 'Dominus Orb',
                 'Maw of Worlds',
                 'Scepter of Emelpar',
@@ -676,23 +676,23 @@ function getDeckWithReshuffle(name)
         local deckDiscardTransform = _getTransform(deckAttributes, 'discard')
         local deckDiscard = _getDeck(deckDiscardTransform)
         if deckDiscard then
-                local bounds = deckDiscard.getBoundsNormalized()
-                local collide = false
-                local fast = true
-                deckDiscard.setPosition({
-                    x = deckTransform.position.x,
-                    y = deckTransform.position.y + bounds.size.y / 2,
-                    z = deckTransform.position.z
-                }, collide, fast)
-                deckDiscard.setRotation(deckTransform.rotation)
-                Wait.time(function() deckDiscard.setNamed(deckAttributes.deckName) end, 1)
-                if deckDiscard.tag == 'Deck' then
-                    deckDiscard.shuffle()
-                end
-                deck = deckDiscard
-          end
+            local bounds = deckDiscard.getBoundsNormalized()
+            local collide = false
+            local fast = true
+            deckDiscard.setPosition({
+                x = deckTransform.position.x,
+                y = deckTransform.position.y + bounds.size.y / 2,
+                z = deckTransform.position.z
+            }, collide, fast)
+            deckDiscard.setRotation(deckTransform.rotation)
+            Wait.time(function() deckDiscard.setName(deckAttributes.deckName) end, 1)
+            if deckDiscard.tag == 'Deck' then
+                deckDiscard.shuffle()
+            end
+            deck = deckDiscard
+        end
     end
-    return deck
+    return deck and deck.getGUID()
 end
 
 --- Given a card name, which deck contains it?
@@ -700,6 +700,28 @@ function getDeckName(cardName)
     assert(type(cardName) == 'string')
     local deckAttributes = _getDeckAttributes(cardName)
     return deckAttributes and deckAttributes.deckName
+end
+
+--- Get deck location (handy for adding cards during setup).
+function getDeckTransform(deckName)
+    local deckAttributes = _getDeckAttributesByType(deckName)
+    return deckAttributes and _getTransform(deckAttributes, 'deck')
+end
+
+--- Get card names from a particular source.
+function getCards(source)
+    assert(type(source) == 'string')
+    local result = {}
+    for _, deckAttributes in pairs(DECKS) do
+        for cardSource, cardNames in pairs(deckAttributes.cardNames) do
+            if cardSource == source then
+                for _, cardName in ipairs(cardNames) do
+                    table.insert(result, cardName)
+                end
+            end
+        end
+    end
+    return result
 end
 
 --- Add a homebrew card.

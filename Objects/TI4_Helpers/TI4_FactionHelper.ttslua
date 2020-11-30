@@ -1408,6 +1408,11 @@ function _procynHeroAbilityCoroutine()
         end
     end
 
+    -- Ensure we're not tracking frontier tokens anymore
+    for tokenGuid, _ in pairs(explorableTokenGuidToSystemGuid) do
+        _animatingGuids[tokenGuid] = nil
+    end
+
     return 1
 end
 

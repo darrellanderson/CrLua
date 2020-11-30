@@ -6,11 +6,10 @@ local DEFAULT_CONFIG = {
     playerCount = 6,
     extraRings = 0,
     usePoK = false,
-    useCodexACs = false,
+    useCodex1ACs = false,
     is14ptGame = false,
+    isRightClick = false,
 }
-
-local CODEX_AC_LIST = {'Hack Election', 'Harness Energy', 'Blitz', 'Fighter Conscription', 'Forward Supply Base', 'Rally', 'War Machine (1)', 'War Machine (2)', 'War Machine (3)', 'War Machine (4)', 'Master Plan', 'Insider Information', 'Plagiarize', 'Scramble Frequency', 'Solar Flare', 'Reflective Shielding', 'Impersonation', 'Sanction', 'Counterstroke', 'Ghost Squad',}
 
 local CONTRIBUTORS = {
     '3tamatulg',
@@ -26,7 +25,7 @@ local CONTRIBUTORS = {
     'Garnet Bear',
     'Goatboy',  -- TI4 model for rotating space dock
     'Hooliganj',
-    'Jabberwocky',  -- PoK wormholes
+    'Jabberwocky',  -- PoK wormholes, scripting
     'Jatta Pake',
     'Jefferson',
     'Lily',
@@ -62,6 +61,8 @@ Thanks to $CONTRIBUTORS, and the entire TI4 community for their contributions.
 A massive shout out to Fantasy Flight Games for creating an awesome game. If you have the opportunity please support them. The board game industry wouldn't be the same without them and if you enjoy their work please, please support them and your local game stores.
 ]]
 
+-------------------------------------------------------------------------------
+
 function getHelperClient(helperObjectName)
     local function getHelperObject()
         for _, object in ipairs(getAllObjects()) do
@@ -77,12 +78,14 @@ function getHelperClient(helperObjectName)
     end
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
-
 local _setupHelper = getHelperClient('TI4_SETUP_HELPER')
 local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
+local _getByNameCache = {}
+
 -------------------------------------------------------------------------------
+
 function onLoad()
     _config = DEFAULT_CONFIG
     Wait.frames(_createUI, 2)
@@ -234,7 +237,7 @@ function _createUI()
             {
                 tag = 'VerticalLayout',
                 attributes = {
-                    padding = '10 10 10 10',
+                    padding = '10 10 10 90',
                 },
                 children = {
                     text('title', 'TI4 Game Setup Options'),
@@ -246,7 +249,7 @@ function _createUI()
                     toggleGroup('extraRings', { 0, 1, 2 }),
 
                     toggle('usePoK', 'Use Prophecy of Kings expansion'),
-                    toggle('useCodexACs', 'Use Codex action cards'),
+                    toggle('useCodex1ACs', 'Use Codex 1 action cards'),
                     toggle('14ptGame', '14 point game'),
                 }
             },
@@ -299,7 +302,7 @@ end
 
 function updateUiFromConfig()
     self.UI.setAttribute('usePoK', 'isOn', _config.usePoK)
-    self.UI.setAttribute('useCodexACs', 'isOn', _config.useCodexACs)
+    self.UI.setAttribute('useCodex1ACs', 'isOn', _config.useCodex1ACs)
     self.UI.setAttribute('14ptGame', 'isOn', _config.is14ptGame)
     for i = 3, 8 do
         self.UI.setAttribute('playerCount' .. i, 'isOn', _config.playerCount == i)
@@ -317,9 +320,6 @@ function onButtonClick(player, inputType, id)
     local isRightClick = inputType == RIGHT_CLICK and true or false
     if id == 'setup' then
         setupGame(isRightClick)
-        if not isRightClick then
-            packSelfIntoSetupBag()
-        end
     else
         error('onButtonClick: unknown button "' .. id .. '"')
     end
@@ -342,8 +342,8 @@ function onToggleValueChanged(player, value, id)
         end
     elseif id == 'usePoK' then
         _config.usePoK = valueAsBool
-    elseif id == 'useCodexACs' then
-        _config.useCodexACs = valueAsBool
+    elseif id == 'useCodex1ACs' then
+        _config.useCodex1ACs = valueAsBool
     elseif id == '14ptGame' then
         _config.is14ptGame = valueAsBool
     else
@@ -359,101 +359,71 @@ end
 -------------------------------------------------------------------------------
 
 function setupGame(isRightClick)
-    local playerCount = _config.playerCount
-    local extraRings = _config.extraRings
-    print('Setting up for ' .. playerCount .. ' players with ' .. extraRings .. ' extra map rings')
+    _config.isRightClick = isRightClick
+    startLuaCoroutine(self, 'setupGameCoroutine')
+end
+
+function setupGameCoroutine()
+    assert(type(_config.playerCount) == 'number')
+    assert(type(_config.extraRings) == 'number')
+    assert(type(_config.usePoK) == 'boolean')
+    assert(type(_config.useCodex1ACs) == 'boolean')
+    assert(type(_config.is14ptGame) == 'boolean')
+    assert(type(_config.isRightClick) == 'boolean')
+
+    print('Setting up for ' .. _config.playerCount .. ' players with ' .. _config.extraRings .. ' extra map rings')
 
     setupPoK(_config.usePoK)
-    setupCodexACs(_config.useCodexACs)
+    coroutine.yield(0)
+
+    setupCodex1ACs(_config.useCodex1ACs)
+    coroutine.yield(0)
+
     setup14ptGame(_config.is14ptGame)
+    coroutine.yield(0)
 
     _setupHelper.setup({
-        playerCount = playerCount,
-        extraRings = extraRings,
-        isRightClick = isRightClick,
+        playerCount = _config.playerCount,
+        extraRings = _config.extraRings,
+        isRightClick = _config.isRightClick,
         includePoK = _config.usePoK,
     })
+    coroutine.yield(0)
+
+    if not _config.isRightClick then
+        packSelfIntoSetupBag()
+    end
+    coroutine.yield(0)
+
+    return 1
 end
 
 function setupPoK(usePoK)
     -- Placeholder, not sure yet how to split between here and setup helper.
+
+    local remove = {
+        'Alliance ($COLOR)',
+        'Leader Sheet ($COLOR)',
+        'Exploration Mat',
+        'Frontier Tokens Bag',
+    }
+
+    local add = {
+        ['PoK Actions'] = {
+            addToDeck = 'Actions'
+        },
+        ['Hazardous Exploration'] = {
+            addToDeck = 'Hazardous Exploration'
+        }
+    }
+
 end
 
-function setupCodexACs(useCodexACs)
-    local actionDeck = false
-    local codexDeck = false
-    local variantsBag = false
-    for i, object in ipairs(getAllObjects()) do
-        local name = object.getName()
-        if object.tag == 'Deck' and name == 'Actions' then
-            actionDeck = object
-        elseif object.tag == 'Deck' and name == 'Codex Action Cards' then
-            codexDeck = object
-        elseif object.tag == 'Bag' and string.match(name, '^Variant Pieces') then
-            variantsBag = object
-        end
-    end
-
-    if not actionDeck then
-        printToAll('Setup codex action cards: cannot find action deck, skipping this step.', 'Red')
-        return
-    end
-    local actionDeckPos = actionDeck.getPosition()
-
-    if useCodexACs then
-        local aboveActionDeckPos = {
-            x = actionDeckPos.x,
-            y = actionDeckPos.y + 3,
-            z = actionDeckPos.z
-        }
-        if codexDeck then
-            local collide = false
-            local fast = true
-            codexDeck.setPositionSmooth(aboveActionDeckPos, collide, fast)
-            codexDeck.setRotationSmooth(actionDeck.getRotation(), collide, fast)
-        elseif variantsBag then
-            for _, entry in ipairs(variantsBag.getObjects()) do
-                if entry.name == 'Codex Action Cards' then
-                    codexDeck = variantsBag.takeObject({
-                        guid = entry.guid,
-                        position = aboveActionDeckPos,
-                        rotation = actionDeck.getRotation(),
-                        smooth = true
-                    })
-                    break
-                end
-            end
-        end
-
-        if codexDeck then
-            print('Setup codex action cards: adding to actions deck')
-        else
-            printToAll('Setup codex action cards: cannot find codex action deck, skipping this step.', 'Red')
-            return
-        end
-        Wait.time(function() actionDeck.shuffle() end, 5)
+function setupCodex1ACs(useCodex1ACs)
+    if useCodex1ACs then
+        _addCards('Variant Pieces (Searching Recommended)', 'Actions', 'Codex 1')
     else
-        -- Remove any Codex ACs in the actions deck.  The Codex ACs start in
-        -- variants, so for this to happen they would have to have been added
-        -- to the Actions deck somehow first.  Since this is rare do not worry
-        -- too much about it, just pull out the cards and let the players take
-        -- it from there.
-        local codexACSet = {}
-        for _, codexAC in ipairs(CODEX_AC_LIST) do
-            codexACSet[codexAC] = true
-        end
-        for i, entry in ipairs(actionDeck.getObjects()) do
-            if codexACSet[entry.name] then
-                actionDeck.takeObject({
-                    guid = entry.guid,
-                    position = {
-                        x = actionDeckPos.x,
-                        y = actionDeckPos.y + 3 + (i / 5),
-                        z = actionDeckPos.z + 5
-                    }
-                })
-            end
-        end
+        _removeCards('Purge Bag', 'Actions', 'Codex 1')
     end
 end
 
@@ -467,6 +437,8 @@ function setup14ptGame(is14ptGame)
     end
 end
 
+-------------------------------------------------------------------------------
+
 function packSelfIntoSetupBag()
     local setupBag = _getByName('Setup Bag')
     local tutorial = _getByName('TI4 TTS Tutorial Series')
@@ -476,10 +448,101 @@ function packSelfIntoSetupBag()
     setupBag.putObject(self)
 end
 
+function _copy(t)
+    if t and type(t) == 'table' then
+        local copy = {}
+        for k, v in pairs(t) do
+            copy[k] = type(v) == 'table' and _copy(v) or v
+        end
+        t = copy
+    end
+    return t
+end
+
 function _getByName(name)
+    local guid = _getByNameCache[name]
+    local object = guid and getObjectFromGUID(guid)
+    if object then
+        return object
+    end
     for _, object in ipairs(getAllObjects()) do
         if object.getName() == name then
+            _getByNameCache[name] = object.getGUID()
             return object
+        end
+    end
+end
+
+function _addCards(containerName, deckName, sourceName)
+    local container = _getByName(containerName)
+    if not container then
+        error('_addCards: missing container "' .. containerName .. '"')
+    end
+
+    local name = sourceName .. ' ' .. deckName
+    local guid = false
+    for _, entry in ipairs(container.getObjects()) do
+        if entry.name == name then
+            guid = entry.guid
+            break
+        end
+    end
+    if not guid then
+        error('_addCards: missing "' .. containerName .. '/' .. name .. '"')
+    end
+
+    local transform = _deckHelper.getDeckTransform(deckName)
+    if not transform then
+        error('_addCards: missing location for "' .. deckName .. '"')
+    end
+
+    container.takeObject({
+        guid = guid,
+        position = {
+            x = transform.position.x,
+            y = transform.position.y + 5,
+            z = transform.position.z,
+        },
+        rotation = _copy(transform.rotation),
+        smooth = true
+    })
+
+    local function delayedShuffle()
+        local deck = getObjectFromGUID(_deckHelper.getDeck(deckName))
+        if deck then
+            deck.shuffle()
+        end
+    end
+    Wait.time(delayedShuffle, 5)
+end
+
+function _removeCards(containerName, deckName, sourceName)
+    local container = _getByName(containerName)
+    if not container then
+        error('_removeCards: missing container "' .. containerName .. '"')
+    end
+
+    local deck = getObjectFromGUID(_deckHelper.getDeck(deckName))
+    if not deck then
+        error('_removeCards: missing deck "' .. deckName .. '"')
+    end
+
+    local nameSet = {}
+    for _, name in ipairs(_deckHelper.getCards(sourceName)) do
+        nameSet[name] = true
+    end
+
+    local position = deck.getPosition()
+    position.y = position.y + 5
+    for _, entry in ipairs(deck.getObjects()) do
+        if nameSet[entry.name] then
+            deck.takeObject({
+                position          = position,
+                callback_function = function(object) container.putObject(object) end,
+                smooth            = true,
+                guid              = entry.guid
+            })
+            position.y = position.y + 0.2
         end
     end
 end

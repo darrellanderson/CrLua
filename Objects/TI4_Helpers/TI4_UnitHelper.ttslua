@@ -865,7 +865,7 @@ local _unitModifiers = {
         description = '+1 die to a unit ability (anti-fighter barrage, bombardment, space cannon)',
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,
-        excludeFaction = 'The Nomad',
+        excludeFaction = 'The Argent Flight',
         apply = function(unitAttrs, params)
             best = false
             for unitType, attr in pairs(unitAttrs) do
@@ -965,7 +965,7 @@ local _unitModifiers = {
         description = 'One non-fighter ship gains the SUSTAIN DAMAGE, combat value, and ANTI-FIGHTER BARRAGE of the Nomad flagship (this modifier adds a new unit for AFB/space combat, remove the affected unit from normal setup)',
         owner = OWNER.SELF,
         type = TYPE.MUTATE,
-        excludeFaction = 'The Argent Flight',
+        excludeFaction = 'The Nomad',
         apply = function(unitAttrs, params)
             unitAttrs['The Cavalry'] = {
                 antiFighterBarrage = { hit = 8, dice = 3 },

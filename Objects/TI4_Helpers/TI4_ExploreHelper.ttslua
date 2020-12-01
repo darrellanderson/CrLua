@@ -2,10 +2,10 @@
 -- @author Milty for adapting to exploration
 
 local attachmentCardToTokenMap = {
-    ["Propulsion Research Facility - Technology Specialty"] = {"Blue Tech Specialty Token"},
-    ["Cybernetic Research Facility - Technology Specialty"] = {"Yellow Tech Specialty Token"},
-    ["Biotic Research Facility - Technology Specialty"] = {"Green Tech Specialty Token"},
-    ["Warfare Research Facility - Technology Specialty"] = {"Red Tech Specialty Token"},
+    ["Propulsion Research Facility"] = {"Blue Tech Specialty Token"},
+    ["Cybernetic Research Facility"] = {"Yellow Tech Specialty Token"},
+    ["Biotic Research Facility"] = {"Green Tech Specialty Token"},
+    ["Warfare Research Facility"] = {"Red Tech Specialty Token"},
     ["Lazax Survivors"] = {"+1 Resource +2 Influence (Lazax Survivors) Token"},
     ["Rich World"] = {"+1 Resource (Rich World) Token"},
     ["Mining World"] = {"+2 Resource (Mining World) Token"},
@@ -177,7 +177,7 @@ function exploreFrontier(token)
         frontierDeck.setRotation({tokenRot.x, tokenRot.y, 0})
     end
 
-    local frontierTokenBag = assert(_getByName('Frontier Tokens Bag', 'Bag'))
+    local frontierTokenBag = assert(_getByName('Frontier Tokens Bag', 'Infinite'))
     frontierTokenBag.putObject(token)
 
     broadcastToAll('Exploring Frontier Token')

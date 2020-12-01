@@ -1762,6 +1762,9 @@ local TOGGLE_ACTIVE_STATE = {
 function _isToggleActiveCard(object)
     if object.tag == 'Card' then
         local modifier = _unitModifiers[object.getName()]
+        if modifier and modifier.alias then
+            modifier = _unitModifiers[modifier.alias]
+        end
         return modifier and modifier.toggleActive
     end
 end

@@ -708,16 +708,29 @@ function getDeckTransform(deckName)
     return deckAttributes and _getTransform(deckAttributes, 'deck')
 end
 
---- Get card names from a particular source.
-function getCards(source)
+--- Get decks with cards from the source (could be some, could be all).
+function getDecksWithSource(source)
     assert(type(source) == 'string')
     local result = {}
-    for _, deckAttributes in pairs(DECKS) do
+    for deckName, deckAttributes in pairs(DECKS) do
         for cardSource, cardNames in pairs(deckAttributes.cardNames) do
             if cardSource == source then
-                for _, cardName in ipairs(cardNames) do
-                    table.insert(result, cardName)
-                end
+                table.insert(result, deckName)
+            end
+        end
+    end
+    return result
+end
+
+--- Get card names from the given deck with the particular source.
+function getCardsWithSource(deckName, source)
+    assert(type(deckName) == 'string' and type(source) == 'string')
+    local deckAttributes = _getDeckAttributesByType(deckName)
+    local result = {}
+    for cardSource, cardNames in pairs(deckAttributes.cardNames) do
+        if cardSource == source then
+            for _, cardName in ipairs(cardNames) do
+                table.insert(result, cardName)
             end
         end
     end

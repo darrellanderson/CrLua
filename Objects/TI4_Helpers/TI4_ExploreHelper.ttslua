@@ -203,8 +203,8 @@ function checkCardForToken(object_spawned, tileGUID, planetName)
     local systemList = _systemHelper.systems()
     local tokenList = attachmentCardToTokenMap[cardName]
     
-    local tokensToRetrieveSet = {}
     if tokenList then
+        local tokensToRetrieveSet = {}
         for _, item in ipairs(tokenList) do
             tokensToRetrieveSet[item] = true
         end

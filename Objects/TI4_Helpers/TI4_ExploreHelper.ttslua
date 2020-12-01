@@ -1,7 +1,6 @@
 -- @author Darrell for context menu stuff
 -- @author Milty for adapting to exploration
 
-local explorationBagGUID = '763340'
 local attachmentCardToTokenMap = {
     ["Propulsion Research Facility - Technology Specialty"] = {"Blue Tech Specialty Token"},
     ["Cybernetic Research Facility - Technology Specialty"] = {"Yellow Tech Specialty Token"},
@@ -41,6 +40,23 @@ local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 
 -------------------------------------------------------------------------------
+
+local _getByNameCache = {}
+function _getByName(name, tag)
+    local guid = _getByNameCache[name]
+    local object = guid and getObjectFromGUID(guid)
+    if object and ((not tag) or object.tag == tag) then
+        return object
+    end
+    for _, object in ipairs(getAllObjects()) do
+        if object.getName() == name and ((not tag) or object.tag == tag) then
+            _getByNameCache[name] = object.getGUID()
+            return object
+        end
+    end
+    error('_getByName: missing "' .. name .. '"')
+end
+
 -------------------------------------------------------------------------------
 
 function onLoad(saveState)
@@ -86,25 +102,12 @@ function applyFrontierGoodness(object)
     object.addContextMenuItem('Explore Frontier', function() exploreFrontier(object) end, false)
 end
 
-
-function onObjectLeaveContainer(container, leaveObject)
-    if isSystemTile(leaveObject) then
-        applyExplorationGoodness(leaveObject)
-    elseif isFrontierToken(leaveObject) then
-        applyFrontierGoodness(leaveObject)
+function onObjectSpawn(object)
+    if isSystemTile(object) then
+        applyExplorationGoodness(object)
+    elseif isFrontierToken(object) then
+        applyFrontierGoodness(object)
     end
-end
-
-function onObjectEnterContainer(container, enterObject)
-    if isSystemTile(enterObject) then
-        clearGoodness(enterObject)
-    elseif isFrontierToken(enterObject) then
-        clearGoodness(enterObject)
-    end
-end
-
-function clearGoodness(object)
-    object.clearContextMenu()
 end
 
 function explorePlanet(tileGUID, planetName)
@@ -157,24 +160,6 @@ function explorePlanet(tileGUID, planetName)
     broadcastToAll('Exploring Planet: ' .. planetName)
 end
 
-local _frontierTokenBagGuid = nil
-function getFrontierTokenBag()
-    local frontierTokenBagObject = getObjectFromGUID(_frontierTokenBagGuid)
-    if frontierTokenBagObject then
-        return frontierTokenBagObject
-    end
-
-    local frontierTokenBagName = 'Frontier Tokens Bag'
-    for _, object in ipairs(getAllObjects()) do
-        if object.tag == 'Bag' and object.getName() == frontierTokenBagName then
-            _frontierTokenBagGuid = object.getGUID()
-            return object
-        end
-    end
-
-    assert(false, 'Unable to locate bag with name "' .. frontierTokenBagName .. '"')
-end
-
 function exploreFrontier(token)
     local tokenPos = token.getPosition()
     local tokenRot = token.getRotation()
@@ -192,7 +177,7 @@ function exploreFrontier(token)
         frontierDeck.setRotation({tokenRot.x, tokenRot.y, 0})
     end
 
-    local frontierTokenBag = assert(getFrontierTokenBag())
+    local frontierTokenBag = assert(_getByName('Frontier Tokens Bag', 'Bag'))
     frontierTokenBag.putObject(token)
 
     broadcastToAll('Exploring Frontier Token')
@@ -202,14 +187,14 @@ function checkCardForToken(object_spawned, tileGUID, planetName)
     local cardName = object_spawned.getName()
     local systemList = _systemHelper.systems()
     local tokenList = attachmentCardToTokenMap[cardName]
-    
+
     if tokenList then
         local tokensToRetrieveSet = {}
         for _, item in ipairs(tokenList) do
             tokensToRetrieveSet[item] = true
         end
 
-        local explorationBag = getObjectFromGUID(explorationBagGUID)
+        local explorationBag = _getByName('Exploration Bag', 'Bag')
         local explorationBagContents = explorationBag.getObjects()
         for _, token in ipairs(explorationBagContents) do
             if tokensToRetrieveSet[token.name] then

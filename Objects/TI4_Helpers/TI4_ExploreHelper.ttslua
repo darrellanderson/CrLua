@@ -14,8 +14,8 @@ local attachmentCardToTokenMap = {
     ["Paradise World"] = {"+2 Influence (Paradise World) Token"},
     ["Tomb of Emphidia"] = {"+1 Influence (Tomb of Emphidia) Token"},
     ["Demilitarized Zone"] = {"DMZ Token"},
-    ["Gamma Wormhole"] = {"Gamma Wormhole Token - Cultural"},
-    ["Gamma Relay"] = {"Gamma Wormhole Token - Frontier"},
+    ["Gamma Wormhole"] = {"Gamma Wormhole Token"},
+    ["Gamma Relay"] = {"Gamma Wormhole Token"},
     ["Mirage (Exploration)"] = {"Mirage Token", "Mirage", "Mirage Flight Academy"},
     ["Ion Storm"] = {"Ion Storm Token"},
 }
@@ -128,13 +128,21 @@ function explorePlanet(tileGUID, planetName)
             planetPos = planet.position
         end
     end
+    assert(planetTrait)
+
     deckType = traitMap[planetTrait]
 
-    local tile = getObjectFromGUID(tileGUID)
+    local tile = assert(getObjectFromGUID(tileGUID))
     local tilePos = tile.getPosition()
     local tileRot = tile.getRotation()
 
-    local exploreDeck = _deckHelper.getDeckWithReshuffle(deckType)
+    local exploreDeckGuid = _deckHelper.getDeckWithReshuffle(deckType)
+    if not exploreDeckGuid then
+        print('ERROR: Unable to locate ' .. deckType .. ' deck.')
+        return
+    end
+
+    local exploreDeck = assert(getObjectFromGUID(exploreDeckGuid))
 
     if exploreDeck.tag == 'Deck' then
         exploreDeck.takeObject({
@@ -194,27 +202,34 @@ function checkCardForToken(object_spawned, tileGUID, planetName)
     local cardName = object_spawned.getName()
     local systemList = _systemHelper.systems()
     local tokenList = attachmentCardToTokenMap[cardName]
+    
     if tokenList then
+        local tokensToRetrieveSet = {}
+        for _, item in ipairs(tokenList) do
+            tokensToRetrieveSet[item] = true
+        end
+
         local explorationBag = getObjectFromGUID(explorationBagGUID)
         local explorationBagContents = explorationBag.getObjects()
-        for _, item in ipairs(tokenList) do
-            for i, token in ipairs(explorationBagContents) do
-                if token.name == item then
-                    local objRot = object_spawned.getRotation()
-                    local techRot = 0
-                    if planetName then
-                        for _, planet in ipairs(systemList[tileGUID].planets) do
-                            if planet.name == planetName then
-                                if planet.tech ~= nil then techRot = 180 end
-                            end
+        for _, token in ipairs(explorationBagContents) do
+            if tokensToRetrieveSet[token.name] then
+                local objRot = object_spawned.getRotation()
+                local techRot = 0
+                if planetName then
+                    for _, planet in ipairs(systemList[tileGUID].planets) do
+                        if planet.name == planetName then
+                            if planet.tech ~= nil then techRot = 180 end
                         end
                     end
-                    explorationBag.takeObject({
-                        position = object_spawned.getPosition(),
-                        rotation = {objRot.x, objRot.y, techRot},
-                        guid = token.guid,
-                    })
                 end
+                explorationBag.takeObject({
+                    position = object_spawned.getPosition(),
+                    rotation = {objRot.x, objRot.y, techRot},
+                    guid = token.guid,
+                })
+
+                -- Only get each token once.
+                tokensToRetrieveSet[token.name] = nil
             end
         end
     end

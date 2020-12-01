@@ -128,10 +128,10 @@ local DECKS = {
                 'Form a Spy Network',
                 'Fuel the War Machine',
                 'Gather A Mighty Fleet',
-                'Learn Secrets of the Cosmos',
+                'Learn the Secrets of the Cosmos',
                 'Make an Example of Their World',
                 'Master the Laws of Physics',
-                'Mine Rare Metals',
+                'Mine Rare Minerals',
                 'Monopolize Production',
                 'Occupy the Seat of the Empire',
                 'Spark a Rebellion',
@@ -236,7 +236,7 @@ local DECKS = {
                 'Checks and Balances',
                 'Articles of War',
                 'Rearmament Agreement',
-                'Research Grant Allocation',
+                'Research Grant Reallocation',
                 'Covert Legislation',
                 'Minister of Antiquities',
                 'Search Warrant',
@@ -499,7 +499,7 @@ local DECKS = {
                 'Freelancers (1)',
                 'Freelancers (2)',
                 'Freelancers (3)',
-                'Demilitarized Zone',
+                'Demilitarized Zone (PoK)',
                 'Dyson Sphere',
                 'Paradise World',
                 'Tomb of Emphidia',
@@ -555,11 +555,11 @@ local DECKS = {
                 'Dominus Orb',
                 'Maw of Worlds',
                 'Scepter of Emelpar',
-                'Shard of the Throne',
+                'Shard of the Throne (PoK)',
                 'Stellar Converter',
                 'The Codex',
-                'The Crown of Emphidia',
-                'The Crown of Thalnos',
+                'The Crown of Emphidia (PoK)',
+                'The Crown of Thalnos (PoK)',
                 'The Obsidian',
                 "The Prophet's Tears",
                 },
@@ -789,7 +789,7 @@ function _processCardDiscardQueue()
         transform = _getTransform(deckAttributes, 'deck')
     end
 
-    transform.position.y = transform.position.y + 3 + (params.index or 0) / 10
+    transform.position.y = transform.position.y + 5 + (params.index or 0) / 10
 
     local container = false
     local cardObject = false

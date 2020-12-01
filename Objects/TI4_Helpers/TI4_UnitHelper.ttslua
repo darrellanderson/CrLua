@@ -935,7 +935,6 @@ local _unitModifiers = {
                     attr.groundCombat.hit = attr.groundCombat.hit - delta
                 end
             end
-
         end
     },
 
@@ -984,6 +983,7 @@ local _unitModifiers = {
         end
     },
 
+    ['The Crown of Thalnos (PoK)'] = { alias = 'The Crown of Thalnos' },
     ['The Crown of Thalnos'] = {
         description = 'Apply +1 to COMBAT rolls, player must destroy any units that do not produce at least one hit',
         owner = OWNER.SELF,

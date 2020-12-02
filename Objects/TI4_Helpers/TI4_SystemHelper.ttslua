@@ -1607,9 +1607,9 @@ function _addContextMenuItems(systemObject)
     systemObject.addContextMenuItem('Diplomacy System', function(clickerColor) onClickDiplomacySystem(clickerColor, systemObject) end, false)
 end
 
-function onObjectLeaveContainer(container, leaveObject)
-    if _systems[leaveObject.getGUID()] then
-        _addContextMenuItems(leaveObject)
+function onObjectSpawn(object)
+    if _systems[object.getGUID()] then
+        _addContextMenuItems(object)
     end
 end
 

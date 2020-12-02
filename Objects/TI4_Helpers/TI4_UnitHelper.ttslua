@@ -935,7 +935,6 @@ local _unitModifiers = {
                     attr.groundCombat.hit = attr.groundCombat.hit - delta
                 end
             end
-
         end
     },
 
@@ -984,6 +983,7 @@ local _unitModifiers = {
         end
     },
 
+    ['The Crown of Thalnos (PoK)'] = { alias = 'The Crown of Thalnos' },
     ['The Crown of Thalnos'] = {
         description = 'Apply +1 to COMBAT rolls, player must destroy any units that do not produce at least one hit',
         owner = OWNER.SELF,
@@ -1762,6 +1762,9 @@ local TOGGLE_ACTIVE_STATE = {
 function _isToggleActiveCard(object)
     if object.tag == 'Card' then
         local modifier = _unitModifiers[object.getName()]
+        if modifier and modifier.alias then
+            modifier = _unitModifiers[modifier.alias]
+        end
         return modifier and modifier.toggleActive
     end
 end

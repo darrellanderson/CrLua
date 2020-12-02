@@ -83,6 +83,7 @@ local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 local _getByNameCache = {}
+local _pendingActionSet = {}
 
 -------------------------------------------------------------------------------
 
@@ -382,6 +383,21 @@ function setupGameCoroutine()
     setup14ptGame(_config.is14ptGame)
     coroutine.yield(0)
 
+    if not _config.isRightClick then
+        packSelfIntoSetupBag()
+    end
+    coroutine.yield(0)
+
+    -- Wait for any pending actions (e.g. adding new public objectives).
+    local function hasPendingAction()
+        for _, _ in pairs(_pendingActionSet) do
+            return true
+        end
+    end
+    while hasPendingAction() do
+        coroutine.yield(0)
+    end
+
     _setupHelper.setup({
         playerCount = _config.playerCount,
         extraRings = _config.extraRings,
@@ -390,33 +406,8 @@ function setupGameCoroutine()
     })
     coroutine.yield(0)
 
-    if not _config.isRightClick then
-        packSelfIntoSetupBag()
-    end
-    coroutine.yield(0)
 
     return 1
-end
-
-function setupPoK(usePoK)
-    -- Placeholder, not sure yet how to split between here and setup helper.
-
-    local remove = {
-        'Alliance ($COLOR)',
-        'Leader Sheet ($COLOR)',
-        'Exploration Mat',
-        'Frontier Tokens Bag',
-    }
-
-    local add = {
-        ['PoK Actions'] = {
-            addToDeck = 'Actions'
-        },
-        ['Hazardous Exploration'] = {
-            addToDeck = 'Hazardous Exploration'
-        }
-    }
-
 end
 
 function setupCodex1ACs(useCodex1ACs)
@@ -434,6 +425,74 @@ function setup14ptGame(is14ptGame)
         scoreboard.setLock(false)
         scoreboard.flip()
         Wait.time(function() scoreboard.setLock(true) end, 5)
+    end
+end
+
+function setupPoK(usePoK)
+    local container = _getByName('Prophecy of Kings')
+    if not container then
+        error('setupPoK: missing box')
+    end
+
+    if usePoK then
+
+        -- Add cards.
+        local deckNames = _deckHelper.getDecksWithSource('PoK')
+        for _, deckName in ipairs(deckNames) do
+            _addCards(container.getName(), deckName, 'PoK')
+            coroutine.yield(0)
+        end
+
+        -- Add planet cards.
+        -- TODO
+
+        -- Add system tiles.
+        -- TODO
+
+    else
+
+        -- Remove cards.
+        local deckNames = _deckHelper.getDecksWithSource('PoK')
+        for _, deckName in ipairs(deckNames) do
+            _removeCards(container.getName(), deckName, 'PoK')
+            coroutine.yield(0)
+        end
+
+        -- Remove alliance promissory notes.
+        for _, object in ipairs(getAllObjects()) do
+            if object.tag == 'Deck' and string.match(object.getName(), '^Notes (.*)$') then
+                for _, entry in ipairs(object.getObjects()) do
+                    if string.match(entry.name, '^Alliance (.*)$') then
+                        object.takeObject({
+                            guid              = entry.guid,
+                            callback_function = function(card) container.putObject(card) end
+                        })
+                    end
+                end
+            end
+        end
+        coroutine.yield(0)
+
+        -- Remove other objects.
+        local removeNameSet = {}
+        for _, color in ipairs(Player.getColors()) do
+            removeNameSet['Leader Sheet (' .. color .. ')'] = true
+            removeNameSet['Exploration Mat'] = true
+            removeNameSet['Exploration Bag'] = true
+            removeNameSet['Frontier Tokens Bag'] = true
+        end
+        for _, object in ipairs(getAllObjects()) do
+            local name = object.getName()
+            if removeNameSet[name] then
+                container.putObject(object)
+            end
+            if object.tag == 'Bag' and string.match(name, '^.* Mech$') then
+                object.jointTo()
+                object.setLock(false)
+                container.putObject(object)
+            end
+        end
+        coroutine.yield(0)
     end
 end
 
@@ -473,7 +532,14 @@ function _getByName(name)
     end
 end
 
+--- Move a deck of cards named "sourceName deckName" from container to deck.
+-- E.g. "Codex 1 Actions" for Codex action cards.
 function _addCards(containerName, deckName, sourceName)
+    assert(type(containerName) == 'string' and type(deckName) == 'string' and type(sourceName) == 'string')
+
+    local key = '_addCards(' .. containerName .. ',' .. deckName .. ',' .. sourceName .. ')'
+    _pendingActionSet[key] = true
+
     local container = _getByName(containerName)
     if not container then
         error('_addCards: missing container "' .. containerName .. '"')
@@ -482,9 +548,11 @@ function _addCards(containerName, deckName, sourceName)
     local name = sourceName .. ' ' .. deckName
     local guid = false
     for _, entry in ipairs(container.getObjects()) do
-        if entry.name == name then
+        if entry.name == name or entry.name == deckName then
+            if guid then
+                error('_addCards: multiple "' .. name .. '" candidates')
+            end
             guid = entry.guid
-            break
         end
     end
     if not guid then
@@ -512,11 +580,16 @@ function _addCards(containerName, deckName, sourceName)
         if deck then
             deck.shuffle()
         end
+        _pendingActionSet[key] = nil
     end
-    Wait.time(delayedShuffle, 5)
+    Wait.time(delayedShuffle, 5 + math.random())
 end
 
+--- Move cards from the given source/deck to the container.  Will move a subset
+-- if the deck has other cards, or the whole deck otherwise.
 function _removeCards(containerName, deckName, sourceName)
+    assert(type(containerName) == 'string' and type(deckName) == 'string' and type(sourceName) == 'string')
+
     local container = _getByName(containerName)
     if not container then
         error('_removeCards: missing container "' .. containerName .. '"')
@@ -524,25 +597,65 @@ function _removeCards(containerName, deckName, sourceName)
 
     local deck = getObjectFromGUID(_deckHelper.getDeck(deckName))
     if not deck then
-        error('_removeCards: missing deck "' .. deckName .. '"')
+        --error('_removeCards: missing deck "' .. deckName .. '"')
+        return -- this is ok, deck starts put away
     end
 
+    local nameList = _deckHelper.getCardsWithSource({ deckName = deckName, source = sourceName })
+    if not nameList then
+        error('_removeCards: missing source "' .. sourceName .. '"')
+    end
     local nameSet = {}
-    for _, name in ipairs(_deckHelper.getCards(sourceName)) do
+    for _, name in ipairs(nameList) do
         nameSet[name] = true
     end
 
-    local position = deck.getPosition()
-    position.y = position.y + 5
+    local removeGuids = {}
     for _, entry in ipairs(deck.getObjects()) do
         if nameSet[entry.name] then
-            deck.takeObject({
+            table.insert(removeGuids, entry.guid)
+        end
+    end
+
+    if deck.getQuantity() == #removeGuids then
+        -- Move the whole deck.
+        container.putObject(deck)
+    else
+        -- Move the subset of cards.
+        local position = deck.getPosition()
+        position.y = position.y + 5
+        local createDeck = false
+        for _, guid in ipairs(removeGuids) do
+            local card = deck.takeObject({
+                guid              = guid,
                 position          = position,
-                callback_function = function(object) container.putObject(object) end,
                 smooth            = true,
-                guid              = entry.guid
             })
             position.y = position.y + 0.2
+            if createDeck then
+                local needYield = createDeck.tag == 'Card'
+                createDeck.setLock(false)
+                createDeck = createDeck.putObject(card)
+                createDeck.setLock(true)
+                while createDeck.spawning do
+                    coroutine.yield(0)
+                end
+                if needYield then
+                    -- give deck a little extra time to form
+                    coroutine.yield(0)
+                    coroutine.yield(0)
+                end
+            else
+                createDeck = card
+                createDeck.setLock(true)
+            end
+        end
+        if createDeck then
+            createDeck.setLock(false)
+            if createDeck.tag == 'Deck' then
+                createDeck.setName(sourceName .. ' ' .. deckName)
+            end
+            container.putObject(createDeck)
         end
     end
 end

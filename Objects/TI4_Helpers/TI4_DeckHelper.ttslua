@@ -128,10 +128,10 @@ local DECKS = {
                 'Form a Spy Network',
                 'Fuel the War Machine',
                 'Gather A Mighty Fleet',
-                'Learn Secrets of the Cosmos',
+                'Learn the Secrets of the Cosmos',
                 'Make an Example of Their World',
                 'Master the Laws of Physics',
-                'Mine Rare Metals',
+                'Mine Rare Minerals',
                 'Monopolize Production',
                 'Occupy the Seat of the Empire',
                 'Spark a Rebellion',
@@ -236,7 +236,7 @@ local DECKS = {
                 'Checks and Balances',
                 'Articles of War',
                 'Rearmament Agreement',
-                'Research Grant Allocation',
+                'Research Grant Reallocation',
                 'Covert Legislation',
                 'Minister of Antiquities',
                 'Search Warrant',
@@ -427,9 +427,9 @@ local DECKS = {
                 'Functioning Base (2)',
                 'Functioning Base (3)',
                 'Functioning Base (4)',
-                'Biotic Research Facility - Technology Specialty',
-                'Propulsion Research Facility - Technology Specialty',
-                'Cybernetic Research Facility - Technology Specialty',
+                'Biotic Research Facility',
+                'Propulsion Research Facility',
+                'Cybernetic Research Facility',
             },
         },
     },
@@ -499,7 +499,7 @@ local DECKS = {
                 'Freelancers (1)',
                 'Freelancers (2)',
                 'Freelancers (3)',
-                'Demilitarized Zone',
+                'Demilitarized Zone (PoK)',
                 'Dyson Sphere',
                 'Paradise World',
                 'Tomb of Emphidia',
@@ -555,11 +555,11 @@ local DECKS = {
                 'Dominus Orb',
                 'Maw of Worlds',
                 'Scepter of Emelpar',
-                'Shard of the Throne',
+                'Shard of the Throne (PoK)',
                 'Stellar Converter',
                 'The Codex',
-                'The Crown of Emphidia',
-                'The Crown of Thalnos',
+                'The Crown of Emphidia (PoK)',
+                'The Crown of Thalnos (PoK)',
                 'The Obsidian',
                 "The Prophet's Tears",
                 },
@@ -708,16 +708,31 @@ function getDeckTransform(deckName)
     return deckAttributes and _getTransform(deckAttributes, 'deck')
 end
 
---- Get card names from a particular source.
-function getCards(source)
+--- Get decks with cards from the source (could be some, could be all).
+function getDecksWithSource(source)
     assert(type(source) == 'string')
     local result = {}
-    for _, deckAttributes in pairs(DECKS) do
+    for deckName, deckAttributes in pairs(DECKS) do
         for cardSource, cardNames in pairs(deckAttributes.cardNames) do
             if cardSource == source then
-                for _, cardName in ipairs(cardNames) do
-                    table.insert(result, cardName)
-                end
+                table.insert(result, deckName)
+            end
+        end
+    end
+    return result
+end
+
+--- Get card names from the given deck with the particular source.
+function getCardsWithSource(params)
+    local deckName = params.deckName
+    local source = params.source
+    assert(type(deckName) == 'string' and type(source) == 'string')
+    local deckAttributes = _getDeckAttributesByType(deckName)
+    local result = {}
+    for cardSource, cardNames in pairs(deckAttributes.cardNames) do
+        if cardSource == source then
+            for _, cardName in ipairs(cardNames) do
+                table.insert(result, cardName)
             end
         end
     end
@@ -776,7 +791,7 @@ function _processCardDiscardQueue()
         transform = _getTransform(deckAttributes, 'deck')
     end
 
-    transform.position.y = transform.position.y + 3 + (params.index or 0) / 10
+    transform.position.y = transform.position.y + 5 + (params.index or 0) / 10
 
     local container = false
     local cardObject = false
@@ -797,7 +812,7 @@ function _processCardDiscardQueue()
                     break
                 end
             end
-            assert(found)
+            assert(found, 'card not found')
         end
     else
         -- Find card on the table.
@@ -820,7 +835,7 @@ function _processCardDiscardQueue()
             smooth            = false,
         })
         container.setLock(isLocked)
-        assert(cardObject)
+        assert(cardObject, 'take card from deck failed')
     else
         error('discard card: no card or container to look for one ("' .. (params.name or '') .. '")')
     end
@@ -944,7 +959,9 @@ function _processDeckDiscardQueue()
                 container.putObject(deckObject)
             end
         end
-        Wait.frames(delayedFinish, 6 + 2 * numAccepted)
+        -- Give discard time to remove cards before stowing deck.
+        -- (Plus a little extra for TTS to update the deck object.)
+        Wait.frames(delayedFinish, 30 + 3 * numAccepted)
     end
 end
 

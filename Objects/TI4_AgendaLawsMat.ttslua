@@ -58,6 +58,9 @@ function isRelevantCard(enterObject)
 end
 
 function onObjectEnterScriptingZone(zone, enterObject)
+    if not enterObject then
+        return
+    end
     if zone == _scriptingZone and isRelevantCard(enterObject) then
         enterObject.setScale({
             x = CARD_SCALE_XZ,
@@ -67,11 +70,12 @@ function onObjectEnterScriptingZone(zone, enterObject)
         _attachedGuidToName[enterObject.getGUID()] = enterObject.getName()
         recomputeLaws()
     end
-
-    local size = enterObject.getBoundsNormalized().size
 end
 
 function onObjectLeaveScriptingZone(zone, leaveObject)
+    if not leaveObject then
+        return
+    end
     if zone == _scriptingZone and isRelevantCard(leaveObject) then
         leaveObject.setScale({
             x = 1,

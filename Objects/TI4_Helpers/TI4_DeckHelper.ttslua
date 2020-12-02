@@ -723,7 +723,9 @@ function getDecksWithSource(source)
 end
 
 --- Get card names from the given deck with the particular source.
-function getCardsWithSource(deckName, source)
+function getCardsWithSource(params)
+    local deckName = params.deckName
+    local source = params.source
     assert(type(deckName) == 'string' and type(source) == 'string')
     local deckAttributes = _getDeckAttributesByType(deckName)
     local result = {}

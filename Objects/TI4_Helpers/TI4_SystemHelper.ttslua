@@ -446,6 +446,7 @@ local _systems = {
 }
 
 local _nonPlanetResourceInfluenceCards = {
+  -- Planet attachment cards
   { name = 'Core Mining', resources = 2, influence = 0 },
   { name = 'Terraforming Initiative', resources = 1, influence = 1 },
   { name = 'Senate Sanctuary', resources = 0, influence = 2 },
@@ -461,6 +462,16 @@ local _nonPlanetResourceInfluenceCards = {
   { name = 'Propulsion Research Facility', resources = 1, influence = 1 },
   { name = 'Terraform', resources = 1, influence = 1 },
   { name = 'Ul the Progenitor', resources = 3, influence = 3, requireFaceUp = true },
+
+  -- Technology
+  -- Predictive Intelligence: Increase minimum available votes by 3.
+  { name = 'Predictive Intelligence', resources = 0, influence = 3, requireFaceUp = true },
+}
+
+local TYPE = {
+    MUTATE = 'mutate', -- adds or removes attribute(s), do first.
+    ADJUST = 'adjust',  -- adjusts existing attribute(s).
+    CHOOSE = 'choose',  -- picks from available unit(s), do after all others.
 }
 
 local LEADER = {
@@ -471,7 +482,8 @@ local LEADER = {
 
 local _resInfModifiers = {
     ['Elder Qanoj'] = {
-        description = '',
+        description = 'Each planet you exhaust to cast votes provides 1 additional vote.',
+        type = TYPE.ADJUST,
         leader = LEADER.COMMANDER, -- Xxcha
         apply = function(resInfCards)
             local planetNameSet = {}
@@ -487,7 +499,25 @@ local _resInfModifiers = {
                 end
             end
         end
-    }
+    },
+
+    ['Zeal'] = {
+        description = 'When you cast at least 1 vote, cast 1 additional vote for each player in the game, including you.',
+        type = TYPE.CHOOSE,
+        apply = function(resInfCards)
+            -- Only applies if votes would otherwise be >0
+            local votesAvailable = false
+            for _, resInfCard in ipairs(resInfCards) do
+                votesAvailable = votesAvailable or (resInfCard.influence > 0)
+            end
+
+            if votesAvailable then
+                local seatedPlayerZones = _zoneHelper.zones()
+
+                table.insert( resInfCards, { name = 'Zeal', resources = 0, influence = #seatedPlayerZones } )
+            end
+        end
+    },
 }
 
 local LOCAL_DISTANCE_TO_PLANET = 1.1
@@ -852,6 +882,15 @@ function getColorToResInfModifiers()
         addModifier(color, name)
     end
 
+    -- Add faction abilities
+    for color, faction in pairs(_factionHelper.allFactions()) do
+        for _, ability in ipairs(faction and faction.abilities or {}) do
+            if _resInfModifiers[ability] then
+                addModifier(color, ability)
+            end
+        end
+    end
+
     -- Apply alliances, imperia.
     local colorToCommanders = _factionHelper.getColorToCommanders()
     for color, commanders in pairs(colorToCommanders) do
@@ -873,13 +912,34 @@ function applyResInfModifiers(params)
     assert(type(params.modifiers) == 'table')
 
     local cards = copyTable(params.cards)  -- do not modify in place
+
+    -- Apply MUTATE first to add/remove attributes.
     for _, modifier in ipairs(params.modifiers) do
         assert(type(modifier) == 'string')
         local modifier = _resInfModifiers[modifier]
-        if modifier then
+        if modifier and modifier.type == TYPE.MUTATE then
             modifier.apply(cards)
         end
     end
+
+    -- Apply ADJUST to update (but not add/remove) values.
+    for _, modifier in ipairs(params.modifiers) do
+        assert(type(modifier) == 'string')
+        local modifier = _resInfModifiers[modifier]
+        if modifier and modifier.type == TYPE.ADJUST then
+            modifier.apply(cards)
+        end
+    end
+
+    -- Apply CHOOSE to apply effects based on adjusted attributes.
+    for _, modifier in ipairs(params.modifiers) do
+        assert(type(modifier) == 'string')
+        local modifier = _resInfModifiers[modifier]
+        if modifier and modifier.type == TYPE.CHOOSE then
+            modifier.apply(cards)
+        end
+    end
+
     return cards
 end
 

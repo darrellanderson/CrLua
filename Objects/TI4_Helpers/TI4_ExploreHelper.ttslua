@@ -62,7 +62,7 @@ end
 function onLoad(saveState)
     self.setColorTint({ r = 0.25, g = 0.25, b = 0.25 })
     self.setScale({ x = 2, y = 0.01, z = 2 })
-    self.setName('TI4_Explorer')
+    self.setName('TI4_EXPLORE_HELPER')
     self.setDescription('Adds right-click exploration options to system tiles and frontier tokens, PLEASE LEAVE ON TABLE! This object is only visible to the black (GM) player.')
 
     -- Only the GM/black player can see this object.  Others can still interact!
@@ -87,6 +87,7 @@ function onLoad(saveState)
 end
 
 function applyExplorationGoodness(object)
+    assert(type(object) == 'userdata')
     local systemList = _systemHelper.systems()
     local planetList = systemList[object.getGUID()].planets
     if planetList ~= nil then
@@ -99,6 +100,7 @@ function applyExplorationGoodness(object)
 end
 
 function applyFrontierGoodness(object)
+    assert(type(object) == 'userdata')
     object.addContextMenuItem('Explore Frontier', function() exploreFrontier(object) end, false)
 end
 
@@ -144,37 +146,65 @@ function explorePlanet(tileGUID, planetName)
         print('ERROR: Unable to locate ' .. deckType .. ' deck.')
         return
     end
-
     local exploreDeck = assert(getObjectFromGUID(exploreDeckGuid))
+
+    local position = tile.positionToWorld(planetPos)
+    position.y = position.y + 3
+    local rotation = { x = 0, y = tileRot.y, z = 0 }
 
     if exploreDeck.tag == 'Deck' then
         exploreDeck.takeObject({
-          position = tile.positionToWorld({planetPos.x, planetPos.y + 1, planetPos.z}),
-          rotation = {tileRot.x, tileRot.y, 0},
+          position = position,
+          rotation = rotation,
           callback_function = function(obj) checkCardForToken(obj, tileGUID, planetName) end,
+          smooth = true
         })
+    elseif exploreDeck.tag == 'Card' then
+        local collide = false
+        local fast = true
+        exploreDeck.setPositionSmooth(position, collide, fast)
+        exploreDeck.setRotationSmooth(rotation, collide, fast)
     else
-        exploreDeck.setPosition(tile.positionToWorld({planetPos.x, planetPos.y + 1, planetPos.z}))
-        exploreDeck.setRotation({tileRot.x, tileRot.y, 0})
+        error('exploreFrontier: bad "' .. deckType .. '" deck')
     end
     broadcastToAll('Exploring Planet: ' .. planetName)
 end
 
 function exploreFrontier(token)
+    assert(type(token) == 'userdata')
+
     local tokenPos = token.getPosition()
     local tokenRot = token.getRotation()
 
-    local frontierDeck = _deckHelper.getDeckWithReshuffle('Frontier Exploration')
+    local frontierDeckGuid = _deckHelper.getDeckWithReshuffle('Frontier Exploration')
+    if not frontierDeckGuid then
+        print('ERROR: Unable to locate "Frontier Exploration" deck.')
+        return
+    end
+    local frontierDeck = assert(getObjectFromGUID(frontierDeckGuid))
+
+    local position = { x = tokenPos.x, y = tokenPos.y + 3, z = tokenPos.z }
+    local rotation = { x = 0, y = 0, z = 0 }
+    local system = _systemHelper.systemFromPosition(tokenPos)
+    local systemObject = system and getObjectFromGUID(system.guid)
+    if systemObject then
+        rotation.y = systemObject.getRotation().y
+    end
 
     if frontierDeck.tag == 'Deck' then
         frontierDeck.takeObject({
-          position = {tokenPos.x, tokenPos.y + 1, tokenPos.z},
-          rotation = {tokenRot.x, tokenRot.y, 0},
-          callback_function = function(obj) checkCardForToken(obj, '', false) end,
+            position = position,
+            rotation = rotation,
+            callback_function = function(obj) checkCardForToken(obj, '', false) end,
+            smooth = true
         })
+    elseif frontierDeck.tag == 'Card' then
+        local collide = false
+        local fast = true
+        frontierDeck.setPositionSmooth(position, collide, fast)
+        frontierDeck.setRotationSmooth(rotation, collide, fast)
     else
-        frontierDeck.setPosition({tokenPos.x, tokenPos.y + 1, tokenPos.z})
-        frontierDeck.setRotation({tokenRot.x, tokenRot.y, 0})
+        error('exploreFrontier: bad "Frontier Exploration" deck')
     end
 
     local frontierTokenBag = assert(_getByName('Frontier Tokens Bag', 'Infinite'))
@@ -196,7 +226,7 @@ function checkCardForToken(object_spawned, tileGUID, planetName)
 
         local explorationBag = _getByName('Exploration Bag', 'Bag')
         local explorationBagContents = explorationBag.getObjects()
-        for _, token in ipairs(explorationBagContents) do
+        for i, token in ipairs(explorationBagContents) do
             if tokensToRetrieveSet[token.name] then
                 local objRot = object_spawned.getRotation()
                 local techRot = 0
@@ -207,8 +237,10 @@ function checkCardForToken(object_spawned, tileGUID, planetName)
                         end
                     end
                 end
+                local position = object_spawned.getPosition()
+                position.y = position.y + 3 + i
                 explorationBag.takeObject({
-                    position = object_spawned.getPosition(),
+                    position = position,
                     rotation = {objRot.x, objRot.y, techRot},
                     guid = token.guid,
                 })
@@ -261,7 +293,7 @@ function systemShouldGetFrontierToken(system)
 end
 
 function _placeFrontierTokensCoroutine()
-    local frontierTokenBag = assert(getFrontierTokenBag())
+    local frontierTokenBag = assert(_getByName('Frontier Tokens Bag'))
 
     local guidToSystem = _systemHelper.systems()
     local emptySystemGuidToTokenPositions = {}
@@ -298,7 +330,6 @@ function _placeFrontierTokensCoroutine()
                 position = { x = tokenPosition.x, y = tokenPosition.y + 3, z = tokenPosition.z },
                 smooth   = true,
             })
-
             coroutine.yield(0)
         end
     end
@@ -311,7 +342,7 @@ function placeFrontierTokens()
 end
 
 function retrieveFrontierTokens()
-    local frontierTokenBag = assert(getFrontierTokenBag())
+    local frontierTokenBag = assert(_getByName('Frontier Tokens Bag'))
 
     -- Grab all frontier tokens, from everywhere.
     for _, object in ipairs(getAllObjects()) do
@@ -320,3 +351,14 @@ function retrieveFrontierTokens()
         end
     end
 end
+
+-------------------------------------------------------------------------------
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

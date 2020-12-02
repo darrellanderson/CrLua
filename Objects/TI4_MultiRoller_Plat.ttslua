@@ -195,6 +195,9 @@ function createUi()
         _allPossibleUnitAttrs['Cruiser']['disablePlanetaryShield'] = true -- 2Ram
         _allPossibleUnitAttrs['Dreadnought']['disablePlanetaryShield'] = true -- 2Ram
 
+        _allPossibleUnitAttrs['Mech']['bombardment'] = {} -- L1Z1X Mech
+        _allPossibleUnitAttrs['Mech']['spaceCannon'] = {} -- Xxcha Mech
+
         _getUnitDataLastRefreshFrame = false  -- make sure not cached!
         _injectExtraUnitUpgrades = false
         _injectExtraModifiers = false

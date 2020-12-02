@@ -2,21 +2,22 @@
 -- @author Milty for adapting to exploration
 
 local attachmentCardToTokenMap = {
-    ["Propulsion Research Facility"] = {"Blue Tech Specialty Token"},
-    ["Cybernetic Research Facility"] = {"Yellow Tech Specialty Token"},
-    ["Biotic Research Facility"] = {"Green Tech Specialty Token"},
-    ["Warfare Research Facility"] = {"Red Tech Specialty Token"},
-    ["Lazax Survivors"] = {"+1 Resource +2 Influence (Lazax Survivors) Token"},
-    ["Rich World"] = {"+1 Resource (Rich World) Token"},
-    ["Mining World"] = {"+2 Resource (Mining World) Token"},
-    ["Dyson Sphere"] = {"+2 Resource +1 Influence (Dyson Sphere) Token"},
-    ["Paradise World"] = {"+2 Influence (Paradise World) Token"},
-    ["Tomb of Emphidia"] = {"+1 Influence (Tomb of Emphidia) Token"},
+    ["Propulsion Research Facility"] = {"Propulsion Research Facility Token"}, -- 1r1i or blue
+    ["Cybernetic Research Facility"] = {"Cybernetic Research Facility Token"}, -- 1r1i or yellow
+    ["Biotic Research Facility"] = {"Biotic Research Facility Token"}, -- 1r1i or green
+    ["Warfare Research Facility"] = {"Warfare Research Facility Token"}, -- 1r1i or red
+    ["Lazax Survivors"] = {"Lazax Survivors Token"}, -- 1r2i
+    ["Rich World"] = {"Rich World Token"}, -- 1r
+    ["Mining World"] = {"Mining World Token"}, -- 2r
+    ["Dyson Sphere"] = {"Dyson Sphere Token"}, -- 2r1i
+    ["Paradise World"] = {"Paradise World Token"}, -- 2i
+    ["Tomb of Emphidia"] = {"Tomb of Emphidia Token"}, -- 1i
     ["Demilitarized Zone"] = {"DMZ Token"},
     ["Gamma Wormhole"] = {"Gamma Wormhole Token"},
     ["Gamma Relay"] = {"Gamma Wormhole Token"},
     ["Mirage (Exploration)"] = {"Mirage Token", "Mirage", "Mirage Flight Academy"},
     ["Ion Storm"] = {"Ion Storm Token"},
+    ["Stellar Converter"] = {"Stellar Converter Token"},
 }
 
 local data = {}
@@ -109,6 +110,18 @@ function onObjectSpawn(object)
         applyExplorationGoodness(object)
     elseif isFrontierToken(object) then
         applyFrontierGoodness(object)
+    end
+
+    -- Give token when card is drawn.
+    if object.tag == 'Card' and object.getName() == 'Stellar Converter' then
+        local guid = object.guid
+        local function delayedCheck()
+            local object = getObjectFromGUID(guid)
+            if object then
+                checkCardForToken(object, false, false)
+            end
+        end
+        Wait.time(delayedCheck, 5)
     end
 end
 
@@ -215,7 +228,6 @@ end
 
 function checkCardForToken(object_spawned, tileGUID, planetName)
     local cardName = object_spawned.getName()
-    local systemList = _systemHelper.systems()
     local tokenList = attachmentCardToTokenMap[cardName]
 
     if tokenList then
@@ -231,7 +243,8 @@ function checkCardForToken(object_spawned, tileGUID, planetName)
                 local objRot = object_spawned.getRotation()
                 local techRot = 0
                 if planetName then
-                    for _, planet in ipairs(systemList[tileGUID].planets) do
+                    local system = _systemHelper.systemFromGuid(tileGUID)
+                    for _, planet in ipairs(system.planets) do
                         if planet.name == planetName then
                             if planet.tech ~= nil then techRot = 180 end
                         end

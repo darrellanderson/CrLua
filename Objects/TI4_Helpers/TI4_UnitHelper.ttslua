@@ -172,7 +172,7 @@ local _unitOverrides = {
     ['Super-Dreadnought II'] = { upgrade = 'Dreadnought', bombardment = { dice = 1, hit = 4 }, spaceCombat = { hit = 4 }, move = 2, capacity = 2 },
     -- PoK faction unit overrides and upgrades
     ['Strike Wing Alpha I'] = { override = 'Destroyer', spaceCombat = { hit = 8 }, capacity = 1 },
-    ['Strike Wing Alpha II'] = { upgrade = 'Destroyer', antiFighterBarrage = { dice = 3, hit = 6 }, spaceCombat = { hit = 7 }, capacity = 1 },
+    ['Strike Wing Alpha II'] = { upgrade = 'Destroyer', antiFighterBarrage = { dice = 3, hit = 6, extraHitsOn = { value = 9, message = '${PlayerName} destroys ${ExtraHits} of the opponent\'s Infantry in the space area.' } }, spaceCombat = { hit = 7 }, capacity = 1 },
     ['Crimson Legionnaire I'] = { override = 'Infantry', groundCombat = { hit = 8 } },
     ['Crimson Legionnaire II'] = { upgrade = 'Infantry', groundCombat = { hit = 7 } },
     ['Saturn Engine I'] = { override = 'Cruiser', spaceCombat = { hit = 7 }, capacity = 1 },
@@ -569,7 +569,9 @@ local _unitModifiers = {
         apply = function(unitAttrs, params)
             local best = false
             for unitType, attr in pairs(unitAttrs) do
-                if attr.groundCombat and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                -- Check for units present, then check for dynamically injected units, then default to 0
+                local unitCount = params.myUnitTypeToCount[unitType] or attr.unitCount or 0
+                if attr.groundCombat and unitCount > 0 then
                     if (not best) or attr.groundCombat.hit < best.groundCombat.hit then
                         best = attr
                     end
@@ -763,7 +765,9 @@ local _unitModifiers = {
         apply = function(unitAttrs, params)
             local best = false
             for unitType, attr in pairs(unitAttrs) do
-                if attr.spaceCannon and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                -- Check for units present, then check for dynamically injected units, then default to 0
+                local unitCount = params.myUnitTypeToCount[unitType] or attr.unitCount or 0
+                if attr.spaceCannon and unitCount > 0 then
                     if (not best) or attr.spaceCannon.hit < best.spaceCannon.hit then
                         best = attr
                     end
@@ -774,7 +778,9 @@ local _unitModifiers = {
             end
             local best = false
             for unitType, attr in pairs(unitAttrs) do
-                if attr.bombardment and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                -- Check for units present, then check for dynamically injected units, then default to 0
+                local unitCount = params.myUnitTypeToCount[unitType] or attr.unitCount or 0
+                if attr.bombardment and unitCount > 0 then
                     if (not best) or attr.bombardment.hit < best.bombardment.hit then
                         best = attr
                     end
@@ -867,9 +873,11 @@ local _unitModifiers = {
         type = TYPE.CHOOSE,
         excludeFaction = 'The Argent Flight',
         apply = function(unitAttrs, params)
-            best = false
+            local best = false
             for unitType, attr in pairs(unitAttrs) do
-                if attr.antiFighterBarrage and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                -- Check for units present, then check for dynamically injected units, then default to 0
+                local unitCount = params.myUnitTypeToCount[unitType] or attr.unitCount or 0
+                if attr.antiFighterBarrage and unitCount > 0 then
                     if (not best) or (attr.antiFighterBarrage.hit < best.antiFighterBarrage.hit) then
                         best = attr
                     end
@@ -878,9 +886,11 @@ local _unitModifiers = {
             if best then
                 best.antiFighterBarrage.extraDice = (best.antiFighterBarrage.extraDice or 0) + 1
             end
-            best = false
+            local best = false
             for unitType, attr in pairs(unitAttrs) do
-                if attr.bombardment and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                -- Check for units present, then check for dynamically injected units, then default to 0
+                local unitCount = params.myUnitTypeToCount[unitType] or attr.unitCount or 0
+                if attr.bombardment and unitCount > 0 then
                     if (not best) or (attr.bombardment.hit < best.bombardment.hit) then
                         best = attr
                     end
@@ -889,9 +899,11 @@ local _unitModifiers = {
             if best then
                 best.bombardment.extraDice = (best.bombardment.extraDice or 0) + 1
             end
-            best = false
+            local best = false
             for unitType, attr in pairs(unitAttrs) do
-                if attr.spaceCannon and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                -- Check for units present, then check for dynamically injected units, then default to 0
+                local unitCount = params.myUnitTypeToCount[unitType] or attr.unitCount or 0
+                if attr.spaceCannon and unitCount > 0 then
                     if (not best) or (attr.spaceCannon.hit < best.spaceCannon.hit) then
                         best = attr
                     end
@@ -915,6 +927,27 @@ local _unitModifiers = {
                 end
                 if attr.groundCombat then
                     attr.groundCombat.hit = attr.groundCombat.hit - 1
+                end
+            end
+        end
+    },
+
+    ['Ta Zern'] = {
+        description = 'You may reroll any dice. (When active will reroll all misses)',
+        leader = LEADER.COMMANDER,
+        owner = OWNER.SELF,
+        type = TYPE.ADJUST,
+        toggleActive = true,
+        apply = function(unitAttrs)
+            for unitType, attr in pairs(unitAttrs) do
+                if attr.spaceCannon then
+                    attr.spaceCannon.rerollMisses = true
+                end
+                if attr.bombardment then
+                    attr.bombardment.rerollMisses = true
+                end
+                if attr.antiFighterBarrage then
+                    attr.antiFighterBarrage.rerollMisses = true
                 end
             end
         end
@@ -1010,36 +1043,42 @@ local _unitModifiers = {
         apply = function(unitAttrs, params)
             local best = false
             for unitType, attr in pairs(unitAttrs) do
-                if attr.antiFighterBarrage and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                -- Check for units present, then check for dynamically injected units, then default to 0
+                local unitCount = params.myUnitTypeToCount[unitType] or attr.unitCount or 0
+                if attr.antiFighterBarrage and unitCount > 0 then
                     if (not best) or (attr.antiFighterBarrage.hit < best.antiFighterBarrage.hit) then
                         best = attr
                     end
                 end
-                if best then
-                    best.antiFighterBarrage.extraDice = (best.antiFighterBarrage.extraDice or 0) + 1
-                end
+            end
+            if best then
+                best.antiFighterBarrage.extraDice = (best.antiFighterBarrage.extraDice or 0) + 1
             end
             local best = false
             for unitType, attr in pairs(unitAttrs) do
-                if attr.bombardment and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                -- Check for units present, then check for dynamically injected units, then default to 0
+                local unitCount = params.myUnitTypeToCount[unitType] or attr.unitCount or 0
+                if attr.bombardment and unitCount > 0 then
                     if (not best) or (attr.bombardment.hit < best.bombardment.hit) then
                         best = attr
                     end
                 end
-                if best then
-                    best.bombardment.extraDice = (best.bombardment.extraDice or 0) + 1
-                end
+            end
+            if best then
+                best.bombardment.extraDice = (best.bombardment.extraDice or 0) + 1
             end
             local best = false
             for unitType, attr in pairs(unitAttrs) do
-                if attr.spaceCannon and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                -- Check for units present, then check for dynamically injected units, then default to 0
+                local unitCount = params.myUnitTypeToCount[unitType] or attr.unitCount or 0
+                if attr.spaceCannon and unitCount > 0 then
                     if (not best) or (attr.spaceCannon.hit < best.spaceCannon.hit) then
                         best = attr
                     end
                 end
-                if best then
-                    best.spaceCannon.extraDice = (best.spaceCannon.extraDice or 0) + 1
-                end
+            end
+            if best then
+                best.spaceCannon.extraDice = (best.spaceCannon.extraDice or 0) + 1
             end
         end
     },
@@ -1069,7 +1108,9 @@ local _unitModifiers = {
         apply = function(unitAttrs, params)
             local best = false
             for unitType, attr in pairs(unitAttrs) do
-                if attr.spaceCombat and (params.myUnitTypeToCount[unitType] or 0) > 0 then
+                -- Check for units present, then check for dynamically injected units, then default to 0
+                local unitCount = params.myUnitTypeToCount[unitType] or attr.unitCount or 0
+                if attr.spaceCombat and unitCount > 0 then
                     if (not best) or (attr.spaceCombat.hit < best.spaceCombat.hit) then
                         best = attr
                     end
@@ -1378,9 +1419,17 @@ function getColorToUnitModifiers()
 
     -- Add commanders (including Alliance and Imperia sharing).
     local colorToCommanders = _factionHelper.getColorToCommanders()
+    local toggleActiveCommanderToColor = {}
     for color, commanders in pairs(colorToCommanders) do
         for _, commander in ipairs(commanders) do
-            addModifier(color, commander)
+            local unitModifier = _unitModifiers[commander]
+            if not unitModifier or not unitModifier.toggleActive then
+                addModifier(color, commander)
+            else
+                -- Toggle Active commanders require additional checks
+                toggleActiveCommanderToColor[commander] = toggleActiveCommanderToColor[commander] or {}
+                table.insert(toggleActiveCommanderToColor[commander], color)
+            end
         end
     end
 
@@ -1456,6 +1505,15 @@ function getColorToUnitModifiers()
                 local color = _zoneHelper.zoneFromPosition(object.getPosition())
                 if sardakk and sardakk.color and sardakk.color ~= color then
                     addModifier(sardakk.color, name)
+                end
+            end
+
+            local commanderColors = toggleActiveCommanderToColor[name]
+            if commanderColors then
+                -- This object has passed any 'toggle active' checks. Add commander to specified colors.
+                -- These come from faction.commander, Alliance promissory notes, and Imperia
+                for _, color in ipairs(commanderColors) do
+                    addModifier(color, name)
                 end
             end
 

@@ -761,8 +761,20 @@ end
 
 function setUnitCount(unit, count)
     assert(type(unit) == 'string' and type(count) == 'number')
-    self.UI.setValue(unit .. ".unitCount", count)
-    _unitTypeToCount[unit] = count
+
+    -- Restrict to allowable unit types
+    -- Non-basic unit types may be dynamically injected;
+    -- we don't want to keep (and subsequently override)
+    -- any dynamic state. So when setting up a roll from
+    -- the "inject" method, ensure we are only tracking
+    -- the known unit types.
+    for _, unitType in ipairs(UNIT_TYPES) do
+        if unitType == unit then
+            self.UI.setValue(unit .. ".unitCount", count)
+            _unitTypeToCount[unit] = count
+            return
+        end
+    end
 end
 
 function getUnitCount(unit)
@@ -1049,7 +1061,7 @@ function Roller_RollDiceCoroutine()
     -- Wait for dice, extract roll values.
     local timeout = Time.time + 3
     for _, dice in ipairs(Roller._dice) do
-        dice._rollValues = {}
+        dice._rollData = {}
         for _, guid in ipairs(dice._guids) do
             local die = false
             while true do
@@ -1061,14 +1073,73 @@ function Roller_RollDiceCoroutine()
                 end
             end
             if die then
-                table.insert(dice._rollValues, die.getValue() or 0)
+                local rollData = { guid = guid, finalValue = die.getValue() or 0 }
+                table.insert(dice._rollData, rollData)
                 die.interactable = true
             end
         end
     end
     coroutine.yield(0)
 
+    -- Find dice that reroll-on-miss, and prep them for reroll.
+    local conductRerolls = false
+    for _, dice in ipairs(Roller._dice) do
+        local rerollMisses = dice.rerollMisses or false
+        if rerollMisses then
+            dice._rerollGuids = {}
+            for _, rollData in ipairs(dice._rollData) do
+                local guid = rollData.guid
+                local origValue = rollData.finalValue
+
+                -- Track dice GUID for reroll
+                -- Set the die's "initial roll" value, unset it's "final roll" value
+                if origValue < dice.hitValue then
+                    table.insert(dice._rerollGuids, guid)
+                    rollData.origValue = origValue
+                    rollData.finalValue = false
+                    conductRerolls = true
+                end
+            end
+        end
+    end
+
+    -- For any rerolls found, roll the dice! And watch for results.
+    if conductRerolls then
+        -- Roll dice in _rerollGuids
+        for _, dice in ipairs(Roller._dice) do
+            for _, guid in ipairs(dice._rerollGuids or {}) do
+                local die = getObjectFromGUID(guid)
+                die.interactable = false
+                die.roll()
+            end
+        end
+        coroutine.yield(0)
+
+        -- Watch ALL dice, and update the 'final value' 
+        local timeout = Time.time + 3
+        for _, dice in ipairs(Roller._dice) do
+            for _, rollData in ipairs(dice._rollData) do
+                local die = false
+                while true do
+                    die = getObjectFromGUID(rollData.guid)  -- re-get every time, can be deleted
+                    if die and (not die.resting) and Time.time < timeout then
+                        coroutine.yield(0)
+                    else
+                        break
+                    end
+                end
+                -- If we have a die, but not a final result, set the final result
+                if die and not rollData.finalValue then
+                    rollData.finalValue = die.getValue() or 0
+                    die.interactable = true
+                end
+            end
+        end
+        coroutine.yield(0)
+    end
+
     -- Generate report.
+    local specialMessages = {}
     local message = {}
     local hits = 0
     for _, dice in ipairs(Roller._dice) do
@@ -1079,28 +1150,49 @@ function Roller_RollDiceCoroutine()
         item = item .. ']: '
 
         local rollValues = {}
+        local critCount = 0
         local unitHitCount = 0
-        for _, rollValue in ipairs(dice._rollValues) do
+        for i, rollData in ipairs(dice._rollData) do
+            local rollValue = rollData.finalValue
+            local prefix = ''
             local suffix = ''
             if rollValue >= dice.hitValue then
                 hits = hits + 1
                 unitHitCount = unitHitCount + 1
                 suffix = '#'
             end
-            if dice.critCount and dice.critValue and (rollValue >= dice.critValue) then
-                hits = hits + dice.critCount
-                unitHitCount = unitHitCount + dice.critCount
-                for _ = 1, dice.critCount do
-                    suffix = suffix .. '#'
+            if (dice.critCount or dice.critMessage) and dice.critValue and (rollValue >= dice.critValue) then
+                if dice.critCount then
+                    hits = hits + dice.critCount
+                    unitHitCount = unitHitCount + dice.critCount
+                    for _ = 1, dice.critCount do
+                        suffix = suffix .. '#'
+                    end
+                end
+                if dice.critMessage then
+                    critCount = critCount + 1
                 end
             end
-            table.insert(rollValues, rollValue .. suffix)
+            if dice.rerollMisses and rollData.origValue then
+                local originalRollValue = rollData.origValue
+                prefix = originalRollValue .. '->'
+            end
+            table.insert(rollValues, prefix .. rollValue .. suffix)
             setHitCount(dice.unitId, unitHitCount)
         end
+
         table.insert(message, dice.unitName .. ' ' .. item .. table.concat(rollValues, ', '))
+
+        if critCount > 0 and dice.critMessage then
+            local critMessage = dice.critMessage:gsub('%${PlayerName}', playerName):gsub('%${ExtraHits}', critCount)
+            table.insert(specialMessages, critMessage)
+        end
     end
     broadcastToAll(playerName .. ' rolled: [ffffff]' .. table.concat(message, ', '), playerColor)
     broadcastToAll(playerName .. ' landed ' .. hits .. ' hit' .. (hits == 1 and '' or 's') .. '.', playerColor)
+    for _, message in ipairs(specialMessages) do
+        broadcastToAll(message, playerColor)
+    end
 
     Roller._setRollInProgress(false)
     return 1
@@ -1139,6 +1231,8 @@ function rollDiceForAbility(player, ability)
                 hitValue = abilityAttrs.hit,
                 critCount = abilityAttrs.extraHitsOn and abilityAttrs.extraHitsOn.count,
                 critValue = abilityAttrs.extraHitsOn and abilityAttrs.extraHitsOn.value,
+                critMessage = abilityAttrs.extraHitsOn and abilityAttrs.extraHitsOn.message,
+                rerollMisses = abilityAttrs.rerollMisses,
                 unitName = unit_stats.name,
                 unitId = unit_id
             })

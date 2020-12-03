@@ -1008,8 +1008,8 @@ local _unitModifiers = {
         type = TYPE.CHOOSE,
         toggleActive = true,
         apply = function(unitAttrs, params)
+            local best = false
             for unitType, attr in pairs(unitAttrs) do
-                local best = false
                 if attr.antiFighterBarrage and (params.myUnitTypeToCount[unitType] or 0) > 0 then
                     if (not best) or (attr.antiFighterBarrage.hit < best.antiFighterBarrage.hit) then
                         best = attr
@@ -1018,7 +1018,9 @@ local _unitModifiers = {
                 if best then
                     best.antiFighterBarrage.extraDice = (best.antiFighterBarrage.extraDice or 0) + 1
                 end
-                local best = false
+            end
+            local best = false
+            for unitType, attr in pairs(unitAttrs) do
                 if attr.bombardment and (params.myUnitTypeToCount[unitType] or 0) > 0 then
                     if (not best) or (attr.bombardment.hit < best.bombardment.hit) then
                         best = attr
@@ -1027,7 +1029,9 @@ local _unitModifiers = {
                 if best then
                     best.bombardment.extraDice = (best.bombardment.extraDice or 0) + 1
                 end
-                local best = false
+            end
+            local best = false
+            for unitType, attr in pairs(unitAttrs) do
                 if attr.spaceCannon and (params.myUnitTypeToCount[unitType] or 0) > 0 then
                     if (not best) or (attr.spaceCannon.hit < best.spaceCannon.hit) then
                         best = attr

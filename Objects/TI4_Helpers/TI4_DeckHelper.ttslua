@@ -545,10 +545,6 @@ local DECKS = {
                 position = { x = 5, y = 0.26, z = -1.75} ,
                 rotation = { x = 0, y = 0, z = 180 },
             },
-            discard = {
-                position = { x = 5, y = 0.26, z = 1.75 },
-                rotation = { x = 0, y = 0, z = 0 },
-            }
         },
         cardNames = {
             ['PoK'] = {
@@ -564,7 +560,25 @@ local DECKS = {
                 "The Prophet's Tears",
             },
         }
-    }
+    },
+
+    ['Legendary Planets'] = {
+        transform = {
+            parent = 'Exploration Mat',
+            deck = {
+                position = { x = 5, y = 0.26, z = 1.75 },
+                rotation = { x = 0, y = 0, z = 180 },
+            },
+        },
+        cardNames = {
+            ['PoK'] = {
+                'Imperial Arms Vault',
+                'Exterrix Headquarters',
+                'The Atrament',
+                'Mirage Flight Academy',
+            }
+        }
+    },
 }
 
 local _parentNameToGuid = {}

@@ -119,6 +119,7 @@ local SetupColor = {
         ['Active/Passed %($COLOR%)'] = { x = 4, y = 1, z = 2, flip = false },  -- do not flip, changing setup can lead to unflipped tokens
         ['Command Sheet %($COLOR%)'] = { x = -8.5, z = 11, lock = true },
         ['Directionaliser %($COLOR%)'] = { x = 0, y = 0.46, z = -2, yRot = 270, lock = true },
+        ['Leader Sheet %($COLOR%)'] = { x = 8.8, z = 11, lock = true },
     },
     NAME_TO_PLAYER_AGENDA_ZONE_OFFSET = {
         ['$COLOR Player Votes'] = { x = 0, y = 1, z = 1, yRot = 180 },
@@ -135,7 +136,7 @@ local SetupColor = {
         ['$COLOR Dreadnought'] = { x = 0, y = 1, z = 6 },
         ['$COLOR Flagship'] = { x = 0, y = 1, z = 9.6 },
         ['$COLOR War Sun'] = { x = 0, y = 1, z = 12.1 },
-        ['$COLOR Mech'] = { x = 0, y = 1, z = 0, pok = true }, -- XXX FILL POSITIONS!
+        ['$COLOR Mech'] = { x = 0, y = 1, z = -14.5 },
     },
 }
 
@@ -166,6 +167,13 @@ local SetupFaction = {
     OTHER_OFFSET = {
         x = -2, z = 2, dx = -2
     },
+    LEADER_OFFSET = {
+        -- In leader sheet local space
+        agent = { x = 1.5, z = -3.36 },
+        commander = { x = 1.5, z = -1.11 },
+        hero = { x = 1.5, z = 1.14 },
+        mech = { x = 1.5, z = 3.38 },
+    }
 }
 
 local SetupFranken = {}
@@ -649,19 +657,17 @@ function SetupColor.unpackUnits(color, colorBox, directionaliser)
 
     local unitBags = {}
     for namePattern, offset in pairs(SetupColor.NAME_TO_DIRECTIONALISER_OFFSET) do
-        if (not offset.pok) or _includePoK then
-            namePattern = string.gsub(namePattern, '$COLOR', color)
-            local guid = assert(getEntryGuid(colorBox, namePattern), 'missing ' .. namePattern)
-            local object = colorBox.takeObject({
-                guid              = guid,
-                position          = directionaliser.positionToWorld(offset),
-                rotation          = directionaliser.getRotation(),
-                callback_function = function(object) object.setLock(offset.lock or false) end,
-                smooth            = false,
-            })
-            object.use_grid = false
-            table.insert(unitBags, object)
-        end
+        namePattern = string.gsub(namePattern, '$COLOR', color)
+        local guid = assert(getEntryGuid(colorBox, namePattern), 'missing ' .. namePattern)
+        local object = colorBox.takeObject({
+            guid              = guid,
+            position          = directionaliser.positionToWorld(offset),
+            rotation          = directionaliser.getRotation(),
+            callback_function = function(object) object.setLock(offset.lock or false) end,
+            smooth            = false,
+        })
+        object.use_grid = false
+        table.insert(unitBags, object)
     end
     return unitBags
 end
@@ -840,8 +846,8 @@ end
 
 -------------------------------------------------------------------------------
 
-function SetupCards.dealObjectives()
-    debugLog('SetupCards.dealObjectives')
+function SetupCards.dealObjectivesWithYields()
+    debugLog('SetupCards.dealObjectivesWithYields')
 
     local stage1Mat = false
     local stage2Mat = false
@@ -860,6 +866,20 @@ function SetupCards.dealObjectives()
     local stage2Guid = _deckHelper.getDeck('Public Objectives II')
     local stage2Deck = stage2Guid and getObjectFromGUID(stage2Guid)
 
+    local function isCardAlreadyThere(position)
+        local hits = Physics.cast({
+            origin       = position,
+            direction    = { x = 0, y = -1, z = 0 },
+            type         = 3,  -- box
+            size         = { x = 0.1, y = 4, z = 0.1 },
+        })
+        for _, hit in ipairs(hits or {}) do
+            if hit.hit_object.tag == 'Card' or hit.hit_object.tag == 'Deck' then
+                return true
+            end
+        end
+    end
+
     local function deal(deck, mat)
         assert(deck.tag == 'Deck')
         local p1 = deck.getPosition()
@@ -867,12 +887,13 @@ function SetupCards.dealObjectives()
             local p2 = mat.positionToWorld(snapPoint.position)
             p2.y = p2.y + 3
             local dSq = (p1.x - p2.x) ^ 2 + (p1.z - p2.z) ^ 2
-            if dSq > 1 then
+            if dSq > 1 and not isCardAlreadyThere(p2) then
                 deck.takeObject({
                     position          = p2,
                     smooth            = true
                 })
             end
+            coroutine.yield(0)
         end
     end
 
@@ -952,9 +973,20 @@ function setupCoroutine()
     coroutine.yield(0)
 
     if not isRightClick then
-        SetupCards.dealObjectives()
+        SetupCards.dealObjectivesWithYields()
     end
     coroutine.yield(0)
+
+    -- Tell any other listeners setup is done (in case further external setup).
+    local listeners = {}
+    for _, object in ipairs(getAllObjects()) do
+        if object.getVar('onSetupHelperSetupFinished') then
+            table.insert(listeners, object)
+        end
+    end
+    for i, listener in ipairs(listeners) do
+        Wait.frames(function() listener.call('onSetupHelperSetupFinished') end, i)
+    end
 
     print('Setup finished')  -- always print when done
     return 1 -- REQUIRED!  MUST RETURN 1 TO STOP COROUTINE!
@@ -1115,6 +1147,106 @@ function SetupFaction.unpack(faction, factionBox, zone, isFranken)
         end
     end
     return nameToObject
+end
+
+function SetupFaction.unpackLeaders(color, faction, factionBox)
+    assert(type(color) == 'string' and type(faction) == 'table' and type(factionBox) == 'userdata')
+    if not _includePoK then
+        return
+    end
+    debugLog('SetupFaction.unpackLeaders ' .. faction.name)
+
+    local function getLeaderSheet()
+        local leaderSheetName = 'Leader Sheet (' .. color .. ')'
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == leaderSheetName then
+                return object
+            end
+        end
+        error('unpack leaders: missing ' .. leaderSheetName)
+    end
+    local leaderSheet = getLeaderSheet()
+
+    -- Add snap points.
+    local snapPoints = {}
+    for _, offset in pairs(SetupFaction.LEADER_OFFSET) do
+        table.insert(snapPoints, {
+            position = { x = offset.x or 0, y = offset.y or 0, z = offset.z or 0 },
+            rotation = { x = 0, y = 0, z = 0},
+            rotation_snap = true
+        })
+    end
+    leaderSheet.setSnapPoints(snapPoints)
+    coroutine.yield(0)
+
+    local function getLeaderBag()
+        local leaderBagName = faction.tokenName .. ' Leaders Bag'
+        for _, entry in ipairs(factionBox.getObjects()) do
+            if entry.name == leaderBagName then
+                local pos = factionBox.getPosition()
+                pos.y = pos.y + 5
+                return factionBox.takeObject({
+                    position          = { x = pos.x, y = pos.y + 5, z = pos.z },
+                    smooth            = false,
+                    guid              = entry.guid
+                })
+            end
+        end
+        error('unpack leaders: missing ' .. leaderBagName)
+    end
+    local leaderBag = getLeaderBag()
+    while leaderBag.spawning do
+        coroutine.yield(0)
+    end
+    leaderBag.setLock(true)
+
+    -- Unpack commander, hero, mech.
+    local factionUnitSet = {}
+    for _, unit in ipairs(faction.units or {}) do
+        factionUnitSet[unit] = true
+    end
+    local agentCount = 0
+    for _, entry in ipairs(leaderBag.getObjects()) do
+        local position = false
+        local rotation = { x = 0, y = leaderSheet.getRotation().y, z = 0 }
+        local isAgent = false
+        if entry.name == faction.commander then
+            position = SetupFaction.LEADER_OFFSET.commander
+            rotation.z = 180
+        elseif entry.name == faction.hero then
+            position = SetupFaction.LEADER_OFFSET.hero
+            rotation.z = 180
+        elseif factionUnitSet[entry.name] then
+            position = SetupFaction.LEADER_OFFSET.mech
+        else
+            position = SetupFaction.LEADER_OFFSET.agent
+            isAgent = true
+        end
+        position = {
+            x = position.x or 0,
+            y = position.y or 0,
+            z = position.z or 0
+        }
+        position = leaderSheet.positionToWorld(position) -- return value mutable
+
+        if isAgent then
+            local dx = 2
+            position.x = position.x + agentCount * dx * ((position.z < 0) and -1 or 1)
+            agentCount = agentCount + 1
+        end
+        position.y = position.y + 3
+
+        leaderBag.takeObject({
+            position          = position,
+            rotation          = rotation,
+            smooth            = true,
+            guid              = entry.guid
+        })
+        coroutine.yield(0)
+    end
+
+    leaderBag.setLock(false)
+    factionBox.putObject(leaderBag)
 end
 
 function SetupFaction.unpackCommandTokens(color, commandTokensBag)
@@ -1579,6 +1711,9 @@ function unpackFactionCoroutine()
         SetupFaction.addFactionSheetUnitUpgradeSnapPoints(factionSheet)
         coroutine.yield(0)
     end
+
+    SetupFaction.unpackLeaders(color, faction, factionBox)
+    coroutine.yield(0)
 
     -- Make sure the faction helper knows about the faction before unpacking tokens.
     _factionHelper.updateFactions()

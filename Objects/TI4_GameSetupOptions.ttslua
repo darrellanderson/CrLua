@@ -78,12 +78,15 @@ function getHelperClient(helperObjectName)
     end
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
-local _setupHelper = getHelperClient('TI4_SETUP_HELPER')
 local _deckHelper = getHelperClient('TI4_DECK_HELPER')
+local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
+local _setupHelper = getHelperClient('TI4_SETUP_HELPER')
+local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 local _getByNameCache = {}
 local _pendingActionSet = {}
+local _setupInProgress = false
 
 -------------------------------------------------------------------------------
 
@@ -360,6 +363,12 @@ end
 -------------------------------------------------------------------------------
 
 function setupGame(isRightClick)
+    if _setupInProgress then
+        error('setupGame: setup in progress, ignoring second click')
+        return
+    end
+    _setupInProgress = true
+
     _config.isRightClick = isRightClick
     startLuaCoroutine(self, 'setupGameCoroutine')
 end
@@ -383,11 +392,6 @@ function setupGameCoroutine()
     setup14ptGame(_config.is14ptGame)
     coroutine.yield(0)
 
-    if not _config.isRightClick then
-        packSelfIntoSetupBag()
-    end
-    coroutine.yield(0)
-
     -- Wait for any pending actions (e.g. adding new public objectives).
     local function hasPendingAction()
         for _, _ in pairs(_pendingActionSet) do
@@ -405,7 +409,6 @@ function setupGameCoroutine()
         includePoK = _config.usePoK,
     })
     coroutine.yield(0)
-
 
     return 1
 end
@@ -433,6 +436,37 @@ function setupPoK(usePoK)
     if not container then
         error('setupPoK: missing box')
     end
+    coroutine.yield(0)
+
+    local redSystemTiles = assert(_getByName('Red Anomaly Tiles'))
+    local blueSystemTiles = assert(_getByName('Blue Planet Tiles'))
+    local pokRedSystemTilesGuidSet = {}
+    local pokBlueSystemTilesGuidSet = {}
+    for _, system in pairs(_systemHelper.systems()) do
+        if system.tile >= 52 and system.tile <= 82 then
+            assert(system.guid)
+            if system.anomalies and #system.anomalies > 0 then
+                pokRedSystemTilesGuidSet[system.guid] = true
+            elseif system.planets and #system.planets > 0 then
+                pokBlueSystemTilesGuidSet[system.guid] = true
+            else
+                pokRedSystemTilesGuidSet[system.guid] = true
+            end
+        end
+    end
+    coroutine.yield(0)
+
+    local factionsBag = assert(_getByName('Factions'))
+    local pickFactionBag = assert(_getByName('Pick a Faction to Play'))
+    local pokFactionBoxNameSet = {}
+    local pokFactionTokenNameSet = {}
+    for _, faction in pairs(_factionHelper.allFactions(true)) do
+        if faction.home and faction.home >= 52 and faction.home <= 82 then
+            pokFactionBoxNameSet[faction.tokenName .. ' Box'] = true
+            pokFactionTokenNameSet[faction.tokenName .. ' Faction Token'] = true
+        end
+    end
+    coroutine.yield(0)
 
     if usePoK then
 
@@ -443,10 +477,61 @@ function setupPoK(usePoK)
             coroutine.yield(0)
         end
 
-        -- TODO: add planet cards?
-        -- TODO: add system tiles?
-        -- TODO: add faction boxes?
-        -- TODO: add faction tokens (pick a faction to play)?
+        -- Add system tiles.
+        local pos = container.getPosition()
+        pos.y = pos.y + 5
+        for _, entry in ipairs(container.getObjects()) do
+            if pokBlueSystemTilesGuidSet[entry.guid] then
+                container.takeObject({
+                    position          = pos,
+                    callback_function = function(object) blueSystemTiles.putObject(object) end,
+                    smooth            = false,
+                    guid              = entry.guid
+                })
+                pos.y = pos.y + 0.5
+                coroutine.yield(0)
+            elseif pokRedSystemTilesGuidSet[entry.guid] then
+                container.takeObject({
+                    position          = pos,
+                    callback_function = function(object) redSystemTiles.putObject(object) end,
+                    smooth            = false,
+                    guid              = entry.guid
+                })
+                pos.y = pos.y + 0.5
+                coroutine.yield(0)
+            end
+        end
+        coroutine.yield(0)
+
+        -- Add faction boxes.
+        for _, entry in ipairs(container.getObjects()) do
+            if pokFactionBoxNameSet[entry.name] then
+                container.takeObject({
+                    position          = pos,
+                    callback_function = function(object) factionsBag.putObject(object) end,
+                    smooth            = false,
+                    guid              = entry.guid
+                })
+                pos.y = pos.y + 3
+                coroutine.yield(0)
+            end
+        end
+        coroutine.yield(0)
+
+        -- Add faction tokens (pick a faction to play).
+        for _, entry in ipairs(container.getObjects()) do
+            if pokFactionTokenNameSet[entry.name] then
+                container.takeObject({
+                    position          = pos,
+                    callback_function = function(object) pickFactionBag.putObject(object) end,
+                    smooth            = false,
+                    guid              = entry.guid
+                })
+                pos.y = pos.y + 0.5
+                coroutine.yield(0)
+            end
+        end
+        coroutine.yield(0)
 
     else
 
@@ -457,50 +542,166 @@ function setupPoK(usePoK)
             coroutine.yield(0)
         end
 
-        -- Remove alliance promissory notes.
-        for _, object in ipairs(getAllObjects()) do
-            if object.tag == 'Deck' and string.match(object.getName(), '^Notes (.*)$') then
-                for _, entry in ipairs(object.getObjects()) do
-                    if string.match(entry.name, '^Alliance (.*)$') then
-                        object.takeObject({
-                            guid              = entry.guid,
-                            callback_function = function(card) container.putObject(card) end
-                        })
-                    end
+        -- Remove other objects.  Only do this for the "final" setup.
+        if not _config.isRightClick then
+            local removeNameSet = {
+                ['Exploration Mat'] = true,
+                ['Exploration Bag'] = true,
+                ['Frontier Tokens Bag'] = true,
+                ['Mallice Tile'] = true,
+            }
+            for _, object in ipairs(getAllObjects()) do
+                local name = object.getName()
+                if removeNameSet[name] then
+                    object.setLock(false)
+                    container.putObject(object)
+                    coroutine.yield(0)
+                end
+            end
+            coroutine.yield(0)
+        end
+
+        -- Remove system tiles.
+        local pos = redSystemTiles.getPosition()
+        pos.y = pos.y + 5
+        for _, entry in ipairs(redSystemTiles.getObjects()) do
+            if pokRedSystemTilesGuidSet[entry.guid] then
+                redSystemTiles.takeObject({
+                    position          = pos,
+                    callback_function = function(object) container.putObject(object) end,
+                    smooth            = false,
+                    guid              = entry.guid
+                })
+                pos.y = pos.y + 0.5
+                coroutine.yield(0)
+            end
+        end
+        local pos = blueSystemTiles.getPosition()
+        pos.y = pos.y + 5
+        for _, entry in ipairs(blueSystemTiles.getObjects()) do
+            if pokBlueSystemTilesGuidSet[entry.guid] then
+                blueSystemTiles.takeObject({
+                    position          = pos,
+                    callback_function = function(object) container.putObject(object) end,
+                    smooth            = false,
+                    guid              = entry.guid
+                })
+                pos.y = pos.y + 0.5
+                coroutine.yield(0)
+            end
+        end
+
+        -- Remove faction boxes.
+        local pos = factionsBag.getPosition()
+        pos.y = pos.y + 5
+        for _, entry in ipairs(factionsBag.getObjects()) do
+            if pokFactionBoxNameSet[entry.name] then
+                factionsBag.takeObject({
+                    position          = pos,
+                    callback_function = function(object) container.putObject(object) end,
+                    smooth            = false,
+                    guid              = entry.guid
+                })
+                pos.y = pos.y + 3
+                coroutine.yield(0)
+            end
+        end
+        coroutine.yield(0)
+
+        -- Remove faction tokens (pick a faction to play).
+        local pos = pickFactionBag.getPosition()
+        pos.y = pos.y + 5
+        for _, entry in ipairs(pickFactionBag.getObjects()) do
+            if pokFactionTokenNameSet[entry.name] then
+                pickFactionBag.takeObject({
+                    position          = pos,
+                    callback_function = function(object) container.putObject(object) end,
+                    smooth            = false,
+                    guid              = entry.guid
+                })
+                pos.y = pos.y + 3
+                coroutine.yield(0)
+            end
+        end
+        coroutine.yield(0)
+    end
+end
+
+-------------------------------------------------------------------------------
+
+function onSetupHelperSetupFinished()
+    startLuaCoroutine(self, 'postSetupCoroutine')
+end
+
+function postSetupCoroutine()
+    if _config.isRightClick then
+        print('Skipping final setup for right-click action.  Finished.')
+        _setupInProgress = false
+        return 1
+    end
+
+    print('Doing final setup')
+
+    postSetupPoK()
+    coroutine.yield(0)
+
+    -- Do not pack into a bag too early, otherwise cannot find object for callback.
+    packSelfIntoSetupBag()
+    coroutine.yield(0)
+
+    _setupInProgress = false
+    print('Doing final setup: finished')
+    return 1
+end
+
+--- Some setup needs to wait for the table to be done adjusting, making sure
+-- things like leader sheets and promissory notes are in order.
+function postSetupPoK()
+    if _config.usePoK then
+        return  -- only need to do more if cleaning up misc PoK items
+    end
+    local container = assert(_getByName('Prophecy of Kings'))
+
+    local removeNameSet = {}
+    for _, color in ipairs(Player.getColors()) do
+        removeNameSet['Leader Sheet (' .. color .. ')'] = true
+        removeNameSet[color .. ' Mech'] = true
+    end
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        if removeNameSet[name] then
+            object.setLock(false)
+            object.jointTo()
+            container.putObject(object)
+            coroutine.yield(0)
+        end
+    end
+    coroutine.yield(0)
+
+    -- Remove alliance promissory notes.
+    local guidToDeck = {}  -- scan for cards first, remove separately
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Deck' and string.match(object.getName(), '^Notes (.*)$') then
+            for _, entry in ipairs(object.getObjects()) do
+                if string.match(entry.name, '^Alliance (.*)$') then
+                    guidToDeck[entry.guid] = object
                 end
             end
         end
-        coroutine.yield(0)
-
-        -- Remove other objects.
-        local removeNameSet = {}
-        for _, color in ipairs(Player.getColors()) do
-            removeNameSet['Leader Sheet (' .. color .. ')'] = true
-            removeNameSet['Exploration Mat'] = true
-            removeNameSet['Exploration Bag'] = true
-            removeNameSet['Frontier Tokens Bag'] = true
-            removeNameSet['Mallice Tile'] = true
-        end
-        for _, object in ipairs(getAllObjects()) do
-            local name = object.getName()
-            if removeNameSet[name] then
-                object.setLock(false)
-                container.putObject(object)
-            end
-            if object.tag == 'Bag' and string.match(name, '^.* Mech$') then
-                object.setLock(false)
-                object.jointTo()
-                container.putObject(object)
-            end
-        end
-        coroutine.yield(0)
-
-        -- TODO: remove planet cards?
-        -- TODO: remove system tiles?
-        -- TODO: remove faction boxes?
-        -- TODO: remove faction tokens (pick a faction to play)?
-
     end
+    coroutine.yield(0)
+    for guid, deck in pairs(guidToDeck) do
+        assert(deck.tag == 'Deck')
+        local pos = deck.getPosition()
+        deck.takeObject({
+            guid              = guid,
+            position          = { x = pos.x, y = pos.y + 5, z = pos.z },
+            callback_function = function(card) container.putObject(card) end,
+            smooth            = false
+        })
+        coroutine.yield(0)
+    end
+    coroutine.yield(0)
 end
 
 -------------------------------------------------------------------------------

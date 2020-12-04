@@ -46,6 +46,13 @@ local FACTION_ID_AND_TOKEN_NAMES = {
     { id = 'Xxcha', tokenName = 'Xxcha Kingdom' },
     { id = 'Yin', tokenName = 'Yin Brotherhood' },
     { id = 'Yssaril', tokenName = 'Yssaril Tribes' },
+    { id = 'Argent', tokenName = 'Argent Flight' },
+    { id = 'Cabal', tokenName = "Vuil'raith Cabal" },
+    { id = 'Empyrean', tokenName = 'Empyrean' },
+    { id = 'Mahact', tokenName = 'Mahact Gene-Sorcerers' },
+    { id = 'Nomad', tokenName = 'Nomad' },
+    { id = 'NRA', tokenName = 'Naaz-Rokha Alliance' },
+    { id = 'Titans', tokenName = 'Titans of Ul' },
 }
 
 local IMAGE_TYPE_ATTRIBUTES = {
@@ -69,7 +76,7 @@ local SIZE = {
     z = 10
 }
 
-local MARGIN = 200
+local MARGIN = 175
 
 local FRANKEN_UNPACK_LABEL = 'FRANKEN'
 local FRANKEN_UNPACK_TOOLTIP = 'Unpack the given faction sheet and tokens, unpack starting tech and units and rename flagship based on Franken tiles in the player area.'
@@ -81,7 +88,7 @@ function doNothing() end
 
 function _addTitle()
     local y = SIZE.y + 0.01
-    local z = -SIZE.z / 2 + 0.8
+    local z = -SIZE.z / 2 + 0.7
 
     local labelNormal = 'Choose a Faction to Unpack'
     local labelFranken = 'FRANKEN UNPACKER'
@@ -96,7 +103,7 @@ function _addTitle()
         scale          = { x = 1, y = 1, z = 1 },
         width          = 0,
         height         = 0,
-        font_size      = 400,
+        font_size      = 300,
         font_color     = { r = 1, g = 1, b = 1 },
     })
 end
@@ -104,14 +111,14 @@ end
 function _addFactionButton(id, index, maxIndex)
     local y = SIZE.y + 0.01
 
-    local reserved = 1.4
+    local reserved = 1.2
 
     local numCols = 6
     local numRows = math.ceil(maxIndex / numCols)
 
     -- Cell sizes.
     local w = SIZE.x / numCols
-    local h = (SIZE.z - reserved) / numRows
+    local h = (SIZE.z - reserved - 0.1) / numRows
 
     local col = (index - 1) % numCols
     local row = math.floor((index - 1) / numCols)
@@ -141,13 +148,16 @@ function _addFactionButton(id, index, maxIndex)
         z = 1
     }
 
-    self.addDecal({
-        name             = id,
-        url              = _getUrl(id, 'Button'),
-        position         = { x = -x, y = y, z = z },
-        rotation         = { 90, 0, 180 },
-        scale            = decalSize,  -- "scale" is size here
-    })
+    local url = _getUrl(id, 'Button')
+    if url then
+        self.addDecal({
+            name             = id,
+            url              = url,
+            position         = { x = -x, y = y, z = z },
+            rotation         = { 90, 0, 180 },
+            scale            = decalSize,  -- "scale" is size here
+        })
+    end
 end
 
 --- Get the custom asset image url.
@@ -189,13 +199,15 @@ function _addInfoDecal(factionId, imageType)
         z = 1,
     }
 
-    self.addDecal({
-        name             = factionId,
-        url              = url,
-        position         = { 0, y, z },
-        rotation         = { 90, 0, 180 },
-        scale            = size -- "scale" is size here
-    })
+    if url then
+        self.addDecal({
+            name             = factionId,
+            url              = url,
+            position         = { 0, y, z },
+            rotation         = { 90, 0, 180 },
+            scale            = size -- "scale" is size here
+        })
+    end
 end
 
 function _createNavButtons(currentPanelImageType)

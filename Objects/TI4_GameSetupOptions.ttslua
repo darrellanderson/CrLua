@@ -443,11 +443,10 @@ function setupPoK(usePoK)
             coroutine.yield(0)
         end
 
-        -- Add planet cards.
-        -- TODO
-
-        -- Add system tiles.
-        -- TODO
+        -- TODO: add planet cards?
+        -- TODO: add system tiles?
+        -- TODO: add faction boxes?
+        -- TODO: add faction tokens (pick a faction to play)?
 
     else
 
@@ -480,19 +479,27 @@ function setupPoK(usePoK)
             removeNameSet['Exploration Mat'] = true
             removeNameSet['Exploration Bag'] = true
             removeNameSet['Frontier Tokens Bag'] = true
+            removeNameSet['Mallice Tile'] = true
         end
         for _, object in ipairs(getAllObjects()) do
             local name = object.getName()
             if removeNameSet[name] then
+                object.setLock(false)
                 container.putObject(object)
             end
             if object.tag == 'Bag' and string.match(name, '^.* Mech$') then
-                object.jointTo()
                 object.setLock(false)
+                object.jointTo()
                 container.putObject(object)
             end
         end
         coroutine.yield(0)
+
+        -- TODO: remove planet cards?
+        -- TODO: remove system tiles?
+        -- TODO: remove faction boxes?
+        -- TODO: remove faction tokens (pick a faction to play)?
+
     end
 end
 
@@ -556,7 +563,8 @@ function _addCards(containerName, deckName, sourceName)
         end
     end
     if not guid then
-        error('_addCards: missing "' .. containerName .. '/' .. name .. '"')
+        --error('_addCards: missing "' .. containerName .. '/' .. name .. '"')
+        return -- this happens if the deck is already on the table
     end
 
     local transform = _deckHelper.getDeckTransform(deckName)
@@ -598,7 +606,7 @@ function _removeCards(containerName, deckName, sourceName)
     local deck = getObjectFromGUID(_deckHelper.getDeck(deckName))
     if not deck then
         --error('_removeCards: missing deck "' .. deckName .. '"')
-        return -- this is ok, deck starts put away
+        return -- this happens if the deck is already put away
     end
 
     local nameList = _deckHelper.getCardsWithSource({ deckName = deckName, source = sourceName })

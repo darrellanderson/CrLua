@@ -544,9 +544,6 @@ end
 function _addCards(containerName, deckName, sourceName)
     assert(type(containerName) == 'string' and type(deckName) == 'string' and type(sourceName) == 'string')
 
-    local key = '_addCards(' .. containerName .. ',' .. deckName .. ',' .. sourceName .. ')'
-    _pendingActionSet[key] = true
-
     local container = _getByName(containerName)
     if not container then
         error('_addCards: missing container "' .. containerName .. '"')
@@ -571,6 +568,9 @@ function _addCards(containerName, deckName, sourceName)
     if not transform then
         error('_addCards: missing location for "' .. deckName .. '"')
     end
+
+    local key = '_addCards(' .. containerName .. ',' .. deckName .. ',' .. sourceName .. ')'
+    _pendingActionSet[key] = true
 
     container.takeObject({
         guid = guid,

@@ -562,9 +562,9 @@ local DECKS = {
                 'The Crown of Thalnos (PoK)',
                 'The Obsidian',
                 "The Prophet's Tears",
-                },
-            }
-      }
+            },
+        }
+    }
 }
 
 local _parentNameToGuid = {}
@@ -1568,17 +1568,25 @@ local function _reportDeckPositionsInParentSpace()
 end
 
 function resetPlanetCardNames()
-    local planetNames = {}
+    local planetSourceToNames = {
+        ['Base'] = {},
+        ['PoK'] = {},
+        ['Other'] = {}
+    }
     for _, system in pairs(_systemHelper.systems()) do
         for _, planet in ipairs(system.planets or {}) do
-            table.insert(planetNames, planet.name)
+            if system.tile >= 1 and system.tile <= 51 then
+                table.insert(planetSourceToNames.Base, planet.name)
+            elseif system.tile >= 52 and system.tile <= 82 then
+                table.insert(planetSourceToNames.PoK, planet.name)
+            else
+                table.insert(planetSourceToNames.Other, planet.name)
+            end
         end
     end
 
     local deckAttributes = assert(DECKS['Planets'])
-    deckAttributes.cardNames = {
-        all = planetNames
-    }
+    deckAttributes.cardNames = planetSourceToNames
 end
 
 function resetSnapPoints()

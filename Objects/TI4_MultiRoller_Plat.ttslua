@@ -197,6 +197,7 @@ function createUi()
 
         _allPossibleUnitAttrs['Mech']['bombardment'] = {} -- L1Z1X Mech
         _allPossibleUnitAttrs['Mech']['spaceCannon'] = {} -- Xxcha Mech
+        _allPossibleUnitAttrs['Mech']['planetaryShield'] = {} -- Arborec Mech
 
         _getUnitDataLastRefreshFrame = false  -- make sure not cached!
         _injectExtraUnitUpgrades = false
@@ -1115,7 +1116,7 @@ function Roller_RollDiceCoroutine()
         end
         coroutine.yield(0)
 
-        -- Watch ALL dice, and update the 'final value' 
+        -- Watch ALL dice, and update the 'final value'
         local timeout = Time.time + 3
         for _, dice in ipairs(Roller._dice) do
             for _, rollData in ipairs(dice._rollData) do

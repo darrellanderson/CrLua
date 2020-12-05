@@ -1386,6 +1386,8 @@ local function _isScoreObjective(card)
         _scoreCardSet = {
             ['Shard of the Throne'] = true,
             ['Holy Planet of Ixth'] = true,
+            ['Shard of the Throne (PoK)'] = true,
+            ['The Crown of Emphidia (PoK)'] = true,
         }
         for _, color in ipairs(Player.getColors()) do
             _scoreCardSet['Support for the Throne (' .. color .. ')'] = true

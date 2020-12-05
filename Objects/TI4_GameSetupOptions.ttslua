@@ -711,7 +711,7 @@ function postSetupPoK()
             if object.tag == 'Deck' and string.match(object.getName(), '^Notes (.*)$') then
                 for _, entry in ipairs(object.getObjects()) do
                     if string.match(entry.name, '^Alliance (.*)$') then
-                        guidToDeck[entry.guid] = object
+                        removeCardsGuidToDeck[entry.guid] = object
                     end
                 end
             end

@@ -657,40 +657,69 @@ end
 --- Some setup needs to wait for the table to be done adjusting, making sure
 -- things like leader sheets and promissory notes are in order.
 function postSetupPoK()
-    if _config.usePoK then
-        return  -- only need to do more if cleaning up misc PoK items
-    end
     local container = assert(_getByName('Prophecy of Kings'))
+    local removeCardsGuidToDeck = {}
 
-    local removeNameSet = {}
-    for _, color in ipairs(Player.getColors()) do
-        removeNameSet['Leader Sheet (' .. color .. ')'] = true
-        removeNameSet[color .. ' Mech'] = true
-    end
-    for _, object in ipairs(getAllObjects()) do
-        local name = object.getName()
-        if removeNameSet[name] then
-            object.setLock(false)
-            object.jointTo()
-            container.putObject(object)
+    if _config.usePoK then
+        -- Remove other cards, per PoK setup.
+        local removeCards = {
+            'Core Mining',
+            'Demilitarized Zone',
+            'Holy Planet of Ixth',
+            'Representative Government',
+            'Research Team: Biotic',
+            'Research Team: Cybernetic',
+            'Research Team: Propulsion',
+            'Research Team: Warfare',
+            'Senate Sanctuary',
+            'Shard of the Throne',
+            'Terraforming Initiative',
+            'The Crown of Emphidia',
+            'The Crown of Thalnos',
+        }
+        for _, cardName in ipairs(removeCards) do
+            local deckName = assert(_deckHelper.getDeckName(cardName), 'getDeckName')
+            local deckGuid = assert(_deckHelper.getDeck(deckName), 'getCardName')
+            local deck = assert(getObjectFromGUID(deckGuid))
+            for _, entry in ipairs(deck.getObjects()) do
+                if entry.name == cardName then
+                    removeCardsGuidToDeck[entry.guid] = deck
+                end
+            end
             coroutine.yield(0)
         end
-    end
-    coroutine.yield(0)
+        coroutine.yield(0)
+    else
+        local removeNameSet = {}
+        for _, color in ipairs(Player.getColors()) do
+            removeNameSet['Leader Sheet (' .. color .. ')'] = true
+            removeNameSet[color .. ' Mech'] = true
+        end
+        for _, object in ipairs(getAllObjects()) do
+            local name = object.getName()
+            if removeNameSet[name] then
+                object.setLock(false)
+                object.jointTo()
+                container.putObject(object)
+                coroutine.yield(0)
+            end
+        end
+        coroutine.yield(0)
 
-    -- Remove alliance promissory notes.
-    local guidToDeck = {}  -- scan for cards first, remove separately
-    for _, object in ipairs(getAllObjects()) do
-        if object.tag == 'Deck' and string.match(object.getName(), '^Notes (.*)$') then
-            for _, entry in ipairs(object.getObjects()) do
-                if string.match(entry.name, '^Alliance (.*)$') then
-                    guidToDeck[entry.guid] = object
+        -- Remove alliance promissory notes.
+        for _, object in ipairs(getAllObjects()) do
+            if object.tag == 'Deck' and string.match(object.getName(), '^Notes (.*)$') then
+                for _, entry in ipairs(object.getObjects()) do
+                    if string.match(entry.name, '^Alliance (.*)$') then
+                        guidToDeck[entry.guid] = object
+                    end
                 end
             end
         end
+        coroutine.yield(0)
     end
-    coroutine.yield(0)
-    for guid, deck in pairs(guidToDeck) do
+
+    for guid, deck in pairs(removeCardsGuidToDeck) do
         assert(deck.tag == 'Deck')
         local pos = deck.getPosition()
         deck.takeObject({

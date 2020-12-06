@@ -49,7 +49,7 @@ local DECKS = {
                 'Expand Borders',
                 'Found Research Outposts',
                 'Intimidate Council',
-                'Lead From The Front',
+                'Lead From the Front',
                 'Negotiate Trade Routes',
                 'Sway the Council',
             },
@@ -123,11 +123,11 @@ local DECKS = {
                 'Control the Region',
                 'Cut Supply Lines',
                 'Destroy Their Greatest Ship',
-                'Establish A Perimeter',
-                'Forge An Alliance',
+                'Establish a Perimeter',
+                'Forge an Alliance',
                 'Form a Spy Network',
                 'Fuel the War Machine',
-                'Gather A Mighty Fleet',
+                'Gather a Mighty Fleet',
                 'Learn the Secrets of the Cosmos',
                 'Make an Example of Their World',
                 'Master the Laws of Physics',
@@ -1519,7 +1519,7 @@ local function _splitDecks()
                 else
                     print('missing "' .. info.cardName .. '"')
                 end
-                pos.y = pos.y + 0.1
+                pos.y = pos.y + 0.2
             end
             rot.y = (rot.y + 90) % 360
         end
@@ -1542,6 +1542,17 @@ local function _splitDecks()
                     local info = cardNameToInfo[cardName]
                     if info and string.len(deck.getName()) == 0 then
                         deck.setName(info.source .. ' ' .. info.deckName)
+                    end
+                    -- Sanity check
+                    if info then
+                        for _, entry in ipairs(deck.getObjects()) do
+                            local info2 = cardNameToInfo[entry.name]
+                            if info2 then
+                                assert(info2.deckName == info.deckName, 'mismatch ' .. entry.name)
+                            else
+                                print('no info for ' .. entry.name)
+                            end
+                        end
                     end
                 end
             end
@@ -1584,20 +1595,32 @@ local function _reportDeckPositionsInParentSpace()
 end
 
 function resetPlanetCardNames()
+    -- Some planet names get reused.  Keep the lowest tile number for each.
+    local planetNameToTile = {}
+    for _, system in pairs(_systemHelper.systems()) do
+        for _, planet in ipairs(system.planets or {}) do
+            local tile = planetNameToTile[planet.name]
+            if tile then
+                tile = math.min(tile, system.tile)
+            else
+                tile = system.tile
+            end
+            planetNameToTile[planet.name] = tile
+        end
+    end
+
     local planetSourceToNames = {
         ['Base'] = {},
         ['PoK'] = {},
         ['Other'] = {}
     }
-    for _, system in pairs(_systemHelper.systems()) do
-        for _, planet in ipairs(system.planets or {}) do
-            if system.tile >= 1 and system.tile <= 51 then
-                table.insert(planetSourceToNames.Base, planet.name)
-            elseif system.tile >= 52 and system.tile <= 82 then
-                table.insert(planetSourceToNames.PoK, planet.name)
-            else
-                table.insert(planetSourceToNames.Other, planet.name)
-            end
+    for planetName, tile in pairs(planetNameToTile) do
+        if tile >= 1 and tile <= 51 then
+            table.insert(planetSourceToNames.Base, planetName)
+        elseif tile >= 52 and tile <= 82 then
+            table.insert(planetSourceToNames.PoK, planetName)
+        else
+            table.insert(planetSourceToNames.Other, planetName)
         end
     end
 

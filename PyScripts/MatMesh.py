@@ -4,34 +4,34 @@ import math
 import sys
 
 # Agenda/Laws:
-CARD_W = 2 * 2
-CARD_H = 3 * 2
-ROWS = 2
-COLS = 5
+# CARD_W = 2 * 2
+# CARD_H = 3 * 2
+# ROWS = 2
+# COLS = 5
 
 # Agenda phase mat:
-CARD_W = 2
-CARD_H = 3
-ROWS = 1
-COLS = 1
+# CARD_W = 2
+# CARD_H = 3
+# ROWS = 1
+# COLS = 1
 
 # Secrets mat:
 CARD_W = 2
 CARD_H = 3
-ROWS = 5
+ROWS = 7
 COLS = 8
 
 # Support for the Throne mat:
-CARD_W = 2
-CARD_H = 3
-ROWS = 1
-COLS = 8
+# CARD_W = 2
+# CARD_H = 3
+# ROWS = 1
+# COLS = 8
 
 # Exploration mat:
-CARD_W = 2
-CARD_H = 3
-ROWS = 2
-COLS = 5
+# CARD_W = 2
+# CARD_H = 3
+# ROWS = 2
+# COLS = 5
 
 MAT_W = (CARD_W * COLS) + (0.5 * (COLS + 1))
 MAT_H = (CARD_H * ROWS) + (0.5 * (ROWS + 1))

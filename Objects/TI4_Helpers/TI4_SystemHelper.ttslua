@@ -523,23 +523,25 @@ local _resInfModifiers = {
         end
     },
 
-    ['Zeal'] = {
-        description = 'When you cast at least 1 vote, cast 1 additional vote for each player in the game, including you',
-        type = TYPE.CHOOSE,
-        apply = function(resInfCards)
-            -- Only applies if votes would otherwise be >0
-            local votesAvailable = false
-            for _, resInfCard in ipairs(resInfCards) do
-                votesAvailable = votesAvailable or (resInfCard.influence > 0)
-            end
-
-            if votesAvailable then
-                local seatedPlayerZones = _zoneHelper.zones()
-
-                table.insert( resInfCards, { name = 'Zeal', resources = 0, influence = #seatedPlayerZones } )
-            end
-        end
-    },
+    -- This modifier isn't quite right, get N votes for EACH time voting.
+    -- Comment this out for now (players can manage) until figuring a better way.
+    -- ['Zeal'] = {
+    --     description = 'When you cast at least 1 vote, cast 1 additional vote for each player in the game, including you',
+    --     type = TYPE.CHOOSE,
+    --     apply = function(resInfCards)
+    --         -- Only applies if votes would otherwise be >0
+    --         local votesAvailable = false
+    --         for _, resInfCard in ipairs(resInfCards) do
+    --             votesAvailable = votesAvailable or (resInfCard.influence > 0)
+    --         end
+    --
+    --         if votesAvailable then
+    --             local seatedPlayerZones = _zoneHelper.zones()
+    --
+    --             table.insert( resInfCards, { name = 'Zeal', resources = 0, influence = #seatedPlayerZones } )
+    --         end
+    --     end
+    -- },
 }
 
 local LOCAL_DISTANCE_TO_PLANET = 1.1

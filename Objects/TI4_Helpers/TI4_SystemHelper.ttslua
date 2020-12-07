@@ -504,7 +504,7 @@ local LEADER = {
 
 local _resInfModifiers = {
     ['Elder Qanoj'] = {
-        description = 'Each planet you exhaust to cast votes provides 1 additional vote.',
+        description = 'Each planet you exhaust to cast votes provides 1 additional vote',
         type = TYPE.ADJUST,
         leader = LEADER.COMMANDER, -- Xxcha
         apply = function(resInfCards)
@@ -524,7 +524,7 @@ local _resInfModifiers = {
     },
 
     ['Zeal'] = {
-        description = 'When you cast at least 1 vote, cast 1 additional vote for each player in the game, including you.',
+        description = 'When you cast at least 1 vote, cast 1 additional vote for each player in the game, including you',
         type = TYPE.CHOOSE,
         apply = function(resInfCards)
             -- Only applies if votes would otherwise be >0
@@ -924,6 +924,21 @@ function getColorToResInfModifiers()
     end
 
     return colorToResInfModifiers
+end
+
+--- Return modifier descriptions.
+-- @param resInfModifiers (table) : list of modifier names.
+-- @return (table) : map from name to description.
+function getResInfModifierDescriptions(resInfModifiers)
+    assert(type(resInfModifiers) == 'table')
+    local result = {}
+    for _, name in ipairs(resInfModifiers) do
+        local modifier = _resInfModifiers[name]
+        if modifier then
+            result[name] = assert(modifier.description)
+        end
+    end
+    return result
 end
 
 --- Compute resource/influcence.

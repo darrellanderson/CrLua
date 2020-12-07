@@ -63,15 +63,19 @@ function isGravRiftObject(object)
             end
         end
     end
-    return _gravityRiftGuidSet[object.getGUID()]
+    if _gravityRiftGuidSet[object.getGUID()] then
+        return true
+    end
+    if object.tag == 'Tile' then
+        local name = object.getName()
+        if name == 'Tear Token (Cabal)' or name == 'Tear Token (Nekro)' then
+            return true
+        end
+    end
 end
 
 function applyGravityRiftGoodness(object)
     object.addContextMenuItem('Roll Grav Rift', function(playerColor) rollRift(object, playerColor) end, true)
-end
-
-function clearGravityRiftGoodness(object)
-    object.clearContextMenu()
 end
 
 -------------------------------------------------------------------------------
@@ -101,15 +105,9 @@ function onLoad(saveState)
     Wait.frames(delayedAdd, 11)
 end
 
-function onObjectLeaveContainer(container, leaveObject)
-    if isGravRiftObject(leaveObject) then
-        applyGravityRiftGoodness(leaveObject)
-    end
-end
-
-function onObjectEnterContainer(container, enterObject)
-    if isGravRiftObject(enterObject) then
-        clearGravityRiftGoodness(enterObject)
+function onObjectSpawn(object)
+    if isGravRiftObject(object) then
+        applyGravityRiftGoodness(object)
     end
 end
 

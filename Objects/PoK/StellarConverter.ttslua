@@ -1,4 +1,4 @@
---- Attach a new planet to a system.
+--- Attach delete planet from a system.
 -- @author Darrell
 
 function getHelperClient(helperObjectName)
@@ -18,14 +18,7 @@ function getHelperClient(helperObjectName)
 end
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 
-local PLANET = {
-    name = 'Mirage',
-    resources = 1,
-    influence = 2,
-    trait = 'cultural',
-    legendary = true,
-    legendaryCard = 'Mirage Flight Acadamy'
-}
+local _originalSystem = false
 
 -------------------------------------------------------------------------------
 
@@ -43,43 +36,49 @@ end
 local function _attach(playerColor)
     local system = _systemHelper.systemFromPosition(self.getPosition())
     if system then
-        if system and system.planets and #system.planets > 0 then
+        local destroyPlanet = _systemHelper.planetFromPosition({
+            systemGuid = system.guid,
+            position = self.getPosition(),
+            exact = false
+        })
+        if not destroyPlanet then
             if playerColor then
-                printToColor('Cannot attach ' .. self.getName() .. ' to a system with planets', playerColor, 'Yellow')
+                printToColor('Cannot attach ' .. self.getName() .. ' to a system without planets', playerColor, 'Yellow')
             end
             return
         end
         printToAll('Attaching ' .. self.getName() .. ' to ' .. system.string, 'Yellow')
 
-        -- Add planet to system.
-        system = _copyTable(system)
-        system.planets = system.planets or {}
-        table.insert(system.planets, PLANET)
-        _systemHelper.injectSystem(system)
+        -- Remember original.
+        _originalSystem = _copyTable(system)
 
-        system = _systemHelper.systemFromGuid(system.guid)
-        local systemObject = getObjectFromGUID(system.guid)
-        systemObject.setLock(true)  -- make sure system is locked
-
-        -- Move to new planet position (might not be center if there's a wormhole).
-        -- Re-fetch the system table to get new planet position.
-        local p = false
+        -- Remove planet from system.
+        local foundPlanet = false
         for i, planet in ipairs(system.planets or {}) do
-            if planet.name == PLANET.name then
-                -- Move a little further.
-                local scaleDistance = 1.5
-                p = systemObject.positionToWorld({
-                    x = planet.position.x * scaleDistance,
-                    y = planet.position.y,
-                    z = planet.position.z * scaleDistance,
-                })
+            if planet.name == destroyPlanet.name then
+                foundPlanet = true
+                system = _copyTable(system)
+                table.remove(system.planets, i)
+                if #system.planets == 0 then
+                    system.planets = nil
+                end
+                break
             end
         end
+        if foundPlanet then
+            printToAll(self.getName() .. ' destroying ' .. destroyPlanet.name, 'Yellow')
+            _systemHelper.injectSystem(system)
+        end
+
+        local systemObject = getObjectFromGUID(system.guid)
+        systemObject.setLock(true)  -- make sure locked!
+
+        -- Move to planet position.
+        local p = systemObject.positionToWorld(destroyPlanet.position)
         p.y = p.y + 0.1
         local collide = false
         local fast = true
         self.setPositionSmooth(p, collide, fast)
-        self.setRotationSmooth({ x = 0, y = systemObject.getRotation().y, z = 0 }, collide, fast)
 
         -- Lock.
         local function delayedLock()
@@ -97,24 +96,11 @@ end
 
 local function _detach(playerColor)
     local system = _systemHelper.systemFromPosition(self.getPosition())
-    if system then
-        -- Remove planet from system.
-        local foundPlanet = false
-        for i, planet in ipairs(system.planets or {}) do
-            if planet.name == PLANET.name then
-                foundPlanet = true
-                system = _copyTable(system)
-                table.remove(system.planets, i)
-                if #system.planets == 0 then
-                    system.planets = nil
-                end
-                break
-            end
-        end
-        if foundPlanet then
-            printToAll('Detaching ' .. self.getName() .. ' from ' .. system.string, 'Yellow')
-            _systemHelper.injectSystem(system)
-        end
+    if system and _originalSystem and system.guid == _originalSystem.guid then
+        -- Restore original.
+        printToAll('Detaching ' .. self.getName() .. ' from ' .. system.string, 'Yellow')
+        _systemHelper.injectSystem(_originalSystem)
+        _originalSystem = false
     end
 end
 

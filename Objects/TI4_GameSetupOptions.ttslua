@@ -658,7 +658,7 @@ end
 -- things like leader sheets and promissory notes are in order.
 function postSetupPoK()
     local container = assert(_getByName('Prophecy of Kings'))
-    local removeCardsGuidToDeck = {}
+    local removeCardsGuidAndDeck = {}
 
     if _config.usePoK then
         -- Remove other cards, per PoK setup.
@@ -683,7 +683,10 @@ function postSetupPoK()
             local deck = assert(getObjectFromGUID(deckGuid))
             for _, entry in ipairs(deck.getObjects()) do
                 if entry.name == cardName then
-                    removeCardsGuidToDeck[entry.guid] = deck
+                    table.insert(removeCardsGuidAndDeck, {
+                        guid = entry.guid,
+                        deck = deck
+                    })
                 end
             end
             coroutine.yield(0)
@@ -706,12 +709,27 @@ function postSetupPoK()
         end
         coroutine.yield(0)
 
+        -- Remove techs.
+        local removeCardSet = {
+            ['Sling Relay'] = true,
+            ['Psychoarchaeology'] = true,
+            ['Predictive Intelligence'] = true,
+            ['AI Development Algorithm'] = true,
+        }
+
         -- Remove alliance promissory notes.
+        for _, color in ipairs(Player.getColors()) do
+            removeCardSet['Alliance (' .. color .. ')'] = true
+        end
+
         for _, object in ipairs(getAllObjects()) do
-            if object.tag == 'Deck' and string.match(object.getName(), '^Notes (.*)$') then
+            if object.tag == 'Deck' then
                 for _, entry in ipairs(object.getObjects()) do
-                    if string.match(entry.name, '^Alliance (.*)$') then
-                        removeCardsGuidToDeck[entry.guid] = object
+                    if removeCardSet[entry.name] then
+                        table.insert(removeCardsGuidAndDeck, {
+                            guid = entry.guid,
+                            deck = object
+                        })
                     end
                 end
             end
@@ -719,7 +737,9 @@ function postSetupPoK()
         coroutine.yield(0)
     end
 
-    for guid, deck in pairs(removeCardsGuidToDeck) do
+    for _, guidAndDeck in pairs(removeCardsGuidAndDeck) do
+        local guid = guidAndDeck.guid
+        local deck = guidAndDeck.deck
         assert(deck.tag == 'Deck')
         local pos = deck.getPosition()
         deck.takeObject({

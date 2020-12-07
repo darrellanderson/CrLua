@@ -1,6 +1,8 @@
 -- @author Darrell for context menu stuff
 -- @author Milty for adapting to exploration
+-- #include <~/CrLua/Objects/TI4_Helpers/TI4_ExploreHelper>
 
+-- Tokens MUST have a "Token" suffix to be planet attachments.
 local attachmentCardToTokenMap = {
     ["Propulsion Research Facility"] = {"Propulsion Research Facility Token"}, -- 1r1i or blue
     ["Cybernetic Research Facility"] = {"Cybernetic Research Facility Token"}, -- 1r1i or yellow
@@ -19,8 +21,6 @@ local attachmentCardToTokenMap = {
     ["Ion Storm"] = {"Ion Storm Token"},
     ["Stellar Converter"] = {"Stellar Converter Token"},
 }
-
-local data = {}
 
 function getHelperClient(helperObjectName)
     local function getHelperObject()
@@ -42,24 +42,6 @@ local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 
 -------------------------------------------------------------------------------
 
-local _getByNameCache = {}
-function _getByName(name, tag)
-    local guid = _getByNameCache[name]
-    local object = guid and getObjectFromGUID(guid)
-    if object and ((not tag) or object.tag == tag) then
-        return object
-    end
-    for _, object in ipairs(getAllObjects()) do
-        if object.getName() == name and ((not tag) or object.tag == tag) then
-            _getByNameCache[name] = object.getGUID()
-            return object
-        end
-    end
-    error('_getByName: missing "' .. name .. '"')
-end
-
--------------------------------------------------------------------------------
-
 function onLoad(saveState)
     self.setColorTint({ r = 0.25, g = 0.25, b = 0.25 })
     self.setScale({ x = 2, y = 0.01, z = 2 })
@@ -77,15 +59,95 @@ function onLoad(saveState)
 
     local function delayedAdd()
         for _, object in ipairs(getAllObjects()) do
-            if isSystemTile(object) then
+            if isExplorable(object) then
                 applyExplorationGoodness(object)
             elseif isFrontierToken(object) then
                 applyFrontierGoodness(object)
+            elseif _isDecalToken(object) then
+                onObjectDrop(false, object)
             end
         end
     end
     Wait.frames(delayedAdd, 11)
 end
+
+function onObjectSpawn(object)
+    if isExplorable(object) then
+        applyExplorationGoodness(object)
+    elseif isFrontierToken(object) then
+        applyFrontierGoodness(object)
+    elseif _isDecalToken(object) then
+        onObjectDrop(false, object)
+    end
+
+    -- Give token when card is drawn.
+    if object.tag == 'Card' and object.getName() == 'Stellar Converter' then
+        local guid = object.guid
+        local function delayedCheck()
+            local object = getObjectFromGUID(guid)
+            if object then
+                checkCardForToken(object, false, false)
+            end
+        end
+        Wait.time(delayedCheck, 5)
+    end
+end
+
+function onObjectDrop(playerColor, droppedObject)
+    if _isDecalToken(droppedObject) then
+        local decalImage = false
+        if droppedObject.is_face_down then
+            decalImage = droppedObject.getCustomObject().image_bottom
+        else
+            decalImage = droppedObject.getCustomObject().image
+        end
+        local card = _planetCardFromPosition(droppedObject.getPosition())
+        if decalImage and card then
+            local name = droppedObject.getName()
+            local decals = card.getDecals() or {}
+            for i, decal in ipairs(decals) do
+                if decal.name == name then
+                    table.remove(decals, i)
+                end
+            end
+            table.insert(decals, {
+                name = name,
+                url = decalImage,
+                position = { x = 0, y = 0.4, z = 0 },
+                rotation = { x = 90, y = 180, z = 0 },
+                scale = { x = 1, y = 1, z = 1 },
+            })
+            table.insert(decals, {
+                name = name,
+                url = decalImage,
+                position = { x = 0, y = -0.4, z = 0 },
+                rotation = { x = 270, y = 0, z = 0 },
+                scale = { x = 1, y = 1, z = 1 },
+            })
+            card.setDecals(decals)
+            card.highlightOn('Red', 100)
+        end
+    end
+end
+
+function onObjectPickUp(playerColor, pickupObject)
+    if _isDecalToken(pickupObject) then
+        local card = _planetCardFromPosition(pickupObject.getPosition())
+        if card then
+            local name = pickupObject.getName()
+            local decals = card.getDecals() or {}
+            for i = #decals, 1, -1 do
+                local decal = decals[i]
+                if decal.name == name then
+                    table.remove(decals, i)
+                end
+            end
+            card.setDecals(decals)
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
 
 function applyExplorationGoodness(object)
     assert(type(object) == 'userdata')
@@ -117,26 +179,6 @@ end
 function applyFrontierGoodness(object)
     assert(type(object) == 'userdata')
     object.addContextMenuItem('Explore Frontier', function() exploreFrontier(object) end, false)
-end
-
-function onObjectSpawn(object)
-    if isSystemTile(object) then
-        applyExplorationGoodness(object)
-    elseif isFrontierToken(object) then
-        applyFrontierGoodness(object)
-    end
-
-    -- Give token when card is drawn.
-    if object.tag == 'Card' and object.getName() == 'Stellar Converter' then
-        local guid = object.guid
-        local function delayedCheck()
-            local object = getObjectFromGUID(guid)
-            if object then
-                checkCardForToken(object, false, false)
-            end
-        end
-        Wait.time(delayedCheck, 5)
-    end
 end
 
 function explorePlanet(tileGUID, planetName)
@@ -279,15 +321,17 @@ function checkCardForToken(object_spawned, tileGUID, planetName)
     end
 end
 
-function isSystemTile(object)
-    if not data.systemTileSet then
-        local systemList = _systemHelper.systems()
-        data.systemTileSet = systemList
+-------------------------------------------------------------------------------
+
+local _systemTileSet = false
+function isExplorable(object)
+    if not _systemTileSet then
+        _systemTileSet = _systemHelper.systems()
     end
     if object.tag ~= 'Generic' then
         return false
     end
-    if data.systemTileSet[object.getGUID()] then
+    if _systemTileSet[object.getGUID()] then
         return true
     end
     if object.getName() == 'Mirage Token' then
@@ -309,6 +353,61 @@ function getAllFrontierTokens()
     end
 
     return frontierTokens
+end
+
+local _getByNameCache = {}
+function _getByName(name, tag)
+    local guid = _getByNameCache[name]
+    local object = guid and getObjectFromGUID(guid)
+    if object and ((not tag) or object.tag == tag) then
+        return object
+    end
+    for _, object in ipairs(getAllObjects()) do
+        if object.getName() == name and ((not tag) or object.tag == tag) then
+            _getByNameCache[name] = object.getGUID()
+            return object
+        end
+    end
+    error('_getByName: missing "' .. name .. '"')
+end
+
+local _decalTokenNameSet = false
+function _isDecalToken(object)
+    if not _decalTokenNameSet then
+        local exclude = {
+            ['Gamma Wormhole Token'] = true,
+            ['Mirage Token'] = true,
+            ['Ion Storm Token'] = true,
+            ['Stellar Converter'] = true,  -- this one removes the planet, pickup will not find it!
+        }
+        _decalTokenNameSet = {}
+        for _, tokenNames in pairs(attachmentCardToTokenMap) do
+            for _, tokenName in ipairs(tokenNames) do
+                if not exclude[tokenName] and string.match(tokenName, ' Token$') then
+                    _decalTokenNameSet[tokenName] = tokenName
+                end
+            end
+        end
+    end
+    return object.tag == 'Tile' and _decalTokenNameSet[object.getName()]
+end
+
+function _planetCardFromPosition(position)
+    assert(type(position) == 'table')
+    local system = _systemHelper.systemFromPosition(position)
+    local planet = system and _systemHelper.planetFromPosition({
+        systemGuid = system.guid,
+        position = position,
+        exact = false
+    })
+    if planet then
+        -- Do NOT cache planet cards by guid, deck helper may change guids.
+        for _, object in ipairs(getAllObjects()) do
+            if object.tag == 'Card' and object.getName() == planet.name then
+                return object
+            end
+        end
+    end
 end
 
 -------------------------------------------------------------------------------

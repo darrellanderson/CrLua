@@ -912,8 +912,9 @@ function discardDeck(params)
             return true
         end
     else
+        params.index = math.max(params.index or 0, #_discardDeckQueue)
         table.insert(_discardDeckQueue, params)
-        Wait.frames(_processDeckDiscardQueue, 2 + 2 * (params.index or 0))
+        Wait.frames(_processDeckDiscardQueue, 3 + 3 * (params.index or 0))
         return true
     end
 end
@@ -932,7 +933,7 @@ function _processDeckDiscardQueue()
             local pos = container.getPosition()
             deckObject = container.takeObject({
                 guid              = params.guid,
-                position          = { x = pos.x, y = pos.y + 5 + (params.index or 0), z = pos.z },
+                position          = { x = pos.x, y = pos.y + 5 + (params.index or 0) * 2, z = pos.z },
                 smooth            = false,
             })
         end

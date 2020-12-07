@@ -887,21 +887,23 @@ function _removeCards(containerName, deckName, sourceName)
             local card = deck.takeObject({
                 guid              = guid,
                 position          = position,
-                smooth            = true,
+                smooth            = false,
             })
             position.y = position.y + 0.2
             if createDeck then
                 local needYield = createDeck.tag == 'Card'
                 createDeck.setLock(false)
                 createDeck = createDeck.putObject(card)
-                createDeck.setLock(true)
                 while createDeck.spawning do
                     coroutine.yield(0)
                 end
+                coroutine.yield(0)
+                createDeck.setLock(true)
                 if needYield then
                     -- give deck a little extra time to form
-                    coroutine.yield(0)
-                    coroutine.yield(0)
+                    for _ = 1, 20 do
+                        coroutine.yield(0)
+                    end
                 end
             else
                 createDeck = card

@@ -380,6 +380,16 @@ function recomputeInfluence(includeFaceDown)
             influence = influence + (card.influence or 0)
         end
         colorToInfluence[color] = influence
+
+        if #modifiers > 0 then
+            local nameToDescription = _systemHelper.getResInfModifierDescriptions(modifiers)
+            local message = {}
+            for name, description in pairs(nameToDescription) do
+                table.insert(message, name .. ' (' .. description .. ')')
+            end
+            message = table.concat(message, ', ')
+            printToAll('Modifiers (' .. color .. '): ' .. message, color)
+        end
     end
 
     for color, voteCounter in pairs(colorToVoteCounter) do

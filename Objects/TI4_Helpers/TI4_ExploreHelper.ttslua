@@ -351,11 +351,13 @@ function checkCardForToken(object_spawned, tileGUID, planetName)
                     end
                 end
                 local position = object_spawned.getPosition()
-                position.y = position.y + 3 + i
+                position.y = position.y + i * 0.3
+                object_spawned.translate({ x = 0, y = 2, z = 0 })
                 explorationBag.takeObject({
                     position = position,
                     rotation = {objRot.x, objRot.y, techRot},
                     guid = token.guid,
+                    smooth = false
                 })
 
                 -- Only get each token once.

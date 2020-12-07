@@ -12,7 +12,7 @@ local attachmentCardToTokenMap = {
     ["Dyson Sphere"] = {"Dyson Sphere Token"}, -- 2r1i
     ["Paradise World"] = {"Paradise World Token"}, -- 2i
     ["Tomb of Emphidia"] = {"Tomb of Emphidia Token"}, -- 1i
-    ["Demilitarized Zone"] = {"DMZ Token"},
+    ["Demilitarized Zone (PoK)"] = {"DMZ Token"},
     ["Gamma Wormhole"] = {"Gamma Wormhole Token"},
     ["Gamma Relay"] = {"Gamma Wormhole Token"},
     ["Mirage (Exploration)"] = {"Mirage Token", "Mirage", "Mirage Flight Academy"},
@@ -89,12 +89,26 @@ end
 
 function applyExplorationGoodness(object)
     assert(type(object) == 'userdata')
-    local systemList = _systemHelper.systems()
-    local planetList = systemList[object.getGUID()].planets
-    if planetList ~= nil then
-        for i, planet in ipairs(planetList) do
-            if planet.trait ~= nil then
-                object.addContextMenuItem('Explore ' .. planet.name, function() explorePlanet(object.getGUID(), planet.name) end, false)
+    if object.getName() == 'Mirage Token' then
+        local function exploreMirage()
+            -- System tile has correct data when Mirage dropped there, but
+            -- since Mirage can move re-find system when asked to explore.
+            local system = _systemHelper.systemFromPosition(object.getPosition())
+            if system then
+                explorePlanet(system.guid, 'Mirage')
+            else
+                print('Mirage not attached to a system, cannot explore')
+            end
+        end
+        object.addContextMenuItem('Explore Mirage', exploreMirage, false)
+    else
+        local systemList = _systemHelper.systems()
+        local planetList = systemList[object.getGUID()].planets
+        if planetList ~= nil then
+            for i, planet in ipairs(planetList) do
+                if planet.trait ~= nil then
+                    object.addContextMenuItem('Explore ' .. planet.name, function() explorePlanet(object.getGUID(), planet.name) end, false)
+                end
             end
         end
     end
@@ -270,7 +284,15 @@ function isSystemTile(object)
         local systemList = _systemHelper.systems()
         data.systemTileSet = systemList
     end
-    return object.tag == 'Generic' and data.systemTileSet[object.getGUID()] or false
+    if object.tag ~= 'Generic' then
+        return false
+    end
+    if data.systemTileSet[object.getGUID()] then
+        return true
+    end
+    if object.getName() == 'Mirage Token' then
+        return true
+    end
 end
 
 function isFrontierToken(object)

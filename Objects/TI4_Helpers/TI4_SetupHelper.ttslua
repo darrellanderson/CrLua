@@ -118,7 +118,7 @@ local SetupColor = {
         ['Notes %($COLOR%)'] = { x = 7, z = 2 },
         ['Active/Passed %($COLOR%)'] = { x = 4, y = 1, z = 2, flip = false },  -- do not flip, changing setup can lead to unflipped tokens
         ['Command Sheet %($COLOR%)'] = { x = -8.5, z = 11, lock = true },
-        ['Directionaliser %($COLOR%)'] = { x = 0, y = 0.46, z = -2, yRot = 270, lock = true },
+        ['Directionaliser %($COLOR%)'] = { x = 0, y = 0, z = -2, yRot = 270, lock = true },
         ['Leader Sheet %($COLOR%)'] = { x = 8.8, z = 11, lock = true },
     },
     NAME_TO_PLAYER_AGENDA_ZONE_OFFSET = {
@@ -126,17 +126,17 @@ local SetupColor = {
     },
     NAME_TO_DIRECTIONALISER_OFFSET = {
         -- These are in Directionaliser local coordinate space.
-        ['$COLOR Infantry'] = { x = 0, y = 1, z = -12.2 },
-        ['$COLOR Fighter'] = { x = 0, y = 1, z = -10.6 },
-        ['$COLOR Space Dock'] = { x = 0, y = 1, z = -8.4 },
-        ['$COLOR PDS'] = { x = 0, y = 1, z = -6.1 },
-        ['$COLOR Carrier'] = { x = 0, y = 1, z = -2.6 },
-        ['$COLOR Destroyer'] = { x = 0, y = 1, z = -0.1 },
-        ['$COLOR Cruiser'] = { x = 0, y = 1, z = 3.0 },
-        ['$COLOR Dreadnought'] = { x = 0, y = 1, z = 6 },
-        ['$COLOR Flagship'] = { x = 0, y = 1, z = 9.6 },
-        ['$COLOR War Sun'] = { x = 0, y = 1, z = 12.1 },
-        ['$COLOR Mech'] = { x = 0, y = 1, z = -14.5 },
+        ['$COLOR Mech'] = { x = 0, y = 1, z = -13 },
+        ['$COLOR Infantry'] = { x = 0, y = 1, z = -11 },
+        ['$COLOR Fighter'] = { x = 0, y = 1, z = -9 },
+        ['$COLOR Space Dock'] = { x = 0, y = 1, z = -7 },
+        ['$COLOR PDS'] = { x = 0, y = 1, z = -5 },
+        ['$COLOR Carrier'] = { x = 0, y = 1, z = -2.15 },
+        ['$COLOR Destroyer'] = { x = 0, y = 1, z = 0.35 },
+        ['$COLOR Cruiser'] = { x = 0, y = 1, z = 3.17 },
+        ['$COLOR Dreadnought'] = { x = 0, y = 1, z = 6.21 },
+        ['$COLOR Flagship'] = { x = 0, y = 1, z = 10.19 },
+        ['$COLOR War Sun'] = { x = 0, y = 1, z = 13 },
     },
 }
 
@@ -654,6 +654,9 @@ end
 function SetupColor.unpackUnits(color, colorBox, directionaliser)
     assert(type(color) == 'string' and colorBox.tag == 'Bag' and type(directionaliser) == 'userdata')
     debugLog('SetupColor.unpackUnits ' .. color)
+
+    -- Remove any snap points, just adds to TTS overhead.
+    directionaliser.setSnapPoints({})
 
     local unitBags = {}
     for namePattern, offset in pairs(SetupColor.NAME_TO_DIRECTIONALISER_OFFSET) do

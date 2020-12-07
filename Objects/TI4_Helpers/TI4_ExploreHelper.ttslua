@@ -105,27 +105,33 @@ function onObjectDrop(playerColor, droppedObject)
         if decalImage and card then
             local name = droppedObject.getName()
             local decals = card.getDecals() or {}
+
+            -- Remove if already present.
             for i, decal in ipairs(decals) do
                 if decal.name == name then
                     table.remove(decals, i)
                 end
             end
+
+            -- Add decal.
+            local scale = { x = 0.6, y = 0.6, z = 1 } -- scale is literal size here
             table.insert(decals, {
                 name = name,
                 url = decalImage,
                 position = { x = 0, y = 0.4, z = 0 },
                 rotation = { x = 90, y = 180, z = 0 },
-                scale = { x = 1, y = 1, z = 1 },
+                scale = scale,
             })
             table.insert(decals, {
                 name = name,
                 url = decalImage,
                 position = { x = 0, y = -0.4, z = 0 },
                 rotation = { x = 270, y = 0, z = 0 },
-                scale = { x = 1, y = 1, z = 1 },
+                scale = scale,
             })
+
+            _positionDecals(decals)
             card.setDecals(decals)
-            card.highlightOn('Red', 100)
         end
     end
 end
@@ -142,9 +148,47 @@ function onObjectPickUp(playerColor, pickupObject)
                     table.remove(decals, i)
                 end
             end
+            _positionDecals(decals)
             card.setDecals(decals)
         end
     end
+end
+
+function _positionDecals(decals)
+    local nextIndex = 0
+    local nameToZeroBasedIndex = {}
+    for _, decal in ipairs(decals) do
+        if not nameToZeroBasedIndex[decal.name] then
+            nameToZeroBasedIndex[decal.name] = nextIndex
+            nextIndex = nextIndex + 1
+        end
+    end
+    local x0 = 0.65
+    local z0 = -1.1
+    local dx = -0.65
+    local dz = 0.65
+    local numCols = 3
+    for _, decal in ipairs(decals) do
+        local zi = nameToZeroBasedIndex[decal.name]
+        -- Leave a blank where the planet r/i appears.
+        if zi >= 3 then
+            zi = zi + 1
+        end
+        local row = math.floor(zi / numCols)
+        local col = zi % numCols
+        if row > 1 then
+            row = row + 1.5 -- planet name area
+        end
+        decal.position = {
+            x = x0 + dx * col,
+            y = decal.position.y,
+            z = z0 + dz * row
+        }
+        if decal.position.y < 0 then
+            decal.position.x = -decal.position.x
+        end
+    end
+
 end
 
 -------------------------------------------------------------------------------

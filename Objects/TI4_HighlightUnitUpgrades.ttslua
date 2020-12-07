@@ -209,8 +209,8 @@ function _highlightUnitUpgradesCoroutine()
         local thickness = 0.4
         if directionaliser then
             local bounds = self.getBoundsNormalized()
-            local topY = directionaliser.getPosition().y + 0.17
-            local midY = directionaliser.getPosition().y - 0.10
+            local topY = directionaliser.getPosition().y + 0.43
+            local midY = directionaliser.getPosition().y + 0.26
             local topZ = 0.66
             local midZ = 1.15 - (thickness / 2) - 0.1
             local lines = {}

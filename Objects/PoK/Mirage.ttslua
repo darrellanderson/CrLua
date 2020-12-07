@@ -22,6 +22,7 @@ local PLANET = {
     name = 'Mirage',
     resources = 1,
     influence = 2,
+    trait = 'cultural',
     legendary = true,
     legendaryCard = 'Mirage Flight Acadamy'
 }
@@ -63,7 +64,13 @@ local function _attach(playerColor)
         local p = false
         for i, planet in ipairs(system.planets or {}) do
             if planet.name == PLANET.name then
-                p = systemObject.positionToWorld(planet.position)
+                -- Move a little further.
+                local scaleDistance = 1.5
+                p = systemObject.positionToWorld({
+                    x = planet.position.x * scaleDistance,
+                    y = planet.position.y,
+                    z = planet.position.z * scaleDistance,
+                })
             end
         end
         p.y = p.y + 0.1

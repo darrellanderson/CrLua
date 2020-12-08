@@ -49,7 +49,7 @@ end
 
 -------------------------------------------------------------------------------
 
-function report()
+function report(playerColor)
     local message = { 'Active/Passed Tokens:' }
     for i, tokenState in ipairs(getAllActivePassedTokens()) do
         table.insert(message, table.concat({
@@ -59,7 +59,8 @@ function report()
             tokenState.seated and 'Seated' or 'NotSeated'
         }, ' '))
     end
-    print(table.concat(message, '\n'))
+    message = table.concat(message, '\n')
+    printToColor(message, playerColor)
 end
 
 -------------------------------------------------------------------------------

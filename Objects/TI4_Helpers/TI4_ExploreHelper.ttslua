@@ -560,6 +560,7 @@ function AttachLib._injectAttachment(system, planetName, attachTokenObject)
     if dele then
         planet.resources = (planet.resources or 0) - (dele.resources or 0)
         planet.influence = (planet.influence or 0) - (dele.influence or 0)
+        planet._attachments[name] = nil
     end
 
     -- Attach.
@@ -567,10 +568,10 @@ function AttachLib._injectAttachment(system, planetName, attachTokenObject)
     planet.resources = (planet.resources or 0) + (attachment.resources or 0)
     planet.influence = (planet.influence or 0) + (attachment.influence or 0)
 
-    if planet.resources == 0 then
+    if planet.resources <= 0 then
         planet.resources = nil
     end
-    if planet.influence == 0 then
+    if planet.influence <= 0 then
         planet.influence = nil
     end
 
@@ -600,12 +601,13 @@ function AttachLib._ejectAttachment(system, planetName, attachTokenObject)
     if dele then
         planet.resources = (planet.resources or 0) - (dele.resources or 0)
         planet.influence = (planet.influence or 0) - (dele.influence or 0)
+        planet._attachments[name] = nil
     end
 
-    if planet.resources == 0 then
+    if planet.resources <= 0 then
         planet.resources = nil
     end
-    if planet.influence == 0 then
+    if planet.influence <= 0 then
         planet.influence = nil
     end
 

@@ -349,10 +349,10 @@ function checkCardForToken(object_spawned, tileGUID, planetName)
             local rotation = object_spawned.getRotation()
 
             local function takeCallback(object)
-                if AttachLib.isAttachToken(droppedObject) then
+                if AttachLib.isAttachToken(object) then
                     -- Attach will figure out if token should be face up/down.
-                    if AttachLib.attach(droppedObject) then
-                        AttachLib.anchor(droppedObject)  -- move beneath any units and lock
+                    if AttachLib.attach(object) then
+                        AttachLib.anchor(object)  -- move beneath any units and lock
                     end
                 end
             end
@@ -362,7 +362,7 @@ function checkCardForToken(object_spawned, tileGUID, planetName)
                 rotation = rotation,
                 guid = token.guid,
                 smooth = true,
-                callback = takeCallback
+                callback_function = takeCallback
             })
 
             -- Only get each token once.
@@ -644,7 +644,7 @@ end
 
 -- Tech ALWAYS applies unless the planet already has one (can be any).
 function AttachLib._orientToken(system, planetName, attachTokenObject)
-    assert(type(system) == 'table' and type(planetName) == 'string' and type(attachTokenObject) == 'userdata')
+    assert(type(system) == 'table' and (not planetName or type(planetName) == 'string') and type(attachTokenObject) == 'userdata')
 
     local planetHasAnyTech = false
     for _, planet in ipairs(system.planets or {}) do

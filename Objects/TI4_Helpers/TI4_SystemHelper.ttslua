@@ -1797,6 +1797,7 @@ function _renameSystemTilesCoroutine()
             object = getObjectFromGUID(guid)
         end
         assert(object)
+        object.setRotation({ x = 0, y = 180, z = 0 })
         if string.len(object.getName()) == 0 then
             object.setName(name)
         end

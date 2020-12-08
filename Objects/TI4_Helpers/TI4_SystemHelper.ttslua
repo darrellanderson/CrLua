@@ -468,26 +468,29 @@ local _systems = {
 }
 
 local _nonPlanetResourceInfluenceCards = {
-  -- Planet attachment cards
-  { name = 'Core Mining', resources = 2, influence = 0 },
-  { name = 'Terraforming Initiative', resources = 1, influence = 1 },
-  { name = 'Senate Sanctuary', resources = 0, influence = 2 },
-  { name = 'Rich World', resources = 1, influence = 0 },
-  { name = 'Mining World', resources = 2, influence = 0 },
-  { name = 'Lazax Survivors', resources = 1, influence = 2 },
-  { name = 'Tomb of Emphidia', resources = 0, influence = 1 },
-  { name = 'Paradise World', resources = 0, influence = 2 },
-  { name = 'Dyson Sphere', resources = 2, influence = 1 },
-  { name = 'Biotic Research Facility', resources = 1, influence = 1 },
-  { name = 'Cybernetic Research Facility', resources = 1, influence = 1 },
-  { name = 'Warfare Research Facility', resources = 1, influence = 1 },
-  { name = 'Propulsion Research Facility', resources = 1, influence = 1 },
-  { name = 'Terraform', resources = 1, influence = 1 },
-  { name = 'Ul the Progenitor', resources = 3, influence = 3, requireFaceUp = true },
+    -- Keep base game agendas here?  Are they gone?  XXX TODO
 
-  -- Technology
-  -- Predictive Intelligence: Increase minimum available votes by 3.
-  { name = 'Predictive Intelligence', resources = 0, influence = 3, requireFaceUp = true },
+    { name = 'Core Mining', resources = 2, influence = 0 },
+    { name = 'Senate Sanctuary', resources = 0, influence = 2 },
+    { name = 'Terraforming Initiative', resources = 1, influence = 1 },
+
+    -- Attachment tokens are the new way to do things.
+    -- { name = 'Rich World', resources = 1, influence = 0 },
+    -- { name = 'Mining World', resources = 2, influence = 0 },
+    -- { name = 'Lazax Survivors', resources = 1, influence = 2 },
+    -- { name = 'Tomb of Emphidia', resources = 0, influence = 1 },
+    -- { name = 'Paradise World', resources = 0, influence = 2 },
+    -- { name = 'Dyson Sphere', resources = 2, influence = 1 },
+    -- { name = 'Biotic Research Facility', resources = 1, influence = 1 },
+    -- { name = 'Cybernetic Research Facility', resources = 1, influence = 1 },
+    -- { name = 'Warfare Research Facility', resources = 1, influence = 1 },
+    -- { name = 'Propulsion Research Facility', resources = 1, influence = 1 },
+    -- { name = 'Terraform', resources = 1, influence = 1 },
+    -- { name = 'Ul the Progenitor', resources = 3, influence = 3, requireFaceUp = true },
+
+    -- Technology
+    -- Predictive Intelligence: Increase minimum available votes by 3.
+    { name = 'Predictive Intelligence', resources = 0, influence = 3, requireFaceUp = true },
 }
 
 local TYPE = {

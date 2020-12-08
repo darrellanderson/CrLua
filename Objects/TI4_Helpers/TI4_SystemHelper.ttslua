@@ -1117,12 +1117,28 @@ end
 -- @return string.
 function _systemToString(system)
     assert(type(system) == 'table' and system.tile)
+    local function capitalizeWords(words)
+        local words, _ = words:gsub("(%l)(%w*)", function(a,b) return string.upper(a)..b end)
+        return words
+    end
     local message = {
         'System ' .. system.tile
     }
-    for i, planet in ipairs(system.planets or {}) do
-        table.insert(message, i == 1 and ': ' or ', ')
+    for _, planet in ipairs(system.planets or {}) do
+        table.insert(message, #message == 1 and ': ' or ', ')
         table.insert(message, '“' .. planet.name .. '”')
+    end
+    for _, wormhole in ipairs(system.wormholes or {}) do
+        table.insert(message, #message == 1 and ': ' or ', ')
+        table.insert(message, capitalizeWords(wormhole) .. ' Wormhole')
+    end
+    for _, anomaly in ipairs(system.anomalies or {}) do
+        table.insert(message, #message == 1 and ': ' or ', ')
+        table.insert(message, capitalizeWords(anomaly))
+    end
+    if system.hyperlane then
+        table.insert(message, #message == 1 and ': ' or ', ')
+        table.insert(message, 'Hyperlane')
     end
     return table.concat(message, '')
 end
@@ -1662,6 +1678,9 @@ function onLoad(saveState)
 
     self.addContextMenuItem('Verify', verifyAllSystems)
 
+    -- Not for full releases, exists for map builders who want to find tiles easily.
+    self.addContextMenuItem('Rename Tiles', function() startLuaCoroutine(self, '_renameSystemTilesCoroutine') end)
+
     -- Only the GM/black player can see this object.  Others can still interact!
     local invisibleTo = {}
     for _, color in ipairs(Player.getColors()) do
@@ -1737,6 +1756,56 @@ function activateSystem(playerColor, system)
         -- Since that is happening, also spread out over N frames.
         Wait.frames(function() object.call('onSystemActivation', system) end, i)
     end
+end
+
+-------------------------------------------------------------------------------
+
+function _renameSystemTilesCoroutine()
+    local bagAndGuidEntries = {} -- allow multiple copies of a tile in different bags
+    for _, object in ipairs(getAllObjects()) do
+        if _systems[object.getGUID()] then
+            table.insert(bagAndGuidEntries, { bag = false, guid = object.getGUID() })
+        elseif object.tag == 'Bag' then
+            for _, entry in ipairs(object.getObjects()) do
+                if _systems[entry.guid] then
+                    table.insert(bagAndGuidEntries, { bag = object, guid = entry.guid })
+                end
+            end
+        end
+    end
+    coroutine.yield(0)
+    for i, bagAndGuidEntry in ipairs(bagAndGuidEntries) do
+        local bag = bagAndGuidEntry.bag
+        local guid = assert(bagAndGuidEntry.guid)
+        local system = assert(_systems[guid])
+        local name = _systemToString(system)
+        local object = false
+        if bag then
+            local pos = bag.getPosition()
+            object = bag.takeObject({
+                guid = guid,
+                position = { x = pos.x, y = pos.y + 5 + i * 0.3, z = pos.z }
+            })
+            while object.spawning do
+                coroutine.yield(0)
+            end
+            coroutine.yield(0)
+        else
+            object = getObjectFromGUID(guid)
+        end
+        assert(object)
+        if string.len(object.getName()) == 0 then
+            object.setName(name)
+        end
+        if bag then
+            bag.putObject(object)
+            for _ = 1, 20 do
+                coroutine.yield(0)
+            end
+        end
+        coroutine.yield(0)
+    end
+    return 1
 end
 
 -------------------------------------------------------------------------------

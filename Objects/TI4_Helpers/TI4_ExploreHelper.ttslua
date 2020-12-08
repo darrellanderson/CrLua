@@ -2,8 +2,7 @@
 -- @author Milty for adapting to exploration
 -- #include <~/CrLua/Objects/TI4_Helpers/TI4_ExploreHelper>
 
--- Tokens MUST have a "Token" suffix to be planet attachments.
-local attachmentCardToTokenMap = {
+local exploreCardToTokenMap = {
     ["Propulsion Research Facility"] = {"Propulsion Research Facility Token"}, -- 1r1i or blue
     ["Cybernetic Research Facility"] = {"Cybernetic Research Facility Token"}, -- 1r1i or yellow
     ["Biotic Research Facility"] = {"Biotic Research Facility Token"}, -- 1r1i or green
@@ -21,6 +20,48 @@ local attachmentCardToTokenMap = {
     ["Ion Storm"] = {"Ion Storm Token"},
     ["Stellar Converter"] = {"Stellar Converter Token"},
 }
+
+local attachTokens = {
+    ['Propulsion Research Facility Token'] = {
+        faceUp = { resources = 1, influence = 1 },
+        faceDown = { tech = 'blue' },
+    },
+    ['Cybernetic Research Facility Token'] = {
+        faceUp = { resources = 1, influence = 1 },
+        faceDown = { tech = 'yellow' },
+    },
+    ['Biotic Research Facility Token'] = {
+        faceUp = { resources = 1, influence = 1 },
+        faceDown = { tech = 'green' },
+    },
+    ['Warfare Research Facility Token'] = {
+        faceUp = { resources = 1, influence = 1 },
+        faceDown = { tech = 'red' },
+    },
+    ['Lazax Survivors Token'] = {
+        faceUpOrDown = { resources = 1, influence = 2 },
+    },
+    ['Rich World Token'] = {
+        faceUpOrDown = { resources = 1 },
+    },
+    ['Mining World Token'] = {
+        faceUpOrDown = { resources = 2 },
+    },
+    ['Dyson Sphere Token'] = {
+        faceUpOrDown = { resources = 2, influence = 1 },
+    },
+    ['Paradise World Token'] = {
+        faceUpOrDown = { influence = 2 },
+    },
+    ['Tomb of Emphidia Token'] = {
+        faceUpOrDown = { influence = 1 },
+    },
+    ['DMZ Token'] = {
+        faceUpOrDown = {},
+    },
+}
+
+-------------------------------------------------------------------------------
 
 function getHelperClient(helperObjectName)
     local function getHelperObject()
@@ -40,6 +81,17 @@ end
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 
+local function copyTable(t)
+    if t and type(t) == 'table' then
+        local copy = {}
+        for k, v in pairs(t) do
+            copy[k] = type(v) == 'table' and copyTable(v) or v
+        end
+        t = copy
+    end
+    return t
+end
+
 -------------------------------------------------------------------------------
 
 function onLoad(saveState)
@@ -58,15 +110,29 @@ function onLoad(saveState)
     self.setInvisibleTo(invisibleTo)
 
     local function delayedAdd()
+        local attachObjectGuids = {}
         for _, object in ipairs(getAllObjects()) do
             if isExplorable(object) then
                 applyExplorationGoodness(object)
             elseif isFrontierToken(object) then
                 applyFrontierGoodness(object)
-            elseif _isDecalToken(object) then
-                onObjectDrop(false, object)
+            elseif AttachLib.isAttachToken(object) then
+                table.insert(attachObjectGuids, object.getGUID())
             end
         end
+
+        -- These are more expensive, spread them out.
+        local function attachOnePerFrame()
+            local guid = table.remove(attachObjectGuids)
+            local object = getObjectFromGUID(guid)
+            if object then
+                AttachLib.attach(object)
+            end
+            if #attachObjectGuids > 0 then
+                Wait.frames(attachOnePerFrame, 1)
+            end
+        end
+        Wait.frames(attachOnePerFrame, 1)
     end
     Wait.frames(delayedAdd, 11)
 end
@@ -76,8 +142,8 @@ function onObjectSpawn(object)
         applyExplorationGoodness(object)
     elseif isFrontierToken(object) then
         applyFrontierGoodness(object)
-    elseif _isDecalToken(object) then
-        onObjectDrop(false, object)
+    elseif AttachLib.isAttachToken(object) then
+        AttachLib.attach(object)
     end
 
     -- Give token when card is drawn.
@@ -94,101 +160,15 @@ function onObjectSpawn(object)
 end
 
 function onObjectDrop(playerColor, droppedObject)
-    if _isDecalToken(droppedObject) then
-        local decalImage = false
-        if droppedObject.is_face_down then
-            decalImage = droppedObject.getCustomObject().image_bottom
-        else
-            decalImage = droppedObject.getCustomObject().image
-        end
-        local card = _planetCardFromPosition(droppedObject.getPosition())
-        if decalImage and card then
-            local name = droppedObject.getName()
-            local decals = card.getDecals() or {}
-
-            -- Remove if already present.
-            for i, decal in ipairs(decals) do
-                if decal.name == name then
-                    table.remove(decals, i)
-                end
-            end
-
-            -- Add decal.
-            local scale = { x = 0.6, y = 0.6, z = 1 } -- scale is literal size here
-            table.insert(decals, {
-                name = name,
-                url = decalImage,
-                position = { x = 0, y = 0.4, z = 0 },
-                rotation = { x = 90, y = 180, z = 0 },
-                scale = scale,
-            })
-            table.insert(decals, {
-                name = name,
-                url = decalImage,
-                position = { x = 0, y = -0.4, z = 0 },
-                rotation = { x = 270, y = 0, z = 0 },
-                scale = scale,
-            })
-
-            _positionDecals(decals)
-            card.setDecals(decals)
-        end
+    if AttachLib.isAttachToken(droppedObject) then
+        AttachLib.attach(droppedObject)
     end
 end
 
 function onObjectPickUp(playerColor, pickupObject)
-    if _isDecalToken(pickupObject) then
-        local card = _planetCardFromPosition(pickupObject.getPosition())
-        if card then
-            local name = pickupObject.getName()
-            local decals = card.getDecals() or {}
-            for i = #decals, 1, -1 do
-                local decal = decals[i]
-                if decal.name == name then
-                    table.remove(decals, i)
-                end
-            end
-            _positionDecals(decals)
-            card.setDecals(decals)
-        end
+    if AttachLib.isAttachToken(pickupObject) then
+        AttachLib.detach(pickupObject)
     end
-end
-
-function _positionDecals(decals)
-    local nextIndex = 0
-    local nameToZeroBasedIndex = {}
-    for _, decal in ipairs(decals) do
-        if not nameToZeroBasedIndex[decal.name] then
-            nameToZeroBasedIndex[decal.name] = nextIndex
-            nextIndex = nextIndex + 1
-        end
-    end
-    local x0 = 0.65
-    local z0 = -1.1
-    local dx = -0.65
-    local dz = 0.65
-    local numCols = 3
-    for _, decal in ipairs(decals) do
-        local zi = nameToZeroBasedIndex[decal.name]
-        -- Leave a blank where the planet r/i appears.
-        if zi >= 3 then
-            zi = zi + 1
-        end
-        local row = math.floor(zi / numCols)
-        local col = zi % numCols
-        if row > 1 then
-            row = row + 1.5 -- planet name area
-        end
-        decal.position = {
-            x = x0 + dx * col,
-            y = decal.position.y,
-            z = z0 + dz * row
-        }
-        if decal.position.y < 0 then
-            decal.position.x = -decal.position.x
-        end
-    end
-
 end
 
 -------------------------------------------------------------------------------
@@ -328,7 +308,7 @@ end
 
 function checkCardForToken(object_spawned, tileGUID, planetName)
     local cardName = object_spawned.getName()
-    local tokenList = attachmentCardToTokenMap[cardName]
+    local tokenList = exploreCardToTokenMap[cardName]
 
     if tokenList then
         local tokensToRetrieveSet = {}
@@ -369,15 +349,18 @@ end
 
 -------------------------------------------------------------------------------
 
-local _systemTileSet = false
+local _systemGuids = false
 function isExplorable(object)
-    if not _systemTileSet then
-        _systemTileSet = _systemHelper.systems()
+    if not _systemGuids then
+        _systemGuids = {}
+        for guid, _ in pairs(_systemHelper.systems()) do
+            _systemGuids[guid] = true
+        end
     end
     if object.tag ~= 'Generic' then
         return false
     end
-    if _systemTileSet[object.getGUID()] then
+    if _systemGuids[object.getGUID()] then
         return true
     end
     if object.getName() == 'Mirage Token' then
@@ -415,45 +398,6 @@ function _getByName(name, tag)
         end
     end
     error('_getByName: missing "' .. name .. '"')
-end
-
-local _decalTokenNameSet = false
-function _isDecalToken(object)
-    if not _decalTokenNameSet then
-        local exclude = {
-            ['Gamma Wormhole Token'] = true,
-            ['Mirage Token'] = true,
-            ['Ion Storm Token'] = true,
-            ['Stellar Converter'] = true,  -- this one removes the planet, pickup will not find it!
-        }
-        _decalTokenNameSet = {}
-        for _, tokenNames in pairs(attachmentCardToTokenMap) do
-            for _, tokenName in ipairs(tokenNames) do
-                if not exclude[tokenName] and string.match(tokenName, ' Token$') then
-                    _decalTokenNameSet[tokenName] = tokenName
-                end
-            end
-        end
-    end
-    return object.tag == 'Tile' and _decalTokenNameSet[object.getName()]
-end
-
-function _planetCardFromPosition(position)
-    assert(type(position) == 'table')
-    local system = _systemHelper.systemFromPosition(position)
-    local planet = system and _systemHelper.planetFromPosition({
-        systemGuid = system.guid,
-        position = position,
-        exact = false
-    })
-    if planet then
-        -- Do NOT cache planet cards by guid, deck helper may change guids.
-        for _, object in ipairs(getAllObjects()) do
-            if object.tag == 'Card' and object.getName() == planet.name then
-                return object
-            end
-        end
-    end
 end
 
 -------------------------------------------------------------------------------
@@ -528,6 +472,179 @@ function retrieveFrontierTokens()
     for _, object in ipairs(getAllObjects()) do
         if isFrontierToken(object) then
             frontierTokenBag.putObject(object)
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
+
+AttachLib = {}
+
+function AttachLib.isAttachToken(object)
+    assert(type(object) == 'userdata')
+    return attachTokens[object.getName()] and true or false
+end
+
+function AttachLib.attach(attachTokenObject)
+    assert(type(attachTokenObject) == 'userdata')
+    local attrs = assert(attachTokens[attachTokenObject.getName()])
+    local system, planetName = AttachLib._getSystemAndPlanetName(attachTokenObject.getPosition())
+    if planetName then
+        AttachLib._injectAttachment(system, planetName, attachTokenObject)
+        local card = AttachLib._getPlanetCard(planetName)
+        if card then
+            AttachLib._attachDecal(card, attachTokenObject)
+        end
+    end
+end
+
+function AttachLib.detach(attachTokenObject)
+    assert(type(attachTokenObject) == 'userdata')
+    local attrs = assert(attachTokens[attachTokenObject.getName()])
+    local system, planetName = AttachLib._getSystemAndPlanetName(attachTokenObject.getPosition())
+    if planetName then
+        AttachLib._ejectAttachment(system, planetName, attachTokenObject)
+        local card = AttachLib._getPlanetCard(planetName)
+        if card then
+            AttachLib._detachDecal(card, attachTokenObject)
+        end
+    end
+end
+
+function AttachLib._getSystemAndPlanetName(position)
+    assert(type(position) == 'table')
+    local system = _systemHelper.systemFromPosition(position)
+    local planet = system and _systemHelper.planetFromPosition({
+        systemGuid = system.guid,
+        position = position,
+        exact = false
+    })
+    local card = false
+    if planet then
+        -- Do NOT cache planet cards by guid, deck helper may change guids.
+        for _, object in ipairs(getAllObjects()) do
+            if object.tag == 'Card' and object.getName() == planet.name then
+                card = object
+                break
+            end
+        end
+    end
+    return system, (planet and planet.name), card
+end
+
+--- Add attachment to a system's planet entry.
+function AttachLib._injectAttachment(system, planetName, attachTokenObject)
+    assert(type(system) == 'table' and type(planetName) == 'string' and type(attachTokenObject) == 'userdata')
+    -- TODO
+end
+
+-- Remove attachment from a system's planet entry.  DO NOT USE CURRENT ORIENTATION,
+-- token may have flipped, instead remove by name.
+function AttachLib._ejectAttachment(system, planetName, attachTokenObject)
+    assert(type(system) == 'table' and type(planetName) == 'string' and type(attachTokenObject) == 'userdata')
+    -- TODO
+end
+
+--- Find the card object.
+function AttachLib._getPlanetCard(planetName)
+    assert(type(planetName) == 'string')
+    -- Do NOT cache planet cards by guid, deck helper may change guids.
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Card' and object.getName() == planetName then
+            return object
+        end
+    end
+end
+
+--- Add a decal to the planet card, with layout.
+function AttachLib._attachDecal(planetCardObject, attachTokenObject)
+    assert(type(planetCardObject) == 'userdata' and planetCardObject.tag == 'Card')
+    assert(type(attachTokenObject) == 'userdata')
+    local decalImage = false
+    if attachTokenObject.is_face_down then
+        decalImage = attachTokenObject.getCustomObject().image_bottom
+    else
+        decalImage = attachTokenObject.getCustomObject().image
+    end
+    if not decalImage then
+        return  -- wrong object type with a different custom table?
+    end
+    local name = attachTokenObject.getName()
+    local decals = planetCardObject.getDecals() or {}
+
+    -- Remove if already present.
+    for i, decal in ipairs(decals) do
+        if decal.name == name then
+            table.remove(decals, i)
+        end
+    end
+
+    -- Add decal.
+    local scale = { x = 0.6, y = 0.6, z = 1 } -- scale is literal size here
+    table.insert(decals, {
+        name = name,
+        url = decalImage,
+        position = { x = 0, y = 0.4, z = 0 },
+        rotation = { x = 90, y = 180, z = 0 },
+        scale = scale,
+    })
+    table.insert(decals, {
+        name = name,
+        url = decalImage,
+        position = { x = 0, y = -0.4, z = 0 },
+        rotation = { x = 270, y = 0, z = 0 },
+        scale = scale,
+    })
+    AttachLib._layoutDecals(decals)
+    planetCardObject.setDecals(decals)
+end
+
+--- Remove a decal from the planet card, with layout.
+function AttachLib._detachDecal(planetCardObject, attachTokenObject)
+    assert(type(planetCardObject) == 'userdata' and planetCardObject.tag == 'Card')
+    assert(type(attachTokenObject) == 'userdata')
+    local name = attachTokenObject.getName()
+    local decals = planetCardObject.getDecals() or {}
+    for i = #decals, 1, -1 do
+        local decal = decals[i]
+        if decal.name == name then
+            table.remove(decals, i)
+        end
+    end
+    AttachLib._layoutDecals(decals)
+    planetCardObject.setDecals(decals)
+end
+
+--- Organize tokens for a grid layout, avoid planet res/inf and name areas.
+function AttachLib._layoutDecals(decals)
+    assert(type(decals) == 'table')
+    local nextIndex = 0
+    local nameToZeroBasedIndex = {}
+    for _, decal in ipairs(decals) do
+        if not nameToZeroBasedIndex[decal.name] then
+            nameToZeroBasedIndex[decal.name] = nextIndex
+            nextIndex = nextIndex + 1
+        end
+    end
+    local x0 = 0.33
+    local z0 = -1.1
+    local dx = -0.66
+    local dz = 0.65
+    local numCols = 2
+    for _, decal in ipairs(decals) do
+        local zi = nameToZeroBasedIndex[decal.name]
+        local row = math.floor(zi / numCols)
+        local col = zi % numCols
+        if row > 1 then
+            row = row + 1.5 -- planet name area
+        end
+        decal.position = {
+            x = x0 + dx * col,
+            y = decal.position.y,
+            z = z0 + dz * row
+        }
+        if decal.position.y < 0 then
+            decal.position.x = -decal.position.x
         end
     end
 end

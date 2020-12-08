@@ -1,6 +1,7 @@
 -- TI4 Map Building Tool by Cruix
 -- @author Cruix
 -- @author Darrell (August 2020 update)
+-- #include <~/CrLua/Objects/TI4_Map_Tool>
 
 -- Maps are stored in a string by their tile numbers,
 -- starting directly above Mecatol Rex and moving in
@@ -189,6 +190,7 @@ function createInputs()
         width          = buttonWidthMajor,
         height         = buttonHeightMajor,
         font_size      = fontSizeMajor,
+        tooltip        = 'Build map from current string'
     })
     self.createButton({
         click_function = 'onButtonSave',
@@ -198,6 +200,8 @@ function createInputs()
         width          = buttonWidthMajor,
         height         = buttonHeightMajor,
         font_size      = fontSizeMajor,
+        tooltip        = 'Update map string based on current system tile layout'
+
     })
     self.createButton({
         click_function = 'onButtonPlaceCards',
@@ -207,6 +211,7 @@ function createInputs()
         width          = buttonWidthMajor,
         height         = buttonHeightMajor,
         font_size      = fontSizeMinor,
+        tooltip        = 'Place cards on planets'
     })
     self.createButton({
         click_function = 'onButtonReturnCards',
@@ -216,6 +221,7 @@ function createInputs()
         width          = buttonWidthMajor,
         height         = buttonHeightMajor,
         font_size      = fontSizeMinor,
+        tooltip        = 'Return planet cards to deck'
     })
     self.createButton({
         click_function = 'onButtonClearTiles',
@@ -225,6 +231,7 @@ function createInputs()
         width          = buttonWidthMajor,
         height         = buttonHeightMajor,
         font_size      = fontSizeMajor,
+        tooltip        = 'Return system tile to bags'
     })
     self.createButton({
         click_function = 'onButtonPlaceFrontier',
@@ -234,6 +241,7 @@ function createInputs()
         width          = buttonWidthMajor,
         height         = buttonHeightMajor,
         font_size      = fontSizeMinor,
+        tooltip        = 'Place Frontier tokens on zero-planet systems'
     })
     self.createButton({
         click_function = 'onButtonDrawLines',
@@ -243,6 +251,7 @@ function createInputs()
         width          = buttonWidthMajor,
         height         = buttonHeightMajor,
         font_size      = fontSizeMinor,
+        tooltip        = 'Redraw map rings and player zone lines'
     })
 
     local countZ = -0.65
@@ -418,8 +427,8 @@ function placeTile(system, bag, position, rotation, ab)
     else
         -- Look on table for object.
         object = getObjectFromGUID(system.guid)
-        object.setLock(false)
         if object then
+            object.setLock(false)
             local collide = false
             local fast = true
             object.setPositionSmooth(position, collide, fast)
@@ -490,7 +499,7 @@ function clearTilesCoroutine()
     if blueBag == nil then
         broadcastToAll('Cannot find blue planet tiles bag')
     end
-    for system, object in pairs(getPlacedSystemToObject()) do
+    for system, object in pairs(getPlacedSystemToObject(false)) do
         local guid = object.getGUID()
         if _tileClonesGuidSet[guid] then
             _tileClonesGuidSet[guid] = nil
@@ -522,7 +531,7 @@ end
 
 function saveTilesCoroutine()
     -- Get tile numbers and positions, convert to hexes.
-    local systemToObject = getPlacedSystemToObject()
+    local systemToObject = getPlacedSystemToObject(false)
     local guidToTile = {}
     local guidToPosition = {}
     for system, object in pairs(systemToObject) do
@@ -530,9 +539,9 @@ function saveTilesCoroutine()
         local tile = system.tile
         if system.hyperlane then
             tile = tile .. (object.is_face_down and 'B' or 'A')
-            tile = tile .. math.floor((tile.getRotation().y / 60) + 0.5)
+            tile = tile .. math.floor((object.getRotation().y / 60) + 0.5)
         end
-        guidToTile[guid] = assert(system.tile)
+        guidToTile[guid] = tile
         guidToPosition[guid] = object.getPosition()
     end
     local guidToHex = _systemHelper.hexesFromPositions(guidToPosition)
@@ -642,14 +651,14 @@ function placeCardsCoroutine()
     coroutine.yield(0)
 
     -- Make sure system tiles are locked, and no longer drawable into hands.
-    for system, object in pairs(getPlacedSystemToObject()) do
+    for system, object in pairs(getPlacedSystemToObject(false)) do
         object.use_hands = false
         object.setLock(true)
     end
 
     -- Build a map from planet name to positionS plural, in case repeated.
     local planetToTransforms = {}
-    for system, object in pairs(getPlacedSystemToObject()) do
+    for system, object in pairs(getPlacedSystemToObject(true)) do
         if not system.home then
             for _, planet in ipairs(system.planets or {}) do
                 local entry = planetToTransforms[planet.name]
@@ -771,7 +780,7 @@ function returnCardsCoroutine()
 
     -- Get the SET of planet names, ignore duplicates (handled by extras above).
     local planetNameSet = {}
-    for system, object in pairs(getPlacedSystemToObject()) do
+    for system, object in pairs(getPlacedSystemToObject(true)) do
         if not system.home then
             for _, planet in ipairs(system.planets or {}) do
                 planetNameSet[planet.name] = true
@@ -798,7 +807,7 @@ function returnCardsCoroutine()
     end
 
     _exploreHelper.retrieveFrontierTokens()
-    
+
     return 1
 end
 
@@ -929,7 +938,7 @@ function count_slices(count)
         return d > 1 and candidates[1].index or false
     end
 
-    for system, object in pairs(getPlacedSystemToObject()) do
+    for system, object in pairs(getPlacedSystemToObject(false)) do
         local i = getClosestIndex(homeSystemPositions, object.getPosition())
         if i then
             updateValue(hsValue[i], system)
@@ -1040,11 +1049,15 @@ function getTableY()
     return 1
 end
 
-function getPlacedSystemToObject()
+function getPlacedSystemToObject(includeOutsideSystems)
+    assert(type(includeOutsideSystems) == 'boolean')
     local systemToObject = {}
     local guidToSystem = _systemHelper.systems()
     for _, object in ipairs(getAllObjects()) do
         local system = guidToSystem[object.getGUID()]
+        if system and (not includeOutsideSystems) and system.tile == 82 then
+            system = false
+        end
         if system then
             systemToObject[system] = object
         end

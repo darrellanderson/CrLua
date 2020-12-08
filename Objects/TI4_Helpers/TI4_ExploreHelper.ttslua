@@ -59,6 +59,12 @@ local attachTokens = {
     ['DMZ Token'] = {
         faceUpOrDown = {},
     },
+    ['Titan Note Token'] = {
+        faceUp = { resources = 1, influence = 1 },  -- need multi-trait support for rest
+    },
+    ['Titan Ultimate Token'] = {
+        faceUp = { resources = 3, influence = 3 },
+    },
 }
 
 -------------------------------------------------------------------------------
@@ -500,6 +506,8 @@ function AttachLib.attach(attachTokenObject)
         if card then
             AttachLib._attachDecal(card, attachTokenObject)
         end
+
+        -- These are permanent, lock token?
     end
 end
 

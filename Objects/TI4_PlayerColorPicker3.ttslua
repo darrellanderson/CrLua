@@ -53,7 +53,8 @@ local SWAP = {
         'Command Sheet ($COLOR)',
         '$COLOR Player Votes',
         'Directionaliser ($COLOR)',
-        'Active/Passed ($COLOR)'
+        'Active/Passed ($COLOR)',
+        'Home System Location ($COLOR)',
     },
 
     -- Move cards into deck, pack deck.  Only expect deck during unpack.
@@ -967,7 +968,7 @@ function SwapPlan._verifyNothingMissing(anonNameToItems)
 
     for _, anonymousName in ipairs(SWAP.SINGLETONS) do
         local items = anonNameToItems[anonymousName]
-        if not items then
+        if (not items) and anonymousName ~= 'Home System Location ($COLOR)' then
             return false, 'missing "' .. anonymousName .. '"'
         end
     end

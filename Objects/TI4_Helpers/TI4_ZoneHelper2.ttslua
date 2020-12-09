@@ -119,12 +119,6 @@ local DEFAULT_ZONES = {
             [3] = {-5.25, 15.16},
             [4] = {15.75, 3.03},
         },
-        homeSystemPositions_alt = {  -- "narrow 4p map"
-            [1] = {10.50, -12.12},
-            [2] = {-10.50, -12.12},
-            [3] = {-10.5, 12.12},
-            [4] = {10.50, 12.12},
-        },
         ghostHomePositions = {
             [1] = {15.75, -21.22},
             [2] = {-15.75, -21.22},
@@ -303,7 +297,6 @@ local _zones = {}
 local _table = {}
 local _lastUpdateZoneColorTime = false
 local _extraRings = 0
-local _altHomeSystemPositions = false
 
 -------------------------------------------------------------------------------
 
@@ -337,9 +330,6 @@ function setPlayerCount(params)
     _extraRings = params.extraRings or zoneAttributes.extraRings or 0
     _zones = {}
     local homeSystemPositionsXZ = zoneAttributes.homeSystemPositions
-    if _altHomeSystemPositions and zoneAttributes.homeSystemPositions_alt then
-        homeSystemPositionsXZ = zoneAttributes.homeSystemPositions_alt
-    end
     for i = 1, params.playerCount do
         local polygon = assert(zoneAttributes.zones[i])
         if _extraRings then
@@ -393,9 +383,6 @@ function getHomeSystemPositions(playerCount)
         playerCount = #_zones
     end
     local positionsXZ = DEFAULT_ZONES[playerCount].homeSystemPositions
-    if _altHomeSystemPositions and DEFAULT_ZONES[playerCount].homeSystemPositions_alt then
-        positionsXZ = DEFAULT_ZONES[playerCount].homeSystemPositions_alt
-    end
     local result = {}
     for _, positionXZ in ipairs(positionsXZ) do
         table.insert(result, {
@@ -405,16 +392,6 @@ function getHomeSystemPositions(playerCount)
         })
     end
     return result
-end
-
---- If a player count has alternate home system positions switch between
--- that and the default (e.g., 4p).
-function toggleAltHomeSystemsPositions()
-    _altHomeSystemPositions = not _altHomeSystemPositions
-    setPlayerCount({
-        playerCount = getPlayerCount(),
-        extraRings = getExtraRings(),
-    })
 end
 
 -------------------------------------------------------------------------------
@@ -990,18 +967,45 @@ function onLoad(saveState)
             playerCount = json.playerCount,
             extraRings = json.extraRings
         })
-        _altHomeSystemPositions = json.altHomeSystemPositions
+        for color, position in pairs(json.homeSystemPositions or {}) do
+            local zone = zoneAttributes(color)
+            if zone then
+                zone.homeSystemPosition = position
+            end
+        end
     end
 
     drawBordersVectorLines(true)
 end
 
 function onSave()
+    local homeSystemPositions = {}
+    for _, zone in ipairs(zonesAttributes()) do
+        homeSystemPositions[zone.color] = zone.homeSystemPosition
+    end
     return JSON.encode({
         playerCount = getPlayerCount(),
         extraRings = getExtraRings(),
-        altHomeSystemPositions = _altHomeSystemPositions,
+        homeSystemPositions = homeSystemPositions
     })
+end
+
+function onObjectDrop(playerColor, droppedObject)
+    local color = string.match(droppedObject.getName(), '^Home System Location %((.*)%)$')
+    if color then
+        local zone = zoneAttributes(color)
+        if zone then
+            local hex = _systemHelper.hexFromPosition(droppedObject.getPosition())
+            local pos = _systemHelper.hexToPosition(hex)
+            zone.homeSystemPosition = {
+                x = pos.x,
+                y = getTableY(),
+                z = pos.z
+            }
+            _drawStaticVectorLines()
+            printToAll('Moved ' .. color .. ' home system location', color)
+        end
+    end
 end
 
 -------------------------------------------------------------------------------

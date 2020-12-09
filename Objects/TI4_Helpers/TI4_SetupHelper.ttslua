@@ -138,6 +138,8 @@ local SetupColor = {
         ['$COLOR Flagship'] = { x = 0, y = 1, z = 10.19 },
         ['$COLOR War Sun'] = { x = 0, y = 1, z = 13 },
     },
+
+    HOME_SYSTEM_TILE = 'Home System Location %($COLOR%)',
 }
 
 local SetupFaction = {
@@ -577,6 +579,7 @@ function SetupColor.pack(color, colorBox)
     for namePattern, offset in pairs(SetupColor.NAME_TO_PLAYER_AGENDA_ZONE_OFFSET) do
         table.insert(namePatterns, namePattern)
     end
+    table.insert(namePatterns, SetupColor.HOME_SYSTEM_TILE)
 
     for i, namePattern in ipairs(namePatterns) do
         namePatterns[i] = string.gsub(namePattern, '$COLOR', '(.*)')
@@ -626,6 +629,17 @@ function SetupColor.unpack(color, colorBox, zone, agendaZoneCenter)
         })
         nameToObject[object.getName()] = object
     end
+
+    local namePattern = string.gsub(SetupColor.HOME_SYSTEM_TILE, '$COLOR', color)
+    local guid = assert(getEntryGuid(colorBox, namePattern), 'missing ' .. namePattern)
+    local object = colorBox.takeObject({
+        guid              = guid,
+        position          = zone.homeSystemPosition,
+        rotation          = { x = 0, y = 0, z = 0 },
+        smooth            = false,
+    })
+    nameToObject[object.getName()] = object
+
     return nameToObject
 end
 
@@ -1294,6 +1308,22 @@ function SetupFaction.unpackHomeSystemTile(faction, factionBox, homeSystemPositi
     assert(type(faction) == 'table' and factionBox.tag == 'Bag' and type(homeSystemPosition) == 'table')
     assert(zone.center)
     debugLog('SetupColor.unpackHomeSystemTile ' .. faction.tokenName)
+
+    -- Put away any home system location tile.
+    local homeSystemLocationTileName = 'Home System Location (' .. zone.color .. ')'
+    local setupBag = false
+    local homeSystemLocationTile = false
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        if object.tag == 'Bag' and name == 'Setup Bag' then
+            setupBag = object
+        elseif name == homeSystemLocationTileName then
+            homeSystemLocationTile = object
+        end
+    end
+    if setupBag and homeSystemLocationTile then
+        setupBag.putObject(homeSystemLocationTile)
+    end
 
     local tileName = faction.tokenName:gsub('-', '%%-') .. ' Tile'
     if tileName == 'Ghosts of Creuss Tile' then

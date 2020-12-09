@@ -399,9 +399,12 @@ end
 --- Update zone colors by scanning for command sheets.
 function updateZoneColors()
     _lastUpdateZoneColorTime = Time.time
+
     for _, zone in ipairs(_zones) do
         zone.color = false
     end
+
+    local colorToHomeSystemPosition = {}
     for _, object in ipairs(getAllObjects()) do
         local color = string.match(object.getName(), '^Command Sheet %((%a+)%)$')
         if color then
@@ -415,6 +418,23 @@ function updateZoneColors()
                     zone.commandSheetGuid = object.getGUID()
                 end
             end
+        end
+        local color = string.match(object.getName(), '^Home System Location %((.*)%)$')
+        if color then
+            local hex = _systemHelper.hexFromPosition(object.getPosition())
+            local pos = _systemHelper.hexToPosition(hex)
+            colorToHomeSystemPosition[color] = {
+                x = pos.x,
+                y = getTableY(),
+                z = pos.z
+            }
+        end
+    end
+
+    for _, zone in ipairs(_zones) do
+        local position = colorToHomeSystemPosition[zone]
+        if position then
+            zone.homeSystemPosition = position
         end
     end
 end
@@ -981,7 +1001,9 @@ end
 function onSave()
     local homeSystemPositions = {}
     for _, zone in ipairs(zonesAttributes()) do
-        homeSystemPositions[zone.color] = zone.homeSystemPosition
+        if zone.color then
+            homeSystemPositions[zone.color] = zone.homeSystemPosition
+        end
     end
     return JSON.encode({
         playerCount = getPlayerCount(),

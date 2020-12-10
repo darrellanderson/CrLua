@@ -78,6 +78,28 @@ local attachTokens = {
         decal = true,
         faceUpOrDown = { resources = 3, influence = 3 },
     },
+    ['Tear Token (Cabal)'] = {
+        nolock = true,
+        injectFunction = function (system, planetName, attachTokenObject)
+            assert(attachTokenObject.getName() == 'Tear Token (Cabal)')
+            return _tearTokenInjectFunction(system, planetName, attachTokenObject)
+        end,
+        ejectFunction = function(system, planetName, attachTokenObject)
+            assert(attachTokenObject.getName() == 'Tear Token (Cabal)')
+            return _tearTokenEjectFunction(system, planetName, attachTokenObject)
+        end
+    },
+    ['Tear Token (Nekro)'] = {
+        nolock = true,
+        injectFunction = function (system, planetName, attachTokenObject)
+            assert(attachTokenObject.getName() == 'Tear Token (Nekro)')
+            return _tearTokenInjectFunction(system, planetName, attachTokenObject)
+        end,
+        ejectFunction = function(system, planetName, attachTokenObject)
+            assert(attachTokenObject.getName() == 'Tear Token (Nekro)')
+            return _tearTokenEjectFunction(system, planetName, attachTokenObject)
+        end
+    },
 }
 
 -------------------------------------------------------------------------------
@@ -553,6 +575,7 @@ end
 --- Move beneath any units and lock.
 function AttachLib.anchor(attachTokenObject)
     assert(type(attachTokenObject) == 'userdata')
+
     local system, planetName = AttachLib._getSystemAndPlanetName(attachTokenObject.getPosition())
 
     local systemObject = system and getObjectFromGUID(system.guid)
@@ -561,7 +584,7 @@ function AttachLib.anchor(attachTokenObject)
     end
 
     local position = systemObject.getPosition()
-    position.y = position.y + 0.1
+    position.y = position.y + system.y + 0.5
 
     -- If there is a planet, use planet position instead.
     if planetName then
@@ -593,7 +616,7 @@ function AttachLib.anchor(attachTokenObject)
 
                 -- Convert to world space for placement.
                 position = systemObject.positionToWorld(position)
-                position.y = position.y + 0.1
+                position.y = position.y + system.y + 0.5
                 break
             end
         end
@@ -603,6 +626,11 @@ function AttachLib.anchor(attachTokenObject)
     local collide = false
     local fast = true
     attachTokenObject.setPositionSmooth(position, collide, fast)
+
+    local attachmentAttrs = assert(attachTokens[attachTokenObject.getName()])
+    if attachmentAttrs.nolock then
+        return
+    end
 
     -- Lock (after things are stable).
     local function condition()
@@ -645,6 +673,12 @@ end
 -- Tech ALWAYS applies unless the planet already has one (can be any).
 function AttachLib._orientToken(system, planetName, attachTokenObject)
     assert(type(system) == 'table' and (not planetName or type(planetName) == 'string') and type(attachTokenObject) == 'userdata')
+
+    local name = attachTokenObject.getName()
+    local attrs = assert(attachTokens[name])
+    if attrs.nolock then
+        return
+    end
 
     local planetHasAnyTech = false
     for _, planet in ipairs(system.planets or {}) do
@@ -732,6 +766,7 @@ function AttachLib._injectAttachment(system, planetName, attachTokenObject)
             break
         end
     end
+    assert(attachment.slot)
 
     -- Attach.
     planet._attachments[name] = attachment
@@ -796,13 +831,6 @@ function AttachLib._ejectAttachment(system, planetName, attachTokenObject)
             planet.tech = nil
         end
         planet._attachments[name] = nil
-    end
-
-    if planet.resources <= 0 then
-        planet.resources = nil
-    end
-    if planet.influence <= 0 then
-        planet.influence = nil
     end
 
     _systemHelper.injectSystem(system)
@@ -915,6 +943,123 @@ function AttachLib._layoutDecals(decals)
             decal.position.x = -decal.position.x
         end
     end
+end
+
+-------------------------------------------------------------------------------
+
+function _tearTokenInjectFunction(system, planetName, attachTokenObject)
+    assert(system)
+            
+    if not planetName then
+        printToAll(attachTokenObject.getName() .. ' should be placed on a planet.', 'Yellow')
+        return false
+    end
+
+    -- Get planet attributes
+    local planet = false
+    for _, systemPlanet in ipairs(system.planets or {}) do
+        if systemPlanet.name == planetName then
+            planet = systemPlanet
+            break
+        end
+    end
+    assert(planet)
+
+    -- If not set already, store original system stats
+    if not system._baseAnomalies then
+        system._baseAnomalies = copyTable(system.anomalies or {})
+    end
+
+    -- Add attachment to planet
+    local attachment = { anomalies = { 'gravity rift' } }
+    planet._attachments = planet._attachments or {}
+    planet._attachments[attachTokenObject.getName()] = attachment
+
+    -- Does system already have a gravity rift?
+    local existingAnomaliesSet = {}
+    for _, anomaly in ipairs(system.anomalies or {}) do
+        existingAnomaliesSet[anomaly] = true
+    end
+
+    -- If so, no need for further action.
+    if existingAnomaliesSet['gravity rift'] then
+        return system
+    end
+
+    -- Add gravity rift to system
+    system.anomalies = system.anomalies or {}
+    table.insert(system.anomalies, 'gravity rift')
+
+    -- Notify players
+    printToAll(system.string .. ' now has a gravity rift.', 'Yellow')
+
+    -- Notify listeners?
+    -- Rift roller needs smart logic to roll for system underneat the tear token.
+
+    -- Return updated system
+    return system
+end
+
+function _tearTokenEjectFunction(system, planetName, attachTokenObject)
+    assert(system)
+
+    if not planetName then
+        -- Just removing a token from a random system tile. Ignore.
+        return false
+    end
+
+    if not system._baseAnomalies then
+        -- There is no pre-attachment state, so nothing to return to. Error? Nah.
+        return false
+    end
+
+    -- Get planet attributes
+    local planet = false
+    for _, systemPlanet in ipairs(system.planets or {}) do
+        if systemPlanet.name == planetName then
+            planet = systemPlanet
+            break
+        end
+    end
+    assert(planet)
+
+    -- Check for attachment to remove
+    local attachments = planet._attachments or {}
+    if not attachments[attachTokenObject.getName()] then
+        -- Attachment was never injected onto planet. Silent early exit.
+        return false
+    end
+
+    -- Remove anomaly entry from planet
+    planet._attachments[attachTokenObject.getName()] = nil
+
+    -- Rebuild system anomalies, which may or may not have changed
+    local fullAnomalySet = {}
+    for _, anomaly in ipairs(system._baseAnomalies) do
+        fullAnomalySet[anomaly] = true
+    end
+    for _, planet in ipairs(system.planets or {}) do
+        for name, attachment in pairs(planet._attachments or {}) do
+            for _, anomaly in ipairs(attachment.anomalies or {}) do
+                fullAnomalySet[anomaly] = true
+            end
+        end
+    end
+    system.anomalies = nil -- Can only have non-empty values
+    for anomaly, _ in pairs(fullAnomalySet) do
+        system.anomalies = system.anomalies or {}
+        table.insert(system.anomalies, anomaly)
+    end
+
+    if not fullAnomalySet['gravity rift'] then
+        -- Notify players
+        printToAll(system.string .. ' lost its gravity rift.', 'Yellow')
+
+        -- Notify listeners?
+    end
+
+    -- Return updated system
+    return system
 end
 
 -------------------------------------------------------------------------------

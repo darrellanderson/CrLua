@@ -169,6 +169,9 @@ function onObjectSpawn(object)
         applyFrontierGoodness(object)
     elseif AttachLib.isAttachToken(object) then
         AttachLib.attach(object)
+    elseif object.tag == 'Card' and AttachLib._planetNameToDecals[object.getName()] then
+        local decals = AttachLib._planetNameToDecals[object.getName()]
+        object.setDecals(decals)
     end
 
     -- Give token when card is drawn.
@@ -268,6 +271,7 @@ function explorePlanet(tileGUID, planetName)
     end
     local exploreDeck = assert(getObjectFromGUID(exploreDeckGuid))
 
+    planetPos.y = 0
     local position = tile.positionToWorld(planetPos)
     position.y = position.y + 3
     local rotation = { x = 0, y = tileRot.y, z = 0 }
@@ -502,7 +506,9 @@ end
 
 -------------------------------------------------------------------------------
 
-AttachLib = {}
+AttachLib = {
+    _planetNameToDecals = {}
+}
 
 function AttachLib.isAttachToken(object)
     assert(type(object) == 'userdata')
@@ -518,10 +524,7 @@ function AttachLib.attach(attachTokenObject)
         local success = AttachLib._injectAttachment(system, planetName, attachTokenObject)
         if success then
             if attachTokens[attachTokenObject.getName()].decal then
-                local card = AttachLib._getPlanetCard(planetName)
-                if card then
-                    AttachLib._attachDecal(card, attachTokenObject)
-                end
+                AttachLib._attachDecal(planetName, attachTokenObject)
             end
             local name = planetName or system.string
             printToAll('Attaching "' .. attachTokenObject.getName() .. '" to "' .. name .. '"', 'Yellow')
@@ -586,7 +589,7 @@ function AttachLib.anchor(attachTokenObject)
                     local r = 0.52
                     position = {
                         x = position.x + math.cos(phi) * r,
-                        y = position.y,
+                        y = 0,
                         z = position.z + math.sin(phi) * r
                     }
                 end
@@ -600,6 +603,7 @@ function AttachLib.anchor(attachTokenObject)
     end
 
     assert(position)
+    systemObject.setLock(true)
     local collide = false
     local fast = true
     attachTokenObject.setPositionSmooth(position, collide, fast)
@@ -821,8 +825,8 @@ function AttachLib._getPlanetCard(planetName)
 end
 
 --- Add a decal to the planet card, with layout.
-function AttachLib._attachDecal(planetCardObject, attachTokenObject)
-    assert(type(planetCardObject) == 'userdata' and planetCardObject.tag == 'Card')
+function AttachLib._attachDecal(planetName, attachTokenObject)
+    assert(type(planetName) == 'string')
     assert(type(attachTokenObject) == 'userdata')
     local decalImage = false
 
@@ -838,7 +842,7 @@ function AttachLib._attachDecal(planetCardObject, attachTokenObject)
         return  -- wrong object type with a different custom table?
     end
     local name = attachTokenObject.getName()
-    local decals = planetCardObject.getDecals() or {}
+    local decals = AttachLib._planetNameToDecals[planetName] or {}
 
     -- Remove if already present.
     for i, decal in ipairs(decals) do
@@ -863,16 +867,21 @@ function AttachLib._attachDecal(planetCardObject, attachTokenObject)
         rotation = { x = 270, y = 0, z = 0 },
         scale = scale,
     })
+
     AttachLib._layoutDecals(decals)
-    planetCardObject.setDecals(decals)
+    AttachLib._planetNameToDecals[planetName] = decals
+    local card = AttachLib._getPlanetCard(planetName)
+    if card then
+        card.setDecals(decals)
+    end
 end
 
 --- Remove a decal from the planet card, with layout.
-function AttachLib._detachDecal(planetCardObject, attachTokenObject)
-    assert(type(planetCardObject) == 'userdata' and planetCardObject.tag == 'Card')
+function AttachLib._detachDecal(planetName, attachTokenObject)
+    assert(type(planetName) == 'string')
     assert(type(attachTokenObject) == 'userdata')
     local name = attachTokenObject.getName()
-    local decals = planetCardObject.getDecals() or {}
+    local decals = AttachLib._planetNameToDecals[planetName] or {}
     for i = #decals, 1, -1 do
         local decal = decals[i]
         if decal.name == name then
@@ -880,7 +889,11 @@ function AttachLib._detachDecal(planetCardObject, attachTokenObject)
         end
     end
     AttachLib._layoutDecals(decals)
-    planetCardObject.setDecals(decals)
+    AttachLib._planetNameToDecals[planetName] = decals
+    local card = AttachLib._getPlanetCard(planetName)
+    if card then
+        card.setDecals(decals)
+    end
 end
 
 --- Organize tokens for a grid layout, avoid planet res/inf and name areas.

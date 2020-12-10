@@ -262,16 +262,18 @@ local _systems = {
         { name = 'Atlas', resources = 3, influence = 1, trait = 'hazardous', },
     }},
     ['b642cd'] = { tile = 65, planets = {
-        { name = 'Primor', resources = 2, influence = 1, trait = 'cultural', legendary = true, legendaryCard = 'The Atrament' },
+        { name = 'Primor', resources = 2, influence = 1, trait = 'cultural', radius = 1.5,
+         legendary = true, legendaryCard = 'The Atrament' },
     }},
     ['1154bc'] = { tile = 66, planets = {
-        { name = "Hope's End", resources = 3, influence = 0, trait = 'hazardous', legendary = true, legendaryCard = 'Imperial Arms Vault' },
+        { name = "Hope's End", resources = 3, influence = 0, trait = 'hazardous', radius = 1.5,
+        legendary = true, legendaryCard = 'Imperial Arms Vault' },
     }},
     ['48ef22'] = { tile = 67, anomalies = { 'gravity rift' }, planets = {
-        { name = 'Cormund', resources = 2, influence = 0, trait = 'hazardous' },
+        { name = 'Cormund', resources = 2, influence = 0, trait = 'hazardous', position = { x = 0.45, z = -0.25 } },
     }},
     ['8bc917'] = { tile = 68, anomalies = { 'nebula' }, planets = {
-        { name = 'Everra', resources = 3, influence = 1, trait = 'cultural' },
+        { name = 'Everra', resources = 3, influence = 1, trait = 'cultural', position = { x = 0.45, z = -0.25 } },
     }},
     ['40bc9e'] = { tile = 69, planets = {
         { name = 'Accoen', resources = 2, influence = 3, trait = 'industrial' },

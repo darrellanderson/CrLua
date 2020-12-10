@@ -312,9 +312,17 @@ local _systems = {
     ['1a6583'] = { tile = 79, anomalies = { 'asteroid field' }, wormholes = { 'alpha' } },
     ['015a9f'] = { tile = 80, anomalies = { 'supernova' } },
     ['33c12d'] = { tile = 81, anomalies = { 'supernova' }, faction = 'muaat' },
-    ['82bf35'] = { tile = 82, localY = 0.101, faceUpWormholes = { 'gamma', 'alpha', 'beta' }, faceDownWormholes = { 'gamma' }, planets = {
-        { name = 'Mallice', resources = 0, influence = 3, legendary = true, legendaryCard = 'Exterrix Headquarters', trait = 'cultural', position = { x = 0.35, z = 0.18 }, radius = 0.8 },
-    }},
+    ['82bf35'] = { tile = 82, localY = 0.101,
+        faceUpWormholes = { 'gamma', 'alpha', 'beta' },
+        faceDownWormholes = { 'gamma' },
+        planets = {
+            {
+                name = 'Mallice', resources = 0, influence = 3,
+                legendary = true, legendaryCard = 'Exterrix Headquarters', trait = 'cultural',
+                position = { x = -0.45, z = -0.47 }, radius = 0.8, -- position is face up
+            }
+        }
+    },
 
     -- Warp zone tiles
     ['81a64a'] = { tile = 83, hyperlane = true },
@@ -1174,7 +1182,8 @@ function _getZoneBorders(system)
     elseif numZones == 3 then
         zoneBorders = { 210, 330, 90, 210 }
     else
-        error(TAG .. ': too many zones (' .. numZones .. ')')
+        -- Mallice has a planet plus three wormholes.  Treat excessive as one zone.
+        zoneBorders = { 0, 360 }
     end
 
     -- Support non-standard rotations (applies to a TI3 tile).

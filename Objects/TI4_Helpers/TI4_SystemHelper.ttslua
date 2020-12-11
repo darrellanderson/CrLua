@@ -682,6 +682,7 @@ function planetFromPosition(params)
     assert(type(systemGuid) == 'string')
     assert(type(position) == 'table' and type(position.x) == 'number')
     local system = _systems[systemGuid]
+    _fillMissingSystemData(systemGuid, system)
     local best = false
     if system then
         local object = getObjectFromGUID(system.guid)

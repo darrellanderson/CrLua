@@ -5,12 +5,12 @@
 
 function onObjectEnterContainer(bag, enterObject)
     if bag == self then
-        printToAll('PURGING ' .. enterObject.getName())
+        printToAll('PURGING ' .. enterObject.getName(), 'Yellow')
     end
 end
 
 function onObjectLeaveContainer(bag, leaveObject)
     if bag == self then
-        print("unPURGING " .. leaveObject.getName())
+        printToAll("unPURGING " .. leaveObject.getName(), 'Yellow')
     end
 end

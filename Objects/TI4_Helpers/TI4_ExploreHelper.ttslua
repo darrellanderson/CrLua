@@ -254,6 +254,11 @@ function explorePlanet(tileGUID, planetName)
             planetPos = planet.position
         end
     end
+    if not planetTrait then
+        -- Stellar Converter can remove a planet but the tile might still have an explore option.
+        printToAll('ERROR: Planet ' .. planetName .. ' has no trait.', 'Red')
+        return
+    end
     assert(planetTrait)
 
     deckType = traitMap[planetTrait]

@@ -812,6 +812,7 @@ function injectFaction(faction)
     end
 
     _factionAttributes[faction.name] = faction
+    _tokenNameToFaction[faction.name] = faction  -- some Franken components use
     _tokenNameToFaction[faction.tokenName] = faction
     if faction.frankenName and not _tokenNameToFaction[faction.frankenName] then
         _tokenNameToFaction[faction.frankenName] = _tokenNameToFaction[faction.tokenName]

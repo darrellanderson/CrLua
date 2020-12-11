@@ -610,10 +610,7 @@ function AttachLib.detach(attachTokenObject)
         local success = AttachLib._ejectAttachment(system, planetName, attachTokenObject)
         if success then
             if planetName and attachTokens[attachTokenObject.getName()].decal then
-                local card = AttachLib._getPlanetCard(planetName)
-                if card then
-                    AttachLib._detachDecal(card, attachTokenObject)
-                end
+                AttachLib._detachDecal(planetName, attachTokenObject)
             end
             local name = planetName or system.string
             printToAll('Detaching "' .. attachTokenObject.getName() .. '" from "' .. name .. '"', 'Yellow')

@@ -1891,7 +1891,7 @@ function SetupFranken.unpackStartingUnits(color)
         end
     end
     if not faction then
-        _safePrintToColor('SetupFranken.unpackStartingUnits: missing starting for ' .. color .. ', skipping starting units', color, 'Red')
+        _safePrintToColor('SetupFranken.unpackStartingUnits: missing starting units for ' .. color .. ', skipping starting units', color, 'Red')
         return
     end
 

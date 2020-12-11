@@ -198,6 +198,9 @@ function createUi()
         _allPossibleUnitAttrs['Mech']['bombardment'] = {} -- L1Z1X Mech
         _allPossibleUnitAttrs['Mech']['spaceCannon'] = {} -- Xxcha Mech
         _allPossibleUnitAttrs['Mech']['planetaryShield'] = {} -- Arborec Mech
+        _allPossibleUnitAttrs['PDS']['groundCombat'] = {} -- Titan PDS
+        _allPossibleUnitAttrs['PDS']['planetaryShield'] = {} -- Titan PDS
+        _allPossibleUnitAttrs['PDS']['sustainDamage'] = {} -- Titan PDS
 
         _getUnitDataLastRefreshFrame = false  -- make sure not cached!
         _injectExtraUnitUpgrades = false

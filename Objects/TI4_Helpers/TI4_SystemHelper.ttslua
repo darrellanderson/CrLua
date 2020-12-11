@@ -1184,8 +1184,6 @@ function _getZoneBorders(system)
         zoneBorders = { 240, 60, 240 }
     elseif numZones == 3 then
         zoneBorders = { 210, 330, 90, 210 }
-    elseif numZones == 4 then -- Organize Mallice as a 1 planet system.
-        zoneBorders = { 0, 360 }
     else
         -- Mallice has a planet plus three wormholes.  Treat excessive as one zone.
         zoneBorders = { 0, 360 }

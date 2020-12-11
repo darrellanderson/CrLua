@@ -1024,9 +1024,6 @@ function _tearTokenInjectFunction(system, planetName, attachTokenObject)
     -- Notify players
     printToAll(system.string .. ' now has a gravity rift.', 'Yellow')
 
-    -- Notify listeners?
-    -- Rift roller needs smart logic to roll for system underneat the tear token.
-
     -- Return updated system
     return system
 end
@@ -1085,8 +1082,6 @@ function _tearTokenEjectFunction(system, planetName, attachTokenObject)
     if not fullAnomalySet['gravity rift'] then
         -- Notify players
         printToAll(system.string .. ' lost its gravity rift.', 'Yellow')
-
-        -- Notify listeners?
     end
 
     -- Return updated system

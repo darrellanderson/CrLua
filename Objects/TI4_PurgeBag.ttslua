@@ -1,0 +1,16 @@
+--- Announces purged objects.
+-- @author Darrell (copied from Deleted Items)
+-- @author Jabberwocky
+--
+
+function onObjectEnterContainer(bag, enterObject)
+    if bag == self then
+        printToAll('PURGING ' .. enterObject.getName())
+    end
+end
+
+function onObjectLeaveContainer(bag, leaveObject)
+    if bag == self then
+        print("unPURGING " .. leaveObject.getName())
+    end
+end

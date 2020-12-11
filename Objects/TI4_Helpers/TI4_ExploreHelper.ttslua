@@ -101,6 +101,7 @@ local attachTokens = {
         end
     },
     ['Mirage Token'] = {
+        systemModifer = true, -- System modifiers get loaded before planet modifiers
         injectFunction = function (system, planetName, attachTokenObject)
             assert(attachTokenObject.getName() == 'Mirage Token')
             return _mirageTokenInjectFunction(system, planetName, attachTokenObject)
@@ -183,6 +184,7 @@ function onLoad(saveState)
 
     local function delayedAdd()
         local attachObjectGuids = {}
+        local attachObjectSystemModifierGuids = {}
         local lowerPlanetNameSet = _systemHelper.planets()
 
         for _, object in ipairs(getAllObjects()) do
@@ -190,22 +192,31 @@ function onLoad(saveState)
                 applyExplorationGoodness(object)
             elseif isFrontierToken(object) then
                 applyFrontierGoodness(object)
-            elseif AttachLib.isAttachToken(object) then
-                table.insert(attachObjectGuids, object.getGUID())
             elseif object.tag == 'Card' and lowerPlanetNameSet[string.lower(object.getName())] then
                 -- Will re-add during attach below
                 object.setDecals({})
+            end
+
+            if AttachLib.isAttachToken(object) then
+                if AttachLib.isSystemModifierAttachToken(object) then
+                    table.insert(attachObjectSystemModifierGuids, object.getGUID())
+                else
+                    table.insert(attachObjectGuids, object.getGUID())
+                end
             end
         end
 
         -- These are more expensive, spread them out.
         local function attachOnePerFrame()
-            local guid = table.remove(attachObjectGuids)
+            local guid = table.remove(attachObjectSystemModifierGuids)
+            if not guid then
+                guid = table.remove(attachObjectGuids)
+            end
             local object = getObjectFromGUID(guid)
             if object then
                 AttachLib.attach(object, false)
             end
-            if #attachObjectGuids > 0 then
+            if #attachObjectSystemModifierGuids > 0 or #attachObjectGuids > 0 then
                 Wait.frames(attachOnePerFrame, 1)
             end
         end
@@ -560,6 +571,11 @@ AttachLib = {}
 function AttachLib.isAttachToken(object)
     assert(type(object) == 'userdata')
     return attachTokens[object.getName()] and true or false
+end
+
+function AttachLib.isSystemModifierAttachToken(object)
+    assert(type(object) == 'userdata')
+    return (attachTokens[object.getName()] and attachTokens[object.getName()].systemModifer) and true or false
 end
 
 --- Attach token to system, return true on success.

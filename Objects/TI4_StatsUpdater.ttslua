@@ -202,37 +202,26 @@ end
 
 --- Get planet cards (and other relevant cards) not in a player's hand.
 -- @return table : list of card objects.
-function getCardsAndDecks()
+function getCards()
     local inHandGuidSet = _zoneHelper.inHand()
     local cards = {}
-    local decks = {}
     for _, object in ipairs(getAllObjects()) do
         if not inHandGuidSet[object.getGUID()] then
             if object.tag == 'Card' then
                 table.insert(cards, object)
-            elseif object.tag == 'Deck' then
-                table.insert(decks, object)
             end
         end
     end
-    return cards, decks
+    return cards
 end
 
-function getLowerCardNames(cards, decks)
+function getLowerCardNames(cards)
     local lowerNameSet = getLowerNameToResourcesAndInfluence()
     local lowerCardNames = {}
     for _, card in ipairs(cards or {}) do
         local lowerName = string.lower(card.getName())
         if lowerNameSet[lowerName] then
             table.insert(lowerCardNames, lowerName)
-        end
-    end
-    for _, deck in ipairs(decks or {}) do
-        for _, entry in ipairs(deck.getObjects()) do
-            local lowerName = string.lower(entry.name)
-            if lowerNameSet[lowerName] then
-                table.insert(lowerCardNames, lowerName)
-            end
         end
     end
     return lowerCardNames
@@ -374,22 +363,17 @@ function updateNotesCoroutine()
     end
     coroutine.yield(0)
 
-    local cards, decks = getCardsAndDecks()
+    local cards = getCards()
     local cardsUp, cardsDown = groupByFaceUpDown(cards)
-    local decksUp, decksDown = groupByFaceUpDown(decks)
     local colorToCardsUp = groupByPlayerZone(cardsUp)
     local colorToCardsDown = groupByPlayerZone(cardsDown)
-    local colorToDecksUp = groupByPlayerZone(decksUp)
-    local colorToDecksDown = groupByPlayerZone(decksDown)
     local colorToLowerCardNamesUp = {}
     local colorToLowerCardNamesDown = {}
     for _, color in ipairs(_zoneHelper.zones()) do
         local cards = colorToCardsUp[color] or {}
-        local decks = colorToDecksUp[color] or {}
-        colorToLowerCardNamesUp[color] = getLowerCardNames(cards, decks)
+        colorToLowerCardNamesUp[color] = getLowerCardNames(cards)
         local cards = colorToCardsDown[color] or {}
-        local decks = colorToDecksDown[color] or {}
-        colorToLowerCardNamesDown[color] = getLowerCardNames(cards, decks)
+        colorToLowerCardNamesDown[color] = getLowerCardNames(cards)
     end
     coroutine.yield(0)
 

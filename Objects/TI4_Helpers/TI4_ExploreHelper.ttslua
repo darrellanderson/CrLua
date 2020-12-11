@@ -663,7 +663,7 @@ function AttachLib.anchor(attachTokenObject)
                         slot = slot + 0.5
                     end
                     local phi = math.rad((slot * 360 / 5) - 52)
-                    local r = 0.52
+                    local r = 0.54
                     position = {
                         x = position.x + math.cos(phi) * r,
                         y = 0,
@@ -1016,7 +1016,7 @@ end
 
 function _tearTokenInjectFunction(system, planetName, attachTokenObject)
     assert(system)
-            
+
     if not planetName then
         printToAll(attachTokenObject.getName() .. ' should be placed on a planet.', 'Yellow')
         return false
@@ -1155,11 +1155,11 @@ function _mirageTokenEjectFunction(system, planetName, attachTokenObject)
             if #system.planets == 0 then
                 system.planets = nil
             end
-            
+
             return system
         end
     end
-    
+
     return false
 end
 
@@ -1276,7 +1276,7 @@ function _stellarConveterTokenDestroyPlanet_coroutine()
                     table.insert(removeUnits, unit)
                 end
             end
-        end  
+        end
     end
     coroutine.yield(0)
 
@@ -1523,7 +1523,7 @@ function _stellarConverterTokenEjectFunction(system, planetName, attachTokenObje
     if not purgeBag then
         return system
     end
-    
+
     -- Restore purged items
     --   Planet card
     --   Attachment tokens on planet

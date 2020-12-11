@@ -1394,6 +1394,53 @@ function _stellarConverterTokenInjectFunction(system, planetName, attachTokenObj
         return false
     end
 
+    -- Detect if we're attaching to planet that's already acted on (eg. onLoad after using Stellar Converter)
+    -- Detection options...none are perfect.
+    --  Is the token locked at hover height?
+    --  Is the planet card in the Purge bag?
+    --  Token is identical on each side, so faceup could be pre-purge, facedown could be post-purge.
+    local purgeBag = _getByName('Purge Bag')
+    if purgeBag then
+        for _, entry in ipairs(purgeBag.getObjects()) do
+            -- Planet has been purged. Token should just anchor down.
+            if entry.name == planetName then
+                -- Save planet state (onLoad will miss any attachments that are already in the Purge bag. Players will have to handle.)
+                system._stellarConverterPlanet = copyTable(planet)
+                -- Clear planet stats
+                planet.resources = 0
+                planet.influence = 0
+                planet.tech = nil
+                planet._attachments = nil
+
+                -- Place token directly on planet, and lock it
+                attachTokenObject.setLock(false)
+                local planetPosition = systemObject.positionToWorld(planet.position)
+                local tokenPosition = { x = planetPosition.x, y = planetPosition.y + 0.5, z = planetPosition.z }
+                local collide = false
+                local fast = true
+                attachTokenObject.setPositionSmooth(tokenPosition, collide, fast)
+
+                local function condition()
+                    if attachTokenObject.isSmoothMoving() then
+                        return false
+                    end
+                    if not attachTokenObject.resting then
+                        return false
+                    end
+                    return true
+                end
+                local function action()
+                    attachTokenObject.setLock(true)
+                end
+                local function timeout() end
+                Wait.condition(action, condition, 3, timeout)
+
+                -- Return modified system. No further action required.
+                return system
+            end
+        end
+    end
+
     -- 'Hover' over target planet (don't disrupt units, tokens, etc.)
     local planetPosition = systemObject.positionToWorld(planet.position)
     local tokenPosition = { x = planetPosition.x, y = planetPosition.y + 5, z = planetPosition.z }

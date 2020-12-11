@@ -203,7 +203,7 @@ function onLoad(saveState)
             local guid = table.remove(attachObjectGuids)
             local object = getObjectFromGUID(guid)
             if object then
-                AttachLib.attach(object)
+                AttachLib.attach(object, false)
             end
             if #attachObjectGuids > 0 then
                 Wait.frames(attachOnePerFrame, 1)
@@ -221,7 +221,7 @@ function onObjectSpawn(object)
     elseif isFrontierToken(object) then
         applyFrontierGoodness(object)
     elseif AttachLib.isAttachToken(object) then
-        AttachLib.attach(object)
+        AttachLib.attach(object, true)
     end
 
     -- Give token when card is drawn.
@@ -239,7 +239,7 @@ end
 
 function onObjectDrop(playerColor, droppedObject)
     if AttachLib.isAttachToken(droppedObject) then
-        if AttachLib.attach(droppedObject) then
+        if AttachLib.attach(droppedObject, true) then
             AttachLib.anchor(droppedObject)  -- move beneath any units and lock
         end
     end
@@ -404,7 +404,7 @@ function checkCardForToken(object_spawned, tileGUID, planetName)
             local function takeCallback(object)
                 if AttachLib.isAttachToken(object) then
                     -- Attach will figure out if token should be face up/down.
-                    if AttachLib.attach(object) then
+                    if AttachLib.attach(object, true) then
                         AttachLib.anchor(object)  -- move beneath any units and lock
                     end
                 end
@@ -563,11 +563,13 @@ function AttachLib.isAttachToken(object)
 end
 
 --- Attach token to system, return true on success.
-function AttachLib.attach(attachTokenObject)
+function AttachLib.attach(attachTokenObject, setOrientation)
     assert(type(attachTokenObject) == 'userdata')
     local system, planetName = AttachLib._getSystemAndPlanetName(attachTokenObject.getPosition())
     if system then
-        AttachLib._orientToken(system, planetName, attachTokenObject)
+        if setOrientation then
+            AttachLib._orientToken(system, planetName, attachTokenObject)
+        end
         local success = AttachLib._injectAttachment(system, planetName, attachTokenObject)
         if success then
             if attachTokens[attachTokenObject.getName()].decal then

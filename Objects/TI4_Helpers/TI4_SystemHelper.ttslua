@@ -262,16 +262,16 @@ local _systems = {
         { name = 'Atlas', resources = 3, influence = 1, trait = 'hazardous', },
     }},
     ['b642cd'] = { tile = 65, planets = {
-        { name = 'Primor', resources = 2, influence = 1, trait = 'cultural', legendary = true, legendaryCard = 'The Atrament' },
+        { name = 'Primor', resources = 2, influence = 1, trait = 'cultural', legendary = true, legendaryCard = 'The Atrament', radius = 1.375, position = { x = -0.01, z = 0 } },
     }},
     ['1154bc'] = { tile = 66, planets = {
-        { name = "Hope's End", resources = 3, influence = 0, trait = 'hazardous', legendary = true, legendaryCard = 'Imperial Arms Vault' },
+        { name = "Hope's End", resources = 3, influence = 0, trait = 'hazardous', legendary = true, legendaryCard = 'Imperial Arms Vault', radius = 1.375, position = { x = -0.01, z = 0 } },
     }},
     ['48ef22'] = { tile = 67, anomalies = { 'gravity rift' }, planets = {
-        { name = 'Cormund', resources = 2, influence = 0, trait = 'hazardous' },
+        { name = 'Cormund', resources = 2, influence = 0, trait = 'hazardous', position = { x = 0.48, z = -0.27 } },
     }},
     ['8bc917'] = { tile = 68, anomalies = { 'nebula' }, planets = {
-        { name = 'Everra', resources = 3, influence = 1, trait = 'cultural' },
+        { name = 'Everra', resources = 3, influence = 1, trait = 'cultural', position = { x = 0.48, z = -0.27 } },
     }},
     ['40bc9e'] = { tile = 69, planets = {
         { name = 'Accoen', resources = 2, influence = 3, trait = 'industrial' },
@@ -313,7 +313,7 @@ local _systems = {
     ['015a9f'] = { tile = 80, anomalies = { 'supernova' } },
     ['33c12d'] = { tile = 81, anomalies = { 'supernova' }, faction = 'muaat' },
     ['82bf35'] = { tile = 82, localY = 0.101, faceUpWormholes = { 'gamma', 'alpha', 'beta' }, faceDownWormholes = { 'gamma' }, planets = {
-        { name = 'Mallice', resources = 0, influence = 3, legendary = true, legendaryCard = 'Exterrix Headquarters', trait = 'cultural', position = { x = 0.35, z = 0.18 }, radius = 0.8 },
+        { name = 'Mallice', resources = 0, influence = 3, legendary = true, legendaryCard = 'Exterrix Headquarters', trait = 'cultural', position = { x = 0.39, z = -0.47 }, radius = 0.8 },
     }},
 
     -- Warp zone tiles

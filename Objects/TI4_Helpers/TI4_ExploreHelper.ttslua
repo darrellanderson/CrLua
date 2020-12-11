@@ -747,6 +747,11 @@ function AttachLib._orientToken(system, planetName, attachTokenObject)
     local rotation = systemObject.getRotation()
     rotation.z = (planetHasAnyTech and 0) or 180
 
+    -- Mirage token back side isn't properly UV mapped.
+    if attachTokenObject.getName() == 'Mirage Token' then
+        rotation.z = 0
+    end
+
     attachTokenObject.setRotation(rotation)
 end
 

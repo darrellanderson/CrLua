@@ -863,7 +863,9 @@ end
 
 -------------------------------------------------------------------------------
 
-function SetupCards.dealObjectivesWithYields()
+-- Do NOT do this as part of normal setup, leaving cards out is sus af.
+-- Jefferson has seen some shit and doesn't trust people
+function dealObjectives()
     debugLog('SetupCards.dealObjectivesWithYields')
 
     local stage1Mat = false
@@ -910,7 +912,6 @@ function SetupCards.dealObjectivesWithYields()
                     smooth            = true
                 })
             end
-            coroutine.yield(0)
         end
     end
 
@@ -987,11 +988,6 @@ function setupCoroutine()
     end
 
     _zoneHelper.drawBordersVectorLines()
-    coroutine.yield(0)
-
-    if not isRightClick then
-        SetupCards.dealObjectivesWithYields()
-    end
     coroutine.yield(0)
 
     -- Tell any other listeners setup is done (in case further external setup).

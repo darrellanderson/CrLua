@@ -262,16 +262,18 @@ local _systems = {
         { name = 'Atlas', resources = 3, influence = 1, trait = 'hazardous', },
     }},
     ['b642cd'] = { tile = 65, planets = {
-        { name = 'Primor', resources = 2, influence = 1, trait = 'cultural', legendary = true, legendaryCard = 'The Atrament', radius = 1.375, position = { x = -0.01, z = 0 } },
+        { name = 'Primor', resources = 2, influence = 1, trait = 'cultural', radius = 1.5,
+         legendary = true, legendaryCard = 'The Atrament' },
     }},
     ['1154bc'] = { tile = 66, planets = {
-        { name = "Hope's End", resources = 3, influence = 0, trait = 'hazardous', legendary = true, legendaryCard = 'Imperial Arms Vault', radius = 1.375, position = { x = -0.01, z = 0 } },
+        { name = "Hope's End", resources = 3, influence = 0, trait = 'hazardous', radius = 1.5,
+        legendary = true, legendaryCard = 'Imperial Arms Vault' },
     }},
     ['48ef22'] = { tile = 67, anomalies = { 'gravity rift' }, planets = {
-        { name = 'Cormund', resources = 2, influence = 0, trait = 'hazardous', position = { x = 0.48, z = -0.27 } },
+        { name = 'Cormund', resources = 2, influence = 0, trait = 'hazardous', position = { x = 0.45, z = -0.25 } },
     }},
     ['8bc917'] = { tile = 68, anomalies = { 'nebula' }, planets = {
-        { name = 'Everra', resources = 3, influence = 1, trait = 'cultural', position = { x = 0.48, z = -0.27 } },
+        { name = 'Everra', resources = 3, influence = 1, trait = 'cultural', position = { x = 0.45, z = -0.25 } },
     }},
     ['40bc9e'] = { tile = 69, planets = {
         { name = 'Accoen', resources = 2, influence = 3, trait = 'industrial' },
@@ -312,9 +314,17 @@ local _systems = {
     ['1a6583'] = { tile = 79, anomalies = { 'asteroid field' }, wormholes = { 'alpha' } },
     ['015a9f'] = { tile = 80, anomalies = { 'supernova' } },
     ['33c12d'] = { tile = 81, anomalies = { 'supernova' }, faction = 'muaat' },
-    ['82bf35'] = { tile = 82, localY = 0.101, faceUpWormholes = { 'gamma', 'alpha', 'beta' }, faceDownWormholes = { 'gamma' }, planets = {
-        { name = 'Mallice', resources = 0, influence = 3, legendary = true, legendaryCard = 'Exterrix Headquarters', trait = 'cultural', position = { x = -0.45, z = -0.45 }, radius = 0.8 },
-    }},
+    ['82bf35'] = { tile = 82, localY = 0.101,
+        faceUpWormholes = { 'gamma', 'alpha', 'beta' },
+        faceDownWormholes = { 'gamma' },
+        planets = {
+            {
+                name = 'Mallice', resources = 0, influence = 3,
+                legendary = true, legendaryCard = 'Exterrix Headquarters', trait = 'cultural',
+                position = { x = -0.45, z = -0.47 }, radius = 0.8, -- position is face up
+            }
+        }
+    },
 
     -- Warp zone tiles
     ['81a64a'] = { tile = 83, hyperlane = true },
@@ -1177,7 +1187,8 @@ function _getZoneBorders(system)
     elseif numZones == 4 then -- Organize Mallice as a 1 planet system.
         zoneBorders = { 0, 360 }
     else
-        error(self.getName() .. ': too many zones (' .. numZones .. ')')
+        -- Mallice has a planet plus three wormholes.  Treat excessive as one zone.
+        zoneBorders = { 0, 360 }
     end
 
     -- Support non-standard rotations (applies to a TI3 tile).

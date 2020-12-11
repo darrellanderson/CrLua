@@ -51,6 +51,7 @@ local SWAP = {
     -- Only pack one copy of these, only expect one during unpack.
     SINGLETONS = {
         'Command Sheet ($COLOR)',
+        'Leader Sheet ($COLOR)',
         '$COLOR Player Votes',
         'Directionaliser ($COLOR)',
         'Active/Passed ($COLOR)',
@@ -150,7 +151,7 @@ function onLoad(saveState)
 end
 
 function onPlayerChangeColor(playerColor)
-    Wait.frames(resetUi, 2)
+    Wait.time(resetUi, 10)  -- give changes time to take effect
 end
 
 function onObjectDestroy(dyingObject)
@@ -966,10 +967,17 @@ function SwapPlan._verifyNothingMissing(anonNameToItems)
     assert(type(anonNameToItems) == 'table')
     CrLua.Log.i(TAG, 'SwapPlan._verifyNothingMissing')
 
+    local exceptions = {
+        ['Alliance ($COLOR)'] = true,  -- pok
+        ['Leader Sheet ($COLOR)'] = true,  -- pok
+        ['$COLOR Mech'] = true,  -- pok
+        ['Home System Location ($COLOR)'] = true,  -- put away after faction unpack
+    }
+
     for _, anonymousName in ipairs(SWAP.SINGLETONS) do
         local items = anonNameToItems[anonymousName]
-        if (not items) and anonymousName ~= 'Home System Location ($COLOR)' then
-            return false, 'missing "' .. anonymousName .. '"'
+        if (not items) and (not exceptions[anonymousName]) then
+            return false, 'missing singleton "' .. anonymousName .. '"'
         end
     end
 
@@ -977,12 +985,10 @@ function SwapPlan._verifyNothingMissing(anonNameToItems)
         -- Only look for cards, they were pulled from decks during scan.
         for _, anonymousCard in ipairs(anonymousCards) do
             local items = anonNameToItems[anonymousCard]
-            if not items then
-                if anonymousCard ~= 'Alliance ($COLOR)' then
-                    return false, 'missing "' .. anonymousCard .. '"'
-                end
-            elseif #items > 1 then
-                return false, 'multiple "' .. anonymousCard .. '"'
+            if items and #items > 1 then
+                return false, 'multiple cards "' .. anonymousCard .. '"'
+            elseif (not items) and (not exceptions[anonymousCard]) then
+                return false, 'missing card "' .. anonymousCard .. '"'
             end
         end
     end
@@ -998,11 +1004,8 @@ function SwapPlan._verifyNothingMissing(anonNameToItems)
                 bag = true
             end
         end
-        if not bag then
-            -- Tolerate Mech bag absence.
-            if not string.match(anonymousName, ' Mech$') then
-                return false, 'missing unit bag "' .. anonymousName .. '"'
-            end
+        if (not bag) and (not exceptions[anonymousName]) then
+            return false, 'missing unit bag "' .. anonymousName .. '"'
         end
     end
     return true

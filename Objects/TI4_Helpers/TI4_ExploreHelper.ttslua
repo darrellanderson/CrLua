@@ -1467,10 +1467,14 @@ function _stellarConverterTokenEjectFunction(system, planetName, attachTokenObje
     if purgeBag then
         -- Get map of attach token name to card name
         local attachmentCardByToken = {}
-        for card, tokens in pairs(exploreCardToTokenMap) do
-            for _, tokenName in ipairs(tokens or {}) do
-                if restorePlanet._attachments[tokenName] then -- If the token was on the planet when it was destroyed
-                    attachmentCardByToken[tokenName] = card
+        if restorePlanet._attachments then
+            for card, tokens in pairs(exploreCardToTokenMap) do
+                for _, tokenName in ipairs(tokens or {}) do
+                    -- Check if the token was on the planet when it was destroyed.
+                    -- NOTE: This won't catch attachments after save/load. Consider reading planet card decals instead.
+                    if restorePlanet._attachments[tokenName] then
+                        attachmentCardByToken[tokenName] = card
+                    end
                 end
             end
         end

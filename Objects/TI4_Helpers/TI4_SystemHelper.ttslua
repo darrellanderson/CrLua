@@ -313,7 +313,7 @@ local _systems = {
     ['015a9f'] = { tile = 80, anomalies = { 'supernova' } },
     ['33c12d'] = { tile = 81, anomalies = { 'supernova' }, faction = 'muaat' },
     ['82bf35'] = { tile = 82, localY = 0.101, faceUpWormholes = { 'gamma', 'alpha', 'beta' }, faceDownWormholes = { 'gamma' }, planets = {
-        { name = 'Mallice', resources = 0, influence = 3, legendary = true, legendaryCard = 'Exterrix Headquarters', trait = 'cultural', position = { x = 0.39, z = -0.47 }, radius = 0.8 },
+        { name = 'Mallice', resources = 0, influence = 3, legendary = true, legendaryCard = 'Exterrix Headquarters', trait = 'cultural', position = { x = -0.45, z = -0.45 }, radius = 0.8 },
     }},
 
     -- Warp zone tiles
@@ -1174,8 +1174,10 @@ function _getZoneBorders(system)
         zoneBorders = { 240, 60, 240 }
     elseif numZones == 3 then
         zoneBorders = { 210, 330, 90, 210 }
+    elseif numZones == 4 then -- Organize Mallice as a 1 planet system.
+        zoneBorders = { 0, 360 }
     else
-        error(TAG .. ': too many zones (' .. numZones .. ')')
+        error(self.getName() .. ': too many zones (' .. numZones .. ')')
     end
 
     -- Support non-standard rotations (applies to a TI3 tile).

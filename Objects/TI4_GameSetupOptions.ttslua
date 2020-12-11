@@ -85,7 +85,6 @@ local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 local _getByNameCache = {}
-local _pendingActionSet = {}
 local _setupInProgress = false
 
 -------------------------------------------------------------------------------
@@ -128,7 +127,7 @@ function _createUI()
     end
 
     local function toggleGroup(idPrefix, values)
-        local height = math.ceil(#values / 3) * 50
+        local height = math.ceil(#values / 4) * 50
         local toggles = {}
         for _, value in ipairs(values) do
             table.insert(toggles, {
@@ -174,7 +173,7 @@ function _createUI()
                 tag = 'GridLayout',
                 attributes = {
                     spacing = '10 10',
-                    cellSize = '62 40' -- 86 40 for three columns
+                    cellSize = '62 40', -- 86 40 for three columns
                 },
             },
             {
@@ -252,8 +251,8 @@ function _createUI()
                     text('heading', 'Extra map rings'),
                     toggleGroup('extraRings', { 0, 1, 2 }),
 
-                    toggle('usePoK', 'Use Prophecy of Kings expansion'),
-                    toggle('useCodex1ACs', 'Use Codex 1 action cards'),
+                    toggle('usePoK', 'Prophecy of Kings expansion'),
+                    toggle('useCodex1ACs', 'Codex 1 action cards'),
                     toggle('14ptGame', '14 point game'),
                 }
             },
@@ -391,16 +390,6 @@ function setupGameCoroutine()
 
     setup14ptGame(_config.is14ptGame)
     coroutine.yield(0)
-
-    -- Wait for any pending actions (e.g. adding new public objectives).
-    local function hasPendingAction()
-        for _, _ in pairs(_pendingActionSet) do
-            return true
-        end
-    end
-    while hasPendingAction() do
-        coroutine.yield(0)
-    end
 
     _setupHelper.setup({
         playerCount = _config.playerCount,
@@ -819,9 +808,6 @@ function _addCards(containerName, deckName, sourceName)
         error('_addCards: missing location for "' .. deckName .. '"')
     end
 
-    local key = '_addCards(' .. containerName .. ',' .. deckName .. ',' .. sourceName .. ')'
-    _pendingActionSet[key] = true
-
     container.takeObject({
         guid = guid,
         position = {
@@ -838,7 +824,6 @@ function _addCards(containerName, deckName, sourceName)
         if deck then
             deck.shuffle()
         end
-        _pendingActionSet[key] = nil
     end
     Wait.time(delayedShuffle, 5 + math.random())
 end

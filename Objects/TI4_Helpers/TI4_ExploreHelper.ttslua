@@ -1429,7 +1429,7 @@ function _stellarConverterTokenInjectFunction(system, planetName, attachTokenObj
             if entry.name == planetName then
                 -- Save planet state (onLoad will miss any attachments that are already in the Purge bag. Players will have to handle.)
                 system._stellarConverterPlanet = copyTable(planet)
-                -- Clear planet stats
+                -- Clear planet stats (leave a planet entry for zone / planet position computations to work for others in the sytem)
                 planet.resources = 0
                 planet.influence = 0
                 planet.tech = nil

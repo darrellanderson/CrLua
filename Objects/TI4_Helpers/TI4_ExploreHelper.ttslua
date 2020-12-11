@@ -167,8 +167,6 @@ function onObjectSpawn(object)
         applyExplorationGoodness(object)
     elseif isFrontierToken(object) then
         applyFrontierGoodness(object)
-    elseif AttachLib.isAttachToken(object) then
-        AttachLib.attach(object)
     elseif object.tag == 'Card' and AttachLib._planetNameToDecals[object.getName()] then
         local decals = AttachLib._planetNameToDecals[object.getName()]
         object.setDecals(decals)
@@ -365,7 +363,7 @@ function checkCardForToken(object_spawned, tileGUID, planetName)
                 position = position,
                 rotation = rotation,
                 guid = token.guid,
-                smooth = true,
+                smooth = false,  -- move there quickly to reduce opportunity to grab it
                 callback_function = takeCallback
             })
 
@@ -523,7 +521,7 @@ function AttachLib.attach(attachTokenObject)
         AttachLib._orientToken(system, planetName, attachTokenObject)
         local success = AttachLib._injectAttachment(system, planetName, attachTokenObject)
         if success then
-            if attachTokens[attachTokenObject.getName()].decal then
+            if planetName and attachTokens[attachTokenObject.getName()].decal then
                 AttachLib._attachDecal(planetName, attachTokenObject)
             end
             local name = planetName or system.string
@@ -540,7 +538,7 @@ function AttachLib.detach(attachTokenObject)
     if system then
         local success = AttachLib._ejectAttachment(system, planetName, attachTokenObject)
         if success then
-            if attachTokens[attachTokenObject.getName()].decal then
+            if planetName and attachTokens[attachTokenObject.getName()].decal then
                 local card = AttachLib._getPlanetCard(planetName)
                 if card then
                     AttachLib._detachDecal(card, attachTokenObject)
@@ -651,10 +649,12 @@ function AttachLib._orientToken(system, planetName, attachTokenObject)
     assert(type(system) == 'table' and (not planetName or type(planetName) == 'string') and type(attachTokenObject) == 'userdata')
 
     local planetHasAnyTech = false
-    for _, planet in ipairs(system.planets or {}) do
-        if planet.name == planetName then
-            planetHasAnyTech = planet.tech ~= nil
-            break
+    if planetName then
+        for _, planet in ipairs(system.planets or {}) do
+            if planet.name == planetName then
+                planetHasAnyTech = planet.tech ~= nil
+                break
+            end
         end
     end
 
@@ -775,6 +775,7 @@ function AttachLib._ejectAttachment(system, planetName, attachTokenObject)
         end
         return system and true or false
     end
+
     -- Otherwise MUST have a planet.
     if not planetName then
         return false
@@ -815,11 +816,13 @@ end
 
 --- Find the card object.
 function AttachLib._getPlanetCard(planetName)
-    assert(type(planetName) == 'string')
+    assert((not planetName) or type(planetName) == 'string')
     -- Do NOT cache planet cards by guid, deck helper may change guids.
-    for _, object in ipairs(getAllObjects()) do
-        if object.tag == 'Card' and object.getName() == planetName then
-            return object
+    if planetName then
+        for _, object in ipairs(getAllObjects()) do
+            if object.tag == 'Card' and object.getName() == planetName then
+                return object
+            end
         end
     end
 end

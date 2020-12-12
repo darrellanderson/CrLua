@@ -343,22 +343,24 @@ function explorePlanet(tileGUID, planetName)
     position.y = position.y + 3
     local rotation = { x = 0, y = tileRot.y, z = 0 }
 
+    local card = false
     if exploreDeck.tag == 'Deck' then
-        exploreDeck.takeObject({
+        card = exploreDeck.takeObject({
           position = position,
           rotation = rotation,
           callback_function = function(obj) checkCardForToken(obj, tileGUID, planetName) end,
           smooth = true
         })
     elseif exploreDeck.tag == 'Card' then
+        card = exploreDeck
         local collide = false
         local fast = true
-        exploreDeck.setPositionSmooth(position, collide, fast)
-        exploreDeck.setRotationSmooth(rotation, collide, fast)
+        card.setPositionSmooth(position, collide, fast)
+        card.setRotationSmooth(rotation, collide, fast)
     else
         error('exploreFrontier: bad "' .. deckType .. '" deck')
     end
-    broadcastToAll('Exploring Planet: ' .. planetName)
+    broadcastToAll('Exploring ' .. planetName .. ': ' .. card.getName())
 end
 
 function exploreFrontier(token)
@@ -382,18 +384,20 @@ function exploreFrontier(token)
         rotation.y = systemObject.getRotation().y
     end
 
+    local card = false
     if frontierDeck.tag == 'Deck' then
-        frontierDeck.takeObject({
+        card = frontierDeck.takeObject({
             position = position,
             rotation = rotation,
             callback_function = function(obj) checkCardForToken(obj, '', false) end,
             smooth = true
         })
     elseif frontierDeck.tag == 'Card' then
+        card = frontierDeck
         local collide = false
         local fast = true
-        frontierDeck.setPositionSmooth(position, collide, fast)
-        frontierDeck.setRotationSmooth(rotation, collide, fast)
+        card.setPositionSmooth(position, collide, fast)
+        card.setRotationSmooth(rotation, collide, fast)
     else
         error('exploreFrontier: bad "Frontier Exploration" deck')
     end
@@ -401,7 +405,7 @@ function exploreFrontier(token)
     local frontierTokenBag = assert(_getByName('Frontier Tokens Bag', 'Infinite'))
     frontierTokenBag.putObject(token)
 
-    broadcastToAll('Exploring Frontier Token')
+    broadcastToAll('Exploring Frontier: ' .. card.getName())
 end
 
 function checkCardForToken(object_spawned, tileGUID, planetName)

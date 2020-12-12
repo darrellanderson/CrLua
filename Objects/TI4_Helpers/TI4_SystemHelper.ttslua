@@ -500,7 +500,9 @@ local _nonPlanetResourceInfluenceCards = {
 
     -- Technology
     -- Predictive Intelligence: Increase minimum available votes by 3.
-    { name = 'Predictive Intelligence', resources = 0, influence = 3, requireFaceUp = true },
+    -- ... but for each vote, see Zeal comment below why this is problematic.
+    -- Comment out for now, reintroduce once there's a better way to do these.
+    --{ name = 'Predictive Intelligence', resources = 0, influence = 3, requireFaceUp = true },
 }
 
 local TYPE = {

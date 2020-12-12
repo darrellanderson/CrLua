@@ -1339,6 +1339,7 @@ function _stellarConveterTokenDestroyPlanet_coroutine()
     end
 
     -- Place token directly on planet, and lock it
+    systemObject.setLock(true)
     attachTokenObject.setLock(false)
     local planetPosition = systemObject.positionToWorld(planet.position)
     local tokenPosition = { x = planetPosition.x, y = planetPosition.y + 0.5, z = planetPosition.z }
@@ -1365,6 +1366,7 @@ function _stellarConveterTokenDestroyPlanet_coroutine()
     attachTokenObject.clearContextMenu()
 
     -- Inject planet with no stats
+    planet.name = 'Shattered remains of ' .. planet.name
     planet.resources = 0
     planet.influence = 0
     planet.tech = nil
@@ -1464,28 +1466,18 @@ function _stellarConverterTokenInjectFunction(system, planetName, attachTokenObj
         end
     end
 
-    -- 'Hover' over target planet (don't disrupt units, tokens, etc.)
-    local planetPosition = systemObject.positionToWorld(planet.position)
-    local tokenPosition = { x = planetPosition.x, y = planetPosition.y + 5, z = planetPosition.z }
-    local collide = false
-    local fast = true
-    attachTokenObject.setPositionSmooth(tokenPosition, collide, fast)
-
-    -- Lock in mid-air as soon as moving finishes.
-    local function condition()
-        if attachTokenObject.isSmoothMoving() then
-            return false
+    -- Edit context menu for available planets.  Serves as a confirmation step.
+    -- Create for all to allow some sloppiness in token placement.
+    local tokenGuid = attachTokenObject.getGUID()
+    attachTokenObject.clearContextMenu()
+    for _, planet in ipairs(system.planets or {}) do
+        local planetName = planet.name
+        local function wrapped()
+            printToAll('Stellar Converter destroying ' .. planetName, 'Yellow')
+            _stellarConveterTokenDestroyPlanet(system, planetName, tokenGuid)
         end
-        return true
+        attachTokenObject.addContextMenuItem('Destroy ' .. planetName, wrapped, false)
     end
-    local function action()
-        attachTokenObject.setLock(true)
-    end
-    local function timeout() end
-    Wait.condition(action, condition, 3, timeout)
-
-    -- Add context menu item to ACTUALLY destroy planet. Serves as a confirmation step.
-    attachTokenObject.addContextMenuItem('Destroy ' .. planetName, function(playerColor) _stellarConveterTokenDestroyPlanet(system, planetName, attachTokenObject.getGUID()) end, false)
 
     return system
 end
@@ -1511,13 +1503,15 @@ function _stellarConverterTokenEjectFunction(system, planetName, attachTokenObje
     local restorePlanet = system._stellarConverterPlanet
     system._stellarConverterPlanet = nil
 
+    local lookForName = 'Shattered remains of ' .. restorePlanet.name
     local destroyedPlanet = false
     for _, systemPlanet in ipairs(system.planets or {}) do
-        if systemPlanet.name == restorePlanet.name then
+        if systemPlanet.name == lookForName then
             destroyedPlanet = systemPlanet
         end
     end
     -- This overwrites any changes players somehow made since the Stellar Converter happened...okay for now.
+    destroyedPlanet.name = restorePlanet.name
     destroyedPlanet.resources = restorePlanet.resources
     destroyedPlanet.influence = restorePlanet.influence
     destroyedPlanet.tech = restorePlanet.tech

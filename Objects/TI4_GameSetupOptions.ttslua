@@ -709,6 +709,10 @@ function postSetupPoK()
             ['Psychoarchaeology'] = true,
             ['Predictive Intelligence'] = true,
             ['AI Development Algorithm'] = true,
+            ['Bio-Stims'] = true,
+            ['Scanlink Drone Network'] = true,
+            ['Self Assembly Routines'] = true,
+            ['Dark Energy Tap'] = true,
         }
 
         -- Remove alliance promissory notes.
@@ -722,7 +726,8 @@ function postSetupPoK()
                     if removeCardSet[entry.name] then
                         table.insert(removeCardsGuidAndDeck, {
                             guid = entry.guid,
-                            deck = object
+                            deck = object,
+                            smooth = false,
                         })
                     end
                 end
@@ -731,14 +736,17 @@ function postSetupPoK()
         coroutine.yield(0)
     end
 
+    local deckToExtraY = {}
     for _, guidAndDeck in pairs(removeCardsGuidAndDeck) do
         local guid = guidAndDeck.guid
         local deck = guidAndDeck.deck
         assert(deck.tag == 'Deck')
         local pos = deck.getPosition()
+        local extraY = deckToExtraY[deck.getGUID()] or 0
+        deckToExtraY[deck.getGUID()] = extraY + 0.2
         deck.takeObject({
             guid              = guid,
-            position          = { x = pos.x, y = pos.y + 5, z = pos.z },
+            position          = { x = pos.x, y = pos.y + 5 + extraY, z = pos.z },
             callback_function = function(card) container.putObject(card) end,
             smooth            = false
         })
@@ -899,6 +907,7 @@ function _removeCards(containerName, deckName, sourceName)
                 createDeck = card
                 createDeck.setLock(true)
             end
+            coroutine.yield(0)
         end
         if createDeck then
             createDeck.setLock(false)

@@ -521,6 +521,7 @@ function setupPoK(usePoK)
             end
         end
         coroutine.yield(0)
+        pickFactionBag.shuffle()
 
     else
 

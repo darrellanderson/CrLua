@@ -538,6 +538,10 @@ function setupPoK(usePoK)
                 ['Exploration Bag'] = true,
                 ['Frontier Tokens Bag'] = true,
                 ['Mallice Tile'] = true,
+                ['Cultural Relic Fragments Bag'] = true,
+                ['Hazardous Relic Fragments Bag'] = true,
+                ['Industrial Relic Fragments Bag'] = true,
+                ['Unknown Relic Fragments Bag'] = true,
             }
             for _, object in ipairs(getAllObjects()) do
                 local name = object.getName()

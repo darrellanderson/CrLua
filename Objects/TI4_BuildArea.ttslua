@@ -219,7 +219,7 @@ function _getUnitAttributes(unitType)
     return _unitAttributes[unitType]
 end
 
-local function _updateUnitAttributes(produceUnitNameToUnitWithCount)
+function _updateUnitAttributes(produceUnitNameToUnitWithCount)
     assert(not produceUnitNameToUnitWithCount or type(produceUnitNameToUnitWithCount) == 'table')
 
     local unitTypeToCount = {}

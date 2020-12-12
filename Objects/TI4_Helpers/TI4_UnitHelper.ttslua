@@ -314,8 +314,8 @@ local _flagshipModifiers = {
                     end
                 end
             end
-            if haveToken then
-                attr = unitAttrs['Flagship']
+            if not haveToken then
+                local attr = unitAttrs['Flagship']
                 attr.spaceCombat.hit = attr.spaceCombat.hit - 2
             end
         end

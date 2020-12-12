@@ -88,7 +88,9 @@ local _data = {
     height = _config.defaultHeight,
 
     boundingBox = false,
+
     lowerNameToResources = false,
+    lowerNameToResourcesLastUpdateTime = false,
 
     inside = {},
 
@@ -487,6 +489,15 @@ end
 
 function getResourcesAndInfluence(objectName)
     assert(type(objectName) == 'string')
+
+    local now = Time.time
+    local last = _data.lowerNameToResourcesLastUpdateTime or 0
+    local age = math.abs(now - last)
+    if age > 3 then
+        _data.lowerNameToResourcesLastUpdateTime = now
+        _data.lowerNameToResources = false
+    end
+
     if not _data.lowerNameToResources then
         _data.lowerNameToResources = {}
         for lowerName, planet in pairs(_systemHelper.planets()) do

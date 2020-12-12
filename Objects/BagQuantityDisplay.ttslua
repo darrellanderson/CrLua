@@ -1,0 +1,43 @@
+--- Display quatity on a bag.
+
+function onLoad(save_state)
+    assert(self.tag == 'Bag')
+    self.createButton({
+        click_function = '_doNothing',
+        function_owner = self,
+        label          = '0',
+        position       = { 0, 2, 1.25 },
+        rotation       = { -50, 0, 0 },
+        width          = 1000,
+        height         = 1000,
+        font_size      = 1200,
+        color          = 'Black',
+        font_color     = self.getColorTint(),
+    })
+    _updateQuantityDisplay()
+end
+
+function onObjectEnterContainer(container, enter_object)
+    if container == self then
+        _updateQuantityDisplay()
+    end
+end
+
+function onObjectLeaveContainer(container, leave_object)
+    if container == self then
+        _updateQuantityDisplay()
+    end
+end
+
+-------------------------------------------------------------------------------
+
+function _doNothing()
+end
+
+function _updateQuantityDisplay()
+    local buttons = self.getButtons()
+    assert(buttons and #buttons == 1)
+    local button = buttons[1]
+    button.label = tostring(self.getQuantity())
+    self.editButton(button)
+end

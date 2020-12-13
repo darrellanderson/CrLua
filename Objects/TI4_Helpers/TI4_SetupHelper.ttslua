@@ -126,9 +126,9 @@ local SetupColor = {
     },
     NAME_TO_DIRECTIONALISER_OFFSET = {
         -- These are in Directionaliser local coordinate space.
-        ['$COLOR Mech'] = { x = 0, y = 1, z = -13 },
+        ['$COLOR Mech'] = { x = 0, y = 1, z = -13.2, yRot = 180 },
         ['$COLOR Infantry'] = { x = 0, y = 1, z = -11 },
-        ['$COLOR Fighter'] = { x = 0, y = 1, z = -9 },
+        ['$COLOR Fighter'] = { x = 0, y = 1, z = -9, yRot = 180 },
         ['$COLOR Space Dock'] = { x = 0, y = 1, z = -7 },
         ['$COLOR PDS'] = { x = 0, y = 1, z = -5 },
         ['$COLOR Carrier'] = { x = 0, y = 1, z = -2.15 },
@@ -675,11 +675,13 @@ function SetupColor.unpackUnits(color, colorBox, directionaliser)
     local unitBags = {}
     for namePattern, offset in pairs(SetupColor.NAME_TO_DIRECTIONALISER_OFFSET) do
         namePattern = string.gsub(namePattern, '$COLOR', color)
+        local rotation = directionaliser.getRotation()
+        rotation.y = rotation.y + (offset.yRot or 0)
         local guid = assert(getEntryGuid(colorBox, namePattern), 'missing ' .. namePattern)
         local object = colorBox.takeObject({
             guid              = guid,
             position          = directionaliser.positionToWorld(offset),
-            rotation          = directionaliser.getRotation(),
+            rotation          = rotation,
             callback_function = function(object) object.setLock(offset.lock or false) end,
             smooth            = false,
         })
@@ -2055,7 +2057,7 @@ local UNIT_SCALE = {
     ['Dreadnought'] = { unit = 0.6, bag = 0.70 },
     ['War Sun'] = { unit = 0.7, bag = 0.8 },
     ['Flagship'] = { unit = 0.7, bag = 0.8 },
-    ['Mech'] = { unit = 0.6, bag = 0.7 },
+    ['Mech'] = { unit = 0.4, bag = 0.5 },
 }
 
 local DIRECTIONALISER_SCALE = 0.85

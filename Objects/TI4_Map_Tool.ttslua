@@ -511,6 +511,11 @@ function clearTilesCoroutine()
         end
         coroutine.yield(0)
     end
+
+    -- Also put away any Frontier tokens.
+    coroutine.yield(0)
+    _exploreHelper.retrieveFrontierTokens()
+
     return 1
 end
 

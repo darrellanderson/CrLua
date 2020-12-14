@@ -556,7 +556,10 @@ local _unitModifiers = {
         owner = OWNER.SELF,
         type = TYPE.MUTATE,
         apply = function(unitAttrs)
-            unitAttrs['Space Dock'].spaceCannon = { dice = 3, hit = 5, range = 1, unitLimit = 1 }
+            unitAttrs['Experimental Battlestation'] = {
+                spaceCannon = { hit = 5, dice = 3, range = 1 },
+                unitCount = 1
+            }
         end
     },
 

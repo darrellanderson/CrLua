@@ -70,28 +70,28 @@ local SetupGeneric = {
             { x = 26.50, y = -0.19, z = 9, lock = true, dx = 1.5, dz = 7.5 }
         },
         ['^x3 Commodities/Tradegoods Bag$'] = {
-            { x = -25.00, y = -0.19, z = 3, lock = true, dx = -5 },
-            { x = 25.00, y = -0.19, z = 3, lock = true, dx = 5 },
+            { x = -29.50, y = -0.19, z = -1.5, lock = true, dx = -5 },
+            { x = 29.50, y = -0.19, z = 3, lock = true, dx = 5 },
         },
         ['^x1 Commodities/Tradegoods Bag$'] = {
-            { x = -28.00, y = -0.19, z = 3, lock = true, dx = -5 },
-            { x = 28.00, y = -0.19, z = 3, lock = true, dx = 5 },
+            { x = -29.50, y = -0.19, z = 1.5, lock = true, dx = -5 },
+            { x = 29.50, y = -0.19, z = 6, lock = true, dx = 5 },
         },
         ['^x3 Fighter Tokens Bag$'] = {
-            { x = -25.00, y = -0.19, z = 0, lock = true, dx = -5 },
-            { x = 25.00, y = -0.19, z = 0, lock = true, dx = 5 },
+            { x = -26.50, y = -0.19, z = -1.5, lock = true, dx = -5 },
+            { x = 26.50, y = -0.19, z = 3, lock = true, dx = 5 },
         },
         ['^x1 Fighter Tokens Bag$'] = {
-            { x = -28.00, y = -0.19, z = 0, lock = true, dx = -5 },
-            { x = 28.00, y = -0.19, z = 0, lock = true, dx = 5 },
+            { x = -26.50, y = -0.19, z = 1.5, lock = true, dx = -5 },
+            { x = 26.50, y = -0.19, z = 6, lock = true, dx = 5 },
         },
         ['^x3 Infantry Tokens Bag$'] = {
-            { x = -25.00, y = -0.19, z = -3, lock = true, dx = -5 },
-            { x = 25.00, y = -0.19, z = -3, lock = true, dx = 5 },
+            { x = -23.50, y = -0.19, z = -1.5, lock = true, dx = -5 },
+            { x = 23.50, y = -0.19, z = 3, lock = true, dx = 5 },
         },
         ['^x1 Infantry Tokens Bag$'] = {
-            { x = -28.00, y = -0.19, z = -3, lock = true, dx = -5 },
-            { x = 28.00, y = -0.19, z = -3, lock = true, dx = 5 },
+            { x = -23.50, y = -0.19, z = 1.5, lock = true, dx = -5 },
+            { x = 23.50, y = -0.19, z = 6, lock = true, dx = 5 },
         },
     }
 }
@@ -414,6 +414,25 @@ end
 function SetupGeneric.unpack(setupBag, extraRings)
     assert(setupBag.tag == 'Bag' and type(extraRings) == 'number')
     debugLog('SetupGeneric.unpack')
+
+    -- Move Mallice.
+    local wormholeNexus = _systemHelper.systemFromTile(82)
+    local wormholeNexusObj = wormholeNexus and getObjectFromGUID(wormholeNexus.guid)
+    if wormholeNexusObj then
+        -- Snap to grid.
+        local pos = {
+            x = 26.24 + 5 * extraRings,
+            y = 1.14,
+            z = -3
+        }
+        if (extraRings % 2) == 1 then
+            pos.z = -6  -- grid stagger
+        end
+        pos = _systemHelper.hexToPosition(_systemHelper.hexFromPosition(pos))
+        pos.y = 1.14 -- gets lost during hex to/from.
+        wormholeNexusObj.setPosition(pos)
+        wormholeNexusObj.setRotation({ x = 0, y = 180, z = 180 })  -- face down
+    end
 
     -- Get per-object json.  Leave the "master" copies of the objects in the
     -- setup bag, spawn new copies from the json.

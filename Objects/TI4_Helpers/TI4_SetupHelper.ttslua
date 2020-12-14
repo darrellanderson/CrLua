@@ -1000,7 +1000,7 @@ function setupCoroutine()
         end
     end
     for i, listener in ipairs(listeners) do
-        Wait.frames(function() listener.call('onSetupHelperSetupFinished') end, i)
+        Wait.frames(function() listener.call('onSetupHelperSetupFinished', params) end, i)
     end
 
     print('Setup finished')  -- always print when done

@@ -83,6 +83,7 @@ local FRANKEN_UNPACK_TOOLTIP = 'Unpack the given faction sheet and tokens, unpac
 
 local _customNameToUrl = false
 local _chosenFactionId = false
+local _includePoK = true
 
 function doNothing() end
 
@@ -303,13 +304,23 @@ end
 
 -------------------------------------------------------------------------------
 
+local function _includeFaction(tokenName)
+    local faction = _factionHelper.fromTokenName(tokenName)
+    if faction.source == 'PoK' and not _includePoK then
+        return false
+    end
+    return true
+end
+
 function showFactionSelection()
     self.clearButtons()
     self.setDecals({})
     _addTitle()
     for i, idAndTokenName in ipairs(FACTION_ID_AND_TOKEN_NAMES) do
         local id = idAndTokenName.id
-        _addFactionButton(id, i, 24)
+        if _includeFaction(idAndTokenName.tokenName) then
+            _addFactionButton(id, i, 24)
+        end
     end
 
     if _factionHelper.isFrankenEnabled() then
@@ -350,6 +361,16 @@ end
 function onFrankenEnabled()
     showFactionSelection()
 end
+
+function onSetupHelperSetupFinished(params)
+    if not params.isRightClick then
+        -- Hide PoK if not enabled when commiting to setup.  Note this gets
+        -- reset across save/load, to avoid this need more save state.
+        _includePoK = _setupHelper.getPoK()
+        Wait.frames(showFactionSelection, 2)
+    end
+end
+
 -------------------------------------------------------------------------------
 
 function onClickBaseInfo(clickObject, clickerColor, altClick)

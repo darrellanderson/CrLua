@@ -40,6 +40,24 @@ function onPlayerTurnEnd(player_color_end, player_color_next)
     _activeSystemGuid = false
 end
 
+function _applyPlanetDecals(system)
+    local decals = {}
+
+    for _, planet in ipairs(system.planets or {}) do
+        if planet.planetDecal then
+            table.insert(decals, {
+                name = planet.name .. ' decal',
+                url = planet.planetDecal,
+                position = { x = planet.position.x, y = 0.1, z = planet.position.z },
+                rotation = { x = 90, y = 180, z = 0 },
+                scale = { x = 2.3, y = 2.3, z = 1 }, -- TODO: rework Mirage image so this can be 1,1,1
+            })
+        end
+    end
+
+    self.setDecals(decals)
+end
+
 function onSystemActivation(system)
     if _activeSystemGuid == system.guid then
         return
@@ -51,6 +69,8 @@ function onSystemActivation(system)
     local systemCustom = systemObject.getCustomObject()
     local custom = self.getCustomObject()
     custom.diffuse = systemCustom.diffuse
+
+    _applyPlanetDecals(system, systemObject)
 
     -- Resetting custom object triggers delete.  Tell Deleted Items it is ok.
     ignoreDeletedItem(self.getGUID())

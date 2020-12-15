@@ -1235,7 +1235,6 @@ function purgeCard(cardObject)
     --TODO: Maybe deck related stuff? Object deletion checks? Card locked stuff?
 
     purgeBagObject.putObject(cardObject)
-    broadcastToAll('PURGING card \'' .. cardObject.getName() .. '\'')
 end
 
 local function _heroCardCanBeUsed(cardObject, usingColor)
@@ -1466,8 +1465,8 @@ function _carrionHeroAbilityCoroutine()
     end
     assert(factionTokenName and factionColor, 'Dimensional Anchor: Trying to invoke Hero Ability, but no faction with "It Feeds on Carrion" is at the table.')
 
-    --Find each dimensional tear token
-    local dimensionalTearName = "Vuil'raith Cabal Gravity Rift Token"
+    --Find each dimensional tear token (Cabal only)
+    local dimensionalTearName = "Tear Token (Cabal)"
     local dimTokenToPosition = {}
     local anyDimensionalTears = false
     for _, object in ipairs(getAllObjects()) do

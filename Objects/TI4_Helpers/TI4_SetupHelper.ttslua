@@ -117,9 +117,9 @@ local SetupColor = {
     NAME_TO_PLAYER_ZONE_OFFSET = {
         ['Notes %($COLOR%)'] = { x = 7, z = 2 },
         ['Active/Passed %($COLOR%)'] = { x = 4, y = 1, z = 2, flip = false },  -- do not flip, changing setup can lead to unflipped tokens
-        ['Command Sheet %($COLOR%)'] = { x = -8.5, z = 11, lock = true },
+        ['Command Sheet %($COLOR%)'] = { x = -8.2, z = 11, lock = true },
         ['Directionaliser %($COLOR%)'] = { x = 0, y = 0, z = -2, yRot = 270, lock = true },
-        ['Leader Sheet %($COLOR%)'] = { x = 8.8, z = 11, lock = true },
+        ['Leader Sheet %($COLOR%)'] = { x = 8.45, z = 11, lock = true },
     },
     NAME_TO_PLAYER_AGENDA_ZONE_OFFSET = {
         ['$COLOR Player Votes'] = { x = 0, y = 1, z = 1, yRot = 180 },
@@ -1645,10 +1645,13 @@ end
 function SetupFaction.addFactionSheetUnitUpgradeSnapPoints(factionSheet)
     assert(type(factionSheet) == 'userdata')
 
-    local x0 = 1.09
-    local dx = (-1.09 * 2) / 3
-    local z0 = -0.74
-    local dz = (0.74 * 2) / 3
+    local x0 = 1.100277662
+    local z0 = -0.73410183
+    local x3 = -1.07248139
+    local z3 = 0.734419465
+
+    local dx = (x3 - x0) / 3
+    local dz = (z3 - z0) / 3
 
     local snapPoints = {}
     for col = 0, 3 do

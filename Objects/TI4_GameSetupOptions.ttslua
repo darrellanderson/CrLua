@@ -28,6 +28,7 @@ local CONTRIBUTORS = {
     'Jabberwocky',  -- PoK wormholes, scripting
     'Jatta Pake',
     'Jefferson',
+    'Legoman',  -- Decal concept, demo for attach tokens
     'Lily',
     'Loving Teammate',
     'Mage',
@@ -703,7 +704,7 @@ function postSetupPoK()
         end
         coroutine.yield(0)
 
-        -- Remove techs.
+        -- Remove techs and alliance promissory notes.
         local removeCardSet = {
             ['Sling Relay'] = true,
             ['Psychoarchaeology'] = true,
@@ -714,12 +715,9 @@ function postSetupPoK()
             ['Self Assembly Routines'] = true,
             ['Dark Energy Tap'] = true,
         }
-
-        -- Remove alliance promissory notes.
         for _, color in ipairs(Player.getColors()) do
             removeCardSet['Alliance (' .. color .. ')'] = true
         end
-
         for _, object in ipairs(getAllObjects()) do
             if object.tag == 'Deck' then
                 for _, entry in ipairs(object.getObjects()) do
@@ -734,8 +732,25 @@ function postSetupPoK()
             end
         end
         coroutine.yield(0)
+
+        -- Remove PoK maps.
+        local mapsBag = _getByName('Maps with Strings')
+        local pos = mapsBag.getPosition()
+        pos.y = pos.y + 5
+        for _, entry in ipairs((mapsBag and mapsBag.getObjects()) or {}) do
+            if string.find(entry.name, 'PoK') then
+                mapsBag.takeObject({
+                    position          = pos,
+                    callback_function = function(object) container.putObject(object) end,
+                    smooth            = false,
+                    guid              = entry.guid
+                })
+                pos.y = pos.y + 1
+            end
+        end
     end
 
+    -- Do any requested card removals.
     local deckToExtraY = {}
     for _, guidAndDeck in pairs(removeCardsGuidAndDeck) do
         local guid = guidAndDeck.guid

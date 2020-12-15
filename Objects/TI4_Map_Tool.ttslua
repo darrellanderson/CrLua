@@ -921,6 +921,9 @@ function count_slices(count)
             if planet.tech then
                 table.insert(valueTable.tech, string.sub(planet.tech, 1, 1):upper())
             end
+            if planet.legendary then
+                valueTable.legendary = (valueTable.legendary or 0) + 1
+            end
         end
     end
 
@@ -963,8 +966,18 @@ function count_slices(count)
     end
 
     local function valueToString(value)
-        local tech = #value.tech > 0 and (' ' .. table.concat(value.tech, '')) or ''
-        return value.resources .. '/' .. value.influence .. tech
+        local items = {
+            value.resources .. '/' .. value.influence
+        }
+        if #value.tech > 0 then
+            table.sort(value.tech)
+            table.insert(items, table.concat(value.tech, ''))
+        end
+        if value.legendary then
+            local n = value.legendary
+            table.insert(items, ((n > 1) and n or '') .. 'L')
+        end
+        return table.concat(items, ' ')
     end
 
     for _, value in ipairs(hsValue) do

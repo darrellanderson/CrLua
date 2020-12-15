@@ -50,11 +50,12 @@ function _applyPlanetDecals(system)
                 url = planet.planetDecal,
                 position = { x = planet.position.x, y = 0.1, z = planet.position.z },
                 rotation = { x = 90, y = 180, z = 0 },
-                scale = { x = 2.3, y = 2.3, z = 1 }, -- TODO: rework Mirage image so this can be 1,1,1
+                scale = { x = 2.3, y = 2.3, z = 1 }, -- scale XY is image size in world units, not "scale"
             })
         end
     end
 
+    -- Always set even if none, to remove any old ones.
     self.setDecals(decals)
 end
 

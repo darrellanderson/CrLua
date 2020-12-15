@@ -1,4 +1,4 @@
--- Volvermilty Tile Dealer
+-- VolverMilty Tile Dealer
 -- Tile dealing system that ensures players get balanced tile hand
 -- Deals tiles from three tiers, with minimum and maximum spends for resources/influence
 -- @author Volverbot for design
@@ -160,7 +160,7 @@ function setuptierhands(clickObject, clickPlayer)
     end
     local message = {
         delim,
-        'Volvermilty Map Building Rules:',
+        'VolverMilty PoK Map Building Rules:',
         'Cormund and Everra may not be placed adjacent to your own home system unless forced. All other normal map building rules apply.',
         'Planets are valued as highest resources or influence. Equal value planets are valued as 50% of each.',
         'Current minimums are: Resources = ' .. tostring(minR) .. ', Influence = ' .. tostring(minI) .. ', Total = ' .. tostring(minTotal),

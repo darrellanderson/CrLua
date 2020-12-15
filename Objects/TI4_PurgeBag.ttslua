@@ -16,7 +16,7 @@ function _getByName(name, tag)
             return object
         end
     end
-    
+
     return false
 end
 
@@ -26,30 +26,34 @@ end
 
 function relocateRelicFragments(object)
     local fragmentType = getRelicFragmentType(object)
-    if fragmentType then
-        local fragBag = _getByName(fragmentType .. ' Relic Fragments Bag', 'Bag')
+    if not fragmentType then
+        return false
+    end
+    local fragBag = _getByName(fragmentType .. ' Relic Fragments Bag', 'Bag')
+    if not fragBag then
+        return false
+    end
 
-        if not fragBag then
-            return false
-        end
-
+    -- Need to wait for onObjectEnterContainer to finish placing this
+    -- object into self before it is safe to call takeObject (otherwise
+    -- will sometimes "take" a defective object).
+    local guid = object.getGUID()
+    local function delayedMove()
         self.takeObject({
-            guid = object.getGUID(),
+            guid = guid,
             callback_function = function (obj)
                 fragBag.putObject(obj)
             end
         })
-
-        return true
     end
+    Wait.frames(delayedMove, 3)
 
-    return false
+    return true
 end
 
 function onObjectEnterContainer(bag, enterObject)
     if bag == self then
         if not relocateRelicFragments(enterObject) then --Try to handle known objects
-
             --Otherwise the object is staying, so announce it
             printToAll('PURGING ' .. enterObject.getName(), 'Yellow')
         end

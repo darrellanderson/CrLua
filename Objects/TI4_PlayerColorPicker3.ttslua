@@ -1746,16 +1746,14 @@ end
 #include <~/CrLua/CrLua>
 #include <~/CrLua/LockGlobals>
 
-#include <~/CrLua/Color>
 #include <~/CrLua/List>
 #include <~/CrLua/LockTable>
 #include <~/CrLua/Log>
 #include <~/CrLua/Table>
-#include <~/CrLua/Util>
 
 #include <~/CrLua/TTS/HelperClient>
 
-CrLua.assertRequired({ 'Color', 'Log', 'TI4.Unit', 'TTS.HelperClient' })
+CrLua.assertRequired({ 'List', 'Log', 'Table', 'TTS.HelperClient' })
 CrLua.lock()
 
 SWAP = CrLua.LockTable.readOnlyRequireKey('SWAP', SWAP)

@@ -22,63 +22,88 @@ local exploreCardToTokenMap = {
 }
 
 local attachTokens = {
-    ['Propulsion Research Facility Token'] = {
+    ['Biotic Research Facility Token'] = {
         decal = true,
         faceUp = { resources = 1, influence = 1 },
-        faceDown = { tech = 'blue' },
+        faceDown = { tech = 'green' },
     },
     ['Cybernetic Research Facility Token'] = {
         decal = true,
         faceUp = { resources = 1, influence = 1 },
         faceDown = { tech = 'yellow' },
     },
-    ['Biotic Research Facility Token'] = {
+    ['DMZ Token'] = {
         decal = true,
-        faceUp = { resources = 1, influence = 1 },
-        faceDown = { tech = 'green' },
-    },
-    ['Warfare Research Facility Token'] = {
-        decal = true,
-        faceUp = { resources = 1, influence = 1 },
-        faceDown = { tech = 'red' },
-    },
-    ['Lazax Survivors Token'] = {
-        decal = true,
-        faceUpOrDown = { resources = 1, influence = 2 },
-    },
-    ['Rich World Token'] = {
-        decal = true,
-        faceUpOrDown = { resources = 1 },
-    },
-    ['Mining World Token'] = {
-        decal = true,
-        faceUpOrDown = { resources = 2 },
+        faceUpOrDown = {},
     },
     ['Dyson Sphere Token'] = {
         decal = true,
         faceUpOrDown = { resources = 2, influence = 1 },
     },
+    -- This works for empty systems, but cultural exploration (and ghosts token) not handled.
+    -- Comment out for now, let players lock them if they want.
+    -- ['Gamma Wormhole Token'] = {
+    --     decal = false,
+    --     injectFunction = function (system, planetName, attachTokenObject)
+    --         -- If empty system return it to trigger anchoring.  Do NOT do so
+    --         -- if there is a planet there (ghost's token most likely).
+    --         if system.planets and #system.planets > 0 then
+    --             return system
+    --         end
+    --     end,
+    --     ejectFunction = function(system, planetName, attachTokenObject)
+    --         if system.planets and #system.planets > 0 then
+    --             return system
+    --         end
+    --     end
+    -- },
+    ['Lazax Survivors Token'] = {
+        decal = true,
+        faceUpOrDown = { resources = 1, influence = 2 },
+    },
+    ['Mining World Token'] = {
+        decal = true,
+        faceUpOrDown = { resources = 2 },
+    },
+    ['Mirage Token'] = {
+        decal = false,
+        systemModifer = true, -- System modifiers get loaded before planet modifiers
+        injectFunction = function (system, planetName, attachTokenObject)
+            assert(attachTokenObject.getName() == 'Mirage Token')
+            return _mirageTokenInjectFunction(system, planetName, attachTokenObject)
+        end,
+        ejectFunction = function(system, planetName, attachTokenObject)
+            assert(attachTokenObject.getName() == 'Mirage Token')
+            return _mirageTokenEjectFunction(system, planetName, attachTokenObject)
+        end
+    },
     ['Paradise World Token'] = {
         decal = true,
         faceUpOrDown = { influence = 2 },
     },
-    ['Tomb of Emphidia Token'] = {
+    ['Propulsion Research Facility Token'] = {
         decal = true,
-        faceUpOrDown = { influence = 1 },
+        faceUp = { resources = 1, influence = 1 },
+        faceDown = { tech = 'blue' },
     },
-    ['DMZ Token'] = {
+    ['Rich World Token'] = {
         decal = true,
-        faceUpOrDown = {},
+        faceUpOrDown = { resources = 1 },
     },
-    ['Titan Note Token'] = {
-        decal = true,
-        faceUpOrDown = { resources = 1, influence = 1 },  -- need multi-trait support for rest
-    },
-    ['Titan Ultimate Token'] = {
-        decal = true,
-        faceUpOrDown = { resources = 3, influence = 3 },
+    ['Stellar Converter Token'] = {
+        decal = false,
+        noanchor = true,
+        injectFunction = function (system, planetName, attachTokenObject)
+            assert(attachTokenObject.getName() == 'Stellar Converter Token')
+            return _stellarConverterTokenInjectFunction(system, planetName, attachTokenObject)
+        end,
+        ejectFunction = function(system, planetName, attachTokenObject)
+            assert(attachTokenObject.getName() == 'Stellar Converter Token')
+            return _stellarConverterTokenEjectFunction(system, planetName, attachTokenObject)
+        end
     },
     ['Tear Token (Cabal)'] = {
+        decal = false,
         noanchor = true,
         injectFunction = function (system, planetName, attachTokenObject)
             assert(attachTokenObject.getName() == 'Tear Token (Cabal)')
@@ -90,6 +115,7 @@ local attachTokens = {
         end
     },
     ['Tear Token (Nekro)'] = {
+        decal = false,
         noanchor = true,
         injectFunction = function (system, planetName, attachTokenObject)
             assert(attachTokenObject.getName() == 'Tear Token (Nekro)')
@@ -100,27 +126,22 @@ local attachTokens = {
             return _tearTokenEjectFunction(system, planetName, attachTokenObject)
         end
     },
-    ['Mirage Token'] = {
-        systemModifer = true, -- System modifiers get loaded before planet modifiers
-        injectFunction = function (system, planetName, attachTokenObject)
-            assert(attachTokenObject.getName() == 'Mirage Token')
-            return _mirageTokenInjectFunction(system, planetName, attachTokenObject)
-        end,
-        ejectFunction = function(system, planetName, attachTokenObject)
-            assert(attachTokenObject.getName() == 'Mirage Token')
-            return _mirageTokenEjectFunction(system, planetName, attachTokenObject)
-        end
+    ['Titan Note Token'] = {
+        decal = true,
+        faceUpOrDown = { resources = 1, influence = 1 },  -- need multi-trait support for rest
     },
-    ['Stellar Converter Token'] = {
-        noanchor = true,
-        injectFunction = function (system, planetName, attachTokenObject)
-            assert(attachTokenObject.getName() == 'Stellar Converter Token')
-            return _stellarConverterTokenInjectFunction(system, planetName, attachTokenObject)
-        end,
-        ejectFunction = function(system, planetName, attachTokenObject)
-            assert(attachTokenObject.getName() == 'Stellar Converter Token')
-            return _stellarConverterTokenEjectFunction(system, planetName, attachTokenObject)
-        end
+    ['Titan Ultimate Token'] = {
+        decal = true,
+        faceUpOrDown = { resources = 3, influence = 3 },
+    },
+    ['Tomb of Emphidia Token'] = {
+        decal = true,
+        faceUpOrDown = { influence = 1 },
+    },
+    ['Warfare Research Facility Token'] = {
+        decal = true,
+        faceUp = { resources = 1, influence = 1 },
+        faceDown = { tech = 'red' },
     },
 }
 
@@ -243,7 +264,7 @@ function onObjectSpawn(object)
         local function delayedCheck()
             local object = getObjectFromGUID(guid)
             if object then
-                checkCardForToken(object, false, false)
+                checkCardForToken(object, false)
             end
         end
         Wait.time(delayedCheck, 5)
@@ -349,7 +370,7 @@ function explorePlanet(tileGUID, planetName)
         card = exploreDeck.takeObject({
           position = position,
           rotation = rotation,
-          callback_function = function(obj) checkCardForToken(obj, tileGUID, planetName) end,
+          callback_function = function(obj) checkCardForToken(obj, planetName) end,
           smooth = true
         })
     elseif exploreDeck.tag == 'Card' then
@@ -390,7 +411,7 @@ function exploreFrontier(token)
         card = frontierDeck.takeObject({
             position = position,
             rotation = rotation,
-            callback_function = function(obj) checkCardForToken(obj, '', false) end,
+            callback_function = function(obj) checkCardForToken(obj, false) end,
             smooth = true
         })
     elseif frontierDeck.tag == 'Card' then
@@ -409,7 +430,7 @@ function exploreFrontier(token)
     broadcastToAll('Exploring Frontier: ' .. card.getName())
 end
 
-function checkCardForToken(object_spawned, tileGUID, planetName)
+function checkCardForToken(object_spawned, planetName)
     local cardName = object_spawned.getName()
     local tokensToRetrieveSet = {}
     for _, item in ipairs(exploreCardToTokenMap[cardName] or {}) do

@@ -16,7 +16,8 @@ function _getByName(name, tag)
             return object
         end
     end
-    error('_getByName: missing "' .. name .. '"')
+    
+    return false
 end
 
 function getRelicFragmentType(object)

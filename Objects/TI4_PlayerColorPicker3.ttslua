@@ -788,13 +788,8 @@ function SwapPlan._getFlagshipName(color)
     local faction = _factionHelper.fromColor(color)
     if faction then
         CrLua.Log.i(TAG, 'SwapPlan._getFlagshipName: ' .. color .. ' faction "' .. faction.name .. '"')
-        local lowerFactionName = string.lower(faction.name)
-        for flagshipName, attributes in pairs(CrLua.TI4.Unit.FLAGSHIP) do
-            if string.lower(attributes.faction) == lowerFactionName then
-                CrLua.Log.i(TAG, 'SwapPlan._getFlagshipName: ' .. color .. ' flagship "' .. flagshipName .. '"')
-                return flagshipName
-            end
-        end
+        assert(faction.flagship)
+        return faction.flagship
     else
         CrLua.Log.i(TAG, 'SwapPlan._getFlagshipName: ' .. color .. ' no faction')
     end
@@ -1757,8 +1752,6 @@ end
 #include <~/CrLua/Log>
 #include <~/CrLua/Table>
 #include <~/CrLua/Util>
-
-#include <~/CrLua/TI4/Unit>
 
 #include <~/CrLua/TTS/HelperClient>
 

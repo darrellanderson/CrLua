@@ -1256,14 +1256,29 @@ function _planetPosition(system, zoneBorders, planetIndex)
         end
     elseif numZones == 3 then
         if planetIndex == 1 then  -- hercant
-            distanceToPlanet = distanceToPlanet + 0.1
-            bearingToPlanet = bearingToPlanet + 5
+            if system.home then
+                distanceToPlanet = distanceToPlanet + 0.1
+                bearingToPlanet = bearingToPlanet + 5
+            else
+                distanceToPlanet = distanceToPlanet + 0.3
+                bearingToPlanet = bearingToPlanet + 8
+            end
         elseif planetIndex == 2 then
-            distanceToPlanet = distanceToPlanet + 0.01
-            bearingToPlanet = bearingToPlanet - 0
+            if system.home then
+                distanceToPlanet = distanceToPlanet + 0.01
+                bearingToPlanet = bearingToPlanet - 0
+            else
+                distanceToPlanet = distanceToPlanet - 0.02
+                bearingToPlanet = bearingToPlanet + 4
+            end
         elseif planetIndex == 3 then
-            distanceToPlanet = distanceToPlanet + 0.22
-            bearingToPlanet = bearingToPlanet - 7
+            if system.home then
+                distanceToPlanet = distanceToPlanet + 0.22
+                bearingToPlanet = bearingToPlanet - 7
+            else
+                distanceToPlanet = distanceToPlanet + 0.22
+                bearingToPlanet = bearingToPlanet - 2
+            end
         end
     end
 

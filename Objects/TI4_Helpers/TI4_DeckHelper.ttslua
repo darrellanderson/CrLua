@@ -1368,6 +1368,21 @@ local function _scoreObjective(playerColor, card)
         end
     end
 end
+local _purgeBagGuid = false
+local function _purgeCard(card)
+    local purgeBag = _purgeBagGuid and getObjectFromGUID(_purgeBagGuid)
+    if not purgeBag then
+        for _, object in ipairs(getAllObjects()) do
+            if object.tag == 'Bag' and object.getName() == 'Purge Bag' then
+                purgeBag = object
+                _purgeBagGuid = object.getGUID()
+            end
+        end
+    end
+    if purgeBag then
+        purgeBag.putObject(card)
+    end
+end
 
 local _scoreDeckSet = false
 local _scoreCardSet = false
@@ -1407,6 +1422,9 @@ local function _applyContextMenuItems(card)
     end
     if _isScoreObjective(card) then
         card.addContextMenuItem('Score Objective', function(playerColor) _scoreObjective(playerColor, card) end, false)
+    end
+    if deckName and string.match(deckName, ' Exploration$') then
+        card.addContextMenuItem('Purge Card', function(playerColor) _purgeCard(card) end)
     end
 end
 

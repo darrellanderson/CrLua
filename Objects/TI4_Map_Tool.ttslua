@@ -605,6 +605,9 @@ local function getPlanetNameToCardOrDeckAndEntryGuid()
     local planetNameSet = {}
     for _, planet in pairs(_systemHelper.planets()) do
         planetNameSet[planet.name] = true
+        if planet.legendaryCard then
+            planetNameSet[planet.legendaryCard] = true
+        end
     end
 
     local planetNameToCardOrDeckAndEntryGuid = {}
@@ -671,6 +674,21 @@ function placeCardsCoroutine()
                     position = { x = pos.x, y = pos.y + 3, z = pos.z },
                     rotation = { x = rot.x, y = rot.y, z = 180 }
                 })
+
+                -- Add legendary cards as "planetName", below will place them.
+                if planet.legendaryCard then
+                    local entry = planetToTransforms[planet.legendaryCard]
+                    if not entry then
+                        entry = {}
+                        planetToTransforms[planet.legendaryCard] = entry
+                    end
+                    local pos = object.positionToWorld(planet.position)
+                    local rot = object.getRotation()
+                    table.insert(entry, {
+                        position = { x = pos.x + 1, y = pos.y + 1, z = pos.z },
+                        rotation = { x = rot.x, y = rot.y, z = 180 } -- rotating y still forms a deck b/c single cards
+                    })
+                end
             end
         end
     end

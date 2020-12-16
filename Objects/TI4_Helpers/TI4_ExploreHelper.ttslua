@@ -383,6 +383,15 @@ function explorePlanet(tileGUID, planetName)
         error('exploreFrontier: bad "' .. deckType .. '" deck')
     end
     broadcastToAll('Exploring ' .. planetName .. ': ' .. card.getName())
+
+    -- With explore attaching tokens the cards aren't needed.  Add a purge option.
+    local purgeBag = _getByName('Purge Bag')
+    if card.tag == 'Card' and purgeBag then
+        local function purgeThisCard()
+            purgeBag.putObject(card)
+        end
+        card.addContextMenuItem('Purge Card', purgeThisCard)
+    end
 end
 
 function exploreFrontier(token)

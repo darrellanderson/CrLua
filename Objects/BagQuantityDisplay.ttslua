@@ -1,5 +1,12 @@
 --- Display quatity on a bag.
 
+local FRAGMENT_COUNT = {
+    ['Cultural Relic Fragment'] = 9,
+    ['Hazardous Relic Fragment'] = 7,
+    ['Industrial Relic Fragment'] = 5,
+    ['Unknown Relic Fragment'] = 3,
+}
+
 local _processDeckOnDestroySet = {}
 local _processDeckQueue = false
 
@@ -11,7 +18,7 @@ function onLoad(save_state)
         label          = '0',
         position       = { 0, 2, 1.25 },
         rotation       = { -50, 0, 0 },
-        width          = 1000,
+        width          = 1400,
         height         = 1000,
         font_size      = 1200,
         color          = 'Black',
@@ -74,7 +81,12 @@ function _updateQuantityDisplay()
     local buttons = self.getButtons()
     assert(buttons and #buttons == 1)
     local button = buttons[1]
-    button.label = tostring(self.getQuantity())
+
+    local quantity = self.getQuantity()
+    local fragmentType = string.match(self.getName(), '^(.* Relic Fragment)s Bag$')
+    local total = FRAGMENT_COUNT[fragmentType] or '?'
+
+    button.label = quantity .. '/' .. total
     self.editButton(button)
 end
 

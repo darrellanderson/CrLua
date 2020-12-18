@@ -364,6 +364,17 @@ function placeTilesCoroutine()
     end
     coroutine.yield(0)
 
+    -- Lift the custudians token.
+    local custodiansToken = getObjectFromGUID(CUSTODIANS_TOKEN_GUID)
+    if custodiansToken then
+        local p = custodiansToken.getPosition()
+        p.y = p.y + 5
+        local collide = false
+        local fast = false -- move slowly so time to swap tile beneath
+        custodiansToken.setPositionSmooth(p, collide, fast)
+    end
+    coroutine.yield(0)
+
     local dy = 0.3
     local positionIterator = getSystemPositionsStartingAtOriginIterator(dy)
 

@@ -40,6 +40,9 @@ local _waitId = false
 local _logNext = false
 local _periodicUpdates = false
 
+local _lowerNameToResourcesAndInfluence = false
+local _lowerNameToResourcesAndInfluenceTimestamp = false
+
 -------------------------------------------------------------------------------
 
 function getHelperClient(helperObjectName)
@@ -60,8 +63,6 @@ end
 local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
-
-local _lowerNameToResourcesAndInfluence = false
 
 --- Group objects by player zone they are in, if any.
 -- @param objects : list of objects.
@@ -182,7 +183,15 @@ end
 -------------------------------------------------------------------------------
 
 function getLowerNameToResourcesAndInfluence()
+    if _lowerNameToResourcesAndInfluence and _lowerNameToResourcesAndInfluenceTimestamp then
+        local age = Time.time - _lowerNameToResourcesAndInfluenceTimestamp
+        if age > 10 then
+            _lowerNameToResourcesAndInfluence = false
+        end
+    end
+
     if not _lowerNameToResourcesAndInfluence then
+        _lowerNameToResourcesAndInfluenceTimestamp = Time.time
         _lowerNameToResourcesAndInfluence = {}
         for lowerName, planet in pairs(_systemHelper.planets()) do
             _lowerNameToResourcesAndInfluence[lowerName] = {

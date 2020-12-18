@@ -67,8 +67,8 @@ function getHelperClient(helperObjectName)
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
 
-local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
+local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _unitHelper = getHelperClient('TI4_UNIT_HELPER')
 
 -------------------------------------------------------------------------------
@@ -696,10 +696,10 @@ function updateCache()
     -- Get a world Y value from system.
     if not _cache.y then
         local system = assert(_systemHelper.systemFromPosition({ x = 0, y = 0, z = 0 }), 'missing system 0,0,0')
-        assert(system.y, 'missing system.y')
         local object = assert(getObjectFromGUID(system.guid), 'missing object 0,0,0')
+        assert(system.y, 'missing system.y')
         local position = object.positionToWorld({ x = 0, y = system.y, z = 0 })
-        _cache.y = position.y + 0.05
+        _cache.y = position.y + 0.01
     end
 
     return 1

@@ -601,7 +601,8 @@ function onButtonPlaceCards(_, color)
     startLuaCoroutine(self, 'placeCardsCoroutine')
 end
 
-local function getPlanetNameToCardOrDeckAndEntryGuid()
+--- Get card guids, or deck+card guids when inside a deck.
+local function getPlanetNameToCardDeckGuid()
     local planetNameSet = {}
     for _, planet in pairs(_systemHelper.planets()) do
         planetNameSet[planet.name] = true
@@ -626,17 +627,15 @@ local function getPlanetNameToCardOrDeckAndEntryGuid()
         local name = object.getName()
         if object.tag == 'Card' and planetNameSet[name] then
             addResult(name, {
-                card = object,
-                deck = false,
-                entryGuid = false
+                cardGuid = object.getGUID(),
+                deckGuid = nil
             })
         elseif object.tag == 'Deck' then
             for _, entry in ipairs(object.getObjects()) do
                 if planetNameSet[entry.name] then
                     addResult(entry.name, {
-                        card = false,
-                        deck = object,
-                        entryGuid = entry.guid
+                        cardGuid = entry.guid,
+                        deckGuid = object.getGUID()
                     })
                 end
             end
@@ -649,7 +648,7 @@ function placeCardsCoroutine()
     broadcastToAll('Placing planet cards')
 
     -- Find all card locations in a single pass, then place cards.
-    local planetNameToCardOrDeckAndEntryGuid = getPlanetNameToCardOrDeckAndEntryGuid()
+    local planetNameToCardDeckGuid = getPlanetNameToCardDeckGuid()
     coroutine.yield(0)
 
     -- Make sure system tiles are locked, and no longer drawable into hands.
@@ -695,19 +694,17 @@ function placeCardsCoroutine()
 
     -- Place cards.
     for planetName, transforms in pairs(planetToTransforms) do
-        local cardOrDeckAndEntryGuid = planetNameToCardOrDeckAndEntryGuid[planetName]
-        if cardOrDeckAndEntryGuid then
-            local card = cardOrDeckAndEntryGuid.card
-            local deck = cardOrDeckAndEntryGuid.deck
-            local entryGuid = cardOrDeckAndEntryGuid.entryGuid
+        local cardDeckGuid = planetNameToCardDeckGuid[planetName]
+        if cardDeckGuid then
+            local card = getObjectFromGUID(cardDeckGuid.cardGuid)
+            local deck = getObjectFromGUID(cardDeckGuid.deckGuid)
             for i, transform in ipairs(transforms) do
                 local pos = transform.position
                 local rot = transform.rotation
                 if i == 1 then
                     -- The first time placing a planet get it from the source.
-                    card = placeCard(pos, rot, card, deck, entryGuid)
+                    card = placeCard(pos, rot, card, deck, cardDeckGuid.cardGuid)
                     deck = false
-                    entryGuid = false
                 else
                     -- Make clones for extra copies.
                     assert(card and card.tag == 'Card')
@@ -779,7 +776,7 @@ end
 function returnCardsCoroutine()
     broadcastToAll('Returning planet cards')
 
-    local planetNameToCardOrDeckAndEntryGuid, extras = getPlanetNameToCardOrDeckAndEntryGuid()
+    local planetNameToCardDeckGuid, extras = getPlanetNameToCardDeckGuid()
     coroutine.yield(0)
 
     -- Destroy any extras.
@@ -787,7 +784,8 @@ function returnCardsCoroutine()
         if extra.card then
             _safeDestroyObject(extra.card)
         else
-            extra.deck.takeObject({
+            local deck = getObjectFromGUID(extra.deckGuid)
+            deck.takeObject({
                 guid = extra.entryGuid,
                 callback_function = _safeDestroyObject
             })
@@ -801,6 +799,9 @@ function returnCardsCoroutine()
         if not system.home then
             for _, planet in ipairs(system.planets or {}) do
                 planetNameSet[planet.name] = true
+                if planet.legendaryCard then
+                    planetNameSet[planet.legendaryCard] = true
+                end
             end
         end
     end
@@ -808,12 +809,12 @@ function returnCardsCoroutine()
 
     local index = 1
     for planetName, _ in pairs(planetNameSet) do
-        local cardOrDeckAndEntryGuid = planetNameToCardOrDeckAndEntryGuid[planetName]
-        if cardOrDeckAndEntryGuid then
+        local cardDeckGuid = planetNameToCardDeckGuid[planetName]
+        if cardDeckGuid then
             _deckHelper.discardCard({
-                guid = cardOrDeckAndEntryGuid.card and cardOrDeckAndEntryGuid.card.getGUID() or cardOrDeckAndEntryGuid.entryGuid,
+                guid = cardDeckGuid.cardGuid,
                 name = planetName,
-                containerGuid = cardOrDeckAndEntryGuid.deck and cardOrDeckAndEntryGuid.deck.getGUID() or nil,
+                containerGuid = cardDeckGuid.deckGuid,
                 index = index
             })
             index = index + 1

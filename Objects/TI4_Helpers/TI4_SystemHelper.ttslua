@@ -214,7 +214,7 @@ local _systems = {
     ['12a49a'] = { tile = 48 },
     ['8f40b4'] = { tile = 49 },
     ['d83cd4'] = { tile = 50 },
-    ['e3be37'] = { tile = 51, home = true, localY = 0.101, wormholes = { 'delta' }, planets = {
+    ['e3be37'] = { tile = 51, home = true, wormholes = { 'delta' }, planets = {
         { name = 'Creuss', resources = 4, influence = 2, position = { x = -0.05, z = -0.4 }, radius = 0.8 },
     }},
 
@@ -314,7 +314,7 @@ local _systems = {
     ['1a6583'] = { tile = 79, anomalies = { 'asteroid field' }, wormholes = { 'alpha' } },
     ['015a9f'] = { tile = 80, anomalies = { 'supernova' } },
     ['33c12d'] = { tile = 81, anomalies = { 'supernova' }, faction = 'muaat' },
-    ['82bf35'] = { tile = 82, localY = 0.101,
+    ['82bf35'] = { tile = 82,
         faceUpWormholes = { 'gamma', 'alpha', 'beta' },
         faceDownWormholes = { 'gamma' },
         planets = {
@@ -552,7 +552,7 @@ local _resInfModifiers = {
 local LOCAL_DISTANCE_TO_PLANET = 1.1
 local LOCAL_PLANET_RADIUS = 0.8
 local LOCAL_SYSTEM_TILE_RADIUS = 2.26
-local LOCAL_SYSTEM_TILE_Y = 0.08
+local LOCAL_SYSTEM_TILE_Y = 0.094 -- mesh Y is -0.1062 to 0.0937
 
 --- Get all systems.
 -- @return table: map from tile GUID to system table.

@@ -342,7 +342,8 @@ function updateNotesCoroutine()
     local colorToCommandTokenPositions = {}
     for _, color in ipairs(_zoneHelper.zones()) do
         local positions = {}
-        for _, commandToken in ipairs(filterTokens(color, commandTokens or {})) do
+        -- Do NOT filter these, allow tokens from other factions in a fleet pool for PoK.
+        for _, commandToken in ipairs(commandTokens) do
             table.insert(positions, commandToken.getPosition())
         end
         colorToCommandTokenPositions[color] = positions

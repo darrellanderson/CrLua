@@ -699,7 +699,7 @@ function updateCache()
         local object = assert(getObjectFromGUID(system.guid), 'missing object 0,0,0')
         assert(system.y, 'missing system.y')
         local position = object.positionToWorld({ x = 0, y = system.y, z = 0 })
-        _cache.y = position.y + 0.01
+        _cache.y = position.y + 0.02
     end
 
     return 1

@@ -1948,22 +1948,29 @@ local function _carrionHeroAbility(owningObject, clickingColor) --Vuil'Raith Her
     startLuaCoroutine(self, '_carrionHeroAbilityCoroutine')
 end
 
+local _heroNameSet = false
 local function _applyContextMenuItems(card)
     assert(card.tag == 'Card')
+    local name = card.getName()
 
-    local factionCardAbilityFunc = _factionCardNameToAbilityFunc and _factionCardNameToAbilityFunc[card.getName()] or false
+    local factionCardAbilityFunc = _factionCardNameToAbilityFunc and _factionCardNameToAbilityFunc[name] or false
 
     if factionCardAbilityFunc then
         card.addContextMenuItem(factionCardAbilityFunc.name, function(clickingColor) factionCardAbilityFunc.method(card, clickingColor) end, false)
     end
 
-    local colorToFactions = allFactions(false)
-    for _, faction in pairs(colorToFactions) do
-        if faction.hero == card.getName() then
-            -- Most heroes are manually handled, and even the automated ones could be manually handled.
-            -- Offer a simple Purge option on all faction hero cards.
-            card.addContextMenuItem("Purge", function(clickingColor) _purgeHeroCard(card, clickingColor) end, false)
+    if not _heroNameSet then
+        _heroNameSet = {}
+        for _, faction in pairs(allFactions(true)) do
+            if faction.hero then
+                _heroNameSet[faction.hero] = true
+            end
         end
+    end
+    -- Most heroes are manually handled, and even the automated ones could be manually handled.
+    -- Offer a simple Purge option on all faction hero cards.
+    if _heroNameSet[name] then
+        card.addContextMenuItem("Purge", function(clickingColor) _purgeHeroCard(card, clickingColor) end, false)
     end
 end
 

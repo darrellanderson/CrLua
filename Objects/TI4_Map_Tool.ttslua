@@ -1045,7 +1045,7 @@ function parseMapString(input)
 
     local centerSystem = string.match(input, '^{(%d+)}')
     if centerSystem then
-        table.insert(buildList, tonumber(centerSystem))
+        table.insert(buildList, { tile = tonumber(centerSystem) })
         local a,b = string.find(input, '}')
         input = string.sub(input, b + 1)
     else

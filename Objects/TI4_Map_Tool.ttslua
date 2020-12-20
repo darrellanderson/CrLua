@@ -1097,7 +1097,7 @@ function getPlacedSystemToObject(includeOutsideSystems)
     local guidToSystem = _systemHelper.systems()
     for _, object in ipairs(getAllObjects()) do
         local system = guidToSystem[object.getGUID()]
-        if system and (not includeOutsideSystems) and system.tile == 82 then
+        if system and (not includeOutsideSystems) and system.offMap then
             system = false
         end
         if system then

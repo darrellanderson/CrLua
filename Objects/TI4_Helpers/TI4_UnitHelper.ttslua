@@ -288,6 +288,10 @@ local _unitOverrides = {
     ['Ragnarov'] = { upgrade = 'Flagship', spaceCombat = { dice = 2, hit = 5 } },
 }
 
+function getUnitOverrides()
+    return _unitOverrides
+end
+
 local _flagshipModifiers = {
     ['Arvicon Rex'] = {
         description = '+2 flagship COMBAT against opponent with no token in your fleet pool',

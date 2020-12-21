@@ -51,6 +51,7 @@ end
 -- - rotate: override, degrees number.
 -- - localY: override tile height (ghosts home system).
 -- - hyperlane: boolean, true if a hyperlane.
+-- - offMap: boolean, if true not part of the system map (e.g. do not count for slice r/i).
 --
 -- Planet attributes:
 -- - name: string.
@@ -214,7 +215,7 @@ local _systems = {
     ['12a49a'] = { tile = 48 },
     ['8f40b4'] = { tile = 49 },
     ['d83cd4'] = { tile = 50 },
-    ['e3be37'] = { tile = 51, home = true, wormholes = { 'delta' }, planets = {
+    ['e3be37'] = { tile = 51, home = true, wormholes = { 'delta' }, offMap = true, planets = {
         { name = 'Creuss', resources = 4, influence = 2, position = { x = -0.05, z = -0.4 }, radius = 0.8 },
     }},
 
@@ -317,7 +318,7 @@ local _systems = {
     ['82bf35'] = { tile = 82,
         faceUpWormholes = { 'gamma', 'alpha', 'beta' },
         faceDownWormholes = { 'gamma' },
-        planets = {
+        offMap = true, planets = {
             {
                 name = 'Mallice', resources = 0, influence = 3,
                 legendary = true, legendaryCard = 'Exterrix Headquarters', trait = 'cultural',

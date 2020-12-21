@@ -202,6 +202,7 @@ local _customLayout = {
 		}
 	}
 }
+local _ObjectManual = "Features: \nImperial - Primary and Number: gain command tokens. \nAll other secondaries consume a (non fleet) strategy token (in strat. pool).\n EXCEPTION: If you have Scepter of Emelpar, the Mahact Agent or the Yssaril with Mahact in game available. \nPolitics - Speaker: Moves speaker token, Draws 2 Action and Agendas. - Sec.: draws 2 Actioncards\nTrade - Prim.: Allocates 3 resources, Refreshes commodities (removes all from comm. pool and gain correct #) - Color: Refreshes colors commodities - Sec.: Refreshes your commodities \nTech - Prim.: Nothing - Tech: Draws the card from tech deck - Faction Tech: Opens a choice popup - Comm Tokens: gain tokens as Necro \nImperial - Score: Only writes message - Secret: Draws secret. - Secondary: Draws secret."
 
 local _workQueue = {
 	["leadership"] = {},
@@ -213,6 +214,32 @@ local _workQueue = {
 	["technology"] = {},
 	["imperial"] = {}
 }
+
+local backManual = {
+	tag = "Panel",
+	attributes = {
+		position = '0 0 -20',
+		rotation = '0 0 90',
+		width = 200,
+		height = 280,
+		padding = '10 10 10 10',
+		spacing = 10
+	},
+	children = {
+		{
+			tag = "Text",
+			attributes = {
+				resizeTextForBestFit = "true",
+				--fontSize = 2,
+				alignment = "UpperLeft",
+				horizontalOverflow = "wrap"
+			},
+			value = _ObjectManual
+		}
+	}
+}
+
+local _updateUiText = "Please click the 'Update UI' button once all players have chosen a faction. Adds automation features (on first use) and updates the colors listed under politics and trade."
 
 local objectUI = {{
 	tag = "VerticalLayout",
@@ -246,7 +273,18 @@ local objectUI = {{
 		-- _workQueue is disabled by default
 		-- This feature is unavaliable to players (not ready yet! Maybe never.)
 		{
-			tag = "Panel"
+			tag = "Panel",
+			children = {
+				{
+					tag = "Text",
+					attributes = {
+						resizeTextForBestFit = "true",
+						alignment = "UpperLeft",
+						horizontalOverflow = "wrap"
+					},
+					value = _updateUiText
+				}
+			}
 		}
 		-- {
 		-- 	tag="ToggleButton",
@@ -278,7 +316,7 @@ function onLoad()
 
 	self.setColorTint("Green")
 
-	self.UI.setXmlTable(objectUI)
+	self.UI.setXmlTable(table.insert(objectUI, backManual))
 end
 
 function toggleWorkQueue(_, isOn)

@@ -257,6 +257,7 @@ function createInputs()
         width          = buttonWidthMinor,
         height         = buttonHeightMinor,
         font_size      = fontSizeMinor,
+        tooltip        = '3p'
     })
     self.createButton({
         click_function = 'count_slices4',
@@ -266,6 +267,7 @@ function createInputs()
         width          = buttonWidthMinor,
         height         = buttonHeightMinor,
         font_size      = fontSizeMinor,
+        tooltip        = '4p'
     })
     self.createButton({
         click_function = 'count_slices5',
@@ -275,6 +277,7 @@ function createInputs()
         width          = buttonWidthMinor,
         height         = buttonHeightMinor,
         font_size      = fontSizeMinor,
+        tooltip        = '5p'
     })
     self.createButton({
         click_function = 'count_slices6',
@@ -284,6 +287,7 @@ function createInputs()
         width          = buttonWidthMinor,
         height         = buttonHeightMinor,
         font_size      = fontSizeMinor,
+        tooltip        = '6p'
     })
     self.createButton({
         click_function = 'count_slices7',
@@ -293,6 +297,7 @@ function createInputs()
         width          = buttonWidthMinor,
         height         = buttonHeightMinor,
         font_size      = fontSizeMinor,
+        tooltip        = '7p'
     })
     self.createButton({
         click_function = 'count_slices8',
@@ -302,6 +307,7 @@ function createInputs()
         width          = buttonWidthMinor,
         height         = buttonHeightMinor,
         font_size      = fontSizeMinor,
+        tooltip        = '8p'
     })
     self.createButton({
         click_function = 'clear_slicelabels',
@@ -1097,7 +1103,7 @@ function getPlacedSystemToObject(includeOutsideSystems)
     local guidToSystem = _systemHelper.systems()
     for _, object in ipairs(getAllObjects()) do
         local system = guidToSystem[object.getGUID()]
-        if system and (not includeOutsideSystems) and system.tile == 82 then
+        if system and (not includeOutsideSystems) and system.offMap then
             system = false
         end
         if system then

@@ -625,7 +625,8 @@ end
 -------------------------------------------------------------------------------
 
 function onSetupHelperSetupFinished()
-    startLuaCoroutine(self, 'postSetupCoroutine')
+    -- Wait a moment for main setup to finish moving things.
+    Wait.time(function() startLuaCoroutine(self, 'postSetupCoroutine') end, 5)
 end
 
 function postSetupCoroutine()
@@ -750,7 +751,7 @@ function postSetupPoK()
         end
     end
 
-    -- Do any requested card removals.
+    -- Do any requested card removals.  (Start y=HIGHER to avoid potential collision with incoming cards.)
     local deckToExtraY = {}
     for _, guidAndDeck in pairs(removeCardsGuidAndDeck) do
         local guid = guidAndDeck.guid
@@ -761,7 +762,7 @@ function postSetupPoK()
         deckToExtraY[deck.getGUID()] = extraY + 0.2
         deck.takeObject({
             guid              = guid,
-            position          = { x = pos.x, y = pos.y + 5 + extraY, z = pos.z },
+            position          = { x = pos.x, y = pos.y + 10 + extraY, z = pos.z },
             callback_function = function(card) container.putObject(card) end,
             smooth            = false
         })

@@ -142,6 +142,10 @@ local SetupColor = {
     HOME_SYSTEM_TILE = 'Home System Location %($COLOR%)',
 }
 
+function getSetupColors()
+    return SetupColor.DEFAULT_COLOR_LIST
+end
+
 local SetupFaction = {
     NAME_TO_PLAYER_ZONE_OFFSET = {
         -- For squeezed overlaping command sheet reference (8 players), x = 1.8.

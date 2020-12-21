@@ -625,7 +625,8 @@ end
 -------------------------------------------------------------------------------
 
 function onSetupHelperSetupFinished()
-    startLuaCoroutine(self, 'postSetupCoroutine')
+    -- Wait a moment for main setup to finish moving things.
+    Wait.time(function() startLuaCoroutine(self, 'postSetupCoroutine') end, 5)
 end
 
 function postSetupCoroutine()

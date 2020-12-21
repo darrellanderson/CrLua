@@ -314,7 +314,7 @@ local _flagshipModifiers = {
                     end
                 end
             end
-            if not haveToken then
+            if faction and not haveToken then
                 local attr = unitAttrs['Flagship']
                 attr.spaceCombat.hit = attr.spaceCombat.hit - 2
             end
@@ -1249,6 +1249,8 @@ end
 
 function applyFlagshipModifiers(params)
     assert(type(params.unitAttrs) == 'table')
+    assert(type(params.myColor) == 'string', 'params.myColor')
+    assert(not params.opponentColor or type(params.opponentColor) == 'string', 'params.opponentColor')
     assert(not params.myUnitTypeToCount or type(params.myUnitTypeToCount) == 'table')
     assert(not params.opponentUnitTypeToCount or type(params.opponentUnitTypeToCount) == 'table')
 
@@ -1985,6 +1987,7 @@ function _dumpAttributes()
         -- Apply flagship effects.
         unitAttrs = applyFlagshipModifiers({
             unitAttrs = assert(unitAttrs),
+            myColor = color,
             myUnitTypeToCount = {},
             opponentUnitTypeToCount = false
         })

@@ -1254,9 +1254,9 @@ end
 function applyFlagshipModifiers(params)
     assert(type(params.unitAttrs) == 'table')
     assert(type(params.myColor) == 'string', 'params.myColor')
-    assert(not params.opponentColor or type(params.opponentColor) == 'string', 'params.opponentColor')
-    assert(not params.myUnitTypeToCount or type(params.myUnitTypeToCount) == 'table')
-    assert(not params.opponentUnitTypeToCount or type(params.opponentUnitTypeToCount) == 'table')
+    assert((not params.opponentColor) or type(params.opponentColor) == 'string', 'params.opponentColor')
+    assert((not params.myUnitTypeToCount) or type(params.myUnitTypeToCount) == 'table')
+    assert((not params.opponentUnitTypeToCount) or type(params.opponentUnitTypeToCount) == 'table')
 
     local unitAttrs = _copy(params.unitAttrs)
     local modifiers = {}
@@ -1292,9 +1292,9 @@ function applyUnitModifiers(params)
     assert(type(params.myColor) == 'string', 'params.myColor')
     assert(type(params.myUnitModifiers) == 'table', 'params.myUnitModifiers')
     assert(type(params.myUnitTypeToCount) == 'table', 'params.myUnitTypeToCount')
-    assert(not params.opponentColor or type(params.opponentColor) == 'string', 'params.opponentColor')
-    assert(not params.opponentUnitModifiers or type(params.opponentUnitModifiers) == 'table', 'params.opponentUnitModifiers')
-    assert(not params.opponentUnitTypeToCount or type(params.opponentUnitTypeToCount) == 'table', 'params.opponentUnitTypeToCount')
+    assert((not params.opponentColor) or type(params.opponentColor) == 'string', 'params.opponentColor')
+    assert((not params.opponentUnitModifiers) or type(params.opponentUnitModifiers) == 'table', 'params.opponentUnitModifiers')
+    assert((not params.opponentUnitTypeToCount) or type(params.opponentUnitTypeToCount) == 'table', 'params.opponentUnitTypeToCount')
 
     local unitAttrs = _copy(params.unitAttrs)
     local modifiers = {}

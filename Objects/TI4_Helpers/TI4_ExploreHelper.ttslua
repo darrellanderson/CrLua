@@ -696,7 +696,7 @@ function AttachLib.anchor(attachTokenObject)
                     end
                 end
                 if slot then
-                    if slot > 5 then
+                    if (math.floor((slot - 1) / 5) % 2) == 1 then
                         slot = slot + 0.5
                     end
                     local phi = math.rad((slot * 360 / 5) - 52)

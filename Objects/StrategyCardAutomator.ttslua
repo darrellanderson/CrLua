@@ -245,11 +245,12 @@ local objectUI = {{
 	tag = "VerticalLayout",
 	attributes = {
 		position = '0 0 2',
-		rotation = '0 180 90',
+		rotation = '0 180 0',
 		width = 200,
 		height = 280,
 		padding = '10 10 10 10',
-		spacing = 10
+		spacing = 10,
+		scale = '1.35 1.0 0.709'
 	},
 	children = {
 		{
@@ -301,7 +302,7 @@ local objectUI = {{
 local _useWorkQueue = false
 
 function onLoad()
-	local _colors = _setupHelper.getSetupColors()
+	local _colors = Player.getColors()
 
 	for card, _ in pairs(_workQueue) do
 		_workQueue[card]['primaryColor'] = nil
@@ -314,13 +315,93 @@ function onLoad()
 		end
 	end
 
-	self.setColorTint("Green")
+	--self.UI.setXmlTable(table.insert(objectUI, backManual))
+	self.UI.setXmlTable({backManual})
+	--self.tooltip = "TESTTOOLTIP"
+	self.setDescription("Please click 'Update UI' before game.\n\nAll secondary Actions consume a command token (if no alternative available)\nImperial: gain tokens\nPolitics: Move speaker, draw agenda and action cards\nTrade: Gain resources and commodities\nTech: Draw tech cards (and move to faction sheet)\nImperial: Draw secret")
 
-	self.UI.setXmlTable(table.insert(objectUI, backManual))
+	
+	local scaleX = 0.73
+	local scaleZ = 1.41
+	local rescale = {x=1/scaleX, y=1, z=1/scaleZ}
+	self.setScale({x=scaleX,y=1,z=scaleZ})
+	self.rotate({x=0,y=90,z=0})
+	
+	-- update UI button
+	self.createButton({
+		tooltip = "Adds automation buttons (on first click) and updates Trade and Politics colors.",
+		click_function = "updateUiOnClick",
+		function_owner = self,
+		position = {x=0, y=0.0, z=0},
+		rotation = {x=0, y=0, z=180},
+		scale = rescale,
+		width = 900,
+		height = 400,
+		font_size = 100,
+		label = "Update UI",
+		})
+	
+	-- front text
+	self.createButton({
+		width = 0,
+		height = 0,
+		font_size = 120,
+		label = "Strategy Card\n Automator",
+		rotation = {x=0, y=0, z=180},
+		position = {x=0, y=0.0, z=-0.63},
+		scale = rescale,
+		click_function = "doNothing",
+		function_owner = self
+		})
+	self.createButton({
+		width = 0,
+		height = 0,
+		font_size = 60,
+		label = "Please click 'Update UI' once all \n players have chosen a faction",
+		font_color = "Red",
+		rotation = {x=0, y=0, z=180},
+		position = {x=0, y=0.0, z=0.54},
+		scale = rescale,
+		click_function = "doNothing",
+		function_owner = self
+		})
+	self.createButton({
+		width = 0,
+		height = 0,
+		font_size = 40,
+		label = "Description of the automation on the back",
+		rotation = {x=0, y=0, z=180},
+		position = {x=0, y=0.0, z=0.8},
+		scale = rescale,
+		click_function = "doNothing",
+		function_owner = self
+		})
+	
+	-- back text
+	-- not possible, because label text is always centered.
+	--self.createButton({
+	--	width = 0,
+	--	height = 0,
+	--	font_size = 40,
+	--	label = _ObjectManual,
+	--	rotation = {x=0, y=0, z=0},
+	--	position = {x=0, y=0.2, z=0},
+	--	scale = rescale,
+	--	click_function = "doNothing",
+	--	function_owner = self,
+	--	alignment = 3
+	--	})
+	--log(self.getAttributes())
+
 end
+
 
 function toggleWorkQueue(_, isOn)
 	_useWorkQueue = isOn
+end
+
+function doNothing()
+	return false
 end
 
 --------------------------------------------------------------------------------
@@ -792,7 +873,10 @@ end
 
 ------------------------------ build custom UI ---------------------------------
 
-function updateUiOnClick()
+function updateUiOnClick(player, option, alt)
+	log(player)
+	log(option)
+	log(alt)
 	local colorTable = {}
 	local factionTable = {}
 
@@ -1027,11 +1111,6 @@ function _updateColorSelector(layout, element, colorTable)
 		for key,value in pairs(yourbutton["attributes"]) do
 			yourbutton["attributes"][key] = string.gsub(value, "COLORPLACEHOLDER", color)
 		end
-
-		--yourbutton["attributes"]["color"] = color
-		--yourbutton["attributes"]["text"] = color
-		--yourbutton["attributes"]["onClick"] = string.gsub(yourbutton["attributes"].onClick, "COLORPLACEHOLDER", color)
-		--yourbutton["attributes"]["tooltip"] = string.gsub(yourbutton["attributes"].tooltip, "COLORPLACEHOLDER", color)
 		return yourbutton
 	end
 
@@ -1083,21 +1162,6 @@ end
 function _dealLeadershipCommandTokens(color, count, dz)
 -- count is the number of command tokens to allocate,
 -- dz is a global offset, so that primary and secondary command tokens are not stacked (for the primary player)
-	local nameToCommandTokensBag = {}
-	local guidToPosition = {}
-	local guidToName = {}
-
-	local inHandGuidSet = _zoneHelper.inHand()
-	for _, object in ipairs(getAllObjects()) do
-		local name = object.getName()
-		local guid = object.getGUID()
-		if object.tag == 'Bag' then
-			local tokenName = string.match(name, '^(.*) Command Tokens Bag')
-			if tokenName then
-				nameToCommandTokensBag[tokenName] = object
-			end
-		end
-	end
 
 	local faction = _factionHelper.fromColor(color)
 	if not faction then
@@ -1105,7 +1169,17 @@ function _dealLeadershipCommandTokens(color, count, dz)
 		return
 	end
 
-	local commandTokensBag = nameToCommandTokensBag[faction.tokenName]
+	local commandTokensBag
+	for _, object in ipairs(getAllObjects()) do
+		local name = object.getName()
+		local guid = object.getGUID()
+		if object.tag == 'Bag' then
+			if name == faction.tokenName..' Command Tokens Bag' then
+				commandTokensBag = object
+			end
+		end
+	end
+
 	if not commandTokensBag then
 		broadcastToAll('Allocate command tokens: missing ' .. faction.tokenName .. ' Command Tokens Bag', 'Red')
 		return
@@ -1208,6 +1282,7 @@ function _consumeStrategyToken(color)
 		return
 	end
 
+	-- todo: change cast and use sheet.positionToLocal instead. check if z > 0 or < 0 or something.
 	local hitlist = Physics.cast({
 			origin = commandSheet.positionToWorld({ x = -2, y = -1, z=1.5 }),
 			direction = {0, 1, 0},
@@ -1399,9 +1474,25 @@ function _gain3Tradegoods(color)
 end
 
 
+-- cache function
+--[[ -- maybe add tag check
+	function _getByName(name) 
+		local guid = _getByNameCache[name] 
+		local object = guid and getObjectFromGUID(guid) 
+		if object then return object end 
+		for _, object in ipairs(getAllObjects()) do 
+			if object.getName() == name then 
+				_getByNameCache[name] = object.getGUID() 
+				return object 
+			end 
+		end 
+	end 
+--]]
+
+
 function _refreshCommodities(color)
 -- gets the number of commodities from the faction.commodities value
---
+-- cache commodities bag. and while we're at it, maybe cache command token bags. and while we're at it, maybe cache everything else aswell.
 	local commoditiesBag = false
 	for _, object in ipairs(getAllObjects()) do
 		local name = object.getName()
@@ -1657,7 +1748,7 @@ end
 
 function _getPlayerFromColor(color)
 	assert(type(color) == "string")
-	for _,player in ipairs(Player.getPlayers()) do
+	for _,player in ipairsuu(Player.getPlayers()) do
 		if player.color == color then
 			return player
 		end

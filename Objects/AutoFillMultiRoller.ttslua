@@ -600,7 +600,9 @@ function autoFillCoroutine()
         -- Apply flagships.
         unitAttrs = _unitHelper.applyFlagshipModifiers({
             unitAttrs = assert(unitAttrs),
+            myColor = color,
             myUnitTypeToCount = unitTypeToCount,
+            opponentColor = opponentColor,
             opponentUnitTypeToCount = opponentUnitTypeToCount
         })
 

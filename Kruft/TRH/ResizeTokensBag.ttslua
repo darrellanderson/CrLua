@@ -3,6 +3,8 @@
 
 local _rewriteOnDropSet = {}
 
+local SIZE = 512
+
 function resizeTileImage(object)
     assert(object.tag == 'Tile')
     print('resize tile image ' .. object.getName())
@@ -17,7 +19,7 @@ function resizeTileImage(object)
     for _, rewriteKey in ipairs(rewriteKeys) do
         local url = custom[rewriteKey]
         if url then
-            custom[rewriteKey] = 'http://localhost:8080/resize?w=256&h=256&img=' .. url
+            custom[rewriteKey] = 'http://localhost:8080/resize?w=' .. SIZE .. '&h=' .. SIZE .. '&img=' .. url
         end
     end
     object.setCustomObject(custom)

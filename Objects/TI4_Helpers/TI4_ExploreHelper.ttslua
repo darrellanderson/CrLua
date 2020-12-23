@@ -187,6 +187,17 @@ local function copyTable(t)
     return t
 end
 
+--- Return explore token names, to be able to put them back in the bag on graveyard.
+function getExploreTokenNames()
+    local result = {}
+    for _, tokenNames in pairs(exploreCardToTokenMap) do
+        for _, tokenName in ipairs(tokenNames) do
+            table.insert(result, tokenName)
+        end
+    end
+    return result
+end
+
 -------------------------------------------------------------------------------
 
 function onLoad(saveState)
@@ -685,7 +696,7 @@ function AttachLib.anchor(attachTokenObject)
                     end
                 end
                 if slot then
-                    if slot > 5 then
+                    if (math.floor((slot - 1) / 5) % 2) == 1 then
                         slot = slot + 0.5
                     end
                     local phi = math.rad((slot * 360 / 5) - 52)

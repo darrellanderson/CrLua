@@ -24,12 +24,15 @@ function getHelperClient(helperObjectName)
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
 local _deckHelper = getHelperClient('TI4_DECK_HELPER')
+local _exploreHelper = getHelperClient('TI4_EXPLORE_HELPER')
 
 -- Bag with faction tokens.
 local PICK_FACTION_BAG = 'Pick a Faction to Play'
+local EXPLORE_TOKEN_BAG = 'Exploration Bag'
 
 -------------------------------------------------------------------------------
 
+local _exploreTokenNameSet = false
 local _objectNameToBagGuid = {}
 
 local _guidToPending = {}  -- waiting for put into self to finish
@@ -66,6 +69,16 @@ local function getNonCardDestination(objectTag, objectName)
     }
     if string.match(objectName, ' Faction Token$') then
         acceptBag[PICK_FACTION_BAG] = true
+    end
+
+    if not _exploreTokenNameSet then
+        _exploreTokenNameSet = {}
+        for _, name in ipairs(_exploreHelper.getExploreTokenNames()) do
+            _exploreTokenNameSet[name] = true
+        end
+    end
+    if _exploreTokenNameSet[objectName] then
+        acceptBag[EXPLORE_TOKEN_BAG] = true
     end
 
     local bestDistance = false

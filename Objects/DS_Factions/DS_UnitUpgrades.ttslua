@@ -34,7 +34,15 @@ local UNIT_MODIFIERS = {
         type = 'adjust',  -- adjusts existing units
         applyFunctionName = 'applyMechPlusOneHitPerUnitUpgrade',
         applyFunctionGuid = self.getGUID(),
-    }
+    },
+    {
+        name = 'GHEMINA RAIDERS NAME HERE',
+        description = '+2 combat when in pairs',
+        owner = 'self',  -- applies to player zone it is inside
+        type = 'adjust',  -- adjusts existing units
+        applyFunctionName = 'applyCombatPlusTwoIfTwo',
+        applyFunctionGuid = self.getGUID(),
+    },
 }
 
 function applyMechPlusTwoDiceWhenAlone(unitAttrs)
@@ -93,6 +101,21 @@ function applyMechPlusOneHitPerUnitUpgrade(unitAttrs)
     end
     if attr.spaceCombat then
         attr.spaceCombat.hit = math.max((attr.spaceCombat.hit or 0) - count, 0)
+    end
+end
+
+function applyCombatPlusTwoIfTwo(unitAttrs)
+    local myUnitTypeToCount = unitAttrs._params.myUnitTypeToCount or {}
+    for unitType, attrs in pairs(unitAttrs) do
+        local count = myUnitTypeToCount[unitType]
+        if unitType ~= 'Fighter' and count == 2 then
+            if attrs.spaceCombat then
+                attrs.spaceCombat.hit = attrs.spaceCombat.hit - 2
+            end
+            if attrs.groundCombat then
+                attrs.groundCombat.hit = attrs.groundCombat.hit - 2
+            end
+        end
     end
 end
 

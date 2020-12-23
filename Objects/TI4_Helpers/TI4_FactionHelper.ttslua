@@ -2000,7 +2000,7 @@ end
 local _heroNameSet = false
 local function _applyContextMenuItems(card)
     assert(card.tag == 'Card')
-local name = card.getName()
+    local name = card.getName()
 
     local factionCardAbilityFunc = _factionCardNameToAbilityFunc and _factionCardNameToAbilityFunc[name] or false
 

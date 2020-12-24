@@ -1,5 +1,6 @@
 -- Place hidden zone over hands.
 -- @author Darrell
+-- #include <~/CrLua/Objects/TI4_HideHands>
 
 function getHelperClient(helperObjectName)
     local function getHelperObject()
@@ -42,7 +43,11 @@ function _hideHands()
                 type              = 'FogOfWarTrigger',
                 position          = transform.position,
                 rotation          = transform.rotation,
-                scale             = transform.scale,
+                scale             = {
+                    x = transform.scale.x + 15,
+                    y = transform.scale.y,
+                    z = transform.scale.z + 5,
+                },
                 callback_fucntion = nil,
                 sound             = false,
                 params            = {},

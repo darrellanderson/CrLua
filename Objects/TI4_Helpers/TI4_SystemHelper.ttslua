@@ -316,8 +316,8 @@ local _systems = {
     ['015a9f'] = { tile = 80, anomalies = { 'supernova' } },
     ['33c12d'] = { tile = 81, anomalies = { 'supernova' }, faction = 'muaat' },
     ['82bf35'] = { tile = 82,
-        faceUpWormholes = { 'gamma', 'alpha', 'beta' },
-        faceDownWormholes = { 'gamma' },
+        wormholes_faceUp = { 'gamma', 'alpha', 'beta' },
+        wormholes_faceDown = { 'gamma' },
         offMap = true, planets = {
             {
                 name = 'Mallice', resources = 0, influence = 3,
@@ -1302,11 +1302,20 @@ function _fillMissingSystemData(guid, system)
         end
     end
 
-    -- If a system has face-up/face-down wormholes, reset wormholes based on state.
-    if system.faceUpWormholes or system.faceDownWormholes then
-        local systemObject = getObjectFromGUID(guid)
-        if systemObject then
-            system.wormholes = systemObject.is_face_down and system.faceDownWormholes or system.faceUpWormholes
+    -- If a system has face-up/face-down attributes, reset based on state.
+    for k, v in pairs(system) do
+        local attrName, side = string.match(k, '^(.*)_face(.*)$')
+        local systemObject = attrName and getObjectFromGUID(guid)
+        if attrName and systemObject then
+            if systemObject.is_face_down then
+                if side == 'Down' then
+                    system[attrName] = v
+                end
+            else
+                if side == 'Up' then
+                    system[attrName] = v
+                end
+            end
         end
     end
 end

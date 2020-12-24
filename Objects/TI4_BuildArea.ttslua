@@ -653,7 +653,7 @@ function getProduceConsumeItems()
             for _, object in ipairs(getAllObjects()) do
                 maybeAdd(object)
             end
-            local guidToColor = _zoneHelper.zonesFromPositions()
+            local guidToColor = _zoneHelper.zonesFromPositions(guidToPosition)
             for guid, color in pairs(guidToColor) do
                 if color == playerColor then
                     local object = getObjectFromGUID(guid)

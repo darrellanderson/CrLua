@@ -1083,31 +1083,23 @@ function parseMapString(input)
 end
 
 function getTableY()
-    local function isZoneHelper2()
-        for _, object in ipairs(getAllObjects()) do
-            if object.getName() == 'TI4_ZONE_HELPER' then
-                return object.getVar('drawBordersVectorLines') and true
-            end
-        end
-    end
-    if isZoneHelper2() then
-        local zones = _zoneHelper.zonesAttributes()
-        return zones[1].center.y
-    end
-    return 1
+    return _zoneHelper.getTableY()
 end
 
 function getPlacedSystemToObject(includeOutsideSystems)
     assert(type(includeOutsideSystems) == 'boolean')
+    local inHandGuidSet = _zoneHelper.inHand()
     local systemToObject = {}
     local guidToSystem = _systemHelper.systems()
     for _, object in ipairs(getAllObjects()) do
-        local system = guidToSystem[object.getGUID()]
-        if system and (not includeOutsideSystems) and system.offMap then
-            system = false
-        end
-        if system then
-            systemToObject[system] = object
+        if not inHandGuidSet[object.getGUID()] then
+            local system = guidToSystem[object.getGUID()]
+            if system and (not includeOutsideSystems) and system.offMap then
+                system = false
+            end
+            if system then
+                systemToObject[system] = object
+            end
         end
     end
     return systemToObject

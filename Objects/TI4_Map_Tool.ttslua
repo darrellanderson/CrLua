@@ -702,7 +702,7 @@ function placeCardsCoroutine()
                     local rot = object.getRotation()
                     table.insert(entry, {
                         position = { x = pos.x + 1, y = pos.y + 1, z = pos.z },
-                        rotation = { x = rot.x, y = rot.y, z = 180 } -- rotating y still forms a deck b/c single cards
+                        rotation = { x = rot.x, y = rot.y, z = 0 } -- rotating y still forms a deck b/c single cards
                     })
                 end
             end

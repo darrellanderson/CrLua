@@ -1423,7 +1423,16 @@ local function _applyContextMenuItems(card)
     if _isScoreObjective(card) then
         card.addContextMenuItem('Score Objective', function(playerColor) _scoreObjective(playerColor, card) end, false)
     end
-    if deckName and string.match(deckName, ' Exploration$') then
+
+    local purgable = false
+    if deckName then
+        if string.match(deckName, ' Exploration$') then
+            purgable = true
+        elseif deckName == 'Relics' and card.getName() == 'The Codex' then
+            purgable = true
+        end
+    end
+    if purgable then
         card.addContextMenuItem('Purge Card', function(playerColor) _purgeCard(card) end)
     end
 end

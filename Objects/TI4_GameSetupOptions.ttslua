@@ -689,6 +689,13 @@ function postSetupPoK()
             coroutine.yield(0)
         end
         coroutine.yield(0)
+
+        -- Shuffle tile bags.
+        local bag = assert(_getByName('Blue Planet Tiles'))
+        bag.shuffle()
+        local bag = assert(_getByName('Red Anomaly Tiles'))
+        bag.shuffle()
+
     else
         local removeNameSet = {}
         for _, color in ipairs(Player.getColors()) do

@@ -1552,7 +1552,8 @@ function getColorToUnitModifiers()
             -- Yssaril agent, copies other agents.
             if name == 'Ssruu' then
                 for other, _ in pairs(allModifiersSet) do
-                    if other ~= 'Ssruu' and _unitModifiers[other].leader == LEADER.AGENT then
+                    local leader = _unitModifiers[other] and _unitModifiers[other].leader
+                    if other ~= 'Ssruu' and leader == LEADER.AGENT then
                         table.insert(entry, other)
                     end
                 end

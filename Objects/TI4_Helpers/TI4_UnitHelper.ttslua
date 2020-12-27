@@ -1432,7 +1432,7 @@ function getColorToUnitModifiers()
     for color, commanders in pairs(colorToCommanders) do
         for _, commander in ipairs(commanders) do
             local unitModifier = _unitModifiers[commander]
-            if not unitModifier or not unitModifier.toggleActive then
+            if (not unitModifier) or (not unitModifier.toggleActive) then
                 addModifier(color, commander)
             else
                 -- Toggle Active commanders require additional checks

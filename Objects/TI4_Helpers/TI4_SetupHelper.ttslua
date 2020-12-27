@@ -446,9 +446,10 @@ function SetupGeneric.unpack(setupBag, extraRings)
         local guid = assert(getEntryGuid(setupBag, namePattern), 'setup bag missing ' .. namePattern)
         local object = setupBag.takeObject({
             guid = guid,
-            position = { x = pos.x, y = pos.y - (5 * i), z = pos.z },
+            position = { x = pos.x, y = pos.y + (5 * i), z = pos.z },
             smooth = false,
         })
+        object.setLock(true)
         if object.tag == 'Infinite' then
             -- Wait for spawn; otherwise infinite bags might glitch wrt contents
             while object.spawning do
@@ -459,6 +460,7 @@ function SetupGeneric.unpack(setupBag, extraRings)
         nameToJson[namePattern] = object.getJSON()
         object.setLock(false)
         setupBag.putObject(object)
+        coroutine.yield(0)
     end
 
     local zonesAttributes = _zoneHelper.zonesAttributes()

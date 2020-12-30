@@ -54,15 +54,16 @@ local CUSTODIANS_TOKEN_GUID = '70642f'
 -- Check these first when looking for tiles.  Otherwise look in SYSTEM_BAG_GUIDS.
 local RED_BAG_GUID = '14a45f'
 local BLUE_BAG_GUID = '69311f'
+local HYPERLANE_BAG_GUID = 'b0899d'
 
 local SYSTEM_BAG_GUIDS = {
     RED_BAG_GUID,
     BLUE_BAG_GUID,
+    HYPERLANE_BAG_GUID,
     "a9f343",  -- Hybrid Franken hexes
     "223e51",  -- Alister systems
     "f69885",  -- Pick-a-planet
     "cb9a22",  -- TI3 systems
-    "b0899d",  -- hyperlanes
 }
 
 local _mapString = false
@@ -504,11 +505,15 @@ function clearTilesCoroutine()
     broadcastToAll('Returning tiles')
     local redBag = getObjectFromGUID(RED_BAG_GUID)
     local blueBag = getObjectFromGUID(BLUE_BAG_GUID)
+    local hyperlaneBag = getObjectFromGUID(HYPERLANE_BAG_GUID)
     if redBag == nil then
         broadcastToAll('Cannot find red planet tiles bag')
     end
     if blueBag == nil then
         broadcastToAll('Cannot find blue planet tiles bag')
+    end
+    if hyperlaneBag == nil then
+        broadcastToAll('Cannot find hyperlane tiles bag')
     end
     for system, object in pairs(getPlacedSystemToObject(false)) do
         local guid = object.getGUID()
@@ -518,9 +523,15 @@ function clearTilesCoroutine()
         elseif not system.home then
             local p = object.getPosition()
             local d = math.abs(p.x + p.z)
-            if (not system.tile == 18) or d > 1 then
-                local hasPlanets = system.planets and #system.planets > 0
-                local bag = hasPlanets and blueBag or redBag
+            if system.tile ~= 18 or d > 1 then
+                local bag = false
+                if system.planets and #system.planets > 0 then
+                    bag = blueBag
+                elseif system.hyperlane then
+                    bag = hyperlaneBag
+                else
+                    bag = redBag
+                end
                 object.setLock(false)
                 object.use_hands = true
                 bag.putObject(object)

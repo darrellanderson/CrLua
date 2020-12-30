@@ -318,14 +318,16 @@ function onLoad()
 	--self.UI.setXmlTable(table.insert(objectUI, backManual))
 	self.UI.setXmlTable({backManual})
 	--self.tooltip = "TESTTOOLTIP"
-	self.setDescription("Please click 'Update UI' before game.\n\nAll secondary Actions consume a command token (if no alternative available)\nImperial: gain tokens\nPolitics: Move speaker, draw agenda and action cards\nTrade: Gain resources and commodities\nTech: Draw tech cards (and move to faction sheet)\nImperial: Draw secret")
+	self.setDescription("Please click 'Update UI' before game.\n\nAll secondary Actions consume a command token (if no alternative available)\nImperial: gain tokens\nPolitics: Move speaker, draw agenda and action cards\nConstruction: Allocate units/command Token\nTrade: Gain resources and commodities\nTech: Draw tech cards (and move to faction sheet)\nImperial: Draw secret")
 
+	
+	
 	
 	local scaleX = 0.73
 	local scaleZ = 1.41
 	local rescale = {x=1/scaleX, y=1, z=1/scaleZ}
 	self.setScale({x=scaleX,y=1,z=scaleZ})
-	self.rotate({x=0,y=90,z=0})
+	self.rotate({x=0,y=0,z=0})
 	
 	-- update UI button
 	self.createButton({
@@ -470,7 +472,7 @@ function onStrategyCardButtonClicked(params)
 	-------------------------- Diplomacy ---------------------------------------
 	-------------------------- Construction ------------------------------------
 	-------------------------- warfare -----------------------------------------
-	if (card == "diplomacy") or (card == "construction") or (card == "warfare") then
+	if (card == "diplomacy") or (card == "warfare") then
 		-- only keep open if secondary was not successful
 		if (action == "secondary") and (not secondarySuccessful) then
 			return
@@ -485,9 +487,9 @@ function onStrategyCardButtonClicked(params)
 
 	if card == "leadership" then
 		if action == "primary" then
-			_dealLeadershipCommandTokens(color, 3, -1)
+			_dealLeadershipCommandTokens(color, 3, {x=0,y=0,z=-1})
 		elseif action == "secondary" then
-			_dealLeadershipCommandTokens(color, option, 0)
+			_dealLeadershipCommandTokens(color, option, {x=0,y=0,z=0})
 			_closeMenu(color, card)
 		end
 		return
@@ -538,6 +540,25 @@ function onStrategyCardButtonClicked(params)
 	end
 
 	--------------------------  Trade ------------------------------------------
+
+	if card == "construction" then
+		local constructionSuccessful = false
+
+		if action == "primary" then
+			if option == "a Space Dock and a PDS" then
+				constructionSuccessful = allocateConstructionUnits(color, {"PDS", "Space Dock"})
+			else
+				constructionSuccessful = allocateConstructionUnits(color, {"PDS", "PDS"})
+			end
+		end
+		if (action == "secondary") and secondarySuccessful then
+			constructionSuccessful = allocateConstructionUnits(color, {"Command Token", string.sub(option, 3, -1)})
+		end
+		if constructionSuccessful then
+			
+			_closeMenu(color,card)
+		end
+	end
 
 	if card == "trade" then
 		if action == "primary" then
@@ -874,9 +895,6 @@ end
 ------------------------------ build custom UI ---------------------------------
 
 function updateUiOnClick(player, option, alt)
-	log(player)
-	log(option)
-	log(alt)
 	local colorTable = {}
 	local factionTable = {}
 
@@ -1159,9 +1177,10 @@ end
 
 ----------------------------- Leadership ---------------------------------------
 
-function _dealLeadershipCommandTokens(color, count, dz)
+function _dealLeadershipCommandTokens(color, count, dpos)
 -- count is the number of command tokens to allocate,
 -- dz is a global offset, so that primary and secondary command tokens are not stacked (for the primary player)
+	assert(type(dpos)=="table")
 
 	local faction = _factionHelper.fromColor(color)
 	if not faction then
@@ -1169,16 +1188,7 @@ function _dealLeadershipCommandTokens(color, count, dz)
 		return
 	end
 
-	local commandTokensBag
-	for _, object in ipairs(getAllObjects()) do
-		local name = object.getName()
-		local guid = object.getGUID()
-		if object.tag == 'Bag' then
-			if name == faction.tokenName..' Command Tokens Bag' then
-				commandTokensBag = object
-			end
-		end
-	end
+	local commandTokensBag = _getByName(faction.tokenName.." Command Tokens Bag", "Bag")
 
 	if not commandTokensBag then
 		broadcastToAll('Allocate command tokens: missing ' .. faction.tokenName .. ' Command Tokens Bag', 'Red')
@@ -1202,9 +1212,9 @@ function _dealLeadershipCommandTokens(color, count, dz)
 		end
 		local token = commandTokensBag.takeObject({
 			position = commandSheet.positionToWorld({
-				x = pos.x + (i * dx),
-				y = pos.y + 1 + (i * 0.25),
-				z = pos.z + dz
+				x = pos.x + (i * dx) + dpos.x,
+				y = pos.y + 1 + (i * 0.25) + dpos.y,
+				z = pos.z + dpos.z
 			})
 		})
 		_strategyCardHelper._addUnallocatedCommandToken(token, color)
@@ -1223,54 +1233,56 @@ function _consumeStrategyToken(color)
 		return
 	end
 	log("consumeStrategyToken")
-	log(faction.name)
 
-	local nameToCommandTokensBag = {}
-
+	
 	local SsruuActive = false
 	local JaeMirKanActive = false
-
-
+	
+	
 	-- find command token bag
 	-- also check if alternate command token payment method available.
 	-- if so, message the player and return true
-	for _, object in ipairs(getAllObjects()) do
-		local name = object.getName()
-		local guid = object.getGUID()
-		if object.tag == 'Bag' then
-			local tokenName = string.match(name, '^(.*) Command Tokens Bag')
-			if tokenName then
-				nameToCommandTokensBag[tokenName] = object
+	local commandTokensBag
+
+	if not _setupHelper.getPoK() then
+		commandTokensBag = _getByName(faction.tokenName .. " Command Tokens Bag", "Bag")
+	else
+		for _, object in ipairs(getAllObjects()) do
+			local name = object.getName()
+			local guid = object.getGUID()
+			if object.tag == 'Bag' then
+				if name == faction.tokenName .. " Command Tokens Bag" then
+					commandTokensBag = object
+				end
+			end
+
+			if (name == "Jae Mir Kan") then
+				JaeMirKanActive = true
+				if (faction.name == "The Mahact Gene-Sorcerers") and (not object.is_face_down) then
+					BroadcastToColor("Jae Mir Kan is available to you. No Token has been used.", color)
+					return true
+				end
+			elseif (faction.name == "The Yssaril Tribes") and (name == "Ssruu") and (not object.is_face_down) then
+				SsruuActive = true
+			end
+
+			if (name == "Scepter of Emelpar") and (not object.is_face_down) then
+				local zoneColor = _zoneHelper.zoneFromPosition(object.getPosition())
+				if zoneColor == color then
+					_safeBroadcastToColor("Scepter of Emelpar is available to you. No Token has been used.", color, color)
+					return true
+				end
+
 			end
 		end
 
-		if (name == "Jae Mir Kan") then
-			JaeMirKanActive = true
-			if (faction.name == "The Mahact Gene-Sorcerers") and (not object.is_face_down) then
-				BroadcastToColor("Jae Mir Kan is available to you. No Token has been used.", color)
-				return true
-			end
-		elseif (faction.name == "The Yssaril Tribes") and (name == "Ssruu") and (not object.is_face_down) then
-			SsruuActive = true
-		end
-
-		if (name == "Scepter of Emelpar") and (not object.is_face_down) then
-			local zoneColor = _zoneHelper.zoneFromPosition(object.getPosition())
-			if zoneColor == color then
-				_safeBroadcastToColor("Scepter of Emelpar is available to you. No Token has been used.", color, color)
-				return true
-			end
-
+		if (SsruuActive and JaeMirKanActive) then
+			_safeBroadcastToColor("Ssruu is available to you. No Token has been used.", color, color)
+			return true
 		end
 	end
 
-	if (SsruuActive and JaeMirKanActive) then
-		_safeBroadcastToColor("Ssruu is available to you. No Token has been used.", color, color)
-		return true
-	end
-
-
-	local commandTokensBag = nameToCommandTokensBag[faction.tokenName]
+	
 	if not commandTokensBag then
 		broadcastToAll('Consume Strategy tokens: missing ' .. faction.tokenName .. ' Command Tokens Bag', 'Red')
 		return
@@ -1283,26 +1295,23 @@ function _consumeStrategyToken(color)
 	end
 
 	-- todo: change cast and use sheet.positionToLocal instead. check if z > 0 or < 0 or something.
-	local hitlist = Physics.cast({
-			origin = commandSheet.positionToWorld({ x = -2, y = -1, z=1.5 }),
-			direction = {0, 1, 0},
-			type = 3,
-			size = {5, 1, 5},
-			maxdistance = 0,
-			debug = false
-		})
-	for _, v in pairs(hitlist) do
-		local name = v.hit_object.getName()
-		if name == string.match(name, ".*Command Token") then
-			local rot = v.hit_object.getRotation()['z']
-			-- rot ~ 0 is strategy token. May be off by a little.
-			if (rot < 90) or (rot > 270) then
-				commandTokensBag.putObject(v.hit_object)
-				_safeBroadcastToColor("A token has been removed from your strategy pool.", color, color)
-				return true
+		
+	local commandTokenName = faction.tokenName .. " Command Token"
+	for _,object in ipairs(getAllObjects()) do
+		local name = object.getName()
+		if name == commandTokenName then
+			local rot = object.getRotation()['z']
+			if rot < 90 or rot > 270 then
+				local pos = commandSheet.positionToLocal(object.getPosition())
+				if pos.x < 2 and pos.x > -4 and pos.z > -0.3 and pos.z < 3.5 then
+					commandTokensBag.putObject(object)
+					_safeBroadcastToColor("A token has been removed from your strategy pool.", color, color)
+					return true
+				end
 			end
 		end
 	end
+
 	return false
 end
 
@@ -1316,15 +1325,7 @@ function _moveSpeakerToken(color)
 	end
 
 	local speakerToken = nil
-	for _, object in ipairs(getAllObjects()) do
-		local name = object.getName()
-		local guid = object.getGUID()
-		if name == "Speaker Token" then
-			speakerToken = object
-			break
-		end
-	end
-
+	speakerToken = _getByName("Speaker Token")
 
 	local commandSheet = getObjectFromGUID(faction.commandSheetGuid)
 	if not commandSheet then
@@ -1359,8 +1360,9 @@ function _getSpeakerLoc(zone)
 	end
 	local z = polygons[i_minz][2]
 
+
 	-- get the x value closest to the system map, with the matching z value.
-	local minx = polygons[i_minz][1]
+	local minx = math.abs(polygons[i_minz][1])
 	local i_minx = 1
 	for k,poly in ipairs(polygons) do
 		if (z == poly[2]) and (math.abs(poly[1]) <= minx) then
@@ -1428,21 +1430,67 @@ function _dealPoliticsAgendas(color)
 	_safeBroadcastToColor("You have drawn 2 agendas.", color, color)
 end
 
+-------------------------------- Construction ----------------------------------
+
+function allocateConstructionUnits(color, tokenTable)
+	assert(type(color) == "string")
+	assert(type(tokenTable) == "table")
+	
+	local faction = _factionHelper.fromColor(color)
+	if not faction then
+		broadcastToAll('Allocate command tokens: no faction for ' .. color, 'Red')
+		return
+	end
+
+	local commandSheet = getObjectFromGUID(faction.commandSheetGuid)
+	if not commandSheet then
+		broadcastToAll('Allocate command tokens: missing ' .. color .. ' Command Sheet', 'Red')
+		return
+	end
+
+	local pos = { x = -6.3, y = 2, z = -9.7 }
+	local dx = 1
+	
+	for i,unitName in ipairs(tokenTable) do
+		if unitName == "Command Token" then
+			_dealLeadershipCommandTokens(color, 1, {x=-4.8,y=2,z=-4.7})
+		else
+			local tokensBag = _getByName(color.." " .. unitName, "Bag")
+
+			if not tokensBag then
+				broadcastToAll('Allocate command tokens: missing ' .. faction.tokenName .. ' Command Tokens Bag', 'Red')
+				return
+			end
+			-- Do the alloation.  Watch out for an empty bag!
+			if tokensBag.getQuantity() == 0 then
+				_safeBroadcastToColor('You have no more tokens to construct a ' .. unitName .. '. ', color, color)
+				return false
+			end
+			local token = tokensBag.takeObject({
+				position = commandSheet.positionToWorld({
+					x = pos.x + (i * dx),
+					y = 2,
+					z = pos.z
+				})
+			})
+			token.highlightOn("Yellow" , 3)
+			--_strategyCardHelper._addUnallocatedCommandToken(token, color)
+		end
+	end
+	
+	_safeBroadcastToColor('Your units have been allocated.', color, color)
+
+end
+
+
+
+
 ------------------------------------ Trade -------------------------------------
 
 function _gain3Tradegoods(color)
 -- deals one 3xTradegoods token to color. Position on commandsheet is hardcoded.
 	local commoditiesBag = false
-	for _, object in ipairs(getAllObjects()) do
-		local name = object.getName()
-		local guid = object.getGUID()
-		if object.tag == 'Infinite' then
-			if name == "x3 Commodities/Tradegoods Bag" then
-				commoditiesBag = object
-				break
-			end
-		end
-	end
+	commoditiesBag = _getByName("x3 Commodities/Tradegoods Bag", "Infinite")
 
 	if not commoditiesBag then
 		broadcastToAll('Dealing Tradegoods: missing x1 Commodities/Tradegoods Bag', 'Red')
@@ -1474,37 +1522,13 @@ function _gain3Tradegoods(color)
 end
 
 
--- cache function
---[[ -- maybe add tag check
-	function _getByName(name) 
-		local guid = _getByNameCache[name] 
-		local object = guid and getObjectFromGUID(guid) 
-		if object then return object end 
-		for _, object in ipairs(getAllObjects()) do 
-			if object.getName() == name then 
-				_getByNameCache[name] = object.getGUID() 
-				return object 
-			end 
-		end 
-	end 
---]]
-
 
 function _refreshCommodities(color)
 -- gets the number of commodities from the faction.commodities value
 -- cache commodities bag. and while we're at it, maybe cache command token bags. and while we're at it, maybe cache everything else aswell.
-	local commoditiesBag = false
-	for _, object in ipairs(getAllObjects()) do
-		local name = object.getName()
-		local guid = object.getGUID()
-		if object.tag == 'Infinite' then
-			if name == "x1 Commodities/Tradegoods Bag" then
-				commoditiesBag = object
-				break
-			end
-		end
-	end
-
+	
+	local commoditiesBag = _getByName("x1 Commodities/Tradegoods Bag", "Infinite")
+	
 	if not commoditiesBag then
 		broadcastToAll('Refresh commodities: missing x1 Commodities/Tradegoods Bag TEST', 'Red')
 		return
@@ -1695,7 +1719,7 @@ function researchTech(color, cardName)
 	end
 end
 
--------------------------------------------------------------------------------
+---------------------------- Utility -------------------------------------
 
 function _isObjectOwner(color, objectName)
 	assert(type(color) == "string")
@@ -1734,7 +1758,6 @@ function _dealImperialSecret(color)
 	broadcastToColor("You have gained a new secret objective.", color)
 end
 
--------------------------------------------------------------------------------
 
 function _safeBroadcastToColor(message, playerColor, messageColor)
 	for _, player in ipairs(Player.getPlayers()) do
@@ -1748,7 +1771,7 @@ end
 
 function _getPlayerFromColor(color)
 	assert(type(color) == "string")
-	for _,player in ipairsuu(Player.getPlayers()) do
+	for _,player in ipair(Player.getPlayers()) do
 		if player.color == color then
 			return player
 		end
@@ -1775,3 +1798,30 @@ function _deepcopy(o, seen)
   end
   return no
 end
+
+-- cache function
+local _getByNameCache = {}
+function _getByName(name, tag)
+	local guid = _getByNameCache[name]
+	local object = guid and getObjectFromGUID(guid)
+	if object then
+		return object 
+	end
+	if not tag then
+		for _, object in ipairs(getAllObjects()) do
+			if object.getName() == name then
+				_getByNameCache[name] = object.getGUID()
+				return object
+			end 
+		end
+	else
+		for _, object in ipairs(getAllObjects()) do
+			if object.tag == tag then
+				if object.getName() == name then
+					_getByNameCache[name] = object.getGUID()
+					return object
+				end
+			end
+		end
+	end
+end 

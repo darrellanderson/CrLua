@@ -205,7 +205,7 @@ local _systems = {
     }},
     ['33520d'] = { tile = 39, wormholes = { 'alpha' } },
     ['b0a6a6'] = { tile = 40, wormholes = { 'beta' } },
-    ['bf138e'] = { tile = 41, anomalies = { 'gravity rift' } },
+    ['3ea35d'] = { tile = 41, anomalies = { 'gravity rift' } },
     ['4d6424'] = { tile = 42, anomalies = { 'nebula' } },
     ['0b360f'] = { tile = 43, anomalies = { 'supernova' } },
     ['006abc'] = { tile = 44, anomalies = { 'asteroid field' } },
@@ -270,7 +270,7 @@ local _systems = {
         { name = "Hope's End", resources = 3, influence = 0, trait = 'hazardous', radius = 1.5,
         legendary = true, legendaryCard = 'Imperial Arms Vault' },
     }},
-    ['48ef22'] = { tile = 67, anomalies = { 'gravity rift' }, planets = {
+    ['834e88'] = { tile = 67, anomalies = { 'gravity rift' }, planets = {
         { name = 'Cormund', resources = 2, influence = 0, trait = 'hazardous', position = { x = 0.45, z = -0.25 } },
     }},
     ['8bc917'] = { tile = 68, anomalies = { 'nebula' }, planets = {
@@ -316,8 +316,8 @@ local _systems = {
     ['015a9f'] = { tile = 80, anomalies = { 'supernova' } },
     ['33c12d'] = { tile = 81, anomalies = { 'supernova' }, faction = 'muaat' },
     ['82bf35'] = { tile = 82,
-        faceUpWormholes = { 'gamma', 'alpha', 'beta' },
-        faceDownWormholes = { 'gamma' },
+        wormholes_faceUp = { 'gamma', 'alpha', 'beta' },
+        wormholes_faceDown = { 'gamma' },
         offMap = true, planets = {
             {
                 name = 'Mallice', resources = 0, influence = 3,
@@ -1302,11 +1302,20 @@ function _fillMissingSystemData(guid, system)
         end
     end
 
-    -- If a system has face-up/face-down wormholes, reset wormholes based on state.
-    if system.faceUpWormholes or system.faceDownWormholes then
-        local systemObject = getObjectFromGUID(guid)
-        if systemObject then
-            system.wormholes = systemObject.is_face_down and system.faceDownWormholes or system.faceUpWormholes
+    -- If a system has face-up/face-down attributes, reset based on state.
+    for k, v in pairs(system) do
+        local attrName, side = string.match(k, '^(.*)_face(.*)$')
+        local systemObject = attrName and getObjectFromGUID(guid)
+        if attrName and systemObject then
+            if systemObject.is_face_down then
+                if side == 'Down' then
+                    system[attrName] = v
+                end
+            else
+                if side == 'Up' then
+                    system[attrName] = v
+                end
+            end
         end
     end
 end

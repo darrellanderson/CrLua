@@ -446,11 +446,21 @@ function SetupGeneric.unpack(setupBag, extraRings)
         local guid = assert(getEntryGuid(setupBag, namePattern), 'setup bag missing ' .. namePattern)
         local object = setupBag.takeObject({
             guid = guid,
-            position = { x = pos.x, y = pos.y - (5 * i), z = pos.z }
+            position = { x = pos.x, y = pos.y + (5 * i), z = pos.z },
+            smooth = false,
         })
+        object.setLock(true)
+        if object.tag == 'Infinite' then
+            -- Wait for spawn; otherwise infinite bags might glitch wrt contents
+            while object.spawning do
+                coroutine.yield(0)
+            end
+            coroutine.yield(0)
+        end
         nameToJson[namePattern] = object.getJSON()
         object.setLock(false)
         setupBag.putObject(object)
+        coroutine.yield(0)
     end
 
     local zonesAttributes = _zoneHelper.zonesAttributes()
@@ -2076,7 +2086,7 @@ local UNIT_SCALE = {
     ['Infantry'] = { unit = 0.7, bag = 0.8 },
     ['Fighter'] = { unit = 0.7, bag = 0.8 },
     ['Space Dock'] = { unit = 0.7, bag = 0.8 },
-    ['PDS'] = { unit = 0.7, bag = 0.8 },
+    ['PDS'] = { unit = 1, bag = 1.1 },
     ['Carrier'] = { unit = 0.6, bag = 0.7 },
     ['Destroyer'] = { unit = 0.6, bag = 0.70 },
     ['Cruiser'] = { unit = 0.6, bag = 0.70 },

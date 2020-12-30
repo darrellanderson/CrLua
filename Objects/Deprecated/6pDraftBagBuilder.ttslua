@@ -1,0 +1,192 @@
+function onLoad()
+    createInputs()
+end
+
+function createInputs()
+    self.createButton({
+        click_function = "dobags",
+        function_owner = self,
+        label          = "Build\nBags",
+        position       = {x=0, y=0.2, z=0},
+        width          = 1200,
+        height         = 800,
+        font_size      = 200,
+    })
+end
+
+function dobags()
+    initializeVariables()
+    createBagsForUse()
+    distributeFactionTokens()
+	distributeBlueTiles()
+	distributeRedTiles()
+    destroyObject(tempBag)
+    destroyObject(trashBag)
+end
+
+function initializeVariables()
+    basebag = getObjectFromGUID("014564")
+    factionBag =  getObjectFromGUID("f16a7a")
+    blueTileBag = getObjectFromGUID("69311f")
+    redTileBag = getObjectFromGUID("14a45f")
+    tileParameters = {}
+    includeNova = false
+    includeAsteroids = false
+end
+
+function createBagsForUse()
+    yellowBag = basebag.clone({['position'] = {-4,3,6} })
+    yellowBag.setColorTint(stringColorToRGB("Yellow"))
+    redBag = basebag.clone({['position'] = {0,3,6} })
+    redBag.setColorTint(stringColorToRGB("Red"))
+    greenBag = basebag.clone({['position'] = {4,3,6} })
+    greenBag.setColorTint(stringColorToRGB("Green"))
+    purpleBag = basebag.clone({['position'] = {-4,3,-6} })
+    purpleBag.setColorTint(stringColorToRGB("Purple"))
+    blueBag = basebag.clone({['position'] = {0,3,-6} })
+    blueBag.setColorTint(stringColorToRGB("Blue"))
+    whiteBag = basebag.clone({['position'] = {4,3,-6} })
+    whiteBag.setColorTint(stringColorToRGB("White"))
+    tempBag = basebag.clone({['position'] = {8,3,0} })
+    tempBag.setColorTint(stringColorToRGB("Brown"))
+    trashBag = basebag.clone({['position'] = {-8,3,0} })
+    trashBag.setColorTint(stringColorToRGB("Brown"))
+end
+
+function distributeFactionTokens()
+    factionBag.shuffle()
+    for i=1, 12, 1 do
+      factionToken = factionBag.takeObject()
+      -- set flag to include supernova if embers is drawn
+      if factionToken.guid == "c195ca" then
+        includeNova = true
+      end
+      -- set flag to include asteroids if saar is drawn
+      if factionToken.guid == "e72156" then
+        includeAsteroids = true
+      end
+      tempBag.putObject(factionToken)
+    end
+
+    -- distribute faction tokens at random
+    tempBag.shuffle()
+    yellowBag.putObject(tempBag.takeObject())
+    yellowBag.putObject(tempBag.takeObject())
+    redBag.putObject(tempBag.takeObject())
+    redBag.putObject(tempBag.takeObject())
+    greenBag.putObject(tempBag.takeObject())
+    greenBag.putObject(tempBag.takeObject())
+    purpleBag.putObject(tempBag.takeObject())
+    purpleBag.putObject(tempBag.takeObject())
+    blueBag.putObject(tempBag.takeObject())
+    blueBag.putObject(tempBag.takeObject())
+    whiteBag.putObject(tempBag.takeObject())
+    whiteBag.putObject(tempBag.takeObject())
+end
+
+function distributeBlueTiles()
+    gatherAndDistributeSixBestSystems()
+    gatherAndDistributeOtherBlueSystems()
+end
+
+function gatherAndDistributeSixBestSystems()
+    -- get 4 best tiles from tile bag
+    tileParameters.guid = "b958aa" -- abyzfria
+    tempBag.putObject(blueTileBag.takeObject(tileParameters))
+    tileParameters.guid = "e0ff33" -- arinammeer
+    tempBag.putObject(blueTileBag.takeObject(tileParameters))
+    tileParameters.guid = "dd2ca7" -- bereglirtavi
+    tempBag.putObject(blueTileBag.takeObject(tileParameters))
+    tileParameters.guid = "fc239f" -- newalbionstarpoint
+    tempBag.putObject(blueTileBag.takeObject(tileParameters))
+
+    -- get the last 2 tiles from a random pick of the 4 middling systems
+    -- centaurigral, mellonzohbat, tequrantorkan, lazarsakulag
+	local randomSystems = { "eb99c0", "aaae9f", "f8caf6", "d5ed63" }
+    for i=1, 2 do
+		randomIndex = math.random(1, 5-i)
+		localguid = table.remove(randomSystems, randomIndex)
+        tileParameters.guid = localguid
+        tempBag.putObject(blueTileBag.takeObject(tileParameters))
+    end
+
+    tempBag.shuffle()
+    yellowBag.putObject(tempBag.takeObject())
+    redBag.putObject(tempBag.takeObject())
+    greenBag.putObject(tempBag.takeObject())
+    purpleBag.putObject(tempBag.takeObject())
+    blueBag.putObject(tempBag.takeObject())
+    whiteBag.putObject(tempBag.takeObject())
+end
+
+function gatherAndDistributeOtherBlueSystems()
+    -- dump the shitty planets
+    tileParameters.guid = "bc4bcc" -- vefut2
+    trashBag.putObject(blueTileBag.takeObject(tileParameters))
+    tileParameters.guid = "7975f7" -- saudor
+    trashBag.putObject(blueTileBag.takeObject(tileParameters))
+
+    -- draw the other 10 systems at random
+    blueTileBag.shuffle()
+    for i=1, 12, 1 do
+        tempBag.putObject(blueTileBag.takeObject())
+    end
+
+    -- distribute gathered blue tiles at random
+    tempBag.shuffle()
+    yellowBag.putObject(tempBag.takeObject())
+    yellowBag.putObject(tempBag.takeObject())
+    redBag.putObject(tempBag.takeObject())
+    redBag.putObject(tempBag.takeObject())
+    greenBag.putObject(tempBag.takeObject())
+    greenBag.putObject(tempBag.takeObject())
+    purpleBag.putObject(tempBag.takeObject())
+    purpleBag.putObject(tempBag.takeObject())
+    blueBag.putObject(tempBag.takeObject())
+    blueBag.putObject(tempBag.takeObject())
+    whiteBag.putObject(tempBag.takeObject())
+    whiteBag.putObject(tempBag.takeObject())
+end
+
+function distributeRedTiles()
+    numberOfRandomTilesToDistribute = 10
+
+    -- first guarantee nova or asteroids if appropriate
+    if includeNova == true then
+        tileParameters.guid = "dca098" -- supernova
+        tempBag.putObject(redTileBag.takeObject(tileParameters))
+        numberOfRandomTilesToDistribute = numberOfRandomTilesToDistribute - 1
+    end
+    if includeAsteroids == true then
+        tileParameters.guid = "cd58c7" -- asteroids
+        tempBag.putObject(redTileBag.takeObject(tileParameters))
+        numberOfRandomTilesToDistribute = numberOfRandomTilesToDistribute - 1
+    end
+
+    -- guarantee both wormhole systems will be in the draw
+    tileParameters.guid = "0378a4" -- alpha
+    tempBag.putObject(redTileBag.takeObject(tileParameters))
+    tileParameters.guid = "ccd7ac" -- beta
+    tempBag.putObject(redTileBag.takeObject(tileParameters))
+
+    -- draw the other red tiles at random
+    redTileBag.shuffle()
+    for i=1, numberOfRandomTilesToDistribute, 1 do
+        tempBag.putObject(redTileBag.takeObject())
+    end
+
+    -- distribute gathered red tiles at random
+    tempBag.shuffle()
+    yellowBag.putObject(tempBag.takeObject())
+    yellowBag.putObject(tempBag.takeObject())
+    redBag.putObject(tempBag.takeObject())
+    redBag.putObject(tempBag.takeObject())
+    greenBag.putObject(tempBag.takeObject())
+    greenBag.putObject(tempBag.takeObject())
+    purpleBag.putObject(tempBag.takeObject())
+    purpleBag.putObject(tempBag.takeObject())
+    blueBag.putObject(tempBag.takeObject())
+    blueBag.putObject(tempBag.takeObject())
+    whiteBag.putObject(tempBag.takeObject())
+    whiteBag.putObject(tempBag.takeObject())
+end

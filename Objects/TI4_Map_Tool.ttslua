@@ -54,15 +54,16 @@ local CUSTODIANS_TOKEN_GUID = '70642f'
 -- Check these first when looking for tiles.  Otherwise look in SYSTEM_BAG_GUIDS.
 local RED_BAG_GUID = '14a45f'
 local BLUE_BAG_GUID = '69311f'
+local HYPERLANE_BAG_GUID = 'b0899d'
 
 local SYSTEM_BAG_GUIDS = {
     RED_BAG_GUID,
     BLUE_BAG_GUID,
+    HYPERLANE_BAG_GUID,
     "a9f343",  -- Hybrid Franken hexes
     "223e51",  -- Alister systems
     "f69885",  -- Pick-a-planet
     "cb9a22",  -- TI3 systems
-    "b0899d",  -- hyperlanes
 }
 
 local _mapString = false
@@ -504,11 +505,15 @@ function clearTilesCoroutine()
     broadcastToAll('Returning tiles')
     local redBag = getObjectFromGUID(RED_BAG_GUID)
     local blueBag = getObjectFromGUID(BLUE_BAG_GUID)
+    local hyperlaneBag = getObjectFromGUID(HYPERLANE_BAG_GUID)
     if redBag == nil then
         broadcastToAll('Cannot find red planet tiles bag')
     end
     if blueBag == nil then
         broadcastToAll('Cannot find blue planet tiles bag')
+    end
+    if hyperlaneBag == nil then
+        broadcastToAll('Cannot find hyperlane tiles bag')
     end
     for system, object in pairs(getPlacedSystemToObject(false)) do
         local guid = object.getGUID()
@@ -518,9 +523,15 @@ function clearTilesCoroutine()
         elseif not system.home then
             local p = object.getPosition()
             local d = math.abs(p.x + p.z)
-            if (not system.tile == 18) or d > 1 then
-                local hasPlanets = system.planets and #system.planets > 0
-                local bag = hasPlanets and blueBag or redBag
+            if system.tile ~= 18 or d > 1 then
+                local bag = false
+                if system.planets and #system.planets > 0 then
+                    bag = blueBag
+                elseif system.hyperlane then
+                    bag = hyperlaneBag
+                else
+                    bag = redBag
+                end
                 object.setLock(false)
                 object.use_hands = true
                 bag.putObject(object)
@@ -702,7 +713,7 @@ function placeCardsCoroutine()
                     local rot = object.getRotation()
                     table.insert(entry, {
                         position = { x = pos.x + 1, y = pos.y + 1, z = pos.z },
-                        rotation = { x = rot.x, y = rot.y, z = 180 } -- rotating y still forms a deck b/c single cards
+                        rotation = { x = rot.x, y = rot.y, z = 0 } -- rotating y still forms a deck b/c single cards
                     })
                 end
             end
@@ -1083,31 +1094,23 @@ function parseMapString(input)
 end
 
 function getTableY()
-    local function isZoneHelper2()
-        for _, object in ipairs(getAllObjects()) do
-            if object.getName() == 'TI4_ZONE_HELPER' then
-                return object.getVar('drawBordersVectorLines') and true
-            end
-        end
-    end
-    if isZoneHelper2() then
-        local zones = _zoneHelper.zonesAttributes()
-        return zones[1].center.y
-    end
-    return 1
+    return _zoneHelper.getTableY()
 end
 
 function getPlacedSystemToObject(includeOutsideSystems)
     assert(type(includeOutsideSystems) == 'boolean')
+    local inHandGuidSet = _zoneHelper.inHand()
     local systemToObject = {}
     local guidToSystem = _systemHelper.systems()
     for _, object in ipairs(getAllObjects()) do
-        local system = guidToSystem[object.getGUID()]
-        if system and (not includeOutsideSystems) and system.offMap then
-            system = false
-        end
-        if system then
-            systemToObject[system] = object
+        if not inHandGuidSet[object.getGUID()] then
+            local system = guidToSystem[object.getGUID()]
+            if system and (not includeOutsideSystems) and system.offMap then
+                system = false
+            end
+            if system then
+                systemToObject[system] = object
+            end
         end
     end
     return systemToObject

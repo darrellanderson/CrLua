@@ -237,22 +237,27 @@ function makeHands(playerColorList)
                     adjusttier[3] = true
                 end
                 if adjusttier[1] == true then
-                    adjusttier[1] = false
                     randomtier1[i], randomtier1[adjCount[1]] = randomtier1[adjCount[1]], randomtier1[i]
+                    adjusttier[1] = false
+                    adjCount[1] = adjCount[1] + 1
                 end
                 if adjusttier[2] == true then
                     randomtier2[i], randomtier2[adjCount[2]] = randomtier2[adjCount[2]], randomtier2[i]
                     adjusttier[2] = false
+                    adjCount[2] = adjCount[2] + 1
                     if adjCount[2] > #tier2 then
                         adjusttier[1] = true
+                        adjusttier[2] = false
                         adjCount[2] = #playerColorList
                     end
                 end
                 if adjusttier[3] == true then
                     randomtier3[i], randomtier3[adjCount[3]] = randomtier3[adjCount[3]], randomtier3[i]
+                    adjusttier[3] = false
                     adjCount[3] = adjCount[3] + 1
                     if adjCount[3] > #tier3 then
                         adjusttier[2] = true
+                        adjusttier[3] = false
                         adjCount[3] = #playerColorList
                     end
                 end

@@ -29,6 +29,7 @@ local _hyperlanes = {
 
 function onLoad(saveState)
     self.addContextMenuItem('Add 5p hyperlanes', add5pHyperlanes)
+    self.addContextMenuItem('Add 2p heads up', add2pHeadsUp)
     self.addContextMenuItem('Clear hyperlanes', clearHyperlanes)
 end
 
@@ -57,6 +58,57 @@ function add5pHyperlanes()
         ['c131ce'] = {
             position = {-5.25, 1.20, 15.16},
             rotation = {0.00, 180.03, 0.00}
+        },
+    }
+
+    -- Do not assume tiles exist, only place if inside self.
+    for _, entry in ipairs(self.getObjects()) do
+        local transform = guidToTransform[entry.guid]
+        if transform then
+            self.takeObject({
+                guid              = entry.guid,
+                position          = transform.position,
+                rotation          = transform.rotation,
+                callback_function = function(object) object.setLock(true) end,
+                smooth            = true,
+            })
+        end
+    end
+end
+
+function add2pHeadsUp()
+    local guidToTransform = {
+        ['c131ce'] = {
+            position = {10.50, 1.20, 12.12},
+            rotation = {0.00, 240.00, 0.00}
+        },
+        ['b74682'] = {
+            position = {15.75, 1.20, 9.09},
+            rotation = {0.00, 120.00, 0.00}
+        },
+        ['a64a36'] = {
+            position = {15.75, 1.14, -9.09},
+            rotation = {0.00, 112, 0.00}
+        },
+        ['bed0e0'] = {
+            position = {10.50, 1.14, -12.12},
+            rotation = {0.00, 300.00, 0.00}
+        },
+        ['81a64a'] = {
+            position = {-10.50, 1.14, -12.12},
+            rotation ={0.00, 240.00, 0.00}
+        },
+        ['b34afa'] = {
+            position = {-15.75, 1.14, -9.09},
+            rotation = {0.00, 240, 0.00}
+        },
+        ['a35ea3'] = {
+            position = {-15.75, 1.20, 9.09},
+            rotation = {0.00, 0.00, 0.00}
+        },
+        ['613593'] = {
+            position = {-10.50, 1.20, 12.12},
+            rotation = {0.00, 180.00, 0.00}
         },
     }
 

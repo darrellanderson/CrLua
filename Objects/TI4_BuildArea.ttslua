@@ -63,6 +63,11 @@ local OBJECT_EFFECTS = {
         requireFaceUp = true,
         warmachine = true,
     },
+
+    -- Leaders
+    ['Berekar Berekon'] = {
+        berekar = true,
+    },
 }
 
 local FACTION_EFFECTS = {
@@ -563,6 +568,7 @@ function getProduceConsumeItems()
         warmachine = false,
         aiDevelopmentAlgorithm = false,
         amalgamation = false,
+        berekar = false,
     }
 
     local unitsInBuildingArea = _getUnitsInsideBuildArea()
@@ -616,6 +622,7 @@ function getProduceConsumeItems()
             result.hegemonic = result.hegemonic or objectEffects.hegemonic
             result.warmachine = result.warmachine or objectEffects.warmachine
             result.aiDevelopmentAlgorithm = result.aiDevelopmentAlgorithm or objectEffects.aiDevelopmentAlgorithm
+            result.berekar = result.berekar or objectEffects.berekar
         end
     end
 
@@ -653,7 +660,7 @@ function getProduceConsumeItems()
             for _, object in ipairs(getAllObjects()) do
                 maybeAdd(object)
             end
-            local guidToColor = _zoneHelper.zonesFromPositions()
+            local guidToColor = _zoneHelper.zonesFromPositions(guidToPosition)
             for guid, color in pairs(guidToColor) do
                 if color == playerColor then
                     local object = getObjectFromGUID(guid)
@@ -706,6 +713,10 @@ function getProduceConsumeResourcesAndCost(produceConsumeItems)
 
     if produceConsumeItems.aiDevelopmentAlgorithm then
         result.cost = math.max(result.cost - produceConsumeItems.aiDevelopmentAlgorithm, 0)
+    end
+
+    if produceConsumeItems.berekar then
+        result.cost = math.max(result.cost - 2, 0)
     end
 
     -- If Hegemonic Trade Policy (swap resouce/influence values), replace
@@ -1087,6 +1098,7 @@ function announce(items, resourcesAndCost)
         ' and total cost ' .. resourcesAndCost.cost,
         items.sarween and '-ST' or '',
         items.warmachine and '-WM' or '',
+        items.berekar and ' (BB)' or '',
         ',',
         ' consuming ' .. resourcesAndCost.resources,
         ' resources',

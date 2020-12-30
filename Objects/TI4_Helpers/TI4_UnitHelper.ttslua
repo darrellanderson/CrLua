@@ -33,6 +33,7 @@ function getHelperClient(helperObjectName)
     end
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
+local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
@@ -1527,8 +1528,11 @@ function getColorToUnitModifiers()
             end
 
             if _unitModifiers[name].owner == OWNER.ANY then
-                for _, color in ipairs(_zoneHelper.zones()) do
-                    addModifier(color, name)
+                -- Make sure card is not in the discard pile.
+                if object.tag ~= 'Card' or not _deckHelper.isDiscard(object.getGUID()) then
+                    for _, color in ipairs(_zoneHelper.zones()) do
+                        addModifier(color, name)
+                    end
                 end
             else
                 local guid = object.getGUID()

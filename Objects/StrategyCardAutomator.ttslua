@@ -315,13 +315,10 @@ function onLoad()
 		end
 	end
 
-	--self.UI.setXmlTable(table.insert(objectUI, backManual))
+	--Description on Back of the Object.
 	self.UI.setXmlTable({backManual})
 	--self.tooltip = "TESTTOOLTIP"
 	self.setDescription("Please click 'Update UI' before game.\n\nAll secondary Actions consume a command token (if no alternative available)\nImperial: gain tokens\nPolitics: Move speaker, draw agenda and action cards\nConstruction: Allocate units/command Token\nTrade: Gain resources and commodities\nTech: Draw tech cards (and move to faction sheet)\nImperial: Draw secret")
-
-	
-	
 	
 	local scaleX = 0.73
 	local scaleZ = 1.41
@@ -393,8 +390,6 @@ function onLoad()
 	--	function_owner = self,
 	--	alignment = 3
 	--	})
-	--log(self.getAttributes())
-
 end
 
 
@@ -426,8 +421,6 @@ function onStrategyCardButtonClicked(params)
 	local secondarySuccessful
 
 	log("Card:"..card.." Action:"..action .. " Option:"..option.. " Color:".. color)
-	--log(_workQueue[card])
-
 
 	--take care of ALL pass and close
 	if (action == "close") or (action == "pass") then
@@ -451,7 +444,6 @@ function onStrategyCardButtonClicked(params)
 
 	if (action == "primary") then
 		_workQueue[card]["primaryColor"] = color
-		--log(_workQueue[card])
 	end
 
 	-- all secondary actions consume a strategy token (except leadership).
@@ -661,9 +653,6 @@ function _dealWorkQueueCards(card)
 		return
 	end
 
-	log("doing workQueue for ".. card)
-	log(_workQueue[card])
-
 	--duplicate the colorTable
 	local doubleTable = {}
 	doubleTable = getSeatedPlayers()
@@ -685,13 +674,11 @@ function _dealWorkQueueCards(card)
 	for index,color in ipairs(doubleTable) do
 
 		if color == _workQueue[card]['primaryColor'] then
-			log("primaryColor is ".. color)
 			started = true
 		end
 		if started then
 			if _workQueue[card]['done'][color] then
 				if _workQueue[card]['job'][color] then
-					log(color .. " was reached")
 					_doWork(card, color)
 					_workQueue[card]['job'][color] = false
 				end
@@ -939,8 +926,6 @@ function updateUiOnClick(player, option, alt)
 	layout = _updateColorSelector(layout, "trade", colorTable)
 	log("_updateColorSelector trade done")
 
-	--log(layout)
-
 	UI.setXmlTable(layout)
 end
 
@@ -948,6 +933,7 @@ function _addTechnologyPrimarySecondary(layout)
 -- adds a "Technology Primary" and "Technology Secondary" button to the tech menu.
 -- The "Technology Primary" only announces "player uses Technology Primary" but does nothing
 -- The "Technology Secondary" consumes a strategy token if necessary
+
 	local technologyIndex = nil
 
 	for majorIndex,menu in ipairs(layout) do
@@ -962,14 +948,34 @@ function _addTechnologyPrimarySecondary(layout)
 	end
 
 	for _,o in pairs(layout[technologyIndex]["children"]) do
-		 if o["attributes"]["id"] == "technology_secondary" then
-			 return layout
-		 end
+		if o["attributes"]["id"] == "technology_secondary" then
+			return layout
+		end
 	end
-		-- add the Assign Speaker Button which opens the Popup
+
+	if not _setupHelper.getPoK() then
+			
+		local techlist = {["greenTechs"] = true, ["yellowTechs"] = true, ["redTechs"] = true, ["blueTechs"] = true}
+		local horizontalKeep = {}
+		for _,o in pairs(layout[technologyIndex]["children"]) do
+			local counter = 1
+			if o["tag"] == "HorizontalLayout" and techlist[o["attributes"]["id"]] then
+				for iv,v in ipairs(o["children"]) do
+					if not (iv == 2) and not (iv == 4) then
+						horizontalKeep[counter] = v
+						counter = counter + 1
+					end
+				end
+				o["children"] = _deepcopy(horizontalKeep)
+			end
+		end
+	
+	end
+
 	table.insert(layout[technologyIndex]["children"], #layout - 1, _customLayout["technology_secondary"])
 	table.insert(layout[technologyIndex]["children"], 2, _customLayout["technology_primary"])
 
+	
 	return layout
 end
 
@@ -1064,8 +1070,6 @@ end
 
 function _addImperialPrimary(layout)
 -- adds the option to either score a point for mecatol rex (does nothing) or draw a secret
-log("_addImperialPrimary started")
-
 	local imperialIndex
 	for majorIndex,menu in ipairs(layout) do
 		if menu["attributes"]["id"] == "imperial" then
@@ -1115,7 +1119,6 @@ function _updateColorSelector(layout, element, colorTable)
 					table.insert(keepTable, #keepTable+1, child)
 				end
 			end
---            log("successfully removed old entries")
 			break
 		end
 	end
@@ -1143,27 +1146,21 @@ function _updateColorSelector(layout, element, colorTable)
 	if #colorTable == 4 then
 		maxButtonsPerRow = 2
 	end
--- log("setting new buttons")
+
 	local colCounter = 1
 
 	for icolor,color in ipairs(colorTable) do
 		local mybutton = _getColorButton(element, color)
---        log('adding Button')
---        log(mybutton)
 
 		tempSelector["children"][colCounter] = _deepcopy(mybutton, {})
 		colCounter = colCounter + 1
 		--if in last row or row full
 		if (icolor == #colorTable) or (icolor%3 == maxButtonsPerRow) then
---            log('here is the full row')
---            log(tempSelector)
 			table.insert(newColorSelector, #newColorSelector+1, _deepcopy(tempSelector))
 			colCounter = 1
 			tempSelector =  _customLayout["colorSelector"]
 		end
 	end
---    log("new ColorSeletor")
---    log(newColorSelector[1]["children"])
 
 	-- position 3 is hardcoded!!! if this were to change somehow we have a problem!
 	for _,newColumn in pairs(newColorSelector) do
@@ -1232,8 +1229,7 @@ function _consumeStrategyToken(color)
 		broadcastToAll('Consume Strategy tokens: no faction for ' .. color, 'Red')
 		return
 	end
-	log("consumeStrategyToken")
-
+	
 	
 	local SsruuActive = false
 	local JaeMirKanActive = false
@@ -1391,7 +1387,6 @@ function _assignSpeaker(color, option)
 end
 
 function _dealPoliticsActionCards(color)
-	-- log("dealing politics to " .. color)
 	local counter = 2
 
 	local faction = _factionHelper.fromColor(color)
@@ -1563,7 +1558,6 @@ function _refreshCommodities(color)
 	for _, v in pairs(hitlist) do
 		local name = v.hit_object.getName()
 		if name == string.match(name, ".*Commodities/Tradegoods$") then
-			--log(v.hit_object.getRotation()['z'])
 			commoditiesBag.putObject(v.hit_object)
 		end
 	end

@@ -898,6 +898,7 @@ function updateUiOnClick(player, option, alt)
 	local layout = UI.getXmlTable()
 
 	-- adds a tech primary and secondary to automatically consume the stategy token
+	-- removes PoK Buttons from tech UI if not playing with PoK
 	layout = _addTechnologyPrimarySecondary(layout)
 	log("_addTechnologyPrimary Done")
 
@@ -933,6 +934,7 @@ function _addTechnologyPrimarySecondary(layout)
 -- adds a "Technology Primary" and "Technology Secondary" button to the tech menu.
 -- The "Technology Primary" only announces "player uses Technology Primary" but does nothing
 -- The "Technology Secondary" consumes a strategy token if necessary
+-- If PoK not selected, remove PoK tech buttons from UI
 
 	local technologyIndex = nil
 
@@ -954,7 +956,8 @@ function _addTechnologyPrimarySecondary(layout)
 	end
 
 	if not _setupHelper.getPoK() then
-			
+		-- remove pok tech from ui
+
 		local techlist = {["greenTechs"] = true, ["yellowTechs"] = true, ["redTechs"] = true, ["blueTechs"] = true}
 		local horizontalKeep = {}
 		for _,o in pairs(layout[technologyIndex]["children"]) do
@@ -1428,18 +1431,21 @@ end
 -------------------------------- Construction ----------------------------------
 
 function allocateConstructionUnits(color, tokenTable)
+-- takes selected units from bags and places them right of token containers
+-- if a secondary action is taken, a command token is placed next to the allocated unit
+
 	assert(type(color) == "string")
 	assert(type(tokenTable) == "table")
 	
 	local faction = _factionHelper.fromColor(color)
 	if not faction then
-		broadcastToAll('Allocate command tokens: no faction for ' .. color, 'Red')
+		broadcastToAll('Allocate Construction tokens: no faction for ' .. color, 'Red')
 		return
 	end
 
 	local commandSheet = getObjectFromGUID(faction.commandSheetGuid)
 	if not commandSheet then
-		broadcastToAll('Allocate command tokens: missing ' .. color .. ' Command Sheet', 'Red')
+		broadcastToAll('Allocate Construction tokens: missing ' .. color .. ' Command Sheet', 'Red')
 		return
 	end
 
@@ -1453,7 +1459,7 @@ function allocateConstructionUnits(color, tokenTable)
 			local tokensBag = _getByName(color.." " .. unitName, "Bag")
 
 			if not tokensBag then
-				broadcastToAll('Allocate command tokens: missing ' .. faction.tokenName .. ' Command Tokens Bag', 'Red')
+				broadcastToAll('Allocate Construction tokens: missing ' .. faction.tokenName .. ' Command Tokens Bag', 'Red')
 				return
 			end
 			-- Do the alloation.  Watch out for an empty bag!
@@ -1469,7 +1475,6 @@ function allocateConstructionUnits(color, tokenTable)
 				})
 			})
 			token.highlightOn("Yellow" , 3)
-			--_strategyCardHelper._addUnallocatedCommandToken(token, color)
 		end
 	end
 	
@@ -1713,6 +1718,20 @@ function researchTech(color, cardName)
 	end
 end
 
+----------------------------- Imperial ----------------------------------
+
+function _dealImperialSecret(color)
+	-- quiet not implemented yet.
+	_deckHelper.deal({
+		deck = 'Secret Objectives',
+		count = 1,
+		color = color,
+		quiet = true
+	})
+
+	broadcastToColor("You have gained a new secret objective.", color)
+end
+
 ---------------------------- Utility -------------------------------------
 
 function _isObjectOwner(color, objectName)
@@ -1741,18 +1760,6 @@ function _isObjectOwner(color, objectName)
 	end
 end
 
-function _dealImperialSecret(color)
-	_deckHelper.deal({
-		deck = 'Secret Objectives',
-		count = 1,
-		color = color,
-		quiet = true
-	})
-
-	broadcastToColor("You have gained a new secret objective.", color)
-end
-
-
 function _safeBroadcastToColor(message, playerColor, messageColor)
 	for _, player in ipairs(Player.getPlayers()) do
 		if player.color == playerColor then
@@ -1773,6 +1780,7 @@ function _getPlayerFromColor(color)
 	error(color.. " is not a current playercolor.")
 end
 
+-- full deep copy of table o
 function _deepcopy(o, seen)
   seen = seen or {}
   if o == nil then return nil end
@@ -1793,7 +1801,7 @@ function _deepcopy(o, seen)
   return no
 end
 
--- cache function
+-- cache function for bags and stuff
 local _getByNameCache = {}
 function _getByName(name, tag)
 	local guid = _getByNameCache[name]

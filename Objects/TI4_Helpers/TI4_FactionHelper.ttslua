@@ -1500,7 +1500,7 @@ local _diceToBeRolled = {}
 function _carrionHeroAbilityCoroutine()
     local owningObject = assert(table.remove(_carrionHeroAbilityOwningObjectQueue))
     if #_diceToBeRolled > 0 then
-        print('Remove previously devoured ships before re-using Dimensional Anchor.')
+        printToAll('Remove previously devoured ships before re-using Dimensional Anchor.')
         return 1
     end
 
@@ -1529,7 +1529,7 @@ function _carrionHeroAbilityCoroutine()
     coroutine.yield(0)
 
     if not anyDimensionalTears then
-        print('Dimensional Anchor: No Dimensional Tear tokens found on the table. Won\'t use Hero Ability.')
+        printToAll('Dimensional Anchor: No Dimensional Tear tokens found on the table. Won\'t use Hero Ability.')
         return 1
     end
 
@@ -1604,7 +1604,7 @@ function _carrionHeroAbilityCoroutine()
     end
 
     if anchoredShipsCount == 0 then
-        print('Dimensional Anchor: No non-fighter ships adjacent to Dimensional Tear systems. Won\'t use Hero Ability.')
+        printToAll('Dimensional Anchor: No non-fighter ships adjacent to Dimensional Tear systems. Won\'t use Hero Ability.')
         return 1
     end
 
@@ -1713,10 +1713,10 @@ function _carrionHeroAbilityCoroutine()
         end
 
         -- Print guide showing the dice color for each ship.
-        print('DICE COLOR GUIDE')
+        printToAll('DICE COLOR GUIDE')
         for unitType, color in pairs(unitTypeToDiceColor) do
             if unitTypesUsed[unitType] then
-                print('* ' .. unitType .. ': ' .. color)
+                printToAll('* ' .. unitType .. ': ' .. color)
             end
         end
 
@@ -1878,7 +1878,7 @@ function _carrionHeroAbilityCoroutine()
             table.insert(resultsForType, assert(shipToResult[ship]))
         end
 
-        print('Results for ' .. system.string .. ':')
+        printToAll('Results for ' .. system.string .. ':')
         for unitType, results in pairs(unitTypeToResultRolls) do
             local resultString = ''
             local first = true
@@ -1895,7 +1895,7 @@ function _carrionHeroAbilityCoroutine()
                 first = false
             end
 
-            print('* ' .. unitType .. ': ' .. resultString)
+            printToAll('* ' .. unitType .. ': ' .. resultString)
         end
     end
 

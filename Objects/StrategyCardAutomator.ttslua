@@ -1258,7 +1258,7 @@ function _consumeStrategyToken(color)
 			if (name == "Jae Mir Kan") then
 				JaeMirKanActive = true
 				if (faction.name == "The Mahact Gene-Sorcerers") and (not object.is_face_down) then
-					BroadcastToColor("Jae Mir Kan is available to you. No Token has been used.", color)
+					_safeBroadcastToColor("Jae Mir Kan is available to you. No Token has been used.", color,color)
 					return true
 				end
 			elseif (faction.name == "The Yssaril Tribes") and (name == "Ssruu") and (not object.is_face_down) then
@@ -1394,7 +1394,7 @@ function _dealPoliticsActionCards(color)
 
 	local faction = _factionHelper.fromColor(color)
 	if not faction then
-		broadcastToAll('Allocate command tokens: no faction for ' .. color, 'Red')
+		broadcastToAll('Deal Action Cards: no faction for ' .. color, 'Red')
 		return
 	end
 
@@ -1412,7 +1412,6 @@ function _dealPoliticsActionCards(color)
 		deck = 'Actions',
 		count = counter,
 		color = color,
-		quiet = true
 	})
 end
 
@@ -1422,10 +1421,7 @@ function _dealPoliticsAgendas(color)
 		deck = 'Agenda',
 		count = 2,
 		color = color,
-		quiet = true
 	})
-
-	_safeBroadcastToColor("You have drawn 2 agendas.", color, color)
 end
 
 -------------------------------- Construction ----------------------------------
@@ -1449,12 +1445,19 @@ function allocateConstructionUnits(color, tokenTable)
 		return
 	end
 
+	
 	local pos = { x = -6.3, y = 2, z = -9.7 }
+	if commandSheet.getPosition().x < 0 then
+		pos.x = 15.5
+	end
 	local dx = 1
+	local posCommandToken = _deepcopy(pos)
+	posCommandToken.x = pos.x + 1.5
+	posCommandToken.z = pos.z + 5
 	
 	for i,unitName in ipairs(tokenTable) do
 		if unitName == "Command Token" then
-			_dealLeadershipCommandTokens(color, 1, {x=-4.8,y=2,z=-4.7})
+			_dealLeadershipCommandTokens(color, 1, posCommandToken)
 		else
 			local tokensBag = _getByName(color.." " .. unitName, "Bag")
 
@@ -1478,8 +1481,8 @@ function allocateConstructionUnits(color, tokenTable)
 		end
 	end
 	
-	_safeBroadcastToColor('Your units have been allocated.', color, color)
-
+	_safeBroadcastToColor('Your constructed units have been allocated.', color, color)
+	return true
 end
 
 
@@ -1512,9 +1515,11 @@ function _gain3Tradegoods(color)
 	local rot = commandSheet.getRotation()
 	local token = commoditiesBag.takeObject({
 		position = commandSheet.positionToWorld({
-			x = 0.57,
+			--x = 0.57,
+			x = 1.2,
 			y = 2,
-			z = 2.13
+			z = 1.7
+			--z = 2.13
 		}),
 		rotation= {x=rot.x, y=rot.y, z=180}
 	})
@@ -1607,7 +1612,7 @@ function researchTech(color, cardName)
 			abilitiesSet[ability] = true
 		end
 		if abilitiesSet['Technological Singularity'] then
-			_dealLeadershipCommandTokens(color, 3, 0)
+			_dealLeadershipCommandTokens(color, 3, {x=0,y=0,z=0})
 			return
 		else
 			_safeBroadcastToColor("Can only gain command tokens as Nekro", color, color)
@@ -1725,11 +1730,10 @@ function _dealImperialSecret(color)
 	_deckHelper.deal({
 		deck = 'Secret Objectives',
 		count = 1,
-		color = color,
-		quiet = true
+		color = color
 	})
 
-	broadcastToColor("You have gained a new secret objective.", color)
+	--	broadcastToColor("You have gained a new secret objective.", color)
 end
 
 ---------------------------- Utility -------------------------------------
@@ -1772,7 +1776,7 @@ end
 
 function _getPlayerFromColor(color)
 	assert(type(color) == "string")
-	for _,player in ipair(Player.getPlayers()) do
+	for _,player in ipairs(Player.getPlayers()) do
 		if player.color == color then
 			return player
 		end

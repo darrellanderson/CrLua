@@ -206,22 +206,16 @@ function _highlightUnitUpgradesCoroutine()
         end
         hsl.a = 0.8
         local lineColor = ColorUtil.hslToRgb(hsl)
-        local thickness = 0.4
+        local thickness = 1
         if directionaliser then
             local bounds = self.getBoundsNormalized()
-            local topY = directionaliser.getPosition().y + 0.43
-            local midY = directionaliser.getPosition().y + 0.26
-            local topZ = 0.66
-            local midZ = 1.15 - (thickness / 2) - 0.1
+            local midY = directionaliser.getPosition().y + 0.22
+            local midZ = 1.2
             local lines = {}
             for _, unitPosition in ipairs(unitPositions or {}) do
                 local p0 = unitPosition
                 local points = {
-                    { x = p0.x, y = midY, z = p0.z + midZ - 0.03 },
-                    { x = p0.x, y = midY, z = p0.z + topZ - 0.03 + 0.01 },
-                    { x = p0.x, y = topY, z = p0.z + topZ - 0.03 },
-                    { x = p0.x, y = topY, z = p0.z - topZ },
-                    { x = p0.x, y = midY, z = p0.z - topZ - 0.01 },
+                    { x = p0.x, y = midY, z = p0.z + midZ },
                     { x = p0.x, y = midY, z = p0.z - midZ },
                 }
                 for i, point in ipairs(points) do
@@ -230,9 +224,9 @@ function _highlightUnitUpgradesCoroutine()
                 table.insert(lines, {
                     points = points,
                     thickness = thickness,
-                    color = lineColor,
+                    color = {r=0,g=0,b=0}, --lineColor, -- try simple black
                     loop = false,
-                    square = false,
+                    square = true,
                 })
             end
             directionaliser.setVectorLines(lines)

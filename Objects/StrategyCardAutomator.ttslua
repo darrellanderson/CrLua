@@ -62,6 +62,7 @@ local _customLayout = {
 			color = "green",
 			textcolor = "black",
 			text = 'Technology Secondary',
+			tooltip = "Consumes a strategy token from your strategy pool.",
 			onClick = "genericFollow(Technology Secondary)"
 		}
 	},
@@ -186,6 +187,7 @@ local _customLayout = {
 					color = "green",
 					textcolor = "black",
 					text = "Score Mecatol Rex",
+					tooltip = "Only usable if you control Mecatol Rex. VP track is NOT updated automatically.",
 					onClick = "genericSilent(Mecatol Rex)"
 				}
 			},
@@ -202,7 +204,18 @@ local _customLayout = {
 		}
 	}
 }
-local _ObjectManual = "Features: \nImperial - Primary and Number: gain command tokens. \nAll other secondaries consume a (non fleet) strategy token (in strat. pool).\n EXCEPTION: If you have Scepter of Emelpar, the Mahact Agent or the Yssaril with Mahact in game available. \nPolitics - Speaker: Moves speaker token, Draws 2 Action and Agendas. - Sec.: draws 2 Actioncards\nTrade - Prim.: Allocates 3 resources, Refreshes commodities (removes all from comm. pool and gain correct #) - Color: Refreshes colors commodities - Sec.: Refreshes your commodities \nTech - Prim.: Nothing - Tech: Draws the card from tech deck - Faction Tech: Opens a choice popup - Comm Tokens: gain tokens as Necro \nImperial - Score: Only writes message - Secret: Draws secret. - Secondary: Draws secret."
+local _ObjectManual = [[
+	Features: \n
+	Imperial - Primary and Number: gain command tokens.\n
+	All other secondaries consume a (non fleet) strategy token (in strat. pool).\n 
+	EXCEPTION: If you have Scepter of Emelpar, the Mahact Agent or the Yssaril with Mahact in game available.\n
+	Politics - Speaker: Moves speaker token, Draws 2 Action and Agendas. - Sec.: draws 2 Actioncards\n
+	Trade - Prim.: Allocates 3 resources, Refreshes commodities (removes all from comm. pool and gain correct #) 
+		- Color: Refreshes colors commodities - Sec.: Refreshes your commodities \n
+	Tech - Prim.: Nothing - Tech: Draws the card from tech deck 
+		- Faction Tech: Opens a choice popup - Comm Tokens: gain tokens as Necro \n
+	Imperial - Score: Only writes message - Secret: Draws secret. - Secondary: Draws secret.
+]]
 
 local _workQueue = {
 	["leadership"] = {},
@@ -230,7 +243,6 @@ local backManual = {
 			tag = "Text",
 			attributes = {
 				resizeTextForBestFit = "true",
-				--fontSize = 2,
 				alignment = "UpperLeft",
 				horizontalOverflow = "wrap"
 			},
@@ -317,8 +329,17 @@ function onLoad()
 
 	--Description on Back of the Object.
 	self.UI.setXmlTable({backManual})
-	--self.tooltip = "TESTTOOLTIP"
-	self.setDescription("Please click 'Update UI' before game.\n\nAll secondary Actions consume a command token (if no alternative available)\nImperial: gain tokens\nPolitics: Move speaker, draw agenda and action cards\nConstruction: Allocate units/command Token\nTrade: Gain resources and commodities\nTech: Draw tech cards (and move to faction sheet)\nImperial: Draw secret")
+	local descriptionText = [[
+	Please click 'Update UI' before game.\n\n
+	All secondary Actions consume a command token (if no alternative available)\n
+	Imperial: gain tokens\n
+	Politics: Move speaker, draw agenda and action cards\n
+	Construction: Allocate units/command Token\n
+	Trade: Gain resources and commodities\n
+	Tech: Draw tech cards (and move to faction sheet)\n
+	Imperial: Draw secret
+	]]
+	self.setDescription(descriptionText)
 	
 	local scaleX = 0.73
 	local scaleZ = 1.41
@@ -375,21 +396,6 @@ function onLoad()
 		click_function = "doNothing",
 		function_owner = self
 		})
-	
-	-- back text
-	-- not possible, because label text is always centered.
-	--self.createButton({
-	--	width = 0,
-	--	height = 0,
-	--	font_size = 40,
-	--	label = _ObjectManual,
-	--	rotation = {x=0, y=0, z=0},
-	--	position = {x=0, y=0.2, z=0},
-	--	scale = rescale,
-	--	click_function = "doNothing",
-	--	function_owner = self,
-	--	alignment = 3
-	--	})
 end
 
 
@@ -538,13 +544,13 @@ function onStrategyCardButtonClicked(params)
 
 		if action == "primary" then
 			if option == "a Space Dock and a PDS" then
-				constructionSuccessful = allocateConstructionUnits(color, {"PDS", "Space Dock"})
+				constructionSuccessful = _allocateConstructionUnits(color, {"PDS", "Space Dock"})
 			else
-				constructionSuccessful = allocateConstructionUnits(color, {"PDS", "PDS"})
+				constructionSuccessful = _allocateConstructionUnits(color, {"PDS", "PDS"})
 			end
 		end
 		if (action == "secondary") and secondarySuccessful then
-			constructionSuccessful = allocateConstructionUnits(color, {"Command Token", string.sub(option, 3, -1)})
+			constructionSuccessful = _allocateConstructionUnits(color, {"Command Token", string.sub(option, 3, -1)})
 		end
 		if constructionSuccessful then
 			
@@ -894,7 +900,7 @@ function updateUiOnClick(player, option, alt)
 		end
 		table.insert(colorTable, color)
 	end
-
+	
 	local layout = UI.getXmlTable()
 
 	-- adds a tech primary and secondary to automatically consume the stategy token
@@ -976,7 +982,7 @@ function _addTechnologyPrimarySecondary(layout)
 	end
 
 	table.insert(layout[technologyIndex]["children"], #layout - 1, _customLayout["technology_secondary"])
-	table.insert(layout[technologyIndex]["children"], 2, _customLayout["technology_primary"])
+	--table.insert(layout[technologyIndex]["children"], 2, _customLayout["technology_primary"])
 
 	
 	return layout
@@ -1142,7 +1148,7 @@ function _updateColorSelector(layout, element, colorTable)
 	--colorTable = { "White", "Blue", "Purple", "Green" }
 
 	local newColorSelector = {}
-	local tempSelector = _customLayout["colorSelector"]
+	local tempSelector = _deepcopy(_customLayout["colorSelector"])
 
 	-- do 3 items per row, except for 4 players. There build 2x2
 	local maxButtonsPerRow = 3
@@ -1426,7 +1432,7 @@ end
 
 -------------------------------- Construction ----------------------------------
 
-function allocateConstructionUnits(color, tokenTable)
+function _allocateConstructionUnits(color, tokenTable)
 -- takes selected units from bags and places them right of token containers
 -- if a secondary action is taken, a command token is placed next to the allocated unit
 
@@ -1446,10 +1452,7 @@ function allocateConstructionUnits(color, tokenTable)
 	end
 
 	
-	local pos = { x = -6.3, y = 2, z = -9.7 }
-	if commandSheet.getPosition().x < 0 then
-		pos.x = 15.5
-	end
+	local pos = { x = 15.5, y = 2, z = -9.7 }
 	local dx = 1
 	local posCommandToken = _deepcopy(pos)
 	posCommandToken.x = pos.x + 1.5

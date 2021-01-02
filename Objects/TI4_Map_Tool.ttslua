@@ -525,11 +525,14 @@ function clearTilesCoroutine()
             local d = math.abs(p.x + p.z)
             if system.tile ~= 18 or d > 1 then
                 local bag = false
-                if system.planets and #system.planets > 0 then
+                if system.anomalies and #system.anomalies then
+                    bag = redBag  -- mix of planets and anomaly is red bag
+                elseif system.planets and #system.planets > 0 then
                     bag = blueBag
                 elseif system.hyperlane then
                     bag = hyperlaneBag
                 else
+                    -- Empty space
                     bag = redBag
                 end
                 object.setLock(false)

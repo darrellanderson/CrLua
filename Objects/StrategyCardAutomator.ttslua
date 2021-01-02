@@ -426,7 +426,7 @@ function onStrategyCardButtonClicked(params)
 
 	local secondarySuccessful
 
-	log("Card:"..card.." Action:"..action .. " Option:"..option.. " Color:".. color)
+	--log("Card:"..card.." Action:"..action .. " Option:"..option.. " Color:".. color)
 
 	--take care of ALL pass and close
 	if (action == "close") or (action == "pass") then
@@ -906,34 +906,28 @@ function updateUiOnClick(player, option, alt)
 	-- adds a tech primary and secondary to automatically consume the stategy token
 	-- removes PoK Buttons from tech UI if not playing with PoK
 	layout = _addTechnologyPrimarySecondary(layout)
-	log("_addTechnologyPrimary Done")
 
 	-- adds the faction tech popup menu
 	layout = _addAutomationTechPopup(layout, colorTable)
-	log("_addAutomationTechPopup done")
 
 	-- adds on "Assign Speaker" button to Politics menu which opens the politics Popup
 	layout = _addAutomationPoliticsPopup(layout)
-	log("_addAutomationPoliticsPopup done")
 
 	-- not implemented
 	-- layout = _addAutomationSecondaryPopup(layout, colorTable)
-	-- log("_addAutomationSecondaryPopup done")
 
 	-- add a choice between scoring mecatol rex and drawing a secret
 	layout = _addImperialPrimary(layout)
-	log("_addImperialPrimary done")
 
 
 	-- adjusts the colors Table for the assign speaker politicsPopup
 	layout = _updateColorSelector(layout, "politicsPopup", colorTable)
-	log("_updateColorSelector politicsPopup done")
 
 	-- adjusts the colors Table for the trade strategycard
 	layout = _updateColorSelector(layout, "trade", colorTable)
-	log("_updateColorSelector trade done")
 
 	UI.setXmlTable(layout)
+	broadcastToAll("The strategy card menu has been updated", "Red")
 end
 
 function _addTechnologyPrimarySecondary(layout)
@@ -1721,9 +1715,32 @@ function researchTech(color, cardName)
 			rotation          = rot,
 			smooth            = true,
 		})
+	_maybeUpdateHighlightUnitUpgrades()
 	else
 		_safeBroadcastToColor('Research Technology: missing technology ' .. cardName, color, color)
 	end
+end
+
+
+function _maybeUpdateHighlightUnitUpgrades()
+    local handler = 'delayedHighlightUnitUpgrades'
+    local listeners = {}
+    for _, object in ipairs(getAllObjects()) do
+        if object.getVar(handler) then
+            table.insert(listeners, object.getGUID())
+        end
+    end
+    if #listeners > 0 then
+        for i, guid in ipairs(listeners) do
+            local function callHandler()
+                local listener = getObjectFromGUID(guid)
+                if listener then
+                    listener.call(handler)
+                end
+            end
+            Wait.frames(callHandler, i)
+        end
+    end
 end
 
 ----------------------------- Imperial ----------------------------------

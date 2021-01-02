@@ -982,7 +982,7 @@ function _addTechnologyPrimarySecondary(layout)
 	end
 
 	table.insert(layout[technologyIndex]["children"], #layout - 1, _customLayout["technology_secondary"])
-	--table.insert(layout[technologyIndex]["children"], 2, _customLayout["technology_primary"])
+	-- we no longer add the "Technology Primary" button, as it has no function. 
 
 	
 	return layout

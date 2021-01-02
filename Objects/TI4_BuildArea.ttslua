@@ -654,7 +654,8 @@ function getProduceConsumeItems()
 
     if result.aiDevelopmentAlgorithm then
         -- Detect unit upgrades (AI Development Algorithm)
-        local unitUpgrades = {}
+        local unitUpgradeSet = {}
+        local unitUpgradeCount = 0
         if playerColor then
             local unitUpgradeNameSet = {}
             for _, name in ipairs(_unitHelper.getUnitUpgradeNames()) do
@@ -680,11 +681,16 @@ function getProduceConsumeItems()
             for guid, color in pairs(guidToColor) do
                 if color == playerColor then
                     local object = getObjectFromGUID(guid)
-                    table.insert(unitUpgrades, object.getName())
+                    local name = object.getName()
+                    if not unitUpgradeSet[name] then
+                        unitUpgradeSet[name] = true
+                        unitUpgradeCount = unitUpgradeCount + 1
+                    end
                 end
             end
         end
-        result.aiDevelopmentAlgorithm = #unitUpgrades
+
+        result.aiDevelopmentAlgorithm = unitUpgradeCount
     end
 
     CrLua.Log.d(TAG, 'getProduceConsumeItems', result)

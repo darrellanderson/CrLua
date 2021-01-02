@@ -370,6 +370,11 @@ function setupGame(isRightClick)
     end
     _setupInProgress = true
 
+    -- Visual feedback while setup is in progress.
+    if not isRightClick then
+        _animateSelfDuringSetup()
+    end
+
     _config.isRightClick = isRightClick
     startLuaCoroutine(self, 'setupGameCoroutine')
 end
@@ -626,6 +631,7 @@ end
 -------------------------------------------------------------------------------
 
 function onSetupHelperSetupFinished()
+    printToAll('Initial setup finished, waiting a few seconds before final setup steps', 'Yellow')
     -- Wait a moment for main setup to finish moving things.
     Wait.time(function() startLuaCoroutine(self, 'postSetupCoroutine') end, 5)
 end
@@ -941,6 +947,15 @@ function _removeCards(containerName, deckName, sourceName)
             container.putObject(createDeck)
         end
     end
+end
+
+function _animateSelfDuringSetup()
+    local delay = 0.1
+    local function doUpdate()
+        self.rotate({ x = 0, y = 3, z = 0 })
+        Wait.time(doUpdate, delay)
+    end
+    Wait.time(doUpdate, delay)
 end
 
 -------------------------------------------------------------------------------

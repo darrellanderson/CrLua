@@ -31,6 +31,7 @@ local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 local _setupHelper = getHelperClient('TI4_SETUP_HELPER')
 local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 local _unitHelper = getHelperClient('TI4_UNIT_HELPER')
+local _technologyHelper = getHelperClient('TI4_TECHNOLOGY_HELPER')
 
 
 local _customLayout = {
@@ -1620,10 +1621,21 @@ function researchTech(color, cardName)
 	-- get technology deck
 	local deckName = 'Technology Cards'
 	local techDeck = false
-	for _, object in ipairs(getAllObjects()) do
-		if (object.tag == 'Deck') and (object.getName() == deckName) and (_zoneHelper.zoneFromPosition(object.getPosition()) == color) then
-			techDeck = object
-			break
+	local techBoard = false
+	local techCardPositionsOnTable = {}
+	local techType = _technologyHelper.getTechType(cardName)
+	for _,object in ipairs(getAllObjects()) do
+		if (color == _zoneHelper.zoneFromPosition(object.getPosition())) then
+			if _technologyHelper.getTechType(object.getName()) == techType then
+				log(object.getName())
+				table.insert(techCardPositionsOnTable, 1, object.getPosition())
+			end
+			if (object.getName() == "Technology Board") then
+				techBoard = object
+			end
+			if (object.tag == 'Deck') and (object.getName() == deckName) then
+				techDeck = object
+			end
 		end
 	end
 
@@ -1634,33 +1646,60 @@ function researchTech(color, cardName)
 		return
 	end
 
-	-- searches through container for an item with name matching namePattern and returns its guid
-	local function getEntryGuid(container, namePattern)
-		assert(type(container) == 'userdata' and type(namePattern) == 'string')
-		for _, entry in ipairs(container.getObjects()) do
-			namePattern = string.gsub(namePattern, "-",".")
-			if string.match(entry.name, namePattern) then
-				return entry.guid
+	local function _getPosToTechBoard(cardName, techBoard, techDeck)
+		local pos
+		local dx 
+		local dz 
+		for _,snap in ipairs(techBoard.getSnapPoints()) do
+			if not pos then
+				pos = snap.position
+			else
+				if (not dz) and (snap.position.z < (pos.z - 0.1)) then
+					dz = pos.z - snap.position.z
+				end
+				if (not dx) and (snap.position.x < (pos.x - 0.1)) then
+					dx = pos.x - snap.position.x
+				end
+				if snap.position.x > pos.x then
+					pos.x = snap.position.x
+				end
+				if snap.position.z > pos.z then
+					pos.z = snap.position.z
+				end
 			end
 		end
-		return false
+		
+		local _columns = {["Blue"]=0, ["Green"]=1, ["Yellow"]=2, ["Red"]=3, ["unitUpgrade"]=4}
+		column = _columns[_technologyHelper.getTechType(cardName)]
+		pos.x = pos.x - column*dx
+	
+		local occupied = {}
+		for _,cardOnTable in ipairs(techCardPositionsOnTable) do
+			onGrid = techBoard.positionToLocal(cardOnTable)
+			if math.floor(onGrid.x*10) == math.floor(math.floor(pos.x*10)) then
+				table.insert(occupied, 1, math.floor((((onGrid.z-pos.z)/dz ) *10 + 0.5)/10))
+			end
+		end
+		local vacant
+		for i = 0,10 do
+			vacant=true
+			for _,occ in ipairs(occupied) do
+				if -i == occ then
+					vacant = false
+				end
+			end
+			if vacant then
+				pos.z = pos.z - dz*i
+				return {position = techBoard.positionToWorld(pos), rotation = techBoard.getRotation()}
+			end
+		end
+		return _getPosToTechDeck(techDeck)
 	end
 
-
-	local factionSheet = getObjectFromGUID(faction.factionSheetGuid)
-	if not factionSheet then
-		broadcastToAll('research Technology: missing ' .. color .. ' Faction Sheet', 'Red')
-		return
-	end
-
-	local overrides = _unitHelper.getUnitOverrides()
-	local pos
-	local rot = {}
-	rot = techDeck.getRotation()
-
-	-- unit upgades are sent to factionSheet, other tech just put left of deck.
-	if overrides[cardName] and overrides[cardName]["upgrade"] then
+	local function _getPosToFactionSheet(cardName, factionSheet, techDeck)
 		-- code copied from setupHelper factionsheetsnappoints
+		local rot = techDeck.getRotation()
+
 		local x0 = 1.09
 		local dx = (-1.09 * 2) / 3
 		local z0 = -0.74
@@ -1680,45 +1719,96 @@ function researchTech(color, cardName)
 				end
 			end
 		end
+		local overrides = _unitHelper.getUnitOverrides()
+		local pos = snapPoints[_pointorder[overrides[cardName]["upgrade"]]]
 
-		local pointorder = {
-		["Flagship"] = 1,
-		["War Sun"] = 2,
-		["Dreadnought"] = 3,
-		["Carrier"] = 4,
-		["Cruiser"] = 5,
-		["Destroyer"] = 6,
-		["Fighter"] = 7,
-		["PDS"] = 8,
-		["Infantry"] = 9,
-		["Space Dock"] = 10
-		}
+		return {position=factionSheet.positionToWorld(pos), rotation=rot}
+	end
 
-		pos = snapPoints[pointorder[overrides[cardName]["upgrade"]]]
-		pos = factionSheet.positionToWorld(pos)
-	else
+	local function _getPosToTechDeck(cardName, techDeck)
 		-- place cards next to tech deck (take care on which side of the table)
-		pos = techDeck.getPosition()
+		local pos = techDeck.getPosition()
+		local rot = techDeck.getRotation()
 		if pos.z > 0 then
 			pos.x = pos.x + 4
 		else
 			pos.x = pos.x - 4
 		end
+		return {position = pos, rotation = rot}
 	end
-	pos.y = pos.y + 2
 
-	local guid = getEntryGuid(techDeck, cardName)
-	if guid then
-		techDeck.takeObject({
-			guid              = guid,
-			position          = pos,
-			rotation          = rot,
-			smooth            = true,
-		})
-	_sendOnNewTechnologyResearched(color, cardName)
-	else
-		_safeBroadcastToColor('Research Technology: missing technology ' .. cardName, color, color)
+	local guid = _getEntryGuid(techDeck, cardName)
+	if not guid then
+		_safeBroadcastToColor('Research Technology: ' .. cardName .. " not found in deck " .. techDeck.getName(), color, color)
+		return
 	end
+
+
+	local pos
+	if techBoard then
+		pos = _getPosToTechBoard(cardName, techBoard, techDeck)
+		if _technologyHelper.getTechType() == "unitUpgrade" then
+			obj = techDeck.takeObject({
+				guid              = guid,
+				position          = pos.position,
+				rotation          = rot.rotation,
+				smooth            = true,
+			})
+			clone = obj.clone()
+			local factionSheet = getObjectFromGUID(faction.factionSheetGuid)
+			if not factionSheet then
+				broadcastToAll('research Technology: missing ' .. color .. ' Faction Sheet', 'Red')
+				return
+			end
+			clonepos = _getPosToFactionSheet(cardName, factionSheet, techDeck)
+			clonepos.position.y = clonepos.position.y + 2
+			clone.setPositionSmooth(clonepos.position, false, true)
+			clone.setRotation(clonepos.rotation)
+			
+			_sendOnNewTechnologyResearched(color, cardName)
+
+			return
+		end
+	else
+		-- unit upgades are sent to factionSheet, other tech just put left of deck.
+		if techType == "unitUpgrade" then
+			local factionSheet = getObjectFromGUID(faction.factionSheetGuid)
+			if not factionSheet then
+				broadcastToAll('research Technology: missing ' .. color .. ' Faction Sheet', 'Red')
+				return
+			end
+			pos = _getPosToFactionSheet(cardName, factionSheet, techDeck)
+		else
+			pos = _getPosToTechDeck(cardName, techDeck)
+		end
+		
+		pos.position.y = pos.position.y + 2
+	end
+	techDeck.takeObject({
+		guid              = guid,
+		position          = pos.position,
+		rotation          = pos.rotation,
+		smooth            = true,
+	})
+	
+	_sendOnNewTechnologyResearched(color, cardName)
+
+end
+
+-- searches through container for an item with name matching namePattern and returns its guid
+function _getEntryGuid(container, namePattern)
+	assert(type(container) == 'userdata' and type(namePattern) == 'string')
+	for _, entry in ipairs(container.getObjects()) do
+		namePattern = string.gsub(namePattern, "-",".")
+		if string.match(entry.name, namePattern) then
+			return entry.guid
+		end
+	end
+	return false
+end
+
+function _sendToPos(cardName, deckObject, pos)
+	return
 end
 
 function _sendOnNewTechnologyResearched(playerColor, cardName)

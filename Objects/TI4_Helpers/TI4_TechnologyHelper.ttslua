@@ -132,7 +132,6 @@ function getTechType(name)
 	if _technologies[name] then
 		return _technologies[name]['type']
 	end
-	log("getTechType: " .. name .. " not found in _technologies")
 	return nil
 end
 function getTechRequirements(name)
@@ -140,7 +139,6 @@ function getTechRequirements(name)
 	if _technologies[name] then
 		return _technologies[name]['requirements']
 	end
-	log("getTechType: " .. name .. " not found in _technologies")
 	return nil
 end
 function getTechAbbrev(name)
@@ -148,7 +146,6 @@ function getTechAbbrev(name)
 	if _technologies[name] then
 		return _technologies[name]['abbrev']
 	end
-	log("getTechType: " .. name .. " not found in _technologies")
 	return nil
 end
 function getTechExpansion(name)
@@ -156,6 +153,5 @@ function getTechExpansion(name)
 	if _technologies[name] then
 		return _technologies[name]['expansion']
 	end
-	log("getTechType: " .. name .. " not found in _technologies")
 	return nil
 end

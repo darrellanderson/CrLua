@@ -298,6 +298,7 @@ local _flagshipModifiers = {
         description = '+2 flagship COMBAT against opponent with no token in your fleet pool',
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
+        isCombat = true,
         apply = function(unitAttrs, params)
             local myColor = params.myColor
             local vsColor = params.opponentColor
@@ -330,6 +331,7 @@ local _flagshipModifiers = {
         description = "+1 to all COMBAT rolls for other ships with the C'morran N'orr",
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
+        isCombat = true,
         apply = function(unitAttrs)
             for unitType, attr in pairs(unitAttrs) do
                 if unitType ~= 'Flagship' and attr.spaceCombat then
@@ -343,6 +345,7 @@ local _flagshipModifiers = {
         description = "Opponent's ships cannot use SUSTAIN DAMAGE",
         owner = OWNER.OPPONENT,
         type = TYPE.MUTATE,
+        isCombat = true,
         apply = function(unitAttrs)
             for unitType, attr in pairs(unitAttrs) do
                 if attr.sustainDamage then
@@ -356,6 +359,7 @@ local _flagshipModifiers = {
         description = 'Fighters may participate in ground combat',
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,  -- copy combat attributes AFTER all adjustments
+        isCombat = true,
         apply = function(unitAttrs)
             unitAttrs['Fighter'].groundCombat = _copy(unitAttrs['Fighter'].spaceCombat)
             unitAttrs['Fighter'].groundCombat.anyPlanet = true
@@ -366,6 +370,7 @@ local _flagshipModifiers = {
         description = "Rolls number of dice equal to number of opponent's non-fighter ships",
         owner = OWNER.SELF,
         type = TYPE.MUTATE,
+        isCombat = true,
         apply = function(unitAttrs, params)
             local count = 1  -- only override if given opponent units
             if params.opponentUnitTypeToCount then
@@ -386,6 +391,7 @@ local _flagshipModifiers = {
         description = 'Ground forces may participate in space combat',
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,  -- copy combat attributes AFTER all adjustments
+        isCombat = true,
         apply = function(unitAttrs)
             for unitType, attr in pairs(unitAttrs) do
                 if attr.groundCombat then
@@ -399,6 +405,7 @@ local _flagshipModifiers = {
         description = 'Other players cannot use SPACE CANNON against your ships in this system',
         owner = OWNER.OPPONENT,
         type = TYPE.MUTATE,
+        isCombat = true,
         apply = function(unitAttrs)
             -- Do nothing unless we can differentiate space cannon offense from defense.
             --for unitType, attr in pairs(unitAttrs) do
@@ -411,6 +418,7 @@ local _flagshipModifiers = {
         description = 'Your mechs in this system roll 1 additional die during combat',
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
+        isCombat = true,
         apply = function(unitAttrs)
             local attr = unitAttrs['Mech']
             if attr.spaceCombat then
@@ -437,6 +445,7 @@ local _unitModifiers = {
         description = 'PLANETARY SHIELD does not prevent BOMBARDMENT',
         owner = OWNER.SELF,
         type = TYPE.MUTATE,
+        isCombat = true,
         apply = function(unitAttrs)
             for unitType, attr in pairs(unitAttrs) do
                 if attr.bombardment then
@@ -450,6 +459,7 @@ local _unitModifiers = {
         description = '-1 to all SPACE CANNON rolls',
         owner = OWNER.OPPONENT,
         type = TYPE.ADJUST,
+        isCombat = true,
         apply = function(unitAttrs)
             for _, attr in pairs(unitAttrs) do
                 if attr.spaceCannon then
@@ -463,6 +473,7 @@ local _unitModifiers = {
         description = 'Mechs lose non-SUSTAIN DAMAGE abilities',
         owner = OWNER.SELF,
         type = TYPE.MUTATE,
+        isCombat = true,
         apply = function(unitAttrs)
             local attr = unitAttrs['Mech']
             attr.antiFighterBarrage = nil
@@ -476,6 +487,7 @@ local _unitModifiers = {
         description = 'BOMBARDMENT 6 to non-fighter, non-bomdbardment ships',
         owner = OWNER.SELF,
         type = TYPE.MUTATE,
+        isCombat = true,
         apply = function(unitAttrs)
             for unitType, attr in pairs(unitAttrs) do
                 if unitType ~= 'Fighter' and attr.spaceCombat and not attr.bombardment then
@@ -508,6 +520,7 @@ local _unitModifiers = {
         description = '-4 to all BOMBARDMENT rolls',
         owner = OWNER.ANY,
         type = TYPE.ADJUST,
+        isCombat = true,
         apply = function(unitAttrs)
             for unitType, attr in pairs(unitAttrs) do
                 if attr.bombardment then
@@ -521,6 +534,7 @@ local _unitModifiers = {
         description = 'Opponent PDS lose PLANETARY SHIELD and SPACE CANNON DEFENSE',
         owner = OWNER.OPPONENT,
         type = TYPE.MUTATE,
+        isCombat = true,
         apply = function(unitAttrs)
             local attr = unitAttrs['PDS']
             attr.planetaryShield = nil
@@ -560,6 +574,7 @@ local _unitModifiers = {
         description = 'One in or adjacent Space Dock gets SPACE CANNON 5x3',
         owner = OWNER.SELF,
         type = TYPE.MUTATE,
+        isCombat = true,
         apply = function(unitAttrs)
             unitAttrs['Experimental Battlestation'] = {
                 spaceCannon = { hit = 5, dice = 3, range = 1 },
@@ -573,6 +588,7 @@ local _unitModifiers = {
         description = '+1 die to a single GROUND COMBAT roll',
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,
+        isCombat = true,
         toggleActive = true,
         apply = function(unitAttrs, params)
             local best = false
@@ -595,6 +611,7 @@ local _unitModifiers = {
         description = "+2 to fighters' COMBAT rolls",
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
+        isCombat = true,
         apply = function(unitAttrs)
             unitAttrs['Fighter'].spaceCombat.hit = unitAttrs['Fighter'].spaceCombat.hit - 2
         end
@@ -604,6 +621,7 @@ local _unitModifiers = {
         description = '-1 to all COMBAT rolls',
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
+        isCombat = true,
         apply = function(unitAttrs)
             for unitType, attr in pairs(unitAttrs) do
                 if attr.spaceCombat then
@@ -621,6 +639,7 @@ local _unitModifiers = {
         description = 'SPACE CANNON 5(x3)',
         owner = OWNER.SELF,
         type = TYPE.MUTATE,
+        isCombat = true,
         toggleActive = true,
         apply = function(unitAttrs)
             unitAttrs['Geoform'] = {
@@ -634,6 +653,7 @@ local _unitModifiers = {
         description = '+2 mech COMBAT rolls if opponent has fragment',
         owner = OWNER.SELF,
         type = TYPE.MUTATE,
+        isCombat = true,
         apply = function(unitAttrs, params)
             local vsColor = params.opponentColor
             local hasFragment = false
@@ -687,6 +707,7 @@ local _unitModifiers = {
         description = '+1 to all COMBAT rolls',
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
+        isCombat = true,
         apply = function(unitAttrs)
             for unitType, attr in pairs(unitAttrs) do
                 if attr.spaceCombat then
@@ -707,6 +728,7 @@ local _unitModifiers = {
         description = '+2 mech COMBAT rolls if opponent has X/Y token',
         owner = OWNER.SELF,
         type = TYPE.MUTATE,
+        isCombat = true,
         apply = function(unitAttrs, params)
             local vsColor = params.opponentColor
             local hasXY = false
@@ -756,6 +778,7 @@ local _unitModifiers = {
         tag = 'Generic',  -- most are cards, not this one
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
+        isCombat = true,
         apply = function(unitAttrs)
             for unitType, attr in pairs(unitAttrs) do
                 if attr.spaceCombat then
@@ -770,6 +793,7 @@ local _unitModifiers = {
         description = '+1 die to a single SPACE CANNON or BOMBARDMENT roll',
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,
+        isCombat = true,
         apply = function(unitAttrs, params)
             local best = false
             for unitType, attr in pairs(unitAttrs) do
@@ -804,6 +828,7 @@ local _unitModifiers = {
         description = "+1 to fighter's COMBAT rolls",
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
+        isCombat = true,
         apply = function(unitAttrs)
             unitAttrs['Fighter'].spaceCombat.hit = unitAttrs['Fighter'].spaceCombat.hit - 1
         end
@@ -813,6 +838,7 @@ local _unitModifiers = {
         description = 'War Suns lose SUSTAIN DAMAGE',
         owner = OWNER.SELF,
         type = TYPE.MUTATE,
+        isCombat = true,
         apply = function(unitAttrs)
             unitAttrs['War Sun'].sustainDamage = false
         end
@@ -833,6 +859,7 @@ local _unitModifiers = {
         description = '+2 to combat rolls',
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
+        isCombat = true,
         toggleActive = true,
         apply = function(unitAttrs)
             for unitType, attr in pairs(unitAttrs) do
@@ -850,6 +877,7 @@ local _unitModifiers = {
         description = 'Infantry on planet with mech are not FRAGILE',
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
+        isCombat = true,
         apply = function(unitAttrs, params)
             -- In a Franken game, might have this mech but not fragile.
             local hasFragile = false
@@ -871,6 +899,7 @@ local _unitModifiers = {
         description = 'Copy abilities from other agents',
         owner = OWNER.SELF,
         type = TYPE.MUTATE,
+        isCombat = true,
         toggleActive = true,
         apply = function(unitAttrs) end
     },
@@ -879,6 +908,7 @@ local _unitModifiers = {
         description = '+1 die to a unit ability (anti-fighter barrage, bombardment, space cannon)',
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,
+        isCombat = true,
         excludeFaction = 'The Argent Flight',
         apply = function(unitAttrs, params)
             local best = false
@@ -927,6 +957,7 @@ local _unitModifiers = {
         description = '+1 to all COMBAT rolls',
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
+        isCombat = true,
         toggleActive = true,
         apply = function(unitAttrs)
             for unitType, attr in pairs(unitAttrs) do
@@ -945,6 +976,7 @@ local _unitModifiers = {
         leader = LEADER.COMMANDER,
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
+        isCombat = true,
         toggleActive = true,
         apply = function(unitAttrs)
             for unitType, attr in pairs(unitAttrs) do
@@ -965,6 +997,7 @@ local _unitModifiers = {
         description = '+1 to GROUND COMBAT rolls for attacker, -1 to Sardakk if opponent owns',  -- -1 to Sardakk if other player has it
         owner = OWNER.ANY,
         type = TYPE.ADJUST,
+        isCombat = true,
         excludeFaction = "The Sardakk N'orr",
         apply = function(unitAttrs, params)
             -- Get faction from color, which is ultimately derived from the faction sheet.
@@ -990,11 +1023,9 @@ local _unitModifiers = {
                 local unitTypeAttrs = unitAttrs[unitType]
                 local produceAmount = (params.myUnitTypeToCount[unitType] or 0)
                 local productionConsumed = math.ceil(produceAmount * (unitTypeAttrs.productionConsumed or 1))
-
                 if productionConsumed > 0 then
                     local applyBonusAmount = math.min(productionConsumed, bonusRemaining)
                     bonusRemaining = bonusRemaining - applyBonusAmount
-
                     unitTypeAttrs.freeProduction = applyBonusAmount
                 end
             end
@@ -1005,6 +1036,7 @@ local _unitModifiers = {
         description = 'One non-fighter ship gains the SUSTAIN DAMAGE, combat value, and ANTI-FIGHTER BARRAGE of the Nomad flagship (this modifier adds a new unit for AFB/space combat, remove the affected unit from normal setup)',
         owner = OWNER.SELF,
         type = TYPE.MUTATE,
+        isCombat = true,
         excludeFaction = 'The Nomad',
         apply = function(unitAttrs, params)
             unitAttrs['The Cavalry'] = {
@@ -1029,6 +1061,7 @@ local _unitModifiers = {
         description = 'Apply +1 to COMBAT rolls, player must destroy any units that do not produce at least one hit',
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
+        isCombat = true,
         toggleActive = true,
         apply = function(unitAttrs)
             for unitType, attr in pairs(unitAttrs) do
@@ -1047,6 +1080,7 @@ local _unitModifiers = {
         description = '+1 die to a unit ability (anti-fighter barrage, bombardment, space cannon)',
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,
+        isCombat = true,
         toggleActive = true,
         apply = function(unitAttrs, params)
             local best = false
@@ -1095,6 +1129,7 @@ local _unitModifiers = {
         description = '+1 to all COMBAT rolls',
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
+        isCombat = true,
         apply = function(unitAttrs)
             for unitType, attr in pairs(unitAttrs) do
                 if attr.spaceCombat then
@@ -1112,6 +1147,7 @@ local _unitModifiers = {
         description = '+1 die to a single SPACE COMBAT roll',
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,
+        isCombat = true,
         toggleActive = true,
         apply = function(unitAttrs, params)
             local best = false
@@ -1136,6 +1172,7 @@ local _unitModifiers = {
         description = 'SPACE CANNON of units in this system may target adjacent systems',
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
+        isCombat = true,
         apply = function(unitAttrs)
             for unitType, attr in pairs(unitAttrs) do
                 if attr.spaceCannon and (attr.spaceCannon.range or 0) == 0 then
@@ -1282,6 +1319,7 @@ function applyFlagshipModifiers(params)
             description = _flagshipModifiers[modifier].description,
             owner = _flagshipModifiers[modifier].owner,
             type = _flagshipModifiers[modifier].type,
+            isCombat = _flagshipModifiers[modifier].isCombat,
         })
     end
 
@@ -1346,6 +1384,7 @@ function applyUnitModifiers(params)
             description = _unitModifiers[modifier].description,
             owner = _unitModifiers[modifier].owner,
             type = _unitModifiers[modifier].type,
+            isCombat = _unitModifiers[modifier].isCombat,
         })
     end
     return unitAttrs

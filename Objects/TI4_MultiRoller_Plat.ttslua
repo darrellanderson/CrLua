@@ -1258,10 +1258,14 @@ end
 function printUnitModifiers(unitAttrs, dstColor)
     local modifiers = {}
     for _, modifier in ipairs(unitAttrs._flagshipModifiers) do
-        table.insert(modifiers, modifier.name .. ' (' .. modifier.description .. ')')
+        if modifier.isCombat then
+            table.insert(modifiers, modifier.name .. ' (' .. modifier.description .. ')')
+        end
     end
     for _, modifier in ipairs(unitAttrs._unitModifiers) do
-        table.insert(modifiers, modifier.name .. ' (' .. modifier.description .. ')')
+        if modifier.isCombat then
+            table.insert(modifiers, modifier.name .. ' (' .. modifier.description .. ')')
+        end
     end
     local msg = 'Roll Modifiers detected: ' .. ((#modifiers > 0) and table.concat(modifiers, ', ') or 'none')
     for _, warning in ipairs(_updateWarnings or {}) do

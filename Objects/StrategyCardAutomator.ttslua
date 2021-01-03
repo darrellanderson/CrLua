@@ -1715,27 +1715,28 @@ function researchTech(color, cardName)
 			rotation          = rot,
 			smooth            = true,
 		})
-	_maybeUpdateHighlightUnitUpgrades()
+	_sendOnNewTechnologyResearched(color, cardName)
 	else
 		_safeBroadcastToColor('Research Technology: missing technology ' .. cardName, color, color)
 	end
 end
 
-
-function _maybeUpdateHighlightUnitUpgrades()
-    local handler = 'delayedHighlightUnitUpgrades'
+function _sendOnNewTechnologyResearched(playerColor, cardName)
+    local handler = 'onNewTechnologyResearched'
     local listeners = {}
     for _, object in ipairs(getAllObjects()) do
         if object.getVar(handler) then
             table.insert(listeners, object.getGUID())
         end
     end
-    if #listeners > 0 then
-        for i, guid in ipairs(listeners) do
+	if #listeners > 0 then
+    	local params = {player = playerColor,
+		technology = cardName}
+	    for i, guid in ipairs(listeners) do
             local function callHandler()
                 local listener = getObjectFromGUID(guid)
                 if listener then
-                    listener.call(handler)
+                    listener.call(handler, params)
                 end
             end
             Wait.frames(callHandler, i)

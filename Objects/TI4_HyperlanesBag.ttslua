@@ -1,65 +1,61 @@
 --- Add/remove hyperlanes
 -- @author Darrell
 
-local _hyperlanes = {
-    ['b41a78'] = {},
-    ['1ffd34'] = {},
-    ['bb11c7'] = {},
-    ['613593'] = {},
-    ['a35ea3'] = {},
-
-    ['34cbfd'] = {},
-    ['1000e9'] = {},
-    ['c131ce'] = {},
-    ['2c5e05'] = {},
-    ['35b72d'] = {},
-
-    ['bdf753'] = {},
-    ['b74682'] = {},
-    ['507cb6'] = {},
-    ['903187'] = {},
-    ['3830ca'] = {},
-
-    ['5dbaf9'] = {},
-    ['902424'] = {},
-    ['e604ce'] = {},
-    ['204530'] = {},
-    ['9a71c7'] = {},
-}
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
+        return function(parameters) return helperObject.call(functionName, parameters) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 
 function onLoad(saveState)
     self.addContextMenuItem('Add 5p hyperlanes', add5pHyperlanes)
     self.addContextMenuItem('Add 2p heads up', add2pHeadsUp)
-    self.addContextMenuItem('Clear hyperlanes', clearHyperlanes)
 end
 
 function add5pHyperlanes()
-    local guidToTransform = {
-        ['a35ea3'] = {
-            position = {0.00, 1.20, 18.19},
-            rotation = {0.00, 60.00, 0.00}
+    local tileToTransform = {
+        [86] = {
+            position = {0.00, 1.14, 18.19},
+            rotation = {0.00, 0.00, 0.00}
         },
-        ['613593'] = {
-            position = {5.24, 1.20, 15.17},
+        [83] = {
+            position = {5.24, 1.14, 15.17},
             rotation = {0.00, 240.00, 0.00}
         },
-        ['1ffd34'] = {
-            position = {5.27, 1.20, 9.08},
-            rotation = {0.00, 60.00, 0.00}
+        [88] = {
+            position = {5.27, 1.14, 9.08},
+            rotation = {0.00, 240.00, 0.00}
         },
-        ['b41a78'] = {
-            position = {0.03, 1.20, 6.08},
-            rotation = {0.00, 60.00, 0.00}
+        [85] = {
+            position = {0.03, 1.14, 6.08},
+            rotation = {0.00, 0.00, 0.00}
         },
-        ['bb11c7'] = {
-            position = {-5.23, 1.20, 9.10},
-            rotation = {0.00, 180.00, 0.00}
+        [87] = {
+            position = {-5.23, 1.14, 9.10},
+            rotation = {0.00, 120.00, 0.00}
         },
-        ['c131ce'] = {
-            position = {-5.25, 1.20, 15.16},
-            rotation = {0.00, 180.03, 0.00}
+        [84] = {
+            position = {-5.25, 1.14, 15.16},
+            rotation = {0.00, 300.00, 0.00}
         },
     }
+
+    local guidToTransform = {}
+    for tile, transform in pairs(tileToTransform) do
+        local system = assert(_systemHelper.systemFromTile(tile))
+        guidToTransform[system.guid] = transform
+    end
 
     -- Do not assume tiles exist, only place if inside self.
     for _, entry in ipairs(self.getObjects()) do
@@ -123,15 +119,6 @@ function add2pHeadsUp()
                 callback_function = function(object) object.setLock(true) end,
                 smooth            = true,
             })
-        end
-    end
-end
-
-function clearHyperlanes()
-    for _, object in ipairs(getAllObjects()) do
-        if _hyperlanes[object.getGUID()] then
-            object.setLock(false)
-            self.putObject(object)
         end
     end
 end

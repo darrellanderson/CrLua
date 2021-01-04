@@ -956,13 +956,13 @@ function autoFillCoroutine()
 
     if fillUnitTypeToCount['Flagship'] and fillUnitTypeToCount['Flagship'] > 0 then
         for _, modifier in ipairs(unitTypeToAttrs._flagshipModifiers) do
-            if modifier.type == 'mutate' then
+            if modifier.isCombat and modifier.type == 'mutate' then
                 table.insert(messages, '(' .. modifier.name .. ': ' .. modifier.description .. ')')
             end
         end
     end
     for _, modifier in ipairs(unitTypeToAttrs._unitModifiers) do
-        if modifier.type == 'mutate' then
+        if modifier.isCombat and modifier.type == 'mutate' then
             table.insert(messages, '(' .. modifier.name .. ': ' .. modifier.description .. ')')
         end
     end

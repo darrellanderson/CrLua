@@ -1287,19 +1287,21 @@ function purgeCard(cardObject)
 end
 
 local function _heroCardCanBeUsed(cardObject, usingColor)
+    assert(type(cardObject) == 'userdata' and type(usingColor) == 'string')
+
     if cardObject.tag ~= 'Card' then
-        print('Cannot use ' .. cardObject.getName() .. '. Hero abilities can only be used from cards.')
+        printToColor('Cannot use ' .. cardObject.getName() .. '. Hero abilities can only be used from cards.', usingColor)
         return false
     end
 
     if cardObject.is_face_down then
-        print('Cannot use ' .. cardObject.getName() .. '. Card is facedown; did you unlock it?')
+        printToColor('Cannot use ' .. cardObject.getName() .. '. Card is facedown; did you unlock it?', usingColor)
         return false
     end
 
     local inHandGuidSet = _zoneHelper.inHand()
     if inHandGuidSet[cardObject.getGUID()] then
-        print('Cannot use ' .. cardObject.getName() .. '. Hero cards cannot be used while in your hand.')
+        printToColor('Cannot use ' .. cardObject.getName() .. '. Hero cards cannot be used while in your hand.', usingColor)
         return false
     end
 
@@ -1311,12 +1313,12 @@ local function _heroCardCanBeUsed(cardObject, usingColor)
         end
     end
     if not factionColor then
-        print('Cannot use ' .. cardObject.getName() .. '. No seated faction has this Hero.')
+        printToColor('Cannot use ' .. cardObject.getName() .. '. No seated faction has this Hero.', usingColor)
         return false
     end
 
     if factionColor ~= usingColor and usingColor ~= 'Black' then
-        print('Cannot use ' .. cardObject.getName() .. '. ' .. usingColor .. ' cannot use ' .. factionColor .. '\'s Hero card.')
+        printToColor('Cannot use ' .. cardObject.getName() .. '. ' .. usingColor .. ' cannot use ' .. factionColor .. '\'s Hero card.', usingColor)
         return false
     end
 
@@ -1498,7 +1500,7 @@ local _diceToBeRolled = {}
 function _carrionHeroAbilityCoroutine()
     local owningObject = assert(table.remove(_carrionHeroAbilityOwningObjectQueue))
     if #_diceToBeRolled > 0 then
-        print('Remove previously devoured ships before re-using Dimensional Anchor.')
+        printToAll('Remove previously devoured ships before re-using Dimensional Anchor.')
         return 1
     end
 
@@ -1527,7 +1529,7 @@ function _carrionHeroAbilityCoroutine()
     coroutine.yield(0)
 
     if not anyDimensionalTears then
-        print('Dimensional Anchor: No Dimensional Tear tokens found on the table. Won\'t use Hero Ability.')
+        printToAll('Dimensional Anchor: No Dimensional Tear tokens found on the table. Won\'t use Hero Ability.')
         return 1
     end
 
@@ -1602,7 +1604,7 @@ function _carrionHeroAbilityCoroutine()
     end
 
     if anchoredShipsCount == 0 then
-        print('Dimensional Anchor: No non-fighter ships adjacent to Dimensional Tear systems. Won\'t use Hero Ability.')
+        printToAll('Dimensional Anchor: No non-fighter ships adjacent to Dimensional Tear systems. Won\'t use Hero Ability.')
         return 1
     end
 
@@ -1711,10 +1713,10 @@ function _carrionHeroAbilityCoroutine()
         end
 
         -- Print guide showing the dice color for each ship.
-        print('DICE COLOR GUIDE')
+        printToAll('DICE COLOR GUIDE')
         for unitType, color in pairs(unitTypeToDiceColor) do
             if unitTypesUsed[unitType] then
-                print('* ' .. unitType .. ': ' .. color)
+                printToAll('* ' .. unitType .. ': ' .. color)
             end
         end
 
@@ -1876,7 +1878,7 @@ function _carrionHeroAbilityCoroutine()
             table.insert(resultsForType, assert(shipToResult[ship]))
         end
 
-        print('Results for ' .. system.string .. ':')
+        printToAll('Results for ' .. system.string .. ':')
         for unitType, results in pairs(unitTypeToResultRolls) do
             local resultString = ''
             local first = true
@@ -1893,7 +1895,7 @@ function _carrionHeroAbilityCoroutine()
                 first = false
             end
 
-            print('* ' .. unitType .. ': ' .. resultString)
+            printToAll('* ' .. unitType .. ': ' .. resultString)
         end
     end
 
@@ -1997,34 +1999,129 @@ local function _carrionHeroAbility(owningObject, clickingColor) --Vuil'Raith Her
     startLuaCoroutine(self, '_carrionHeroAbilityCoroutine')
 end
 
-local _heroNameSet = false
-local function _applyContextMenuItems(card)
-    assert(card.tag == 'Card')
-    local name = card.getName()
+local function _replaceTitanSleeperToken(sleeperTokenObject, clickingColor, replacements)
+    assert(type(sleeperTokenObject) == 'userdata' and type(clickingColor) == 'string' and type(replacements) == 'table')
 
-    local factionCardAbilityFunc = _factionCardNameToAbilityFunc and _factionCardNameToAbilityFunc[name] or false
-
-    if factionCardAbilityFunc then
-        card.addContextMenuItem(factionCardAbilityFunc.name, function(clickingColor) factionCardAbilityFunc.method(card, clickingColor) end, false)
+    -- Can the clicking player replace the token?
+    local canReplace = false
+    local faction = fromColor(clickingColor) or {}
+    for _, ability in ipairs(faction.abilities or {}) do
+        if ability == 'Awaken' then
+            canReplace = true
+        end
+    end
+    if not canReplace then
+        printToColor(clickingColor .. ' does not have the "Awaken" ability, ignoring replace', clickingColor, 'Red')
+        return
     end
 
-    if not _heroNameSet then
+    printToAll('Replacing ' .. sleeperTokenObject.getName() .. ' with ' .. table.concat(replacements, ', '), 'Yellow')
+
+    -- Find bags (set true to search for them, search replaces with the bag).
+    local replacementNameToBagName = {}
+    local bagNameToBag = {
+        ['Titan Sleeper Tokens Bag'] = true,
+        ['x1 Infantry Tokens Bag'] = true
+    }
+    for _, replacement in ipairs(replacements) do
+        local bagName = clickingColor .. ' ' .. replacement
+        replacementNameToBagName[replacement] = bagName
+        bagNameToBag[bagName] = true
+    end
+    for _, object in ipairs(getAllObjects()) do
+        local tag = object.tag
+        local name = object.getName()
+        if (tag == 'Bag' or tag == 'Infinite') and (bagNameToBag[name] == true) then
+            bagNameToBag[name] = object
+        end
+    end
+
+    -- Use infantry tokens if infanty bag is empty.
+    if replacementNameToBagName['Infantry'] then
+        local bagName = replacementNameToBagName['Infantry']
+        local bag = bagNameToBag[bagName]
+        if (not bag) or (bag == true) or (bag.getQuantity() == 0) then
+            replacementNameToBagName['Infantry'] = 'x1 Infantry Tokens Bag'
+        end
+    end
+
+    -- Verify unit availability.
+    local takeFromBags = {}
+    for i, replacement in ipairs(replacements) do
+        local bagName = assert(replacementNameToBagName[replacement])
+        local bag = bagNameToBag[bagName]
+        if (not bag) or (bag == true) then
+            printToAll('Warning: missing ' .. bagName .. ', aborting', 'Yellow')
+            return
+        elseif bag.tag == 'Bag' and bag.getQuantity() == 0 then
+            printToAll('Warning: no ' .. replacement .. ' available, aborting', 'Yellow')
+            return
+        else
+            table.insert(takeFromBags, bag)
+        end
+    end
+
+    -- All units are available, proceed with replacment(s).
+    for i, bag in ipairs(takeFromBags) do
+        local p = sleeperTokenObject.getPosition()
+        p.x = p.x + (i - 1) * 1.1
+        p.y = p.y + 3
+        bag.takeObject({
+            position          = p,
+            smooth            = true
+        })
+    end
+    local sleeperTokensBag = assert(bagNameToBag['Titan Sleeper Tokens Bag'])
+    sleeperTokensBag.putObject(sleeperTokenObject)
+end
+
+local _heroNameSet = false
+local _hasContextMenuCardNameSet = false
+local function _hasContextMenuItems(object)
+    if not _hasContextMenuCardNameSet then
         _heroNameSet = {}
+        _hasContextMenuCardNameSet = {}
+        for name, _ in pairs(_factionCardNameToAbilityFunc) do
+            _hasContextMenuCardNameSet[name] = true
+        end
         for _, faction in pairs(allFactions(true)) do
             if faction.hero then
                 _heroNameSet[faction.hero] = true
+                _hasContextMenuCardNameSet[faction.hero] = true
             end
         end
     end
+
+    local name = object.getName()
+    if object.tag == 'Card' and _hasContextMenuCardNameSet[name] then
+        return true
+    elseif object.tag == 'Tile' and name == 'Titan Sleeper Token' then
+        return true
+    end
+end
+
+local function _applyContextMenuItems(object)
+    local name = object.getName()
+
+    local factionCardAbilityFunc = _factionCardNameToAbilityFunc and _factionCardNameToAbilityFunc[name] or false
+    if factionCardAbilityFunc then
+        object.addContextMenuItem(factionCardAbilityFunc.name, function(clickingColor) factionCardAbilityFunc.method(object, clickingColor) end, false)
+    end
+
+    if name == 'Titan Sleeper Token' then
+        object.addContextMenuItem('Replace PDS', function(clickingColor) _replaceTitanSleeperToken(object, clickingColor, {'PDS'}) end, false)
+        object.addContextMenuItem('Replace Mech/Inf', function(clickingColor) _replaceTitanSleeperToken(object, clickingColor, {'Mech', 'Infantry'}) end, false)
+    end
+
     -- Most heroes are manually handled, and even the automated ones could be manually handled.
     -- Offer a simple Purge option on all faction hero cards.
     if _heroNameSet[name] then
-        card.addContextMenuItem("Purge", function(clickingColor) _purgeHeroCard(card, clickingColor) end, false)
+        object.addContextMenuItem("Purge", function(clickingColor) _purgeHeroCard(object, clickingColor) end, false)
     end
 end
 
 function onObjectSpawn(object)
-    if object and object.tag == 'Card' then
+    if object and _hasContextMenuItems(object) then
         _applyContextMenuItems(object)
     end
 end
@@ -2061,7 +2158,7 @@ function onLoad(saveState)
 
     local function delayedApplyContextMenuItems()
         for _, object in ipairs(getAllObjects()) do
-            if object.tag == 'Card' then
+            if _hasContextMenuItems(object) then
                 _applyContextMenuItems(object)
             end
         end

@@ -205,15 +205,15 @@ local _customLayout = {
 	}
 }
 local _ObjectManual = [[
-	Features: \n
-	Imperial - Primary and Number: gain command tokens.\n
-	All other secondaries consume a (non fleet) strategy token (in strat. pool).\n 
-	EXCEPTION: If you have Scepter of Emelpar, the Mahact Agent or the Yssaril with Mahact in game available.\n
-	Politics - Speaker: Moves speaker token, Draws 2 Action and Agendas. - Sec.: draws 2 Actioncards\n
-	Trade - Prim.: Allocates 3 resources, Refreshes commodities (removes all from comm. pool and gain correct #) 
-		- Color: Refreshes colors commodities - Sec.: Refreshes your commodities \n
-	Tech - Prim.: Nothing - Tech: Draws the card from tech deck 
-		- Faction Tech: Opens a choice popup - Comm Tokens: gain tokens as Necro \n
+	Features:
+	Leadership - Primary and Number: gain command tokens.
+	All other secondaries consume a (non fleet) strategy token (in strat. pool).
+	EXCEPTION: If you have Scepter of Emelpar, the Mahact Agent or the Yssaril with Mahact in game available.
+	Politics - Speaker: Moves speaker token, Draws 2 Action and Agendas. - Sec.: draws 2 Actioncards
+	Trade - Prim.: Allocates 3 resources, Refreshes commodities (removes all from comm. pool and gain correct #)
+		- Color: Refreshes colors commodities - Sec.: Refreshes your commodities.
+	Tech - Prim.: Nothing - Tech: Draws the card from tech deck
+		- Faction Tech: Opens a choice popup - Comm Tokens: gain tokens as Necro.
 	Imperial - Score: Only writes message - Secret: Draws secret. - Secondary: Draws secret.
 ]]
 
@@ -231,12 +231,11 @@ local _workQueue = {
 local backManual = {
 	tag = "Panel",
 	attributes = {
-		position = '0 0 -20',
-		rotation = '0 0 90',
+		position = '0 0 -20.5',
+		rotation = '0 0 180',
 		width = 200,
-		height = 280,
-		padding = '10 10 10 10',
-		spacing = 10
+		height = 270,
+		scale = '1.35 0.709 1.0',
 	},
 	children = {
 		{
@@ -251,7 +250,7 @@ local backManual = {
 	}
 }
 
-local _updateUiText = "Please click the 'Update UI' button once all players have chosen a faction. Adds automation features (on first use) and updates the colors listed under politics and trade."
+local _updateUiText = "Please click the 'Update UI' button after all players have chosen a faction. Adds automation features (on first use) and updates the colors listed under politics and trade."
 
 local objectUI = {{
 	tag = "VerticalLayout",
@@ -330,26 +329,30 @@ function onLoad()
 	--Description on Back of the Object.
 	self.UI.setXmlTable({backManual})
 	local descriptionText = [[
-	Please click 'Update UI' before game.\n\n
-	All secondary Actions consume a command token (if no alternative available)\n
-	Imperial: gain tokens\n
-	Politics: Move speaker, draw agenda and action cards\n
-	Construction: Allocate units/command Token\n
-	Trade: Gain resources and commodities\n
-	Tech: Draw tech cards (and move to faction sheet)\n
-	Imperial: Draw secret
+	Please click 'Update UI' to modify strategy card windows (such as choosing speaker, faction techology menus).
+
+	Secondary actions consume a command token (if no alternative available).
+
+	Leadership: gain command tokens.
+	Politics: move speaker, draw agenda and action cards.
+	Construction: allocate units/command token.
+	Trade: gain tradegoods and commodities.
+	Tech: draw tech cards (move unit upgrades to faction sheet).
+	Imperial: draw secret.
+
+	Place this object in a bag (or delete it) to stop getting strategy card automation.
 	]]
 	self.setDescription(descriptionText)
-	
+
 	local scaleX = 0.73
 	local scaleZ = 1.41
 	local rescale = {x=1/scaleX, y=1, z=1/scaleZ}
 	self.setScale({x=scaleX,y=1,z=scaleZ})
 	self.rotate({x=0,y=0,z=0})
-	
+
 	-- update UI button
 	self.createButton({
-		tooltip = "Adds automation buttons (on first click) and updates Trade and Politics colors.",
+		tooltip = "Adds automation buttons (on first click) and updates Trade and Politics colors (on first click as well as future clicks).",
 		click_function = "updateUiOnClick",
 		function_owner = self,
 		position = {x=0, y=0.0, z=0},
@@ -360,13 +363,13 @@ function onLoad()
 		font_size = 100,
 		label = "Update UI",
 		})
-	
+
 	-- front text
 	self.createButton({
 		width = 0,
 		height = 0,
 		font_size = 120,
-		label = "Strategy Card\n Automator",
+		label = "Strategy Card\nAutomator",
 		rotation = {x=0, y=0, z=180},
 		position = {x=0, y=0.0, z=-0.63},
 		scale = rescale,
@@ -377,7 +380,7 @@ function onLoad()
 		width = 0,
 		height = 0,
 		font_size = 60,
-		label = "Please click 'Update UI' once all \n players have chosen a faction",
+		label = "Please click 'Update UI' after all\nplayers have chosen a faction.",
 		font_color = "Red",
 		rotation = {x=0, y=0, z=180},
 		position = {x=0, y=0.0, z=0.54},
@@ -553,7 +556,7 @@ function onStrategyCardButtonClicked(params)
 			constructionSuccessful = _allocateConstructionUnits(color, {"Command Token", string.sub(option, 3, -1)})
 		end
 		if constructionSuccessful then
-			
+
 			_closeMenu(color,card)
 		end
 	end
@@ -900,7 +903,7 @@ function updateUiOnClick(player, option, alt)
 		end
 		table.insert(colorTable, color)
 	end
-	
+
 	local layout = UI.getXmlTable()
 
 	-- adds a tech primary and secondary to automatically consume the stategy token
@@ -972,13 +975,13 @@ function _addTechnologyPrimarySecondary(layout)
 				o["children"] = _deepcopy(horizontalKeep)
 			end
 		end
-	
+
 	end
 
 	table.insert(layout[technologyIndex]["children"], #layout - 1, _customLayout["technology_secondary"])
-	-- we no longer add the "Technology Primary" button, as it has no function. 
+	-- we no longer add the "Technology Primary" button, as it has no function.
 
-	
+
 	return layout
 end
 
@@ -1232,12 +1235,12 @@ function _consumeStrategyToken(color)
 		broadcastToAll('Consume Strategy tokens: no faction for ' .. color, 'Red')
 		return
 	end
-	
-	
+
+
 	local SsruuActive = false
 	local JaeMirKanActive = false
-	
-	
+
+
 	-- find command token bag
 	-- also check if alternate command token payment method available.
 	-- if so, message the player and return true
@@ -1281,7 +1284,7 @@ function _consumeStrategyToken(color)
 		end
 	end
 
-	
+
 	if not commandTokensBag then
 		broadcastToAll('Consume Strategy tokens: missing ' .. faction.tokenName .. ' Command Tokens Bag', 'Red')
 		return
@@ -1294,7 +1297,7 @@ function _consumeStrategyToken(color)
 	end
 
 	-- todo: change cast and use sheet.positionToLocal instead. check if z > 0 or < 0 or something.
-		
+
 	local commandTokenName = faction.tokenName .. " Command Token"
 	for _,object in ipairs(getAllObjects()) do
 		local name = object.getName()
@@ -1432,7 +1435,7 @@ function _allocateConstructionUnits(color, tokenTable)
 
 	assert(type(color) == "string")
 	assert(type(tokenTable) == "table")
-	
+
 	local faction = _factionHelper.fromColor(color)
 	if not faction then
 		broadcastToAll('Allocate Construction tokens: no faction for ' .. color, 'Red')
@@ -1445,13 +1448,13 @@ function _allocateConstructionUnits(color, tokenTable)
 		return
 	end
 
-	
+
 	local pos = { x = 15.5, y = 2, z = -9.7 }
 	local dx = 1
 	local posCommandToken = _deepcopy(pos)
 	posCommandToken.x = pos.x + 1.5
 	posCommandToken.z = pos.z + 5
-	
+
 	for i,unitName in ipairs(tokenTable) do
 		if unitName == "Command Token" then
 			_dealLeadershipCommandTokens(color, 1, posCommandToken)
@@ -1477,7 +1480,7 @@ function _allocateConstructionUnits(color, tokenTable)
 			token.highlightOn("Yellow" , 3)
 		end
 	end
-	
+
 	_safeBroadcastToColor('Your constructed units have been allocated.', color, color)
 	return true
 end
@@ -1528,9 +1531,9 @@ end
 function _refreshCommodities(color)
 -- gets the number of commodities from the faction.commodities value
 -- cache commodities bag. and while we're at it, maybe cache command token bags. and while we're at it, maybe cache everything else aswell.
-	
+
 	local commoditiesBag = _getByName("x1 Commodities/Tradegoods Bag", "Infinite")
-	
+
 	if not commoditiesBag then
 		broadcastToAll('Refresh commodities: missing x1 Commodities/Tradegoods Bag TEST', 'Red')
 		return
@@ -1832,14 +1835,14 @@ function _getByName(name, tag)
 	local guid = _getByNameCache[name]
 	local object = guid and getObjectFromGUID(guid)
 	if object then
-		return object 
+		return object
 	end
 	if not tag then
 		for _, object in ipairs(getAllObjects()) do
 			if object.getName() == name then
 				_getByNameCache[name] = object.getGUID()
 				return object
-			end 
+			end
 		end
 	else
 		for _, object in ipairs(getAllObjects()) do
@@ -1851,4 +1854,4 @@ function _getByName(name, tag)
 			end
 		end
 	end
-end 
+end

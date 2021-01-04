@@ -1427,9 +1427,27 @@ local function _applyContextMenuItems(card)
     local purgable = false
     if deckName then
         if string.match(deckName, ' Exploration$') then
-            purgable = true
-        elseif deckName == 'Relics' and card.getName() == 'The Codex' then
-            purgable = true
+            local name = card.getName()
+            if string.match(name, '^.* Relic Fragment %(.*%%)') then
+                purgable = true
+            else
+                local purgeSet = {
+                    ['Gamma Wormhole'] = true,
+                    ['Gamma Relay'] = true,
+                    ['Enigmatic Device (1)'] = true,
+                    ['Enigmatic Device (2)'] = true,
+                    ['Mirage (Exploration)'] = true,
+                }
+                purgable = purgeSet[card.getName()]
+            end
+        elseif deckName == 'Relics' then
+            local purgeSet = {
+                ['The Codex'] = true,
+                ['Maw of Worlds'] = true,
+                ['Dominus Orb'] = true,
+                ['Stellar Converter'] = true,
+            }
+            purgable = purgeSet[card.getName()]
         end
     end
     if purgable then

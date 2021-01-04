@@ -103,6 +103,7 @@ function onLoad(saveState)
     createInputs()
 
     self.addContextMenuItem('Add Clone To Tiles', addCloneMenuOptionToSystemTiles)
+    self.addContextMenuItem('Rotate Map 180', rotateMap180)
 
     -- If any clones are still on the table, add them to the systems table.
     _clones = (saveState and string.len(saveState) > 0 and JSON.decode(saveState)) or {}
@@ -149,6 +150,38 @@ function addCloneMenuOptionToSystemTiles()
             _hasCloneMenuGuidSet[guid] = true
         end
     end
+end
+
+function rotateMap180()
+    for system, object in pairs(getPlacedSystemToObject(false)) do
+        object.setLock(false)
+        local collide = false
+        local fast = true
+
+        local p = object.getPosition()
+        p = {
+            x = -p.x,
+            y = p.y + 1,
+            z = -p.z
+        }
+        object.setPositionSmooth(p, collide, fast)
+
+        if system.hyperlane then
+            local r = object.getRotation()
+            r = {
+                x = 0,
+                y = (r.y + 180) % 360,
+                z = 0
+            }
+            object.setRotationSmooth(r, collide, fast)
+        end
+    end
+    local function delayedLock()
+        for system, object in pairs(getPlacedSystemToObject(false)) do
+            object.setLock(true)
+        end
+    end
+    Wait.time(delayedLock, 5)
 end
 
 -------------------------------------------------------------------------------
@@ -525,11 +558,14 @@ function clearTilesCoroutine()
             local d = math.abs(p.x + p.z)
             if system.tile ~= 18 or d > 1 then
                 local bag = false
-                if system.planets and #system.planets > 0 then
+                if system.anomalies and #system.anomalies then
+                    bag = redBag  -- mix of planets and anomaly is red bag
+                elseif system.planets and #system.planets > 0 then
                     bag = blueBag
                 elseif system.hyperlane then
                     bag = hyperlaneBag
                 else
+                    -- Empty space
                     bag = redBag
                 end
                 object.setLock(false)

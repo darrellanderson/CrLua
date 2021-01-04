@@ -147,6 +147,10 @@ local attachTokens = {
 
 local MIRAGE_PLANET = {
     name = 'Mirage',
+    position = { -- move further out for less overlap with center-tile wormholes
+        x = 0.9, -- standard is 0.47,
+        z = -1.1, -- standard is -0.81
+    },
     resources = 1,
     influence = 2,
     trait = 'cultural',

@@ -405,7 +405,13 @@ function onInputValueChanged(player, value, id)
 end
 
 function onBeginDrag(player, option, id)
-    local pp = self.positionToLocal(player.getPointerPosition())
+    local gpp = player.getPointerPosition()
+    if not gpp then
+        _data.dragOffset = nil
+        return
+    end
+
+    local pp = self.positionToLocal(gpp)
     _data.dragOffset = {
         x = _data.width - pp.x,
         z = _data.height - pp.z
@@ -413,7 +419,12 @@ function onBeginDrag(player, option, id)
 end
 
 function onEndDrag(player, option, id)
-    local pp = self.positionToLocal(player.getPointerPosition())
+    local gpp = player.getPointerPosition()
+    if not gpp or not _data.dragOffset then
+        return
+    end
+
+    local pp = self.positionToLocal(gpp)
     _data.width = pp.x + _data.dragOffset.x
     _data.height = pp.z + _data.dragOffset.z
     _data.width = math.max(_data.width, _config.minWidth)
@@ -422,7 +433,12 @@ function onEndDrag(player, option, id)
 end
 
 function onDrag(player, option, id)
-    local pp = self.positionToLocal(player.getPointerPosition())
+    local gpp = player.getPointerPosition()
+    if not gpp or not _data.dragOffset then
+        return
+    end
+
+    local pp = self.positionToLocal(gpp)
     _data.width = pp.x + _data.dragOffset.x
     _data.height = pp.z + _data.dragOffset.z
     _data.width = math.max(_data.width, _config.minWidth)
@@ -638,7 +654,8 @@ function getProduceConsumeItems()
 
     if result.aiDevelopmentAlgorithm then
         -- Detect unit upgrades (AI Development Algorithm)
-        local unitUpgrades = {}
+        local unitUpgradeSet = {}
+        local unitUpgradeCount = 0
         if playerColor then
             local unitUpgradeNameSet = {}
             for _, name in ipairs(_unitHelper.getUnitUpgradeNames()) do
@@ -664,11 +681,16 @@ function getProduceConsumeItems()
             for guid, color in pairs(guidToColor) do
                 if color == playerColor then
                     local object = getObjectFromGUID(guid)
-                    table.insert(unitUpgrades, object.getName())
+                    local name = object.getName()
+                    if not unitUpgradeSet[name] then
+                        unitUpgradeSet[name] = true
+                        unitUpgradeCount = unitUpgradeCount + 1
+                    end
                 end
             end
         end
-        result.aiDevelopmentAlgorithm = #unitUpgrades
+
+        result.aiDevelopmentAlgorithm = unitUpgradeCount
     end
 
     CrLua.Log.d(TAG, 'getProduceConsumeItems', result)

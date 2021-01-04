@@ -213,13 +213,13 @@ function onButtonClick(player, input, id)
     elseif id == 'colors:none' then
         setAll(Player.getAvailableColors(), false)
     elseif id == 'showUnits' then
-        showUnits()
+        showUnits(player)
     end
 end
 
 -------------------------------------------------------------------------------
 
-function showUnits()
+function showUnits(player)
     local colorSet = {}
     for _, color in ipairs(Player.getAvailableColors()) do
         if _toggles[color] then
@@ -247,10 +247,13 @@ function showUnits()
         end
     end
 
+    -- Highlight with white for visibility.
+    local highlightColor = {r=1,g=1,b=1}
     for _, object in ipairs(getAllObjects()) do
         local color = objectNameToColor[object.getName()]
         if object.tag ~= 'Bag' and color then
-            object.highlightOn(color, 30)
+            object.highlightOn(highlightColor, 20)
+            player.pingTable(object.getPosition())
         end
     end
 end

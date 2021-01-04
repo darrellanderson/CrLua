@@ -1025,6 +1025,8 @@ function setupCoroutine()
     _zoneHelper.drawBordersVectorLines()
     coroutine.yield(0)
 
+    print('Setup finished')  -- always print when done
+
     -- Tell any other listeners setup is done (in case further external setup).
     local listeners = {}
     for _, object in ipairs(getAllObjects()) do
@@ -1036,7 +1038,6 @@ function setupCoroutine()
         Wait.frames(function() listener.call('onSetupHelperSetupFinished', params) end, i)
     end
 
-    print('Setup finished')  -- always print when done
     return 1 -- REQUIRED!  MUST RETURN 1 TO STOP COROUTINE!
 end
 

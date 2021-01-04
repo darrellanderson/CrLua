@@ -223,9 +223,10 @@ local _ObjectManual = [[
 	All other secondaries consume a (non fleet) strategy token (in strat. pool).
 	EXCEPTION: If you have Scepter of Emelpar, the Mahact Agent or the Yssaril with Mahact in game available.
 	Politics - Speaker: Moves speaker token, Draws 2 Action and Agendas. - Sec.: draws 2 Actioncards
+	Construction - Allocate constructed units.
 	Trade - Prim.: Allocates 3 resources, Refreshes commodities (removes all from comm. pool and gain correct #)
 		- Color: Refreshes colors commodities - Sec.: Refreshes your commodities.
-	Tech - Prim.: Nothing - Tech: Draws the card from tech deck
+	Tech: Draws the card from tech deck, use Tech Board if available.
 		- Faction Tech: Opens a choice popup - Comm Tokens: gain tokens as Necro.
 	Imperial - Score: Only writes message - Secret: Draws secret. - Secondary: Draws secret.
 ]]
@@ -294,9 +295,6 @@ local objectUI = {{
 			},
 			value = "Update UI"
 		},
-		-- Panel as placeholder for the toggle button.
-		-- _workQueue is disabled by default
-		-- This feature is unavaliable to players (not ready yet! Maybe never.)
 		{
 			tag = "Panel",
 			children = {
@@ -311,14 +309,6 @@ local objectUI = {{
 				}
 			}
 		}
-		-- {
-		-- 	tag="ToggleButton",
-		-- 	attributes = {
-		-- 		onValueChanged = "toggleWorkQueue",
-		-- 		fontSize = 18
-		-- 	},
-		-- 	value = "Deal cards in order"
-		-- }
 	}
 
 }}

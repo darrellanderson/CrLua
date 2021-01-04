@@ -1603,39 +1603,6 @@ end
 
 --------------------------------- Technology -----------------------------------
 
-local _waitForTech = {}
-
-function queueResearchTech(color, cardName)
-	local function getResting()
-		if not _waitForTech[color] then
-			return true
-		end
-		local obj
-		if pcall(function() getObjectFromGUID(_waitForTech[color]) end) then
-			obj = getObjectFromGUID(_waitForTech[color])
-			if not obj then
-				return false
-			end
-		else
-			_waitForTech[color] = nil
-			return true
-		end
-		if obj and obj.resting then
-			_waitForTech[color] = nil
-			return true
-		else
-			return false
-		end
-	end
-	
-	Wait.condition(
-		function() researchTech(color, cardName) end,
-		function() return getResting() end,
-		3,
-		function() researchTech(color, cardName) end
-	)
-end
-
 function researchTech(color, cardName)
 	assert(type(color) == 'string')
 	assert(type(cardName) == "string")
@@ -1654,7 +1621,6 @@ function researchTech(color, cardName)
 	elseif cardName == "Command Tokens" then
 		local abilitiesSet = {}
 		for _, ability in ipairs(faction.abilities) do
-
 			abilitiesSet[ability] = true
 		end
 		if abilitiesSet['Technological Singularity'] then
@@ -1674,7 +1640,7 @@ function researchTech(color, cardName)
 	local techType = _technologyHelper.getTechType(cardName)
 	for _,object in ipairs(getAllObjects()) do
 		if (color == _zoneHelper.zoneFromPosition(object.getPosition())) then
-			if _technologyHelper.getTechType(object.getName()) == techType then
+			if _technologyHelper.isTechFromName(object.getName()) then
 				table.insert(techCardPositionsOnTable, 1, object.getPosition())
 			end
 			if (object.getName() == "Technology Board") then
@@ -1692,7 +1658,7 @@ function researchTech(color, cardName)
 		broadcastToAll("If not, please name your deck of remaining technology cards 'Technology Cards' and leave them in your zone.", color)
 		return
 	end
-	
+
 	local factionSheet = getObjectFromGUID(faction.factionSheetGuid)
 	if not factionSheet then
 		broadcastToAll('research Technology: missing ' .. color .. ' Faction Sheet', 'Red')
@@ -1706,17 +1672,18 @@ function researchTech(color, cardName)
 	end
 
 
+
 	local function _getPosToTechBoard(cardName, techBoard, techDeck)
 		local pos
-		local dx 
-		local dz 
+		local dx
+		local dz
 		-- find grid size and origin of snap points on tech board
 		for _,snap in ipairs(techBoard.getSnapPoints()) do
 			if not pos then
 				pos = snap.position
 			else
 				if (not dz) and (snap.position.z < (pos.z - 0.1)) then
-					dz = pos.z - snap.position.z
+					dz = snap.position.z - pos.z
 				end
 				if (not dx) and (snap.position.x < (pos.x - 0.1)) then
 					dx = pos.x - snap.position.x
@@ -1729,80 +1696,72 @@ function researchTech(color, cardName)
 				end
 			end
 		end
-		
+
 		-- find column for tech color
 		local _columns = {["Blue"]=0, ["Green"]=1, ["Yellow"]=2, ["Red"]=3, ["unitUpgrade"]=4}
 		column = _columns[_technologyHelper.getTechType(cardName)]
 		pos.x = pos.x - column*dx
-	
-		-- find all tech cards in respective column and add their positions on the grid (indexed by Origin + i * gridSize (dz))
-		local occupied = {}
-		for _,cardOnTable in ipairs(techCardPositionsOnTable) do
-			onGrid = techBoard.positionToLocal(cardOnTable)
-			if math.floor(onGrid.x*10) == math.floor(math.floor(pos.x*10)) then
-				table.insert(occupied, 1, math.floor((((onGrid.z-pos.z)/dz ) *10 + 0.5)/10))
-			end
-		end
 
-		-- find first vacant position in column and return coordinates
-		local vacant
-		for i = 0,10 do
-			vacant=true
-			for _,occ in ipairs(occupied) do
-				if -i == occ then
-					vacant = false
+		-- find first spot not occupied by tech card
+		local vacant = false
+		while not vacant do
+			vacant = true
+			for _,cardOnTable in ipairs(techCardPositionsOnTable) do
+				cardPos = techBoard.positionToLocal(cardOnTable)
+				if math.floor(cardPos.x*10+0.5) == math.floor(pos.x*10+0.5) then
+					if math.floor(cardPos.z*10+0.5) == math.floor(pos.z*10+0.5) then
+						vacant = false
+						pos.z = pos.z + dz
+						break
+					end
 				end
 			end
-			if vacant then
-				pos.z = pos.z - dz*i
-				return {position = techBoard.positionToWorld(pos), rotation = techBoard.getRotation()}
-			end
 		end
-		-- no vacant position => just draw card from deck
-		return _getPosToTechDeck(techDeck)
+		return {position = techBoard.positionToWorld(pos), rotation = techBoard.getRotation()}
 	end
-	
+
 	local function _getPosToTechDeck(cardName, techDeck)
 		-- place cards next to tech deck (take care on which side of the table)
 		local pos = techDeck.getPosition()
 		local rot = techDeck.getRotation()
+		local dz = 2
 		if pos.z > 0 then
 			pos.x = pos.x + 4
+			dz = -2
 		else
 			pos.x = pos.x - 4
 		end
-		return {position = pos, rotation = rot}
-	end
-	
-	local function _getPosToFactionSheet(cardName, factionSheet, techDeck)
-		-- code copied from setupHelper factionsheetsnappoints
-		local rot = techDeck.getRotation()
-		local x0 = 1.09
-		local dx = (-1.09 * 2) / 3
-		local z0 = -0.74
-		local dz = (0.74 * 2) / 3
-	
-		local counter = 1
-		local snapPoints = {}
-		for col = 0, 3 do
-			for row = 0, 3 do
-				if col <= row then
-					snapPoints[counter] = {
-							x = x0 + col * dx,
-							y = 0,
-							z = z0 + row * dz
-						}
-					counter = counter + 1
+
+		-- check that the card is not moved over another existing tech card
+		local vacant = false
+		while not vacant do
+			vacant = true
+			for _,cardPos in ipairs(techCardPositionsOnTable) do
+				if math.floor(cardPos.x*10+0.5) == math.floor(pos.x*10+0.5) then
+					if math.floor(cardPos.z*10+0.5) == math.floor(pos.z*10+0.5) then
+						vacant = false
+						pos.z = pos.z + dz
+						break
+					end
 				end
 			end
 		end
+		return {position = pos, rotation = rot}
+	end
+
+	local function _getPosToFactionSheet(cardName, factionSheet, techDeck)
+		local rot = factionSheet.getRotation()
+
 		local _overrides = _unitHelper.getUnitOverrides()
-		local pos = snapPoints[_pointorder[_overrides[cardName]["upgrade"]]]
-	
+		local snapPoints = factionSheet.getSnapPoints()
+
+		local pos = snapPoints[_pointorder[_overrides[cardName]["upgrade"]]].position
+		pos.y = pos.y + 0.1
+
 		return {position=factionSheet.positionToWorld(pos), rotation=rot}
 	end
 
-	local function copyUnitUpgradeTechToFactionSheet(cardObject)
+	local function _copyUnitUpgradeTechToFactionSheet(cardObject)
 		-- copy unitUpgrade technology card and send it to respective position on faction sheet.
 		local positionTable = {}
 		positionTable.position = _getPosToFactionSheet(cardName, factionSheet, techDeck).position
@@ -1813,14 +1772,15 @@ function researchTech(color, cardName)
 
 	local params = {
 		guid = guid,
-		smooth = true
+		smooth = false,
+		callback_function = function(obj) obj.highlightOn(color, 1) end
 	}
 	local pos
-	
+
 	if techBoard then
 		pos = _getPosToTechBoard(cardName, techBoard, techDeck)
 		if techType == "unitUpgrade" then
-			params["callback_function"] = function(obj) copyUnitUpgradeTechToFactionSheet(obj) end
+			params["callback_function"] = function(obj) _copyUnitUpgradeTechToFactionSheet(obj) end
 		end
 	else	-- unit upgades are sent to factionSheet, other tech just put left of deck.
 		if techType == "unitUpgrade" then
@@ -1829,24 +1789,19 @@ function researchTech(color, cardName)
 			pos = _getPosToTechDeck(cardName, techDeck)
 		end
 	end
-	
-	pos.position.y = pos.position.y + 1
 
 	params["position"] = pos.position
 	params["rot"] = pos.rotation
-	
+
 	techDeck.takeObject(params)
 	_sendOnNewTechnologyResearched(color, cardName)
-	
-	_waitForTech[color] = guid
 end
 
 -- searches through container for an item with name matching namePattern and returns its guid
 function _getEntryGuid(container, namePattern)
 	assert(type(container) == 'userdata' and type(namePattern) == 'string')
 	for _, entry in ipairs(container.getObjects()) do
-		namePattern = string.gsub(namePattern, "-",".")
-		if string.match(entry.name, namePattern) then
+		if entry.name == namePattern or entry.name == namePattern.." Ω" then
 			return entry.guid
 		end
 	end

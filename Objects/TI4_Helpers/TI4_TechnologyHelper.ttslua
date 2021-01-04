@@ -21,42 +21,42 @@ local _technologies = {
 	["Bio-Stims"] = { type = "Green", requirements = "G", abbrev = 'Bio-Stims', expansion="PoK" },
 	["Hyper Metabolism"] = { type = "Green", requirements = "GG", abbrev = 'Hyper', expansion="base" },
 	["X-89 Bacterial Weapon"] = { type = "Green", requirements = "GGG", abbrev = 'X-89 B.W.', expansion="base" },
-	
+
 	["Plasma Scoring"] = { type = "Red", requirements = nil, abbrev = 'Plasma', expansion="base" },
 	["AI Development Algorithm"] = { type = "Red", requirements = nil, abbrev = 'AI Dev Algo', expansion="PoK" },
 	["Magen Defense Grid"] = { type = "Red", requirements = "R", abbrev = 'Magen', expansion="base" },
 	["Self-Assembly Routines"] = { type = "Red", requirements = "R", abbrev = 'Self Assembly', expansion="PoK" },
 	["Duranium Armor"] = { type = "Red", requirements = "RR", abbrev = 'Duranium', expansion="base" },
 	["Assault Cannon"] = { type = "Red", requirements = "RRR", abbrev = 'Assault Cannon', expansion="base" },
-	
+
 	["Antimass Deflectors"] = { type = "Blue", requirements = nil, abbrev = 'Antimass', expansion="base" },
 	["Dark Energy Tap"] = { type = "Blue", requirements = nil, abbrev = 'Dark Energy Tap', expansion="PoK" },
 	["Gravity Drive"] = { type = "Blue", requirements = "B", abbrev = 'Grav Drive', expansion="base" },
 	["Sling Relay"] = { type = "Blue", requirements = "B", abbrev = 'Sling Relay', expansion="PoK" },
 	["Fleet Logistics"] = { type = "Blue", requirements = "BB", abbrev = 'Fleet Logistics', expansion="base" },
 	["Light-Wave Deflector"] = { type = "Blue", requirements = "BBB", abbrev = 'Light/Wave', expansion="base" },
-	
+
 	["Sarween Tools"] = { type = "Yellow", requirements = nil, abbrev = 'Sarween', expansion="base" },
 	["Scanlink Drone Network"] = { type = "Yellow", requirements = nil, abbrev = 'Scanlink', expansion="PoK" },
 	["Graviton Laser System"] = { type = "Yellow", requirements = "Y", abbrev = 'Graviton', expansion="base" },
 	["Predictive Intelligence"] = { type = "Yellow", requirements = "Y", abbrev = 'Pred Intel', expansion="PoK" },
 	["Transit Diodes"] = { type = "Yellow", requirements = "YY", abbrev = 'Transit', expansion="base" },
 	["Integrated Economy"] = { type = "Yellow", requirements = "YYY", abbrev = 'Integrated Eco.', expansion="base" },
-	
+
 	["Infantry II"] = { type = "unitUpgrade", requirements = "GG", abbrev = 'Infantry II', expansion="base" },
 	["Destroyer II"] = { type = "unitUpgrade", requirements = "RR", abbrev = 'Destroyer II', expansion="base" },
 	["Carrier II"] = { type = "unitUpgrade", requirements = "BB", abbrev = 'Carrier II', expansion="base" },
 	["Space Dock II"] = { type = "unitUpgrade", requirements = "YY", abbrev = 'Space Dock II', expansion="base" },
-	
+
 	["Fighter II"] = { type = "unitUpgrade", requirements = "BG", abbrev = 'Fighter II', expansion="base" },
 	["PDS II"] = { type = "unitUpgrade", requirements = "RY", abbrev = 'PDS II', expansion="base" },
 	["Cruiser II"] = { type = "unitUpgrade", requirements = "RGY", abbrev = 'Cruiser II', expansion="base" },
 	["Dreadnought II"] = { type = "unitUpgrade", requirements = "BBY", abbrev = 'Dread II', expansion="base" },
 	['War Sun'] = { type = "unitUpgrade", requirements = "RRRY", abbrev = 'War Sun', expansion="base" },
-	
+
 	-- faction tech
 	["Letani Warrior II"] = { type = "unitUpgrade", requirements = "GG", abbrev = 'Letani II', expansion = "base" },
- 	["Bioplasmosis"] = { type = "Green", requirements = "GG", abbrev = 'Bioplas', expansion = "base" },
+	["Bioplasmosis"] = { type = "Green", requirements = "GG", abbrev = 'Bioplas', expansion = "base" },
 	["L4 Disruptors"] = { type = "Yellow", requirements = "Y", abbrev = 'L4 Disrupt', expansion = "base" },
 	["Non-Euclidean Shielding"] = { type = "Red", requirements = "RR", abbrev = 'N.E.S.', expansion = "base" },
 	["Chaos Mapping"] = { type = "Blue", requirements = "B", abbrev = 'Chaos Map', expansion = "base" },
@@ -134,6 +134,7 @@ function getTechType(name)
 	end
 	return nil
 end
+
 function getTechRequirements(name)
 	assert(type(name) == "string")
 	if _technologies[name] then
@@ -141,6 +142,7 @@ function getTechRequirements(name)
 	end
 	return nil
 end
+
 function getTechAbbrev(name)
 	assert(type(name) == "string")
 	if _technologies[name] then
@@ -148,10 +150,20 @@ function getTechAbbrev(name)
 	end
 	return nil
 end
+
 function getTechExpansion(name)
 	assert(type(name) == "string")
 	if _technologies[name] then
 		return _technologies[name]['expansion']
 	end
 	return nil
+end
+
+function isTechFromName(name)
+	assert(type(name) == "string")
+	if _technologies[name] then
+		return true
+	else
+		return false
+	end
 end

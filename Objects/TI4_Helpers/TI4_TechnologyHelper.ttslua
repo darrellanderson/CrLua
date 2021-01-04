@@ -129,6 +129,7 @@ end
 
 function getTechType(name)
 	assert(type(name) == "string")
+	name = string.gsub(name, " Ω$", "")
 	if _technologies[name] then
 		return _technologies[name]['type']
 	end
@@ -137,6 +138,7 @@ end
 
 function getTechRequirements(name)
 	assert(type(name) == "string")
+	name = string.gsub(name, " Ω$", "")
 	if _technologies[name] then
 		return _technologies[name]['requirements']
 	end
@@ -145,6 +147,7 @@ end
 
 function getTechAbbrev(name)
 	assert(type(name) == "string")
+	name = string.gsub(name, " Ω$", "")
 	if _technologies[name] then
 		return _technologies[name]['abbrev']
 	end
@@ -153,6 +156,7 @@ end
 
 function getTechExpansion(name)
 	assert(type(name) == "string")
+	name = string.gsub(name, " Ω$", "")
 	if _technologies[name] then
 		return _technologies[name]['expansion']
 	end
@@ -161,6 +165,7 @@ end
 
 function isTechFromName(name)
 	assert(type(name) == "string")
+	name = string.gsub(name, " Ω$", "")
 	if _technologies[name] then
 		return true
 	else

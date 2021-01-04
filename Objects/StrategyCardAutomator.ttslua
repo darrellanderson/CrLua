@@ -601,7 +601,7 @@ function onStrategyCardButtonClicked(params)
 				_openPopupUi(color, color.."technologyPopup")
 			end
 			-- picks the tech card and takes care of necro command tokens
-			queueResearchTech(color, option)
+			researchTech(color, option)
 		elseif action == "popup" and option == "close" then
 			_closeMenu(color, color..card.."Popup")
 		end
@@ -1123,7 +1123,6 @@ end
 
 function _updateColorSelector(layout, element, colorTable)
 	assert(type(element) == "string")
-	log("_updateColors " .. element .. " starting.")
 	local keepTable = {}
 	local elementIndex = 0
 
@@ -1737,8 +1736,8 @@ function researchTech(color, cardName)
 		while not vacant do
 			vacant = true
 			for _,cardPos in ipairs(techCardPositionsOnTable) do
-				if math.floor(cardPos.x*10+0.5) == math.floor(pos.x*10+0.5) then
-					if math.floor(cardPos.z*10+0.5) == math.floor(pos.z*10+0.5) then
+				if math.floor(cardPos.x+0.5) == math.floor(pos.x+0.5) then
+					if math.floor(cardPos.z+0.5) == math.floor(pos.z+0.5) then
 						vacant = false
 						pos.z = pos.z + dz
 						break
@@ -1756,7 +1755,7 @@ function researchTech(color, cardName)
 		local snapPoints = factionSheet.getSnapPoints()
 
 		local pos = snapPoints[_pointorder[_overrides[cardName]["upgrade"]]].position
-		pos.y = pos.y + 0.1
+		pos.y = pos.y + 0.2
 
 		return {position=factionSheet.positionToWorld(pos), rotation=rot}
 	end
@@ -1784,6 +1783,7 @@ function researchTech(color, cardName)
 		end
 	else	-- unit upgades are sent to factionSheet, other tech just put left of deck.
 		if techType == "unitUpgrade" then
+			params.smooth = true
 			pos = _getPosToFactionSheet(cardName, factionSheet, techDeck)
 		else
 			pos = _getPosToTechDeck(cardName, techDeck)

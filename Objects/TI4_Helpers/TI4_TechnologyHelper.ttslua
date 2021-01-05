@@ -225,7 +225,7 @@ function _getPosParamsFromTechBoard(techBoard)
 	}
 end
 
-function _getTechBoardAndCards(color)
+function getTechBoardAndCards(color)
 	-- Searches for a tech board in COLOR zone.
 	-- If a tech board is found, returns table with tech board and all tech cards in COLOR zone.
 	assert(type(color) == 'string')
@@ -234,15 +234,11 @@ function _getTechBoardAndCards(color)
 	local techBoard
 	for _, object in ipairs(getAllObjects()) do
 		local name = object.getName()
-		if (name == "Technology Board") and _zoneHelper.zoneFromPosition(object.getPosition()) then
+		if (name == "Technology Board") and _zoneHelper.zoneFromPosition(object.getPosition()) == color then
 			techBoard = object
 		elseif isTechFromName(name) then
 			guidToPosList[object.getGUID()] = object.getPosition()
 		end
-	end
-
-	if not techBoard then
-		return
 	end
 
 	local cardPositionsInZone = {}
@@ -254,8 +250,8 @@ function _getTechBoardAndCards(color)
 	end
 
 	return {
-		["Technology Board"] = techBoard,
-		["cardPositionsInZone"] = cardPositionsInZone
+		techBoard = techBoard,
+		cardPositionsInZone = cardPositionsInZone
 	}
 end
 
@@ -317,14 +313,13 @@ function getVacantPosOnTechBoard(params)
 	local occupiedPositions = params.occupiedPositions
 	-- if no techBoard was provided, get tech board and tech cards in COLORs zone
 	if not techBoard then
-		local techBoardAndCards = _getTechBoardAndCards(params.color)
+		local techBoardAndCards = getTechBoardAndCards(params.color)
 		-- exit if no technology board was found for color
-		if not techBoardAndCards["Technology Board"] then
-			return nil
-		else
-			techBoard = techBoardAndCards["Technology Board"]
+		if not techBoardAndCards.techBoard then
+			return
 		end
-		occupiedPositions = techBoardAndCards["cardPositionsInZone"]
+		techBoard = techBoardAndCards.techBoard
+		occupiedPositions = techBoardAndCards.cardPositionsInZone
 	else
 		if not occupiedPositions then
 			error("_getVacantPosOnTechBoard: got passed params.techBoard without params.occupiedPositions. Requires both or neither.")
@@ -338,9 +333,13 @@ function getVacantPosOnTechBoard(params)
 	local posParams = _getPosParamsFromTechBoard(techBoard)
 	local _columns = {["Blue"]=0, ["Green"]=1, ["Yellow"]=2, ["Red"]=3, ["unitUpgrade"]=4}
 	local column = _columns[getTechType(params.cardName)]
+	if not column then
+		-- Nekro tech has no column, ignore
+		return
+	end
 	local p0 = posParams.p0
 	local dpos = posParams.dpos
-	p0.x = p0.x - column*dpos.dx
+	p0.x = p0.x - column * dpos.dx
 
 	for i,pos in ipairs(occupiedPositions) do
 		occupiedPositions[i] = techBoard.positionToLocal(pos)

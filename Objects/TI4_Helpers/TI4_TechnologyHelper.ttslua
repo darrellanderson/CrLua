@@ -1,3 +1,7 @@
+--- Technology attributes, tech board use.
+-- @author Jirach08
+-- #include <~/CrLua/Objects/TI4_Helpers/TI4_TechnologyHelper>
+
 function getHelperClient(helperObjectName)
 	local function getHelperObject()
 		for _, object in ipairs(getAllObjects()) do
@@ -11,7 +15,7 @@ function getHelperClient(helperObjectName)
 		if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
 		return function(parameters) return helperObject.call(functionName, parameters) end
 	end
-return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+	return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
 
 local _technologies = {
@@ -25,7 +29,7 @@ local _technologies = {
 	["Plasma Scoring"] = { type = "Red", requirements = nil, abbrev = 'Plasma' },
 	["AI Development Algorithm"] = { type = "Red", requirements = nil, abbrev = 'AI Dev Algo', source="PoK" },
 	["Magen Defense Grid"] = { type = "Red", requirements = "R", abbrev = 'Magen' },
-	["Self-Assembly Routines"] = { type = "Red", requirements = "R", abbrev = 'Self Assembly', source="PoK" },
+	["Self Assembly Routines"] = { type = "Red", requirements = "R", abbrev = 'Self Assembly', source="PoK" },
 	["Duranium Armor"] = { type = "Red", requirements = "RR", abbrev = 'Duranium' },
 	["Assault Cannon"] = { type = "Red", requirements = "RRR", abbrev = 'Assault Cannon' },
 
@@ -175,17 +179,18 @@ function isTechFromName(name)
 	end
 end
 
-local techNameSet = {}
+local _techNameSet = false
 
 function getTechNameSet()
 	-- Returns list of all valid technologies.
 	-- Names ending in " Ω" are not in list.
-	if next(techNameSet) == nil then
+	if not _techNameSet then
+		_techNameSet = {}
 		for k,_ in pairs(_technologies) do
-			techNameSet[k] = true
+			_techNameSet[k] = true
 		end
 	end
-	return techNameSet
+	return _techNameSet
 end
 
 ------------------------------------------------------------------------------
@@ -196,7 +201,7 @@ function _getPosParamsFromTechBoard(techBoard)
 	local dx
 	local dz
 	-- find grid size and origin of snap points on tech board
-	for _,snap in ipairs(techBoard.getSnapPoints()) do
+	for _, snap in ipairs(techBoard.getSnapPoints()) do
 		if not p0 then
 			p0 = snap.position
 		else
@@ -215,8 +220,8 @@ function _getPosParamsFromTechBoard(techBoard)
 		end
 	end
 	return {
-		['p0'] = p0,
-		['dpos'] = {['dx'] = dx, ['dy'] = 0, ['dz'] = dz}
+		p0 = p0,
+		dpos = {['dx'] = dx, ['dy'] = 0, ['dz'] = dz}
 	}
 end
 
@@ -226,15 +231,13 @@ function _getTechBoardAndCards(color)
 	assert(type(color) == 'string')
 
 	local guidToPosList = {}
-
 	local techBoard
-	for _,object in ipairs(getAllObjects()) do
-		if (object.getName() == "Technology Board") and _zoneHelper.zoneFromPosition(object.getPosition()) then
+	for _, object in ipairs(getAllObjects()) do
+		local name = object.getName()
+		if (name == "Technology Board") and _zoneHelper.zoneFromPosition(object.getPosition()) then
 			techBoard = object
-		else
-			if isTechFromName(object.getName()) then
-				guidToPosList[object.getGUID()] = object.getPosition()
-			end
+		elseif isTechFromName(name) then
+			guidToPosList[object.getGUID()] = object.getPosition()
 		end
 	end
 
@@ -242,13 +245,9 @@ function _getTechBoardAndCards(color)
 		return
 	end
 
-	if next(guidToPosList) == nil then
-		return {['Technology Board'] = techBoard, ["cardPositionsInZone"] = nil}
-	end
-
 	local cardPositionsInZone = {}
 	local zonesForTech = _zoneHelper.zonesFromPositions(guidToPosList)
-	for guid,zoneColor in pairs(zonesForTech) do
+	for guid, zoneColor in pairs(zonesForTech) do
 		if zoneColor == color then
 			table.insert(cardPositionsInZone, 1, guidToPosList[guid])
 		end
@@ -267,6 +266,7 @@ function getFirstVacantPosition(params)
 	assert(type(params) == "table")
 	assert(type(params.p0) == "table")
 	assert(type(params.dpos) == "table")
+
 	local occupiedPositions = {}
 	if params.occupiedPositions then
 		assert(type(params.occupiedPositions) == "table")
@@ -275,7 +275,7 @@ function getFirstVacantPosition(params)
 
 	-- first loop to find only cards in respective column
 	local positionInColumn = {}
-	for _,cardPos in ipairs(occupiedPositions) do
+	for _, cardPos in ipairs(occupiedPositions) do
 		if math.floor(cardPos.x/params.dpos.dx+0.5) == math.floor(params.p0.x/params.dpos.dx+0.5) then
 			table.insert(positionInColumn, 1, cardPos)
 		end
@@ -287,7 +287,7 @@ function getFirstVacantPosition(params)
 	local vacant = false
 	while not vacant do
 		vacant = true
-		for _,cardPos in ipairs(positionInColumn) do
+		for _, cardPos in ipairs(positionInColumn) do
 			if math.floor(cardPos.z/params.dpos.dz+0.5) == math.floor(pos.z/params.dpos.dz+0.5) then
 				vacant = false
 				pos.z = pos.z + params.dpos.dz
@@ -304,9 +304,9 @@ function getVacantPosOnTechBoard(params)
 	--	to potentially avoid multiple getAllObjects() calls.
 	-- params["occupiedPositions"] must be in positionToWorld coordinates.
 	-- returns nil if COLOR has no tech board in zone, else returns {position={}, rotation={}} table.
-	assert(type(params) == "table")
-	assert(type(params.cardName) == "string")
-	assert(type(params.color) == "string")
+	assert(type(params) == "table", "bad params")
+	assert(type(params.cardName) == "string", "bad params.cardName")
+	assert(type(params.color) == "string", "bad params.color")
 
 	if not isTechFromName(params.cardName) then
 		log("getVacantPosOnTechBoard: " .. params.cardName .. " is not a valid Technology Card.")
@@ -331,8 +331,8 @@ function getVacantPosOnTechBoard(params)
 		end
 	end
 
-	assert(type(techBoard) == "userdata")
-	assert(type(occupiedPositions) == "table")
+	assert(type(techBoard) == "userdata", "bad techBoard")
+	assert(type(occupiedPositions) == "table", "bad occupiedPositions")
 
 	-- {['p0'] = pos, ['dx'] = dx, ['dz'] = dz} in techBoard local coordinates
 	local posParams = _getPosParamsFromTechBoard(techBoard)
@@ -353,7 +353,7 @@ function getVacantPosOnTechBoard(params)
 	return {
 		position = techBoard.positionToWorld(vacantPos),
 		rotation = techBoard.getRotation()
-		}
+	}
 end
 
 -- full deep copy of table o
@@ -372,5 +372,16 @@ function _deepcopy(o, seen)
 	else -- number, string, boolean, etc
 		no = o
 	end
-return no
+	return no
 end
+
+-------------------------------------------------------------------------------
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

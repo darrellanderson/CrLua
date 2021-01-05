@@ -39,6 +39,7 @@ end
 local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
+local _technologyHelper = getHelperClient('TI4_TECHNOLOGY_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 local PRINT_DEBUG_LOG_MESSAGES = false
@@ -1530,25 +1531,82 @@ function SetupFaction.unpackStartingTech(color, faction, zone)
     end
     local techDeck = getTechDeck()
 
+    -- Find cards in deck, do not move them yet.
+    local techCards = {}
+    for i, name in ipairs(faction.startingTech) do
+        local namePattern = string.gsub(name, '-', '%%-')
+        local guid = getEntryGuid(techDeck, namePattern)
+        if guid then
+            table.insert(techCards, {
+                name = name,
+                guid = guid,
+                position = false,  -- fill in later
+                rotation = false,  -- fill in later
+            })
+        else
+            _safePrintToColor('unpackStartingTech: missing starting technology ' .. name, color, 'Red')
+        end
+    end
+
+    -- Find where cards should unpack, use tech board if present.
+    local techBoardAndCards = _technologyHelper.getTechBoardAndCards(color)
+    local techBoard = techBoardAndCards and techBoardAndCards.techBoard
+    if techBoard then
+        local params = {
+            cardName = false, -- set this for each card
+            color = color,
+            techBoard = techBoard,
+            occupiedPositions = techBoardAndCards.cardPositionsInZone
+        }
+        for _, techCard in ipairs(techCards) do
+            params.cardName = techCard.name
+            local posRot = _technologyHelper.getVacantPosOnTechBoard(params)
+            if posRot then
+                techCard.position = posRot.position
+                techCard.rotation = posRot.rotation
+            end
+        end
+        -- Watch out for collisions.
+        local usedSet = {}
+        local dz = 2.04 * ((techDeck.getPosition().z < 0) and -1 or 1)
+        for _, techCard in ipairs(techCards) do
+            if techCard.position then
+                while true do
+                    local usedKey = techCard.position.x .. ',' .. techCard.position.z
+                    if not usedSet[usedKey] then
+                        usedSet[usedKey] = true
+                        break
+                    end
+                    -- Would be safer to use local positions and/or snap points.
+                    techCard.position.z = techCard.position.z + dz
+                end
+            end
+        end
+    end
+
+    -- Assign positions for any tech cards without them (e.g. all if no tech
+    -- board, or nekro techs that don't belong there, etc).
     local offset = {
         x = SetupFaction.STARTING_TECH_OFFSET.x,
         y = SetupFaction.STARTING_TECH_OFFSET.y,
         z = SetupFaction.STARTING_TECH_OFFSET.z
     }
-    for i, name in ipairs(faction.startingTech) do
-        name = string.gsub(name, '-', '%%-')
-        local guid = getEntryGuid(techDeck, name)
-        if guid then
-            techDeck.takeObject({
-                guid              = guid,
-                position          = offsetPosition(zone.center, offset),
-                rotation          = zoneRotation(zone, offset),
-                smooth            = true,
-            })
-        else
-            _safePrintToColor('unpackStartingTech: missing starting technology ' .. name, color, 'Red')
+    for _, techCard in ipairs(techCards) do
+        if not techCard.position then
+            techCard.position = offsetPosition(zone.center, offset)
+            techCard.rotation = zoneRotation(zone, offset)
+            offset.z = offset.z + SetupFaction.STARTING_TECH_OFFSET.dz
         end
-        offset.z = offset.z + SetupFaction.STARTING_TECH_OFFSET.dz
+    end
+
+    -- Draw the cards.
+    for _, techCard in ipairs(techCards) do
+        techDeck.takeObject({
+            guid              = techCard.guid,
+            position          = techCard.position,
+            rotation          = techCard.rotation,
+            smooth            = true,
+        })
     end
 end
 

@@ -1,3 +1,7 @@
+--- Execute many strategy card actions, see description for details.
+-- @author Jirach08
+-- #include <~/CrLua/Objects/StrategyCardAutomator>
+
 function getHelperClient(helperObjectName)
 	local function getHelperObject()
 		for _, object in ipairs(getAllObjects()) do
@@ -423,14 +427,12 @@ function onStrategyCardButtonClicked(params)
 	assert(type(params.value) == 'string')
 
 
-	local card
-	card = string.match(params.strategyCard, "(.*)_.*")
-	local action
-	action = string.gsub(params.strategyCard, card.."_", "")
+	local card = string.match(params.strategyCard, "(.*)_.*")
+	local action = string.gsub(params.strategyCard, card.."_", "")
 	local color = params.player
 	local option = params.value
 
-	local secondarySuccessful
+	local secondarySuccessful = false
 
 	--log("Card:"..card.." Action:"..action .. " Option:"..option.. " Color:".. color)
 
@@ -462,16 +464,13 @@ function onStrategyCardButtonClicked(params)
 		-- EXCEPTION: if player has scepter of emelpar or is has mahact agent available
 		-- or has Yssaril agent available with mahact agent in game.
 	-- would be nice to have alt key to choose to use alternative, but not possible in xml buttons.
-	if action == "secondary" then
-		if not (card == "leadership") then
-			secondarySuccessful = _consumeStrategyToken(color)
-			if not secondarySuccessful then
-				_safeBroadcastToColor("No token in you strategy pool.", color, color)
-				return
-			end
+	if action == "secondary" and card ~= "leadership" then
+		local capatalizedCardName = string.gsub(card, "^%l", string.upper)
+		secondarySuccessful = _consumeStrategyToken(color, capatalizedCardName)
+		if not secondarySuccessful then
+			return  -- consumeStrategyToken printed the error message
 		end
 	end
-
 
 	-------------------------- Diplomacy ---------------------------------------
 	-------------------------- Construction ------------------------------------
@@ -485,7 +484,6 @@ function onStrategyCardButtonClicked(params)
 			return
 		end
 	end
-
 
 	-------------------------- Leadership --------------------------------------
 
@@ -607,9 +605,9 @@ function onStrategyCardButtonClicked(params)
 			if string.find(option, "Mecatol Rex") then
 				-- maybe outsource checking to separate function to not inflate the code?
 				if not _isObjectOwner(color, "Mecatol Rex") then
-					_safeBroadcastToColor("You do not control Mecatol Rex.", color, color)
+					_safeBroadcastToColor("Imperial: " .. color .. " does have Mecatol Rex planet card, not scoring.", color, "Red")
 				else
-					broadcastToAll(_getPlayerFromColor(color).steam_name .." uses Imperial Primary to score 1 VP for Mecatol Rex", color)
+					broadcastToAll("Imperial: " .. color .. " scores 1 VP for Mecatol Rex", color)
 					_closeMenu(color, card)
 				end
 			else
@@ -631,7 +629,6 @@ function onStrategyCardButtonClicked(params)
 			_closeMenu(color, card)
 		end
 	end
-
 end
 
 ----------------------------- Work Queue ---------------------------------------
@@ -895,16 +892,25 @@ end
 
 function updateUiOnClick(player, option, alt)
 	local colorTable = {}
-	local factionTable = {}
+	local factionColors = {}
+	local missingFactionColors = false
 
-	--only if all players have chosen a faction
-	for _,color in pairs(getSeatedPlayers()) do
+	-- Get all player zone colors as eligible for color choices (player may be
+	-- running late or disconnected, still include their zone).  Only register
+	-- faction techs for players with factions, warn about missing factions.
+	for _, color in pairs(_zoneHelper.zones()) do
 		local faction = _factionHelper.fromColor(color)
-		if not faction then
-			broadcastToAll('Update UI: ' .. color .. ' has not yet chosen a faction', 'Red')
-			return
+		if faction then
+			table.insert(factionColors, color)
+		else
+			missingFactionColors = missingFactionColors or {}
+			table.insert(missingFactionColors, color)
 		end
 		table.insert(colorTable, color)
+	end
+	if missingFactionColors then
+		local colors = table.concat(missingFactionColors, ', ')
+		broadcastToAll('Warning: no faction for ' .. colors .. '. Please repeat button click afterward to enable their faction technologies', 'Red')
 	end
 
 	local layout = UI.getXmlTable()
@@ -914,7 +920,7 @@ function updateUiOnClick(player, option, alt)
 	layout = _addTechnologyPrimarySecondary(layout)
 
 	-- adds the faction tech popup menu
-	layout = _addAutomationTechPopup(layout, colorTable)
+	layout = _addAutomationTechPopup(layout, factionColors)
 
 	-- adds on "Assign Speaker" button to Politics menu which opens the politics Popup
 	layout = _addAutomationPoliticsPopup(layout)
@@ -925,7 +931,6 @@ function updateUiOnClick(player, option, alt)
 	-- add a choice between scoring mecatol rex and drawing a secret
 	layout = _addImperialPrimary(layout)
 
-
 	-- adjusts the colors Table for the assign speaker politicsPopup
 	layout = _updateColorSelector(layout, "politicsPopup", colorTable)
 
@@ -933,7 +938,7 @@ function updateUiOnClick(player, option, alt)
 	layout = _updateColorSelector(layout, "trade", colorTable)
 
 	UI.setXmlTable(layout)
-	broadcastToAll("The strategy card menu has been updated", "Red")
+	broadcastToAll("Updated strategy card menus for automator", "Yellow")
 end
 
 function _addTechnologyPrimarySecondary(layout)
@@ -1068,13 +1073,13 @@ function _addAutomationPoliticsPopup(layout)
 end
 
 
-function  _addAutomationSecondaryPopup(layout, factionTable)
--- UI.createButton not available for global UI. It would have been nice to use alt click,
--- to select alternative to using strategy token if available.
--- now consumeStrategyToken just exits if alternative is available to the player and tells the player what her alternative is.
-log("_addAutomationSecondaryPopup not implemented yet")
-assert(type(factionTable) == "table")
-return layout
+function _addAutomationSecondaryPopup(layout, factionTable)
+	-- UI.createButton not available for global UI. It would have been nice to use alt click,
+	-- to select alternative to using strategy token if available.
+	-- now consumeStrategyToken just exits if alternative is available to the player and tells the player what her alternative is.
+	log("_addAutomationSecondaryPopup not implemented yet")
+	assert(type(factionTable) == "table")
+	return layout
 end
 
 function _addImperialPrimary(layout)
@@ -1210,9 +1215,10 @@ function _dealLeadershipCommandTokens(color, count, dpos)
 	local dx = -0.4
 
 	-- Do the alloation.  Watch out for an empty bag!
+	local gained = 0
 	for i = 1, count do
 		if commandTokensBag.getQuantity() == 0 then
-			_safeBroadcastToColor('You are out of Command Tokens. Only able to gain ' .. i .. ' Tokens. ', color, color)
+			_safeBroadcastToColor('Leadership: ' .. color .. ' out of Command Tokens. Only able to gain ' .. i .. ' tokens. ', color, "Red")
 			break
 		end
 		local token = commandTokensBag.takeObject({
@@ -1223,25 +1229,25 @@ function _dealLeadershipCommandTokens(color, count, dpos)
 			})
 		})
 		_strategyCardHelper._addUnallocatedCommandToken(token, color)
+		gained = gained + 1
 	end
 
-	_safeBroadcastToColor('You have gained Command Tokens.', color, color)
-
+	_safeBroadcastToColor('Leadership: ' .. color .. ' gained ' .. gained .. ' Command Tokens.', color, color)
 end
 
 ------------------------------ secondary ---------------------------------------
 
-function _consumeStrategyToken(color)
+function _consumeStrategyToken(color, strategyCard)
+	assert(type(color) == 'string' and type(strategyCard) == 'string')
+
 	local faction = _factionHelper.fromColor(color)
 	if not faction then
 		broadcastToAll('Consume Strategy tokens: no faction for ' .. color, 'Red')
 		return
 	end
 
-
 	local SsruuActive = false
 	local JaeMirKanActive = false
-
 
 	-- find command token bag
 	-- also check if alternate command token payment method available.
@@ -1263,7 +1269,7 @@ function _consumeStrategyToken(color)
 			if (name == "Jae Mir Kan") then
 				JaeMirKanActive = true
 				if (faction.name == "The Mahact Gene-Sorcerers") and (not object.is_face_down) then
-					_safeBroadcastToColor("Jae Mir Kan is available to you. No Token has been used.", color,color)
+					_safeBroadcastToColor(strategyCard .. ": Jae Mir Kan is available to you. No Token has been used.", color,color)
 					return true
 				end
 			elseif (faction.name == "The Yssaril Tribes") and (name == "Ssruu") and (not object.is_face_down) then
@@ -1273,7 +1279,7 @@ function _consumeStrategyToken(color)
 			if (name == "Scepter of Emelpar") and (not object.is_face_down) then
 				local zoneColor = _zoneHelper.zoneFromPosition(object.getPosition())
 				if zoneColor == color then
-					_safeBroadcastToColor("Scepter of Emelpar is available to you. No Token has been used.", color, color)
+					_safeBroadcastToColor(strategyCard .. ": Scepter of Emelpar is available to you. No Token has been used.", color, color)
 					return true
 				end
 
@@ -1281,11 +1287,10 @@ function _consumeStrategyToken(color)
 		end
 
 		if (SsruuActive and JaeMirKanActive) then
-			_safeBroadcastToColor("Ssruu is available to you. No Token has been used.", color, color)
+			_safeBroadcastToColor(strategyCard .. ": Ssruu is available to you. No Token has been used.", color, color)
 			return true
 		end
 	end
-
 
 	if not commandTokensBag then
 		broadcastToAll('Consume Strategy tokens: missing ' .. faction.tokenName .. ' Command Tokens Bag', 'Red')
@@ -1309,42 +1314,40 @@ function _consumeStrategyToken(color)
 				local pos = commandSheet.positionToLocal(object.getPosition())
 				if pos.x < 2 and pos.x > -4 and pos.z > -0.3 and pos.z < 3.5 then
 					commandTokensBag.putObject(object)
-					_safeBroadcastToColor("A token has been removed from your strategy pool.", color, color)
+					_safeBroadcastToColor(strategyCard .. ": removed one Command Token from " .. color .. "'s strategy pool.", color, color)
 					return true
 				end
 			end
 		end
 	end
 
+	_safeBroadcastToColor(strategyCard .. ": no command token in " .. color .. "'s strategy pool.", color, "Red")
 	return false
 end
 
 -------------------------------- Politics --------------------------------------
 
 function _moveSpeakerToken(color)
-	local faction = _factionHelper.fromColor(color)
-	if not faction then
-		broadcastToAll('Assign speaker token: no faction selected for ' .. color, 'Red')
-		return
-	end
-
 	local speakerToken = nil
 	speakerToken = _getByName("Speaker Token")
-
-	local commandSheet = getObjectFromGUID(faction.commandSheetGuid)
-	if not commandSheet then
-		broadcastToAll('Assign speaker token: missing ' .. color .. ' Command Sheet', 'Red')
+	if not speakerToken then
+		broadcastToAll('Assign speaker token: missing Speaker Token', 'Red')
 		return
 	end
-	local rot = commandSheet.getRotation()
+
 	zone = _zoneHelper.zoneAttributes(color)
+	if not zone then
+		broadcastToAll('Assign speaker token: missing ' .. color .. ' player area', 'Red')
+		return
+	end
 
 	local loc = _getSpeakerLoc(zone)
+	local rot = zone.rotation
 
-	speakerToken.setPositionSmooth( loc, false, true )
-	speakerToken.setRotation(rot)
+	speakerToken.setPositionSmooth(loc, false, true)
+	speakerToken.setRotationSmooth(rot, false, true)
 
-	broadcastToAll(color .. " has been assigned the new speaker.", color)
+	broadcastToAll(color .. " is the new speaker.", color)
 	return true
 end
 
@@ -1469,7 +1472,7 @@ function _allocateConstructionUnits(color, tokenTable)
 			end
 			-- Do the alloation.  Watch out for an empty bag!
 			if tokensBag.getQuantity() == 0 then
-				_safeBroadcastToColor('You have no more tokens to construct a ' .. unitName .. '. ', color, color)
+				_safeBroadcastToColor(color .. ' has no strategy token to construct a ' .. unitName .. '. ', color, "Red")
 				return false
 			end
 			local token = tokensBag.takeObject({
@@ -1483,12 +1486,9 @@ function _allocateConstructionUnits(color, tokenTable)
 		end
 	end
 
-	_safeBroadcastToColor('Your constructed units have been allocated.', color, color)
+	_safeBroadcastToColor("Allocated " .. color .. "'s constructed units", color, color)
 	return true
 end
-
-
-
 
 ------------------------------------ Trade -------------------------------------
 
@@ -1525,7 +1525,7 @@ function _gain3Tradegoods(color)
 		}),
 		rotation= {x=rot.x, y=rot.y, z=180}
 	})
-	_safeBroadcastToColor("You have gained 3 Tradegoods", color, color)
+	_safeBroadcastToColor(color .. " gained 3 Tradegoods", color, color)
 end
 
 
@@ -1587,7 +1587,7 @@ function _refreshCommodities(color)
 			rotation = factionSheet.getRotation()
 		})
 	end
-	_safeBroadcastToColor("Your Commodities have been refreshed", color, color)
+	_safeBroadcastToColor("Refreshed " .. color .. "'s commodities", color, color)
 end
 
 --------------------------------- Technology -----------------------------------
@@ -1598,7 +1598,7 @@ function researchTech(color, cardName)
 
 	local faction = _factionHelper.fromColor(color)
 	if not faction then
-		broadcastToAll('research Technology: no faction selected for ' .. color, 'Red')
+		broadcastToAll('Research Technology: no faction selected for ' .. color, 'Red')
 		return
 	end
 
@@ -1616,7 +1616,7 @@ function researchTech(color, cardName)
 			_dealLeadershipCommandTokens(color, 3, {x=0,y=0,z=0})
 			return
 		else
-			_safeBroadcastToColor("Can only gain command tokens as Nekro", color, color)
+			_safeBroadcastToColor("Can only gain command tokens as Nekro", color, "Red")
 			return
 		end
 	end
@@ -1627,6 +1627,9 @@ function researchTech(color, cardName)
 	local techBoard = false
 	local guidToPosTechOnTable = {}
 	local techType = _technologyHelper.getTechType(cardName)
+	if not techType then
+		error('_technologyHelper did not find "' .. cardName .. '"')
+	end
 
 	local techNameSet = _technologyHelper.getTechNameSet()
 	if not techNameSet then
@@ -1658,7 +1661,7 @@ function researchTech(color, cardName)
 
 	if not techDeck then
 		broadcastToAll('Research Technology: missing deckname ' .. deckName, color)
-		broadcastToAll("If you have researched all your available technologies: Congratulations to you " .. _getPlayerFromColor(color).steam_name .."!", color)
+		broadcastToAll("If you have researched all your available technologies: Congratulations to you " .. color .."!", color)
 		broadcastToAll("If not, please name your deck of remaining technology cards 'Technology Cards' and leave them in your zone.", color)
 		return
 	end
@@ -1669,9 +1672,9 @@ function researchTech(color, cardName)
 		return
 	end
 
-	local guid = _getEntryGuid(techDeck, cardName)
+	local guid = _getEntryGuid(techDeck, cardName) or _getEntryGuid(techDeck, cardName .. ' Ω')
 	if not guid then
-		_safeBroadcastToColor('Research Technology: ' .. cardName .. " not found in deck " .. techDeck.getName(), color, color)
+		_safeBroadcastToColor('Research Technology: ' .. cardName .. " not found in " .. techDeck.getName() .. " deck", color, "Red")
 		return
 	end
 
@@ -1721,32 +1724,36 @@ function researchTech(color, cardName)
 
 	local params = {
 		guid = guid,
-		smooth = false,
+		smooth = true,
 		callback_function = function(obj) obj.highlightOn(color, 1) end
 	}
-	local pos
 
+	local posRot
 	if techBoard then
-		pos = _technologyHelper.getVacantPosOnTechBoard({
+		posRot = _technologyHelper.getVacantPosOnTechBoard({
 			['cardName'] = cardName,
 			['color'] = color
 			--['techBoard'] = techBoard,
 			--['occupiedPositions'] = techCardPositionsOnTable
 		})
 		if techType == "unitUpgrade" then
-			params["callback_function"] = function(obj) _copyUnitUpgradeTechToFactionSheet(obj) end
+			local function newCallback(obj)
+				obj.highlightOn(color, 1)
+			 	_copyUnitUpgradeTechToFactionSheet(obj)
+			end
+			params.callback_function = newCallback
 		end
 	else	-- unit upgades are sent to factionSheet, other tech just put left of deck.
 		if techType == "unitUpgrade" then
 			params.smooth = true
-			pos = _getPosToFactionSheet(cardName, factionSheet, techDeck)
+			posRot = _getPosToFactionSheet(cardName, factionSheet, techDeck)
 		else
-			pos = _getPosToTechDeck(cardName, techDeck)
+			posRot = _getPosToTechDeck(cardName, techDeck)
 		end
 	end
 
-	params["position"] = pos.position
-	params["rot"] = pos.rotation
+	params.position = posRot.position
+	params.rotation = posRot.rotation
 
 	techDeck.takeObject(params)
 	_sendOnNewTechnologyResearched(color, cardName)

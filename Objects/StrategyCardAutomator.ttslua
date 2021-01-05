@@ -1625,18 +1625,33 @@ function researchTech(color, cardName)
 	local deckName = 'Technology Cards'
 	local techDeck = false
 	local techBoard = false
-	local techCardPositionsOnTable = {}
+	local guidToPosTechOnTable = {}
 	local techType = _technologyHelper.getTechType(cardName)
+
+	local techNameSet = _technologyHelper.getTechNameSet()
+	if not techNameSet then
+		error("_technologyHelper returned empty techNameSet")
+	end
+
 	for _,object in ipairs(getAllObjects()) do
-		if (color == _zoneHelper.zoneFromPosition(object.getPosition())) then
-			if _technologyHelper.isTechFromName(object.getName()) then
-				table.insert(techCardPositionsOnTable, 1, object.getPosition())
-			end
-			if (object.getName() == "Technology Board") then
-				techBoard = object
-			end
-			if (object.tag == 'Deck') and (object.getName() == deckName) then
-				techDeck = object
+		name = object.getName()
+		if techNameSet[string.gsub(name, " Ω$","")]then
+			guidToPosTechOnTable[object.getGUID()] = object.getPosition()
+		end
+		if (object.getName() == "Technology Board") and (color == _zoneHelper.zoneFromPosition(object.getPosition())) then
+			techBoard = object
+		end
+		if (object.getName() == deckName) and (object.tag == 'Deck') and (color == _zoneHelper.zoneFromPosition(object.getPosition())) then
+			techDeck = object
+		end
+	end
+
+	local techCardPositionsOnTable = {}
+	local zonesForTechOnTable = _zoneHelper.zonesFromPositions(guidToPosTechOnTable)
+	if zonesForTechOnTable then
+		for guid,zoneColor in pairs(zonesForTechOnTable) do
+			if zoneColor == color then
+				table.insert(techCardPositionsOnTable, 1, guidToPosTechOnTable[guid])
 			end
 		end
 	end
@@ -1650,7 +1665,7 @@ function researchTech(color, cardName)
 
 	local factionSheet = getObjectFromGUID(faction.factionSheetGuid)
 	if not factionSheet then
-		broadcastToAll('research Technology: missing ' .. color .. ' Faction Sheet', 'Red')
+		broadcastToAll('Research Technology: missing ' .. color .. ' Faction Sheet', 'Red')
 		return
 	end
 
@@ -1660,81 +1675,26 @@ function researchTech(color, cardName)
 		return
 	end
 
-
-
-	local function _getPosToTechBoard(cardName, techBoard, techDeck)
-		local pos
-		local dx
-		local dz
-		-- find grid size and origin of snap points on tech board
-		for _,snap in ipairs(techBoard.getSnapPoints()) do
-			if not pos then
-				pos = snap.position
-			else
-				if (not dz) and (snap.position.z < (pos.z - 0.1)) then
-					dz = snap.position.z - pos.z
-				end
-				if (not dx) and (snap.position.x < (pos.x - 0.1)) then
-					dx = pos.x - snap.position.x
-				end
-				if snap.position.x > pos.x then
-					pos.x = snap.position.x
-				end
-				if snap.position.z > pos.z then
-					pos.z = snap.position.z
-				end
-			end
-		end
-
-		-- find column for tech color
-		local _columns = {["Blue"]=0, ["Green"]=1, ["Yellow"]=2, ["Red"]=3, ["unitUpgrade"]=4}
-		column = _columns[_technologyHelper.getTechType(cardName)]
-		pos.x = pos.x - column*dx
-
-		-- find first spot not occupied by tech card
-		local vacant = false
-		while not vacant do
-			vacant = true
-			for _,cardOnTable in ipairs(techCardPositionsOnTable) do
-				cardPos = techBoard.positionToLocal(cardOnTable)
-				if math.floor(cardPos.x*10+0.5) == math.floor(pos.x*10+0.5) then
-					if math.floor(cardPos.z*10+0.5) == math.floor(pos.z*10+0.5) then
-						vacant = false
-						pos.z = pos.z + dz
-						break
-					end
-				end
-			end
-		end
-		return {position = techBoard.positionToWorld(pos), rotation = techBoard.getRotation()}
-	end
-
 	local function _getPosToTechDeck(cardName, techDeck)
 		-- place cards next to tech deck (take care on which side of the table)
-		local pos = techDeck.getPosition()
+		local p0 = techDeck.getPosition()
 		local rot = techDeck.getRotation()
 		local dz = 2
-		if pos.z > 0 then
-			pos.x = pos.x + 4
+		local dx = 4
+		if p0.z > 0 then
+			p0.x = p0.x + dx
 			dz = -2
 		else
-			pos.x = pos.x - 4
+			p0.x = p0.x - dx
 		end
 
-		-- check that the card is not moved over another existing tech card
-		local vacant = false
-		while not vacant do
-			vacant = true
-			for _,cardPos in ipairs(techCardPositionsOnTable) do
-				if math.floor(cardPos.x+0.5) == math.floor(pos.x+0.5) then
-					if math.floor(cardPos.z+0.5) == math.floor(pos.z+0.5) then
-						vacant = false
-						pos.z = pos.z + dz
-						break
-					end
-				end
-			end
-		end
+		local dpos = { ['dx'] = dx, ['dy'] = 0, ['dz'] = dz }
+		local pos = _technologyHelper.getFirstVacantPosition({
+			 ['p0'] = p0,
+			 ['dpos'] = dpos,
+			 ['occupiedPositions'] = techCardPositionsOnTable
+		})
+
 		return {position = pos, rotation = rot}
 	end
 
@@ -1767,7 +1727,12 @@ function researchTech(color, cardName)
 	local pos
 
 	if techBoard then
-		pos = _getPosToTechBoard(cardName, techBoard, techDeck)
+		pos = _technologyHelper.getVacantPosOnTechBoard({
+			['cardName'] = cardName,
+			['color'] = color
+			--['techBoard'] = techBoard,
+			--['occupiedPositions'] = techCardPositionsOnTable
+		})
 		if techType == "unitUpgrade" then
 			params["callback_function"] = function(obj) _copyUnitUpgradeTechToFactionSheet(obj) end
 		end
@@ -1799,26 +1764,26 @@ function _getEntryGuid(container, namePattern)
 end
 
 function _sendOnNewTechnologyResearched(playerColor, cardName)
-    local handler = 'onNewTechnologyResearched'
-    local listeners = {}
-    for _, object in ipairs(getAllObjects()) do
-        if object.getVar(handler) then
-            table.insert(listeners, object.getGUID())
-        end
-    end
+	local handler = 'onNewTechnologyResearched'
+	local listeners = {}
+	for _, object in ipairs(getAllObjects()) do
+		if object.getVar(handler) then
+			table.insert(listeners, object.getGUID())
+		end
+	end
 	if #listeners > 0 then
-    	local params = {player = playerColor,
+		local params = {player = playerColor,
 		technology = cardName}
-	    for i, guid in ipairs(listeners) do
-            local function callHandler()
-                local listener = getObjectFromGUID(guid)
-                if listener then
-                    listener.call(handler, params)
-                end
-            end
-            Wait.frames(callHandler, i)
-        end
-    end
+		for i, guid in ipairs(listeners) do
+			local function callHandler()
+				local listener = getObjectFromGUID(guid)
+				if listener then
+					listener.call(handler, params)
+				end
+			end
+			Wait.frames(callHandler, i)
+		end
+	end
 end
 
 ----------------------------- Imperial ----------------------------------

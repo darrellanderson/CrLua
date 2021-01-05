@@ -1,115 +1,117 @@
 function getHelperClient(helperObjectName)
-    local function getHelperObject()
-        for _, object in ipairs(getAllObjects()) do
-            if object.getName() == helperObjectName then return object end
-        end
-        error('missing object "' .. helperObjectName .. '"')
-    end
-    local helperObject = false
-    local function getCallWrapper(functionName)
-        helperObject = helperObject or getHelperObject()
-        if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
-        return function(parameters) return helperObject.call(functionName, parameters) end
-    end
-    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+	local function getHelperObject()
+		for _, object in ipairs(getAllObjects()) do
+			if object.getName() == helperObjectName then return object end
+		end
+		error('missing object "' .. helperObjectName .. '"')
+	end
+	local helperObject = false
+	local function getCallWrapper(functionName)
+		helperObject = helperObject or getHelperObject()
+		if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
+		return function(parameters) return helperObject.call(functionName, parameters) end
+	end
+return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
 
 local _technologies = {
-	["Neural Motivator"] = { type = "Green", requirements = nil, abbrev = 'Neural', expansion="base" },
-	["Psychoarchaeology"] = { type = "Green", requirements = nil, abbrev = 'Pyschoarch', expansion="PoK" },
-	["Dacxive Animators"] = { type = "Green", requirements = "G", abbrev = 'Dacxive', expansion="base" },
-	["Bio-Stims"] = { type = "Green", requirements = "G", abbrev = 'Bio-Stims', expansion="PoK" },
-	["Hyper Metabolism"] = { type = "Green", requirements = "GG", abbrev = 'Hyper', expansion="base" },
-	["X-89 Bacterial Weapon"] = { type = "Green", requirements = "GGG", abbrev = 'X-89 B.W.', expansion="base" },
+	["Neural Motivator"] = { type = "Green", requirements = nil, abbrev = 'Neural' },
+	["Psychoarchaeology"] = { type = "Green", requirements = nil, abbrev = 'Pyschoarch', source="PoK" },
+	["Dacxive Animators"] = { type = "Green", requirements = "G", abbrev = 'Dacxive' },
+	["Bio-Stims"] = { type = "Green", requirements = "G", abbrev = 'Bio-Stims', source="PoK" },
+	["Hyper Metabolism"] = { type = "Green", requirements = "GG", abbrev = 'Hyper' },
+	["X-89 Bacterial Weapon"] = { type = "Green", requirements = "GGG", abbrev = 'X-89 B.W.' },
 
-	["Plasma Scoring"] = { type = "Red", requirements = nil, abbrev = 'Plasma', expansion="base" },
-	["AI Development Algorithm"] = { type = "Red", requirements = nil, abbrev = 'AI Dev Algo', expansion="PoK" },
-	["Magen Defense Grid"] = { type = "Red", requirements = "R", abbrev = 'Magen', expansion="base" },
-	["Self-Assembly Routines"] = { type = "Red", requirements = "R", abbrev = 'Self Assembly', expansion="PoK" },
-	["Duranium Armor"] = { type = "Red", requirements = "RR", abbrev = 'Duranium', expansion="base" },
-	["Assault Cannon"] = { type = "Red", requirements = "RRR", abbrev = 'Assault Cannon', expansion="base" },
+	["Plasma Scoring"] = { type = "Red", requirements = nil, abbrev = 'Plasma' },
+	["AI Development Algorithm"] = { type = "Red", requirements = nil, abbrev = 'AI Dev Algo', source="PoK" },
+	["Magen Defense Grid"] = { type = "Red", requirements = "R", abbrev = 'Magen' },
+	["Self-Assembly Routines"] = { type = "Red", requirements = "R", abbrev = 'Self Assembly', source="PoK" },
+	["Duranium Armor"] = { type = "Red", requirements = "RR", abbrev = 'Duranium' },
+	["Assault Cannon"] = { type = "Red", requirements = "RRR", abbrev = 'Assault Cannon' },
 
-	["Antimass Deflectors"] = { type = "Blue", requirements = nil, abbrev = 'Antimass', expansion="base" },
-	["Dark Energy Tap"] = { type = "Blue", requirements = nil, abbrev = 'Dark Energy Tap', expansion="PoK" },
-	["Gravity Drive"] = { type = "Blue", requirements = "B", abbrev = 'Grav Drive', expansion="base" },
-	["Sling Relay"] = { type = "Blue", requirements = "B", abbrev = 'Sling Relay', expansion="PoK" },
-	["Fleet Logistics"] = { type = "Blue", requirements = "BB", abbrev = 'Fleet Logistics', expansion="base" },
-	["Light-Wave Deflector"] = { type = "Blue", requirements = "BBB", abbrev = 'Light/Wave', expansion="base" },
+	["Antimass Deflectors"] = { type = "Blue", requirements = nil, abbrev = 'Antimass' },
+	["Dark Energy Tap"] = { type = "Blue", requirements = nil, abbrev = 'Dark Energy Tap', source="PoK" },
+	["Gravity Drive"] = { type = "Blue", requirements = "B", abbrev = 'Grav Drive' },
+	["Sling Relay"] = { type = "Blue", requirements = "B", abbrev = 'Sling Relay', source="PoK" },
+	["Fleet Logistics"] = { type = "Blue", requirements = "BB", abbrev = 'Fleet Logistics' },
+	["Light-Wave Deflector"] = { type = "Blue", requirements = "BBB", abbrev = 'Light/Wave' },
 
-	["Sarween Tools"] = { type = "Yellow", requirements = nil, abbrev = 'Sarween', expansion="base" },
-	["Scanlink Drone Network"] = { type = "Yellow", requirements = nil, abbrev = 'Scanlink', expansion="PoK" },
-	["Graviton Laser System"] = { type = "Yellow", requirements = "Y", abbrev = 'Graviton', expansion="base" },
-	["Predictive Intelligence"] = { type = "Yellow", requirements = "Y", abbrev = 'Pred Intel', expansion="PoK" },
-	["Transit Diodes"] = { type = "Yellow", requirements = "YY", abbrev = 'Transit', expansion="base" },
-	["Integrated Economy"] = { type = "Yellow", requirements = "YYY", abbrev = 'Integrated Eco.', expansion="base" },
+	["Sarween Tools"] = { type = "Yellow", requirements = nil, abbrev = 'Sarween' },
+	["Scanlink Drone Network"] = { type = "Yellow", requirements = nil, abbrev = 'Scanlink', source="PoK" },
+	["Graviton Laser System"] = { type = "Yellow", requirements = "Y", abbrev = 'Graviton' },
+	["Predictive Intelligence"] = { type = "Yellow", requirements = "Y", abbrev = 'Pred Intel', source="PoK" },
+	["Transit Diodes"] = { type = "Yellow", requirements = "YY", abbrev = 'Transit' },
+	["Integrated Economy"] = { type = "Yellow", requirements = "YYY", abbrev = 'Integrated Eco.' },
 
-	["Infantry II"] = { type = "unitUpgrade", requirements = "GG", abbrev = 'Infantry II', expansion="base" },
-	["Destroyer II"] = { type = "unitUpgrade", requirements = "RR", abbrev = 'Destroyer II', expansion="base" },
-	["Carrier II"] = { type = "unitUpgrade", requirements = "BB", abbrev = 'Carrier II', expansion="base" },
-	["Space Dock II"] = { type = "unitUpgrade", requirements = "YY", abbrev = 'Space Dock II', expansion="base" },
+	["Infantry II"] = { type = "unitUpgrade", requirements = "GG", abbrev = 'Infantry II' },
+	["Destroyer II"] = { type = "unitUpgrade", requirements = "RR", abbrev = 'Destroyer II' },
+	["Carrier II"] = { type = "unitUpgrade", requirements = "BB", abbrev = 'Carrier II' },
+	["Space Dock II"] = { type = "unitUpgrade", requirements = "YY", abbrev = 'Space Dock II' },
 
-	["Fighter II"] = { type = "unitUpgrade", requirements = "BG", abbrev = 'Fighter II', expansion="base" },
-	["PDS II"] = { type = "unitUpgrade", requirements = "RY", abbrev = 'PDS II', expansion="base" },
-	["Cruiser II"] = { type = "unitUpgrade", requirements = "RGY", abbrev = 'Cruiser II', expansion="base" },
-	["Dreadnought II"] = { type = "unitUpgrade", requirements = "BBY", abbrev = 'Dread II', expansion="base" },
-	['War Sun'] = { type = "unitUpgrade", requirements = "RRRY", abbrev = 'War Sun', expansion="base" },
+	["Fighter II"] = { type = "unitUpgrade", requirements = "BG", abbrev = 'Fighter II' },
+	["PDS II"] = { type = "unitUpgrade", requirements = "RY", abbrev = 'PDS II' },
+	["Cruiser II"] = { type = "unitUpgrade", requirements = "RGY", abbrev = 'Cruiser II' },
+	["Dreadnought II"] = { type = "unitUpgrade", requirements = "BBY", abbrev = 'Dread II' },
+	['War Sun'] = { type = "unitUpgrade", requirements = "RRRY", abbrev = 'War Sun' },
 
 	-- faction tech
-	["Letani Warrior II"] = { type = "unitUpgrade", requirements = "GG", abbrev = 'Letani II', expansion = "base" },
-	["Bioplasmosis"] = { type = "Green", requirements = "GG", abbrev = 'Bioplas', expansion = "base" },
-	["L4 Disruptors"] = { type = "Yellow", requirements = "Y", abbrev = 'L4 Disrupt', expansion = "base" },
-	["Non-Euclidean Shielding"] = { type = "Red", requirements = "RR", abbrev = 'N.E.S.', expansion = "base" },
-	["Chaos Mapping"] = { type = "Blue", requirements = "B", abbrev = 'Chaos Map', expansion = "base" },
-	["Floating Factory II"] = { type = "unitUpgrade", requirements = "YY", abbrev = "FF II", expansion = "base" },
-	["Prototype War Sun II"] = { type = "unitUpgrade", requirements = "YRRR", abbrev = "PWS II", expansion = "base" },
-	["Magmus Reactor"] = { type = "Red", requirements = "RR", abbrev = 'Magmus', expansion = "base" },
-	["Quantum Datahub Node"] = { type = "Yellow", requirements = "YYY", abbrev = 'QDHN', expansion = "base" },
-	["Production Biomes"] = { type = "Green", requirements = "GG", abbrev = 'Prod. Biomes', expansion = "base" },
-	["Spec Ops II"] = { type = "unitUpgrade", requirements = "GG", abbrev = 'Spec Ops II', expansion = "base" },
-	["Advanced Carrier II"] = { type = "unitUpgrade", requirements = "BB", abbrev = 'Adv Carrier II', expansion = "base" },
-	["Wormhole Generator"] = { type = "Blue", requirements = "BB", abbrev = 'Wormhole Gen', expansion = "base" },
-	["Dimensional Splicer"] = { type = "Red", requirements = "R", abbrev = 'D. Splicer', expansion = "base" },
-	["Super-Dreadnought II"] = { type = "unitUpgrade", requirements = "BBY", abbrev = 'SuperDread II', expansion = "base" },
-	["Inheritance Systems"] = { type = "Yellow", requirements = "YY", abbrev = 'Inherit. Systems', expansion = "base" },
-	["Mirror Computing"] = { type = "Yellow", requirements = "YYY", abbrev = 'Mirror Comp', expansion = "base" },
-	["Salvage Operations"] = { type = "Yellow", requirements = "YY", abbrev = 'Salvage Ops.', expansion = "base" },
-	["Hybrid Crystal Fighter II"] = { type = "unitUpgrade", requirements = "GB", abbrev = "HCF II", expansion = "base" },
-	["Neuroglaive"] = { type = "Green", requirements = "GGG", abbrev = 'Neuroglaive', expansion = "base" },
-	["Valefar Assimilator X"] = { type = nil, requirements = nil, abbrev = nil, expansion = "base" },
-	["Valefar Assimilator Y"] = { type = nil, requirements = nil, abbrev = nil, expansion = "base" },
-	["Exotrireme II"] = { type = "unitUpgrade", requirements = "BBY", abbrev = 'Exotrireme II', expansion = "base" },
-	["Valkyrie Particle Weave"] = { type = "Red", requirements = "RR", abbrev = 'Valkyrie PW', expansion = "base" },
-	["Spacial Conduit Cylinder"] = { type = "Blue", requirements = "BB", abbrev = 'Spacial Conduit', expansion = "base" },
-	["E-res Siphons"] = { type = "Yellow", requirements = "YY", abbrev = 'E-Res', expansion = "base" },
-	["Lazax Gate Folding"] = { type = "Blue", requirements = "BB", abbrev = 'Lazax Gate', expansion = "base" },
-	["Hegemonic Trade Policy"] = { type = "Yellow", requirements = "YY", abbrev = 'Hegemonic', expansion = "base" },
-	["Instinct Training"] = { type = "Green", requirements = "G", abbrev = 'Instinct Train', expansion = "base" },
-	["Nullification Field"] = { type = "Yellow", requirements = "YY", abbrev = 'Null. Field', expansion = "base" },
-	["Yin Spinner"] = { type = "Green", requirements = "GG", abbrev = 'Yin Spin', expansion = "base" },
-	["Impulse Core"] = { type = "Yellow", requirements = "YY", abbrev = 'Impulse', expansion = "base" },
-	["Mageon Implants"] = { type = "Green", requirements = "GGG", abbrev = 'Mageon', expansion = "base" },
-	["Transparasteel Plating"] = { type = "Green", requirements = "G", abbrev = 'Transparasteel', expansion = "base" },
+	["Letani Warrior II"] = { type = "unitUpgrade", requirements = "GG", abbrev = 'Letani II' },
+	["Bioplasmosis"] = { type = "Green", requirements = "GG", abbrev = 'Bioplas' },
+	["L4 Disruptors"] = { type = "Yellow", requirements = "Y", abbrev = 'L4 Disrupt' },
+	["Non-Euclidean Shielding"] = { type = "Red", requirements = "RR", abbrev = 'N.E.S.' },
+	["Chaos Mapping"] = { type = "Blue", requirements = "B", abbrev = 'Chaos Map' },
+	["Floating Factory II"] = { type = "unitUpgrade", requirements = "YY", abbrev = "FF II" },
+	["Prototype War Sun II"] = { type = "unitUpgrade", requirements = "YRRR", abbrev = "PWS II" },
+	["Magmus Reactor"] = { type = "Red", requirements = "RR", abbrev = 'Magmus' },
+	["Quantum Datahub Node"] = { type = "Yellow", requirements = "YYY", abbrev = 'QDHN' },
+	["Production Biomes"] = { type = "Green", requirements = "GG", abbrev = 'Prod. Biomes' },
+	["Spec Ops II"] = { type = "unitUpgrade", requirements = "GG", abbrev = 'Spec Ops II' },
+	["Advanced Carrier II"] = { type = "unitUpgrade", requirements = "BB", abbrev = 'Adv Carrier II' },
+	["Wormhole Generator"] = { type = "Blue", requirements = "BB", abbrev = 'Wormhole Gen' },
+	["Dimensional Splicer"] = { type = "Red", requirements = "R", abbrev = 'D. Splicer' },
+	["Super-Dreadnought II"] = { type = "unitUpgrade", requirements = "BBY", abbrev = 'SuperDread II' },
+	["Inheritance Systems"] = { type = "Yellow", requirements = "YY", abbrev = 'Inherit. Systems' },
+	["Mirror Computing"] = { type = "Yellow", requirements = "YYY", abbrev = 'Mirror Comp' },
+	["Salvage Operations"] = { type = "Yellow", requirements = "YY", abbrev = 'Salvage Ops.' },
+	["Hybrid Crystal Fighter II"] = { type = "unitUpgrade", requirements = "GB", abbrev = "HCF II" },
+	["Neuroglaive"] = { type = "Green", requirements = "GGG", abbrev = 'Neuroglaive' },
+	["Valefar Assimilator X"] = { type = nil, requirements = nil, abbrev = nil },
+	["Valefar Assimilator Y"] = { type = nil, requirements = nil, abbrev = nil },
+	["Exotrireme II"] = { type = "unitUpgrade", requirements = "BBY", abbrev = 'Exotrireme II' },
+	["Valkyrie Particle Weave"] = { type = "Red", requirements = "RR", abbrev = 'Valkyrie PW' },
+	["Spacial Conduit Cylinder"] = { type = "Blue", requirements = "BB", abbrev = 'Spacial Conduit' },
+	["E-res Siphons"] = { type = "Yellow", requirements = "YY", abbrev = 'E-Res' },
+	["Lazax Gate Folding"] = { type = "Blue", requirements = "BB", abbrev = 'Lazax Gate' },
+	["Hegemonic Trade Policy"] = { type = "Yellow", requirements = "YY", abbrev = 'Hegemonic' },
+	["Instinct Training"] = { type = "Green", requirements = "G", abbrev = 'Instinct Train' },
+	["Nullification Field"] = { type = "Yellow", requirements = "YY", abbrev = 'Null. Field' },
+	["Yin Spinner"] = { type = "Green", requirements = "GG", abbrev = 'Yin Spin' },
+	["Impulse Core"] = { type = "Yellow", requirements = "YY", abbrev = 'Impulse' },
+	["Mageon Implants"] = { type = "Green", requirements = "GGG", abbrev = 'Mageon' },
+	["Transparasteel Plating"] = { type = "Green", requirements = "G", abbrev = 'Transparasteel' },
 	-- PoK faction tech
-	["Temporal Command Suite"] = { type = "Yellow", requirements = "Y", abbrev = 'Temp Cmd Suite', expansion = "base" },
-	["Memoria II"] = { type = "unitUpgrade", requirements = "GBY", abbrev = 'Memoria II', expansion = "base" },
-	["Vortex"] = { type = "Red", requirements = "R", abbrev = 'Vortex', expansion = "base" },
-	["Dimensional Tear II"] = { type = "unitUpgrade", requirements = "YY", abbrev = 'Dim Tear II', expansion = "base" },
-	["Aerie Hololattice"] = { type = "Yellow", requirements = "Y", abbrev = 'Aerie Holo', expansion = "base" },
-	["Strike Wing Alpha II"] = { type = "unitUpgrade", requirements = "RR", abbrev = 'String Wing II', expansion = "base" },
-	["Saturn Engine II"] = { type = "unitUpgrade", requirements = "GYR", abbrev = 'Sat Eng II', expansion = "base" },
-	["Hel Titan II"] = { type = "unitUpgrade", requirements = "YR", abbrev = 'Hel-Titan II', expansion = "base" },
-	["Aetherstream"] = { type = "Blue", requirements = "BB", abbrev = 'Aetherstream', expansion = "base" },
-	["Voidwatch"] = { type = "Green", requirements = "G", abbrev = 'Voidwatch', expansion = "base" },
-	["Crimson Legionnaire II"] = { type = "unitUpgrade", requirements = "GG", abbrev = 'Crimson Legin II', expansion = "base" },
-	["Genetic Recombination"] = { type = "Green", requirements = "G", abbrev = 'Gene Recomb', expansion = "base" },
-	["Supercharge"] = { type = "Red", requirements = "R", abbrev = 'Supercharge', expansion = "base" },
-	["Pre-Fab Arcologies"] = { type = "Green", requirements = "GGG", abbrev = 'Pre-Fab Arc', expansion = "base" },
+	["Temporal Command Suite"] = { type = "Yellow", requirements = "Y", abbrev = 'Temp Cmd Suite', source = "PoK" },
+	["Memoria II"] = { type = "unitUpgrade", requirements = "GBY", abbrev = 'Memoria II', source = "PoK" },
+	["Vortex"] = { type = "Red", requirements = "R", abbrev = 'Vortex', source = "PoK" },
+	["Dimensional Tear II"] = { type = "unitUpgrade", requirements = "YY", abbrev = 'Dim Tear II', source = "PoK" },
+	["Aerie Hololattice"] = { type = "Yellow", requirements = "Y", abbrev = 'Aerie Holo', source = "PoK" },
+	["Strike Wing Alpha II"] = { type = "unitUpgrade", requirements = "RR", abbrev = 'String Wing II', source = "PoK" },
+	["Saturn Engine II"] = { type = "unitUpgrade", requirements = "GYR", abbrev = 'Sat Eng II', source = "PoK" },
+	["Hel-Titan II"] = { type = "unitUpgrade", requirements = "YR", abbrev = 'Hel-Titan II', source = "PoK" },
+	["Aetherstream"] = { type = "Blue", requirements = "BB", abbrev = 'Aetherstream', source = "PoK" },
+	["Voidwatch"] = { type = "Green", requirements = "G", abbrev = 'Voidwatch', source = "PoK" },
+	["Crimson Legionnaire II"] = { type = "unitUpgrade", requirements = "GG", abbrev = 'Crimson Legin II', source = "PoK" },
+	["Genetic Recombination"] = { type = "Green", requirements = "G", abbrev = 'Gene Recomb', source = "PoK" },
+	["Supercharge"] = { type = "Red", requirements = "R", abbrev = 'Supercharge', source = "PoK" },
+	["Pre-Fab Arcologies"] = { type = "Green", requirements = "GGG", abbrev = 'Pre-Fab Arc', source = "PoK" },
 	-- codex?
-	['????_REDACTED_????'] = { abbrev = 'Scenario Destroyer'},
-	['???_EXCEPTION_NO_ID_???'] = { abbrev = 'Scenario Tech'}
+	['????_REDACTED_????'] = { type = "unitUpgrade", requirements = "RR", abbrev = 'Scenario Destroyer', source = "Codex 1" },
+	['???_EXCEPTION_NO_ID_???'] = { type = "Yellow", requirements = "Y", abbrev = 'Scenario Tech', source = "Codex 1" }
 }
 
 -------------------------------------------------------------------------------
+
+local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 function onLoad(saveState)
     self.setColorTint({ r = 0.25, g = 0.25, b = 0.25 })
@@ -154,11 +156,11 @@ function getTechAbbrev(name)
 	return nil
 end
 
-function getTechExpansion(name)
+function getTechSource(name)
 	assert(type(name) == "string")
 	name = string.gsub(name, " Ω$", "")
 	if _technologies[name] then
-		return _technologies[name]['expansion']
+		return _technologies[name]['source']
 	end
 	return nil
 end
@@ -171,4 +173,204 @@ function isTechFromName(name)
 	else
 		return false
 	end
+end
+
+local techNameSet = {}
+
+function getTechNameSet()
+	-- Returns list of all valid technologies.
+	-- Names ending in " Ω" are not in list.
+	if next(techNameSet) == nil then
+		for k,_ in pairs(_technologies) do
+			techNameSet[k] = true
+		end
+	end
+	return techNameSet
+end
+
+------------------------------------------------------------------------------
+
+function _getPosParamsFromTechBoard(techBoard)
+	assert(type(techBoard) == 'userdata')
+	local p0
+	local dx
+	local dz
+	-- find grid size and origin of snap points on tech board
+	for _,snap in ipairs(techBoard.getSnapPoints()) do
+		if not p0 then
+			p0 = snap.position
+		else
+			if (not dz) and (snap.position.z < (p0.z - 0.1)) then
+				dz = snap.position.z - p0.z
+			end
+			if (not dx) and (snap.position.x < (p0.x - 0.1)) then
+				dx = p0.x - snap.position.x
+			end
+			if snap.position.x > p0.x then
+				p0.x = snap.position.x
+			end
+			if snap.position.z > p0.z then
+				p0.z = snap.position.z
+			end
+		end
+	end
+	return {
+		['p0'] = p0,
+		['dpos'] = {['dx'] = dx, ['dy'] = 0, ['dz'] = dz}
+	}
+end
+
+function _getTechBoardAndCards(color)
+	-- Searches for a tech board in COLOR zone.
+	-- If a tech board is found, returns table with tech board and all tech cards in COLOR zone.
+	assert(type(color) == 'string')
+
+	local guidToPosList = {}
+
+	local techBoard
+	for _,object in ipairs(getAllObjects()) do
+		if (object.getName() == "Technology Board") and _zoneHelper.zoneFromPosition(object.getPosition()) then
+			techBoard = object
+		else
+			if isTechFromName(object.getName()) then
+				guidToPosList[object.getGUID()] = object.getPosition()
+			end
+		end
+	end
+
+	if not techBoard then
+		return
+	end
+
+	if next(guidToPosList) == nil then
+		return {['Technology Board'] = techBoard, ["cardPositionsInZone"] = nil}
+	end
+
+	local cardPositionsInZone = {}
+	local zonesForTech = _zoneHelper.zonesFromPositions(guidToPosList)
+	for guid,zoneColor in pairs(zonesForTech) do
+		if zoneColor == color then
+			table.insert(cardPositionsInZone, 1, guidToPosList[guid])
+		end
+	end
+
+	return {
+		["Technology Board"] = techBoard,
+		["cardPositionsInZone"] = cardPositionsInZone
+	}
+end
+
+function getFirstVacantPosition(params)
+	-- Checks for collision occupiedPositions in dz direction
+	-- starting from origin p0 with width dx and height dz
+	-- and return first vacant position in dz direction
+	assert(type(params) == "table")
+	assert(type(params.p0) == "table")
+	assert(type(params.dpos) == "table")
+	local occupiedPositions = {}
+	if params.occupiedPositions then
+		assert(type(params.occupiedPositions) == "table")
+		occupiedPositions = params.occupiedPositions
+	end
+
+	-- first loop to find only cards in respective column
+	local positionInColumn = {}
+	for _,cardPos in ipairs(occupiedPositions) do
+		if math.floor(cardPos.x/params.dpos.dx+0.5) == math.floor(params.p0.x/params.dpos.dx+0.5) then
+			table.insert(positionInColumn, 1, cardPos)
+		end
+	end
+
+	local pos = _deepcopy(params.p0)
+	-- second loop over the few remaining cards in dx column
+	-- may be more efficient by sorting table, but prob not worth the effort.
+	local vacant = false
+	while not vacant do
+		vacant = true
+		for _,cardPos in ipairs(positionInColumn) do
+			if math.floor(cardPos.z/params.dpos.dz+0.5) == math.floor(pos.z/params.dpos.dz+0.5) then
+				vacant = false
+				pos.z = pos.z + params.dpos.dz
+				break
+			end
+		end
+	end
+	return pos
+end
+
+function getVacantPosOnTechBoard(params)
+	-- params['cardName'] and params['color'] are required.
+	-- params["techBoard"] and params["occupiedPositions"] are optional (provide both or none)
+	--	to potentially avoid multiple getAllObjects() calls.
+	-- params["occupiedPositions"] must be in positionToWorld coordinates.
+	-- returns nil if COLOR has no tech board in zone, else returns {position={}, rotation={}} table.
+	assert(type(params) == "table")
+	assert(type(params.cardName) == "string")
+	assert(type(params.color) == "string")
+
+	if not isTechFromName(params.cardName) then
+		log("getVacantPosOnTechBoard: " .. params.cardName .. " is not a valid Technology Card.")
+		return
+	end
+
+	local techBoard = params.techBoard
+	local occupiedPositions = params.occupiedPositions
+	-- if no techBoard was provided, get tech board and tech cards in COLORs zone
+	if not techBoard then
+		local techBoardAndCards = _getTechBoardAndCards(params.color)
+		-- exit if no technology board was found for color
+		if not techBoardAndCards["Technology Board"] then
+			return nil
+		else
+			techBoard = techBoardAndCards["Technology Board"]
+		end
+		occupiedPositions = techBoardAndCards["cardPositionsInZone"]
+	else
+		if not occupiedPositions then
+			error("_getVacantPosOnTechBoard: got passed params.techBoard without params.occupiedPositions. Requires both or neither.")
+		end
+	end
+
+	assert(type(techBoard) == "userdata")
+	assert(type(occupiedPositions) == "table")
+
+	-- {['p0'] = pos, ['dx'] = dx, ['dz'] = dz} in techBoard local coordinates
+	local posParams = _getPosParamsFromTechBoard(techBoard)
+	local _columns = {["Blue"]=0, ["Green"]=1, ["Yellow"]=2, ["Red"]=3, ["unitUpgrade"]=4}
+	local column = _columns[getTechType(params.cardName)]
+	local p0 = posParams.p0
+	local dpos = posParams.dpos
+	p0.x = p0.x - column*dpos.dx
+
+	for i,pos in ipairs(occupiedPositions) do
+		occupiedPositions[i] = techBoard.positionToLocal(pos)
+	end
+	local vacantPos = getFirstVacantPosition({
+		['p0'] = p0,
+		['dpos'] = dpos,
+		['occupiedPositions'] = occupiedPositions
+	})
+	return {
+		position = techBoard.positionToWorld(vacantPos),
+		rotation = techBoard.getRotation()
+		}
+end
+
+-- full deep copy of table o
+function _deepcopy(o, seen)
+	seen = seen or {}
+	if o == nil then return nil end
+	if seen[o] then return seen[o] end
+	local no
+	if type(o) == 'table' then
+		no = {}
+		seen[o] = no
+		for k, v in next, o, nil do
+		no[_deepcopy(k, seen)] = _deepcopy(v, seen)
+		end
+		setmetatable(no, _deepcopy(getmetatable(o), seen))
+	else -- number, string, boolean, etc
+		no = o
+	end
+return no
 end

@@ -31,7 +31,20 @@ local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 local _setupHelper = getHelperClient('TI4_SETUP_HELPER')
 local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 local _unitHelper = getHelperClient('TI4_UNIT_HELPER')
+local _technologyHelper = getHelperClient('TI4_TECHNOLOGY_HELPER')
 
+local _pointorder = {
+	["Flagship"] = 1,
+	["War Sun"] = 2,
+	["Dreadnought"] = 3,
+	["Carrier"] = 4,
+	["Cruiser"] = 5,
+	["Destroyer"] = 6,
+	["Fighter"] = 7,
+	["PDS"] = 8,
+	["Infantry"] = 9,
+	["Space Dock"] = 10
+	}
 
 local _customLayout = {
 	['assignSpeakerButton'] = {
@@ -210,9 +223,10 @@ local _ObjectManual = [[
 	All other secondaries consume a (non fleet) strategy token (in strat. pool).
 	EXCEPTION: If you have Scepter of Emelpar, the Mahact Agent or the Yssaril with Mahact in game available.
 	Politics - Speaker: Moves speaker token, Draws 2 Action and Agendas. - Sec.: draws 2 Actioncards
+	Construction - Allocate constructed units.
 	Trade - Prim.: Allocates 3 resources, Refreshes commodities (removes all from comm. pool and gain correct #)
 		- Color: Refreshes colors commodities - Sec.: Refreshes your commodities.
-	Tech - Prim.: Nothing - Tech: Draws the card from tech deck
+	Tech: Draws the card from tech deck, use Tech Board if available.
 		- Faction Tech: Opens a choice popup - Comm Tokens: gain tokens as Necro.
 	Imperial - Score: Only writes message - Secret: Draws secret. - Secondary: Draws secret.
 ]]
@@ -281,9 +295,6 @@ local objectUI = {{
 			},
 			value = "Update UI"
 		},
-		-- Panel as placeholder for the toggle button.
-		-- _workQueue is disabled by default
-		-- This feature is unavaliable to players (not ready yet! Maybe never.)
 		{
 			tag = "Panel",
 			children = {
@@ -298,14 +309,6 @@ local objectUI = {{
 				}
 			}
 		}
-		-- {
-		-- 	tag="ToggleButton",
-		-- 	attributes = {
-		-- 		onValueChanged = "toggleWorkQueue",
-		-- 		fontSize = 18
-		-- 	},
-		-- 	value = "Deal cards in order"
-		-- }
 	}
 
 }}
@@ -1110,7 +1113,6 @@ end
 
 function _updateColorSelector(layout, element, colorTable)
 	assert(type(element) == "string")
-	log("_updateColors " .. element .. " starting.")
 	local keepTable = {}
 	local elementIndex = 0
 
@@ -1608,7 +1610,6 @@ function researchTech(color, cardName)
 	elseif cardName == "Command Tokens" then
 		local abilitiesSet = {}
 		for _, ability in ipairs(faction.abilities) do
-
 			abilitiesSet[ability] = true
 		end
 		if abilitiesSet['Technological Singularity'] then
@@ -1623,10 +1624,35 @@ function researchTech(color, cardName)
 	-- get technology deck
 	local deckName = 'Technology Cards'
 	local techDeck = false
-	for _, object in ipairs(getAllObjects()) do
-		if (object.tag == 'Deck') and (object.getName() == deckName) and (_zoneHelper.zoneFromPosition(object.getPosition()) == color) then
+	local techBoard = false
+	local guidToPosTechOnTable = {}
+	local techType = _technologyHelper.getTechType(cardName)
+
+	local techNameSet = _technologyHelper.getTechNameSet()
+	if not techNameSet then
+		error("_technologyHelper returned empty techNameSet")
+	end
+
+	for _,object in ipairs(getAllObjects()) do
+		name = object.getName()
+		if techNameSet[string.gsub(name, " Ω$","")]then
+			guidToPosTechOnTable[object.getGUID()] = object.getPosition()
+		end
+		if (object.getName() == "Technology Board") and (color == _zoneHelper.zoneFromPosition(object.getPosition())) then
+			techBoard = object
+		end
+		if (object.getName() == deckName) and (object.tag == 'Deck') and (color == _zoneHelper.zoneFromPosition(object.getPosition())) then
 			techDeck = object
-			break
+		end
+	end
+
+	local techCardPositionsOnTable = {}
+	local zonesForTechOnTable = _zoneHelper.zonesFromPositions(guidToPosTechOnTable)
+	if zonesForTechOnTable then
+		for guid,zoneColor in pairs(zonesForTechOnTable) do
+			if zoneColor == color then
+				table.insert(techCardPositionsOnTable, 1, guidToPosTechOnTable[guid])
+			end
 		end
 	end
 
@@ -1637,113 +1663,127 @@ function researchTech(color, cardName)
 		return
 	end
 
-	-- searches through container for an item with name matching namePattern and returns its guid
-	local function getEntryGuid(container, namePattern)
-		assert(type(container) == 'userdata' and type(namePattern) == 'string')
-		for _, entry in ipairs(container.getObjects()) do
-			namePattern = string.gsub(namePattern, "-",".")
-			if string.match(entry.name, namePattern) then
-				return entry.guid
-			end
-		end
-		return false
-	end
-
-
 	local factionSheet = getObjectFromGUID(faction.factionSheetGuid)
 	if not factionSheet then
-		broadcastToAll('research Technology: missing ' .. color .. ' Faction Sheet', 'Red')
+		broadcastToAll('Research Technology: missing ' .. color .. ' Faction Sheet', 'Red')
 		return
 	end
 
-	local overrides = _unitHelper.getUnitOverrides()
-	local pos
-	local rot = {}
-	rot = techDeck.getRotation()
+	local guid = _getEntryGuid(techDeck, cardName)
+	if not guid then
+		_safeBroadcastToColor('Research Technology: ' .. cardName .. " not found in deck " .. techDeck.getName(), color, color)
+		return
+	end
 
-	-- unit upgades are sent to factionSheet, other tech just put left of deck.
-	if overrides[cardName] and overrides[cardName]["upgrade"] then
-		-- code copied from setupHelper factionsheetsnappoints
-		local x0 = 1.09
-		local dx = (-1.09 * 2) / 3
-		local z0 = -0.74
-		local dz = (0.74 * 2) / 3
-
-		local counter = 1
-		local snapPoints = {}
-		for col = 0, 3 do
-			for row = 0, 3 do
-				if col <= row then
-					snapPoints[counter] = {
-							x = x0 + col * dx,
-							y = 0,
-							z = z0 + row * dz
-						}
-					counter = counter + 1
-				end
-			end
-		end
-
-		local pointorder = {
-		["Flagship"] = 1,
-		["War Sun"] = 2,
-		["Dreadnought"] = 3,
-		["Carrier"] = 4,
-		["Cruiser"] = 5,
-		["Destroyer"] = 6,
-		["Fighter"] = 7,
-		["PDS"] = 8,
-		["Infantry"] = 9,
-		["Space Dock"] = 10
-		}
-
-		pos = snapPoints[pointorder[overrides[cardName]["upgrade"]]]
-		pos = factionSheet.positionToWorld(pos)
-	else
+	local function _getPosToTechDeck(cardName, techDeck)
 		-- place cards next to tech deck (take care on which side of the table)
-		pos = techDeck.getPosition()
-		if pos.z > 0 then
-			pos.x = pos.x + 4
+		local p0 = techDeck.getPosition()
+		local rot = techDeck.getRotation()
+		local dz = 2
+		local dx = 4
+		if p0.z > 0 then
+			p0.x = p0.x + dx
+			dz = -2
 		else
-			pos.x = pos.x - 4
+			p0.x = p0.x - dx
+		end
+
+		local dpos = { ['dx'] = dx, ['dy'] = 0, ['dz'] = dz }
+		local pos = _technologyHelper.getFirstVacantPosition({
+			 ['p0'] = p0,
+			 ['dpos'] = dpos,
+			 ['occupiedPositions'] = techCardPositionsOnTable
+		})
+
+		return {position = pos, rotation = rot}
+	end
+
+	local function _getPosToFactionSheet(cardName, factionSheet, techDeck)
+		local rot = factionSheet.getRotation()
+
+		local _overrides = _unitHelper.getUnitOverrides()
+		local snapPoints = factionSheet.getSnapPoints()
+
+		local pos = snapPoints[_pointorder[_overrides[cardName]["upgrade"]]].position
+		pos.y = pos.y + 0.2
+
+		return {position=factionSheet.positionToWorld(pos), rotation=rot}
+	end
+
+	local function _copyUnitUpgradeTechToFactionSheet(cardObject)
+		-- copy unitUpgrade technology card and send it to respective position on faction sheet.
+		local positionTable = {}
+		positionTable.position = _getPosToFactionSheet(cardName, factionSheet, techDeck).position
+		clone = cardObject.clone(positionTable)
+		clone.setRotation(factionSheet.getRotation())
+		clone.highlightOn(color, 1)
+	end
+
+	local params = {
+		guid = guid,
+		smooth = false,
+		callback_function = function(obj) obj.highlightOn(color, 1) end
+	}
+	local pos
+
+	if techBoard then
+		pos = _technologyHelper.getVacantPosOnTechBoard({
+			['cardName'] = cardName,
+			['color'] = color
+			--['techBoard'] = techBoard,
+			--['occupiedPositions'] = techCardPositionsOnTable
+		})
+		if techType == "unitUpgrade" then
+			params["callback_function"] = function(obj) _copyUnitUpgradeTechToFactionSheet(obj) end
+		end
+	else	-- unit upgades are sent to factionSheet, other tech just put left of deck.
+		if techType == "unitUpgrade" then
+			params.smooth = true
+			pos = _getPosToFactionSheet(cardName, factionSheet, techDeck)
+		else
+			pos = _getPosToTechDeck(cardName, techDeck)
 		end
 	end
-	pos.y = pos.y + 2
 
-	local guid = getEntryGuid(techDeck, cardName)
-	if guid then
-		techDeck.takeObject({
-			guid              = guid,
-			position          = pos,
-			rotation          = rot,
-			smooth            = true,
-		})
-	_maybeUpdateHighlightUnitUpgrades()
-	else
-		_safeBroadcastToColor('Research Technology: missing technology ' .. cardName, color, color)
-	end
+	params["position"] = pos.position
+	params["rot"] = pos.rotation
+
+	techDeck.takeObject(params)
+	_sendOnNewTechnologyResearched(color, cardName)
 end
 
+-- searches through container for an item with name matching namePattern and returns its guid
+function _getEntryGuid(container, namePattern)
+	assert(type(container) == 'userdata' and type(namePattern) == 'string')
+	for _, entry in ipairs(container.getObjects()) do
+		if entry.name == namePattern or entry.name == namePattern.." Ω" then
+			return entry.guid
+		end
+	end
+	return false
+end
 
-function _maybeUpdateHighlightUnitUpgrades()
-    local handler = 'delayedHighlightUnitUpgrades'
-    local listeners = {}
-    for _, object in ipairs(getAllObjects()) do
-        if object.getVar(handler) then
-            table.insert(listeners, object.getGUID())
-        end
-    end
-    if #listeners > 0 then
-        for i, guid in ipairs(listeners) do
-            local function callHandler()
-                local listener = getObjectFromGUID(guid)
-                if listener then
-                    listener.call(handler)
-                end
-            end
-            Wait.frames(callHandler, i)
-        end
-    end
+function _sendOnNewTechnologyResearched(playerColor, cardName)
+	local handler = 'onNewTechnologyResearched'
+	local listeners = {}
+	for _, object in ipairs(getAllObjects()) do
+		if object.getVar(handler) then
+			table.insert(listeners, object.getGUID())
+		end
+	end
+	if #listeners > 0 then
+		local params = {player = playerColor,
+		technology = cardName}
+		for i, guid in ipairs(listeners) do
+			local function callHandler()
+				local listener = getObjectFromGUID(guid)
+				if listener then
+					listener.call(handler, params)
+				end
+			end
+			Wait.frames(callHandler, i)
+		end
+	end
 end
 
 ----------------------------- Imperial ----------------------------------

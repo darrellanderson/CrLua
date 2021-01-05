@@ -109,6 +109,10 @@ end
 
 -------------------------------------------------------------------------------
 
+function onNewTechnologyResearched(params)
+	delayedHighlightUnitUpgrades()
+end
+
 function delayedHighlightUnitUpgrades()
     if _waitId then
         Wait.stop(_waitId)

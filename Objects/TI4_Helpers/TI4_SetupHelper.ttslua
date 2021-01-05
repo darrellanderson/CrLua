@@ -1568,7 +1568,7 @@ function SetupFaction.unpackStartingTech(color, faction, zone)
         end
         -- Watch out for collisions.
         local usedSet = {}
-        local dz = 2.04 * ((techDeck.getPosition().z < 0) and -1 or 1)
+        local dz = 2.04 * ((techDeck.getPosition().z < 0) and 1 or -1)
         for _, techCard in ipairs(techCards) do
             if techCard.position then
                 while true do

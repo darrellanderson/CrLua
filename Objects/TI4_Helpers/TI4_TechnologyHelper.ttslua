@@ -193,6 +193,19 @@ function getTechNameSet()
 	return _techNameSet
 end
 
+local _techSourceSet = false
+
+function getTechSourceSet()
+	-- Returns list of sources for all technologies.
+	-- Names ending in " Ω" are not in list.
+	if not _techSourceSet then
+		_techSourceSet = {}
+		for k,v in pairs(_technologies) do
+			_techSourceSet[k] = getTechSource(k) or "Base"
+		end
+	end
+	return _techSourceSet
+end
 ------------------------------------------------------------------------------
 
 function _getPosParamsFromTechBoard(techBoard)

@@ -968,27 +968,26 @@ function _addTechnologyPrimarySecondary(layout)
 
 	if not _setupHelper.getPoK() then
 		-- remove pok tech from ui
-
+		local _techSourceSet = _technologyHelper.getTechSourceSet()
 		local techlist = {["greenTechs"] = true, ["yellowTechs"] = true, ["redTechs"] = true, ["blueTechs"] = true}
-		local horizontalKeep = {}
 		for _,o in pairs(layout[technologyIndex]["children"]) do
 			local counter = 1
 			if o["tag"] == "HorizontalLayout" and techlist[o["attributes"]["id"]] then
-				for iv,v in ipairs(o["children"]) do
-					if not (iv == 2) and not (iv == 4) then
-						horizontalKeep[counter] = v
+				local horizontalKeep = {}
+				for ibutton,button in ipairs(o["children"]) do
+					local techName = button['attributes']['onClick']
+					source = _techSourceSet[string.sub(techName, 10, -2)]
+					if not (source == "PoK") then
+						horizontalKeep[counter] = button
 						counter = counter + 1
 					end
 				end
 				o["children"] = _deepcopy(horizontalKeep)
 			end
 		end
-
 	end
 
 	table.insert(layout[technologyIndex]["children"], #layout - 1, _customLayout["technology_secondary"])
-	-- we no longer add the "Technology Primary" button, as it has no function.
-
 
 	return layout
 end
@@ -1148,16 +1147,13 @@ function _updateColorSelector(layout, element, colorTable)
 		return yourbutton
 	end
 
-	--make new color list
-	--colorTable = { "White", "Blue", "Purple", "Green" }
-
 	local newColorSelector = {}
 	local tempSelector = _deepcopy(_customLayout["colorSelector"])
 
 	-- do 3 items per row, except for 4 players. There build 2x2
-	local maxButtonsPerRow = 3
+	local maxButtonsPerRow = 2
 	if #colorTable == 4 then
-		maxButtonsPerRow = 2
+		maxButtonsPerRow = 1
 	end
 
 	local colCounter = 1
@@ -1168,10 +1164,10 @@ function _updateColorSelector(layout, element, colorTable)
 		tempSelector["children"][colCounter] = _deepcopy(mybutton, {})
 		colCounter = colCounter + 1
 		--if in last row or row full
-		if (icolor == #colorTable) or (icolor%3 == maxButtonsPerRow) then
+		if (icolor == #colorTable) or ((icolor-1)%3 == maxButtonsPerRow) then
 			table.insert(newColorSelector, #newColorSelector+1, _deepcopy(tempSelector))
 			colCounter = 1
-			tempSelector =  _customLayout["colorSelector"]
+			tempSelector =  _deepcopy(_customLayout["colorSelector"])
 		end
 	end
 

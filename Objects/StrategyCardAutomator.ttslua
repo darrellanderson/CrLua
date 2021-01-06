@@ -589,7 +589,7 @@ function onStrategyCardButtonClicked(params)
 				_openPopupUi(color, color.."technologyPopup")
 			end
 			-- picks the tech card and takes care of necro command tokens
-			researchTech(color, option)
+			queueResearchTech(color, option)
 		elseif action == "popup" and option == "close" then
 			_closeMenu(color, color..card.."Popup")
 		end
@@ -1528,8 +1528,6 @@ function _gain3Tradegoods(color)
 	_safeBroadcastToColor(color .. " gained 3 Tradegoods", color, color)
 end
 
-
-
 function _refreshCommodities(color)
 -- gets the number of commodities from the faction.commodities value
 -- cache commodities bag. and while we're at it, maybe cache command token bags. and while we're at it, maybe cache everything else aswell.
@@ -1592,7 +1590,42 @@ end
 
 --------------------------------- Technology -----------------------------------
 
-function researchTech(color, cardName)
+-- Research pulling techs to a tech board checks what techs are already there.
+-- If there is a tech card currently moving delay second research until resting.
+local _colorToPendingTech = {}
+
+function queueResearchTech(color, cardName)
+	-- If a queue exists, add to queue and let chain callbacks handle it.
+	local techQueue = _colorToPendingTech[color]
+	if techQueue then
+		table.insert(techQueue, cardName)
+		return
+	end
+
+	-- Otherwise make a queue and kick off a callback driven service.
+	techQueue = {}
+	_colorToPendingTech[color] = techQueue
+	table.insert(techQueue, cardName)
+
+	local function servicePendingTechQueue()
+		local cardName = (#techQueue > 0) and table.remove(techQueue, 1)
+		if not cardName then
+			-- Queue is empty and AFTER last card finished, remove queue.
+			_colorToPendingTech[color] = nil
+			return
+		end
+		-- Take the next tech, chain self when take finishes.
+		local guid = researchTech(color, cardName, servicePendingTechQueue)
+		if not guid then
+			-- If guid then use chain callback to get next, otherwise no take
+			-- happened so move on to the next right away.
+			servicePendingTechQueue()
+		end
+	end
+	servicePendingTechQueue()
+end
+
+function researchTech(color, cardName, chainCallback)
 	assert(type(color) == 'string')
 	assert(type(cardName) == "string")
 
@@ -1722,24 +1755,31 @@ function researchTech(color, cardName)
 		clone.highlightOn(color, 1)
 	end
 
+	local function takeCallback(obj)
+		obj.highlightOn(color, 1)
+		if chainCallback then
+			chainCallback(obj)
+		end
+	end
+
 	local params = {
 		guid = guid,
 		smooth = true,
-		callback_function = function(obj) obj.highlightOn(color, 1) end
+		callback_function = takeCallback
 	}
 
 	local posRot
 	if techBoard then
 		posRot = _technologyHelper.getVacantPosOnTechBoard({
 			['cardName'] = cardName,
-			['color'] = color
-			--['techBoard'] = techBoard,
-			--['occupiedPositions'] = techCardPositionsOnTable
+			['color'] = color,
+			['techBoard'] = techBoard,
+			['occupiedPositions'] = techCardPositionsOnTable
 		})
 		if techType == "unitUpgrade" then
 			local function newCallback(obj)
-				obj.highlightOn(color, 1)
 			 	_copyUnitUpgradeTechToFactionSheet(obj)
+				takeCallback(obj)
 			end
 			params.callback_function = newCallback
 		end
@@ -1757,6 +1797,9 @@ function researchTech(color, cardName)
 
 	techDeck.takeObject(params)
 	_sendOnNewTechnologyResearched(color, cardName)
+
+	-- Return the guid in case caller wants to wait for resting, etc.
+	return params.guid
 end
 
 -- searches through container for an item with name matching namePattern and returns its guid

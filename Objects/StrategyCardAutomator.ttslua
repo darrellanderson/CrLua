@@ -969,7 +969,6 @@ function _addTechnologyPrimarySecondary(layout)
 	if not _setupHelper.getPoK() then
 		-- remove pok tech from ui
 		local _techSourceSet = _technologyHelper.getTechSourceSet()
-		log(_techSourceSet)
 		local techlist = {["greenTechs"] = true, ["yellowTechs"] = true, ["redTechs"] = true, ["blueTechs"] = true}
 		for _,o in pairs(layout[technologyIndex]["children"]) do
 			local counter = 1
@@ -978,9 +977,7 @@ function _addTechnologyPrimarySecondary(layout)
 				for ibutton,button in ipairs(o["children"]) do
 					local techName = button['attributes']['onClick']
 					source = _techSourceSet[string.sub(techName, 10, -2)]
-					log(source)
 					if not (source == "PoK") then
-						log('keeping '..source)
 						horizontalKeep[counter] = button
 						counter = counter + 1
 					end
@@ -1153,10 +1150,8 @@ function _updateColorSelector(layout, element, colorTable)
 	local newColorSelector = {}
 	local tempSelector = _deepcopy(_customLayout["colorSelector"])
 
-	-- colorTable = {"Red", "Greed", "Blue", "Indigo", "Violet", "Pink", "Orange"}
 	-- do 3 items per row, except for 4 players. There build 2x2
 	local maxButtonsPerRow = 2
-	log(colorTable)
 	if #colorTable == 4 then
 		maxButtonsPerRow = 1
 	end
@@ -1169,12 +1164,7 @@ function _updateColorSelector(layout, element, colorTable)
 		tempSelector["children"][colCounter] = _deepcopy(mybutton, {})
 		colCounter = colCounter + 1
 		--if in last row or row full
-		log(icolor)
-		log(icolor%3)
-		log(maxButtonsPerRow)
-		log(#colorTable)
 		if (icolor == #colorTable) or ((icolor-1)%3 == maxButtonsPerRow) then
-			log("nextRow")
 			table.insert(newColorSelector, #newColorSelector+1, _deepcopy(tempSelector))
 			colCounter = 1
 			tempSelector =  _deepcopy(_customLayout["colorSelector"])

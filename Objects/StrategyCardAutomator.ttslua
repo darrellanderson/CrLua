@@ -968,27 +968,26 @@ function _addTechnologyPrimarySecondary(layout)
 
 	if not _setupHelper.getPoK() then
 		-- remove pok tech from ui
-
+		local _techSourceSet = _technologyHelper.getTechSourceSet()
 		local techlist = {["greenTechs"] = true, ["yellowTechs"] = true, ["redTechs"] = true, ["blueTechs"] = true}
-		local horizontalKeep = {}
 		for _,o in pairs(layout[technologyIndex]["children"]) do
 			local counter = 1
 			if o["tag"] == "HorizontalLayout" and techlist[o["attributes"]["id"]] then
-				for iv,v in ipairs(o["children"]) do
-					if not (iv == 2) and not (iv == 4) then
-						horizontalKeep[counter] = v
+				local horizontalKeep = {}
+				for ibutton,button in ipairs(o["children"]) do
+					local techName = button['attributes']['onClick']
+					source = _techSourceSet(string.sub(techName, 10, -2))
+					if (not source) or (not source == "PoK") then
+						horizontalKeep[counter] = button
 						counter = counter + 1
 					end
 				end
 				o["children"] = _deepcopy(horizontalKeep)
 			end
 		end
-
 	end
 
 	table.insert(layout[technologyIndex]["children"], #layout - 1, _customLayout["technology_secondary"])
-	-- we no longer add the "Technology Primary" button, as it has no function.
-
 
 	return layout
 end

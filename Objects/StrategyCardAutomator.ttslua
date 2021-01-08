@@ -324,12 +324,12 @@ function onLoad()
 
 	for card, _ in pairs(_workQueue) do
 		_workQueue[card]['primaryColor'] = nil
-		_workQueue[card]['done'] = {}
 		_workQueue[card]['job'] = {}
+		_workQueue[card]['done'] = {}
 
 		for _,c in pairs(_colors) do
-			_workQueue[card]['done'][c] = false
 			_workQueue[card]['job'][c] = false
+			_workQueue[card]['done'][c] = false
 		end
 	end
 
@@ -517,35 +517,30 @@ function onStrategyCardButtonClicked(params)
 				-- primary passes "self" or COLOR as option
 				local success = _assignSpeaker(color, option)
 				if success then
-					_dealPoliticsActionCards(color)
+					_workQueue[card]["primaryColor"] = color
+					_workQueue[card]["done"][color] = true
+					_workQueue[card]["job"][color] = true
+					_dealWorkQueueCards(card, color)
 					-- wait to deal agendas, then they arrive grouped in the hand.
 					Wait.frames(function() _dealPoliticsAgendas(color) end,3)
 
-					_workQueue[card]["done"][color] = true
-					if _useWorkQueue then
-						_dealWorkQueueCards(card)
-					end
 					_closePopupUi(color, card.."Popup")
 				end
 			end
 		end
 		if (action == "secondary") and secondarySuccessful then
-			if _useWorkQueue then
-				_workQueue[card]["done"][color] = true
-				_workQueue[card]["job"][color] = true
-				_dealWorkQueueCards(card)
-			else
-				_dealPoliticsActionCards(color)
-			end
+			_workQueue[card]["done"][color] = true
+			_workQueue[card]["job"][color] = true
+			_dealWorkQueueCards(card, color)
 			_closeMenu(color, card)
 		end
 	end
 
-	--------------------------  Trade ------------------------------------------
+	-------------------------- Construction --------------------------------------
 
 	if card == "construction" then
 		local constructionSuccessful = false
-
+		
 		if action == "primary" then
 			if option == "a Space Dock and a PDS" then
 				constructionSuccessful = _allocateConstructionUnits(color, {"PDS", "Space Dock"})
@@ -557,10 +552,12 @@ function onStrategyCardButtonClicked(params)
 			constructionSuccessful = _allocateConstructionUnits(color, {"Command Token", string.sub(option, 3, -1)})
 		end
 		if constructionSuccessful then
-
+			
 			_closeMenu(color,card)
 		end
 	end
+
+	--------------------------  Trade ------------------------------------------
 
 	if card == "trade" then
 		if action == "primary" then
@@ -615,17 +612,12 @@ function onStrategyCardButtonClicked(params)
 				_dealImperialSecret(color)
 				_closeMenu(color, card)
 			end
-			if _useWorkQueue then
-				_dealWorkQueueCards(card)
-			end
+			_workQueue[card]['done']=true
+			_dealWorkQueueCards(card, color)
 		elseif (action == "secondary") and secondarySuccessful then
-			if _useWorkQueue then
-				_workQueue[card]['job'][color] = true
-				_workQueue[card]['done'][color] = true
-				_dealWorkQueueCards(card)
-			else
-				_dealImperialSecret(color)
-			end
+			_workQueue[card]['job'][color] = true
+			_workQueue[card]['done'][color] = true
+			_dealWorkQueueCards(card, color)
 			_closeMenu(color, card)
 		end
 	end
@@ -652,47 +644,36 @@ end
 
 --------------------------------------------------------------------------------
 
-function _dealWorkQueueCards(card)
-	-- currently disabled
+local _workQueueFunctionMap = {
+	["politics"] = function(color) _dealPoliticsActionCards(color) end,
+	["imperial"] = function(color) _dealImperialSecret(color) end
+}
+
+function _dealWorkQueueCards(card, color)
+	if not _workQueueFunctionMap[card] then return end
+	
+	local colorTable _zoneHelper.zones()
+	
 	if not _useWorkQueue then
+		_workQueue[card]['job'][color] = false
+		_workQueueFunctionMap[card](color)
 		return
 	end
 
-	if not _workQueue[card]["primaryColor"] then
-		return
-	end
-
-	--duplicate the colorTable
-	local doubleTable = {}
-	doubleTable = getSeatedPlayers()
-	for _,v in ipairs(getSeatedPlayers()) do
-		table.insert(doubleTable, v)
-	end
-
-	local function _doWork(card, color)
-		if card == "imperial" then
-			_dealImperialSecret(color)
-		end
-		if card == "politics" then
-			_dealPoliticsActionCards(color)
-		end
-		return
-	end
+	local primaryColor = _workQueue[card]["primaryColor"]
+	if not primaryColor then return	end
 
 	local started = false
-	for index,color in ipairs(doubleTable) do
-
-		if color == _workQueue[card]['primaryColor'] then
-			started = true
-		end
+	local mappedIndex
+	for index = 1, 2*#colorTable do
+		c = colorTable[(index - 1) % #colorTable +1]
+		started = started or (c == primaryColor)
 		if started then
-			if _workQueue[card]['done'][color] then
-				if _workQueue[card]['job'][color] then
-					_doWork(card, color)
-					_workQueue[card]['job'][color] = false
-				end
-			else
+			if not _workQueue[card]['done'][c] then
 				return
+			elseif _workQueue[card]['job'][c] then
+				_workQueue[card]['job'][c] = false
+				_workQueueFunctionMap[card](c)
 			end
 		end
 	end
@@ -700,38 +681,17 @@ end
 
 
 function _clearWorkQueue(card)
-	-- currently disabled
-	if not _useWorkQueue then
-		return
-	end
+	if not (_useWorkQueue and _workQueueFunctionMap[card]) then return	end
 
-	local function _doWork(card, color)
-		if card == "imperial" then
-			_dealImperialSecret(color)
-		end
-		if card == "politics" then
-			_dealPoliticsActionCards(color)
-		end
-		return
-	end
-
-	for color,job in pairs(_workQueue[card]['job']) do
-		for _,c in ipairs(getSeatedPlayers()) do
-			if c == color then
-				if job then
-					_doWork(card, color)
-				end
-			end
-		end
-	end
-
+	local colorTable = _zoneHelper.zones()
+	
 	_workQueue[card]['primaryColor'] = nil
-	local _colors = _setupHelper.getSetupColors()
-	for _,c in ipairs(_colors) do
-		if _workQueue[card]['job'][c] then
+	for _,color in ipairs(colorTable) do
+		if _workQueue[card]['job'][color] then
+			_workQueue[card]['job'][c] = false
+			_workQueueFunctionMap[card](color)
 		end
 		_workQueue[card]['done'][c] = false
-		_workQueue[card]['job'][c] = false
 	end
 end
 
@@ -880,9 +840,7 @@ function _closeMenu(color, card)
 		UI.setAttribute(card, "active", "false")
 		if not popup then
 			broadcastToAll("All players have responded", "Black")
-			if _useWorkQueue then
-				_clearWorkQueue(card)
-			end
+			_clearWorkQueue(card)
 		end
 	end
 	UI.setAttribute(card, "visibility", newVis)
@@ -908,6 +866,7 @@ function updateUiOnClick(player, option, alt)
 		end
 		table.insert(colorTable, color)
 	end
+
 	if missingFactionColors then
 		local colors = table.concat(missingFactionColors, ', ')
 		broadcastToAll('Warning: no faction for ' .. colors .. '. Please repeat button click afterward to enable their faction technologies', 'Red')
@@ -1628,11 +1587,13 @@ function researchTech(color, cardName, chainCallback)
 	local faction = _factionHelper.fromColor(color)
 	if not faction then
 		broadcastToAll('Research Technology: no faction selected for ' .. color, 'Red')
+		chainCallback()
 		return
 	end
 
 	-- "Faction Tech" handled by onStrategyCardButtonClicked.
 	if cardName == "Faction Tech" then
+		chainCallback()
 		return
 
 		-- gain command tokens only available to necro
@@ -1643,9 +1604,11 @@ function researchTech(color, cardName, chainCallback)
 		end
 		if abilitiesSet['Technological Singularity'] then
 			_dealLeadershipCommandTokens(color, 3, {x=0,y=0,z=0})
+			chainCallback()
 			return
 		else
 			_safeBroadcastToColor("Can only gain command tokens as Nekro", color, "Red")
+			chainCallback()
 			return
 		end
 	end
@@ -1658,12 +1621,14 @@ function researchTech(color, cardName, chainCallback)
 	local techType = _technologyHelper.getTechType(cardName)
 	if not techType then
 		log('_technologyHelper did not find "' .. cardName .. '"')
+		chainCallback()
 		return
 	end
 
 	local techNameSet = _technologyHelper.getTechNameSet()
 	if not techNameSet then
 		log("_technologyHelper returned empty techNameSet")
+		chainCallback()
 		return
 	end
 
@@ -1694,18 +1659,21 @@ function researchTech(color, cardName, chainCallback)
 		broadcastToAll('Research Technology: missing deckname ' .. deckName, color)
 		broadcastToAll("If you have researched all your available technologies: Congratulations to you " .. color .."!", color)
 		broadcastToAll("If not, please name your deck of remaining technology cards 'Technology Cards' and leave them in your zone.", color)
+		chainCallback()
 		return
 	end
 
 	local factionSheet = getObjectFromGUID(faction.factionSheetGuid)
 	if not factionSheet then
 		broadcastToAll('Research Technology: missing ' .. color .. ' Faction Sheet', 'Red')
+		chainCallback()
 		return
 	end
 
 	local guid = _getEntryGuid(techDeck, cardName) or _getEntryGuid(techDeck, cardName .. ' Ω')
 	if not guid then
 		_safeBroadcastToColor('Research Technology: ' .. cardName .. " not found in " .. techDeck.getName() .. " deck", color, "Red")
+		chainCallback()
 		return
 	end
 

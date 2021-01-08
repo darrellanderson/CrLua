@@ -1657,12 +1657,14 @@ function researchTech(color, cardName, chainCallback)
 	local guidToPosTechOnTable = {}
 	local techType = _technologyHelper.getTechType(cardName)
 	if not techType then
-		error('_technologyHelper did not find "' .. cardName .. '"')
+		log('_technologyHelper did not find "' .. cardName .. '"')
+		return
 	end
 
 	local techNameSet = _technologyHelper.getTechNameSet()
 	if not techNameSet then
-		error("_technologyHelper returned empty techNameSet")
+		log("_technologyHelper returned empty techNameSet")
+		return
 	end
 
 	for _,object in ipairs(getAllObjects()) do

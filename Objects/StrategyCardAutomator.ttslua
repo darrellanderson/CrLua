@@ -465,8 +465,8 @@ function onStrategyCardButtonClicked(params)
 	-- or has Yssaril agent available with mahact agent in game.
 	-- would be nice to have alt key to choose to use alternative, but not possible in xml buttons.
 	if action == "secondary" and card ~= "leadership" then
-		local capatalizedCardName = string.gsub(card, "^%l", string.upper)
-		secondarySuccessful = _consumeStrategyToken(color, capatalizedCardName)
+		local capitalizedCardName = string.gsub(card, "^%l", string.upper)
+		secondarySuccessful = _consumeStrategyToken(color, capitalizedCardName)
 		if not secondarySuccessful then
 			return  -- consumeStrategyToken printed the error message
 		end

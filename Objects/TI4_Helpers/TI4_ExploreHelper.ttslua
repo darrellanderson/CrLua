@@ -316,6 +316,25 @@ function applyExplorationGoodness(object)
             end
         end
         object.addContextMenuItem('Explore Mirage', exploreMirage, false)
+    elseif object.getName() == 'Titan Note Token' then
+        local function exploreTitanNoteToken(traitOverride)
+            local system = _systemHelper.systemFromPosition(object.getPosition())
+            local planet = system and _systemHelper.planetFromPosition({
+                systemGuid = system.guid,
+                position = object.getPosition(),
+                exact = false
+            })
+            if planet then
+                local capitalized = string.gsub(traitOverride, "^%l", string.upper)
+                printToAll('Titan Note Token using ' .. capitalized, 'Yellow')
+                explorePlanet(system.guid, planet.name, traitOverride)
+            else
+                printToAll('Titan Note Token not attached to a planet, cannot explore', 'Red')
+            end
+        end
+        object.addContextMenuItem('Explore Cultural', function() exploreTitanNoteToken('cultural') end)
+        object.addContextMenuItem('Explore Hazardous', function() exploreTitanNoteToken('hazardous') end)
+        object.addContextMenuItem('Explore Industrial', function() exploreTitanNoteToken('industrial') end)
     else
         local systemList = _systemHelper.systems()
         local planetList = systemList[object.getGUID()].planets
@@ -334,7 +353,7 @@ function applyFrontierGoodness(object)
     object.addContextMenuItem('Explore Frontier', function() exploreFrontier(object) end, false)
 end
 
-function explorePlanet(tileGUID, planetName)
+function explorePlanet(tileGUID, planetName, traitOverride)
     local systemList = _systemHelper.systems()
     local planetTrait = false
     local deckType = false
@@ -362,7 +381,12 @@ function explorePlanet(tileGUID, planetName)
     end
     assert(planetTrait)
 
+    if traitOverride then
+        planetTrait = traitOverride
+    end
+
     deckType = traitMap[planetTrait]
+    assert(deckType)
 
     local tile = assert(getObjectFromGUID(tileGUID))
     local tilePos = tile.getPosition()
@@ -397,7 +421,7 @@ function explorePlanet(tileGUID, planetName)
     else
         error('exploreFrontier: bad "' .. deckType .. '" deck')
     end
-    broadcastToAll('Exploring ' .. planetName .. ': ' .. card.getName())
+    broadcastToAll('Exploring ' .. planetName .. ': ' .. card.getName(), 'Yellow')
 end
 
 function exploreFrontier(token)
@@ -442,7 +466,7 @@ function exploreFrontier(token)
     local frontierTokenBag = assert(_getByName('Frontier Tokens Bag', 'Infinite'))
     frontierTokenBag.putObject(token)
 
-    broadcastToAll('Exploring Frontier: ' .. card.getName())
+    broadcastToAll('Exploring Frontier: ' .. card.getName(), 'Yellow')
 end
 
 function checkCardForToken(object_spawned, planetName)
@@ -493,13 +517,13 @@ function isExplorable(object)
             _systemGuids[guid] = true
         end
     end
-    if object.tag ~= 'Generic' then
-        return false
-    end
-    if _systemGuids[object.getGUID()] then
+    if object.tag == 'Generic' and _systemGuids[object.getGUID()] then
         return true
     end
-    if object.getName() == 'Mirage Token' then
+    if object.tag == 'Generic' and object.getName() == 'Mirage Token' then
+        return true
+    end
+    if object.tag == 'Tile' and object.getName() == 'Titan Note Token' then
         return true
     end
 end

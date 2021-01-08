@@ -320,14 +320,13 @@ local objectUI = {{
 local _useWorkQueue = false
 
 function onLoad()
-	local _colors = Player.getColors()
-
+	local colorTable = _zoneHelper.zones()
 	for card, _ in pairs(_workQueue) do
 		_workQueue[card]['primaryColor'] = nil
 		_workQueue[card]['job'] = {}
 		_workQueue[card]['done'] = {}
 
-		for _,c in pairs(_colors) do
+		for _,c in pairs(colorTable) do
 			_workQueue[card]['job'][c] = false
 			_workQueue[card]['done'][c] = false
 		end
@@ -362,13 +361,31 @@ function onLoad()
 		tooltip = "Adds automation buttons (on first click) and updates Trade and Politics colors (on first click as well as future clicks).",
 		click_function = "updateUiOnClick",
 		function_owner = self,
-		position = {x=0, y=0.0, z=0},
+		position = {x=0, y=0.0, z=-0.2},
 		rotation = {x=0, y=0, z=180},
 		scale = rescale,
 		width = 900,
-		height = 400,
+		height = 300,
 		font_size = 100,
 		label = "Update UI",
+	})
+
+	self.createButton({
+		tooltip = [[Toggle Card Queue
+		------------
+		Politics and Imperial strategy cards automatically deal Secrets and Actioncards to players. 
+
+		Enabled: Wait for the correct players turn to draw cards. 
+		Disabled: Deal cards immediately. ]],
+		click_function = "toggleWorkQueue",
+		function_owner = self,
+		position = {x=0, y=0.0, z=0.54},
+		rotation = {x=0, y=0, z=180},
+		scale = rescale,
+		width = 900,
+		height = 200,
+		font_size = 90,
+		label = "Toggle Card Queue",
 	})
 
 	-- front text
@@ -390,7 +407,7 @@ function onLoad()
 		label = "Please click 'Update UI' after all\nplayers have chosen a faction.",
 		font_color = "Red",
 		rotation = {x=0, y=0, z=180},
-		position = {x=0, y=0.0, z=0.54},
+		position = {x=0, y=0.0, z=0.2},
 		scale = rescale,
 		click_function = "doNothing",
 		function_owner = self
@@ -409,8 +426,14 @@ function onLoad()
 end
 
 
-function toggleWorkQueue(_, isOn)
-	_useWorkQueue = isOn
+function toggleWorkQueue()
+	_useWorkQueue = not _useWorkQueue
+	local params = {
+		index = 1,
+		color = (_useWorkQueue and "Grey") or "White",
+		label = (_useWorkQueue and "Card Queue Enabled") or "Card Queue Disabled"
+	}
+	self.editButton(params)
 end
 
 function doNothing()
@@ -612,7 +635,7 @@ function onStrategyCardButtonClicked(params)
 				_dealImperialSecret(color)
 				_closeMenu(color, card)
 			end
-			_workQueue[card]['done']=true
+			_workQueue[card]['done'][color]=true
 			_dealWorkQueueCards(card, color)
 		elseif (action == "secondary") and secondarySuccessful then
 			_workQueue[card]['job'][color] = true
@@ -652,7 +675,7 @@ local _workQueueFunctionMap = {
 function _dealWorkQueueCards(card, color)
 	if not _workQueueFunctionMap[card] then return end
 	
-	local colorTable _zoneHelper.zones()
+	local colorTable = _zoneHelper.zones()
 	
 	if not _useWorkQueue then
 		_workQueue[card]['job'][color] = false
@@ -664,9 +687,9 @@ function _dealWorkQueueCards(card, color)
 	if not primaryColor then return	end
 
 	local started = false
-	local mappedIndex
 	for index = 1, 2*#colorTable do
 		c = colorTable[(index - 1) % #colorTable +1]
+
 		started = started or (c == primaryColor)
 		if started then
 			if not _workQueue[card]['done'][c] then
@@ -685,13 +708,13 @@ function _clearWorkQueue(card)
 
 	local colorTable = _zoneHelper.zones()
 	
-	_workQueue[card]['primaryColor'] = nil
+	_workQueue[card]["primaryColor"] = nil
 	for _,color in ipairs(colorTable) do
 		if _workQueue[card]['job'][color] then
-			_workQueue[card]['job'][c] = false
+			_workQueue[card]['job'][color] = false
 			_workQueueFunctionMap[card](color)
 		end
-		_workQueue[card]['done'][c] = false
+		_workQueue[card]['done'][color] = false
 	end
 end
 
@@ -866,7 +889,7 @@ function updateUiOnClick(player, option, alt)
 		end
 		table.insert(colorTable, color)
 	end
-
+	
 	if missingFactionColors then
 		local colors = table.concat(missingFactionColors, ', ')
 		broadcastToAll('Warning: no faction for ' .. colors .. '. Please repeat button click afterward to enable their faction technologies', 'Red')

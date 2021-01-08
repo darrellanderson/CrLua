@@ -324,12 +324,12 @@ function onLoad()
 
 	for card, _ in pairs(_workQueue) do
 		_workQueue[card]['primaryColor'] = nil
-		_workQueue[card]['job'] = {}
 		_workQueue[card]['done'] = {}
+		_workQueue[card]['job'] = {}
 
 		for _,c in pairs(_colors) do
-			_workQueue[card]['job'][c] = false
 			_workQueue[card]['done'][c] = false
+			_workQueue[card]['job'][c] = false
 		end
 	end
 
@@ -517,30 +517,35 @@ function onStrategyCardButtonClicked(params)
 				-- primary passes "self" or COLOR as option
 				local success = _assignSpeaker(color, option)
 				if success then
-					_workQueue[card]["primaryColor"] = color
-					_workQueue[card]["done"][color] = true
-					_workQueue[card]["job"][color] = true
-					_dealWorkQueueCards(card, color)
+					_dealPoliticsActionCards(color)
 					-- wait to deal agendas, then they arrive grouped in the hand.
 					Wait.frames(function() _dealPoliticsAgendas(color) end,3)
 
+					_workQueue[card]["done"][color] = true
+					if _useWorkQueue then
+						_dealWorkQueueCards(card)
+					end
 					_closePopupUi(color, card.."Popup")
 				end
 			end
 		end
 		if (action == "secondary") and secondarySuccessful then
-			_workQueue[card]["done"][color] = true
-			_workQueue[card]["job"][color] = true
-			_dealWorkQueueCards(card, color)
+			if _useWorkQueue then
+				_workQueue[card]["done"][color] = true
+				_workQueue[card]["job"][color] = true
+				_dealWorkQueueCards(card)
+			else
+				_dealPoliticsActionCards(color)
+			end
 			_closeMenu(color, card)
 		end
 	end
 
-	-------------------------- Construction --------------------------------------
+	--------------------------  Trade ------------------------------------------
 
 	if card == "construction" then
 		local constructionSuccessful = false
-		
+
 		if action == "primary" then
 			if option == "a Space Dock and a PDS" then
 				constructionSuccessful = _allocateConstructionUnits(color, {"PDS", "Space Dock"})
@@ -552,12 +557,10 @@ function onStrategyCardButtonClicked(params)
 			constructionSuccessful = _allocateConstructionUnits(color, {"Command Token", string.sub(option, 3, -1)})
 		end
 		if constructionSuccessful then
-			
+
 			_closeMenu(color,card)
 		end
 	end
-
-	--------------------------  Trade ------------------------------------------
 
 	if card == "trade" then
 		if action == "primary" then
@@ -612,12 +615,17 @@ function onStrategyCardButtonClicked(params)
 				_dealImperialSecret(color)
 				_closeMenu(color, card)
 			end
-			_workQueue[card]['done']=true
-			_dealWorkQueueCards(card, color)
+			if _useWorkQueue then
+				_dealWorkQueueCards(card)
+			end
 		elseif (action == "secondary") and secondarySuccessful then
-			_workQueue[card]['job'][color] = true
-			_workQueue[card]['done'][color] = true
-			_dealWorkQueueCards(card, color)
+			if _useWorkQueue then
+				_workQueue[card]['job'][color] = true
+				_workQueue[card]['done'][color] = true
+				_dealWorkQueueCards(card)
+			else
+				_dealImperialSecret(color)
+			end
 			_closeMenu(color, card)
 		end
 	end
@@ -644,36 +652,47 @@ end
 
 --------------------------------------------------------------------------------
 
-local _workQueueFunctionMap = {
-	["politics"] = function(color) _dealPoliticsActionCards(color) end,
-	["imperial"] = function(color) _dealImperialSecret(color) end
-}
-
-function _dealWorkQueueCards(card, color)
-	if not _workQueueFunctionMap[card] then return end
-	
-	local colorTable _zoneHelper.zones()
-	
+function _dealWorkQueueCards(card)
+	-- currently disabled
 	if not _useWorkQueue then
-		_workQueue[card]['job'][color] = false
-		_workQueueFunctionMap[card](color)
 		return
 	end
 
-	local primaryColor = _workQueue[card]["primaryColor"]
-	if not primaryColor then return	end
+	if not _workQueue[card]["primaryColor"] then
+		return
+	end
+
+	--duplicate the colorTable
+	local doubleTable = {}
+	doubleTable = getSeatedPlayers()
+	for _,v in ipairs(getSeatedPlayers()) do
+		table.insert(doubleTable, v)
+	end
+
+	local function _doWork(card, color)
+		if card == "imperial" then
+			_dealImperialSecret(color)
+		end
+		if card == "politics" then
+			_dealPoliticsActionCards(color)
+		end
+		return
+	end
 
 	local started = false
-	local mappedIndex
-	for index = 1, 2*#colorTable do
-		c = colorTable[(index - 1) % #colorTable +1]
-		started = started or (c == primaryColor)
+	for index,color in ipairs(doubleTable) do
+
+		if color == _workQueue[card]['primaryColor'] then
+			started = true
+		end
 		if started then
-			if not _workQueue[card]['done'][c] then
+			if _workQueue[card]['done'][color] then
+				if _workQueue[card]['job'][color] then
+					_doWork(card, color)
+					_workQueue[card]['job'][color] = false
+				end
+			else
 				return
-			elseif _workQueue[card]['job'][c] then
-				_workQueue[card]['job'][c] = false
-				_workQueueFunctionMap[card](c)
 			end
 		end
 	end
@@ -681,17 +700,38 @@ end
 
 
 function _clearWorkQueue(card)
-	if not (_useWorkQueue and _workQueueFunctionMap[card]) then return	end
+	-- currently disabled
+	if not _useWorkQueue then
+		return
+	end
 
-	local colorTable = _zoneHelper.zones()
-	
+	local function _doWork(card, color)
+		if card == "imperial" then
+			_dealImperialSecret(color)
+		end
+		if card == "politics" then
+			_dealPoliticsActionCards(color)
+		end
+		return
+	end
+
+	for color,job in pairs(_workQueue[card]['job']) do
+		for _,c in ipairs(getSeatedPlayers()) do
+			if c == color then
+				if job then
+					_doWork(card, color)
+				end
+			end
+		end
+	end
+
 	_workQueue[card]['primaryColor'] = nil
-	for _,color in ipairs(colorTable) do
-		if _workQueue[card]['job'][color] then
-			_workQueue[card]['job'][c] = false
-			_workQueueFunctionMap[card](color)
+	local _colors = _setupHelper.getSetupColors()
+	for _,c in ipairs(_colors) do
+		if _workQueue[card]['job'][c] then
 		end
 		_workQueue[card]['done'][c] = false
+		_workQueue[card]['job'][c] = false
 	end
 end
 
@@ -840,7 +880,9 @@ function _closeMenu(color, card)
 		UI.setAttribute(card, "active", "false")
 		if not popup then
 			broadcastToAll("All players have responded", "Black")
-			_clearWorkQueue(card)
+			if _useWorkQueue then
+				_clearWorkQueue(card)
+			end
 		end
 	end
 	UI.setAttribute(card, "visibility", newVis)

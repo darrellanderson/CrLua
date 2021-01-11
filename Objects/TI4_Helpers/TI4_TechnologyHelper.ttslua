@@ -233,8 +233,16 @@ function _getPosParamsFromTechBoard(techBoard)
 		end
 	end
 	return {
-		p0 = p0,
-		dpos = {['dx'] = dx, ['dy'] = 0, ['dz'] = dz}
+		p0 = { -- LOCAL SPACE!
+			x = p0.x,
+			y = techBoard.getPosition().y + (techBoard.is_face_down and -1 or 1) * 3,
+			z = p0.z
+		},
+		dpos = {
+			dx = dx,
+			dy = 0,
+			dz = dz
+		}
 	}
 end
 
@@ -350,6 +358,9 @@ function getVacantPosOnTechBoard(params)
 		-- Nekro tech has no column, ignore
 		return
 	end
+	if techBoard.is_face_down then
+		column = 4 - column
+	end
 	local p0 = posParams.p0
 	local dpos = posParams.dpos
 	p0.x = p0.x - column * dpos.dx
@@ -358,13 +369,17 @@ function getVacantPosOnTechBoard(params)
 		occupiedPositions[i] = techBoard.positionToLocal(pos)
 	end
 	local vacantPos = getFirstVacantPosition({
-		['p0'] = p0,
-		['dpos'] = dpos,
-		['occupiedPositions'] = occupiedPositions
+		p0 = p0,
+		dpos = dpos,
+		occupiedPositions = occupiedPositions
 	})
 	return {
 		position = techBoard.positionToWorld(vacantPos),
-		rotation = techBoard.getRotation()
+		rotation = {
+			x = 0,
+			y = techBoard.getRotation().y,
+			z = 0
+		}
 	}
 end
 

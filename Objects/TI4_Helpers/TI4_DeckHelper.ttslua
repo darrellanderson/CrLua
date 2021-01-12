@@ -1094,8 +1094,8 @@ function dealCoroutine()
         end
 
         -- Deal as many cards as able.
+        local dealCount = 0
         if deck then
-            local dealCount = 0
             if deck.tag == 'Deck' then
                 dealCount = math.min(params.count, deck.getQuantity())
             elseif deck.tag == 'Card' then
@@ -1108,7 +1108,11 @@ function dealCoroutine()
             coroutine.yield(0)
 
             -- Wait a moment while any deal-in-progress cards move away.
-            local waitUntil = Time.time + 1
+            local delay = 1
+            if #_dealQueue > 0 and _dealQueue[1].color == params.color then
+                delay = delay + dealCount + 0.1 -- give this deal more time before another to same color
+            end
+            local waitUntil = Time.time + delay
             while Time.time < waitUntil do
                 _dealCoroutineHeartbeat = Time.time
                 coroutine.yield(0)
@@ -1133,8 +1137,8 @@ function dealCoroutine()
                 _dealCoroutineHeartbeat = Time.time
                 coroutine.yield(0)
 
-                -- Give set position smooth time to work.
-                local waitUntil = Time.time + 1
+                -- Give previous deal and set position smooth time to work.
+                local waitUntil = Time.time + dealCount + 0.1
                 while Time.time < waitUntil or discard.isSmoothMoving() do
                     _dealCoroutineHeartbeat = Time.time
                     coroutine.yield(0)
@@ -1175,35 +1179,36 @@ function _dealHack(deck, count, playerColor)
 
     -- Move cards to player zones before clone swap.
     local zoneAttrs = _zoneHelper.zoneAttributes(playerColor)
-    local p = zoneAttrs and zoneAttrs.center or { x = 0, y = 1, z = 0 }
+    local p0 = zoneAttrs and zoneAttrs.center or { x = 0, y = 1, z = 0 }
     local nextPositionIndex = 0
     local function nextPosition()
         nextPositionIndex = nextPositionIndex + 1
         return {
-            x = p.x,
-            y = p.y + 3 + nextPositionIndex * 0.2,
-            z = p.z
+            x = p0.x,
+            y = p0.y + 3 + nextPositionIndex * 0.2,
+            z = p0.z
         }
     end
-
+    local rotation = {
+        x = 0,
+        y = zoneAttrs.rotation.y,
+        z = deck.getRotation().z
+    }
     local deletedItems = _getDeletedItemsBag()
-    local function cloneAndDeal(card)
-        assert(card.tag == 'Card')
+
+    local function spawnCallback(card)
+        assert(card and card.tag == 'Card')
+        card.deal(1, playerColor)
+    end
+    local function takeCallback(card)
+        assert(card and card.tag == 'Card')
+        card.setLock(false)
         -- Grab json and spawn a new one.  Clone is simpler but makes a sound.
         local cardJson = card.getJSON()
-
-        local function spawnCallback(object)
-            object.deal(1, playerColor)
-
-            -- Wait to delete the original until after the spawn is ready
-            -- (to make sure it does not reuse the guid).
-            card.setLock(false)
-            if deletedItems then
-                deletedItems.call('ignoreGuid', card.getGUID())
-            end
-            destroyObject(card)
+        if deletedItems then
+            deletedItems.call('ignoreGuid', card.getGUID())
         end
-
+        destroyObject(card)
         local clone = spawnObjectJSON({
             json              = cardJson,
             position          = nextPosition(),
@@ -1214,35 +1219,39 @@ function _dealHack(deck, count, playerColor)
             params            = nil,
             snap_to_grid      = false
         })
-
-        -- Lock the card for the moment to prevent falling, will be deleted
-        -- when spawn finishes.
-        card.setLock(true)
     end
 
-    -- This is called from a coroutine so it allowed to yield(0).
-    for _ = 1, count do
+    for i = 1, count do
+        local function delayedTakeCallback(card)
+            assert(card and card.tag == 'Card')
+            card.setLock(true)
+            Wait.time(function() takeCallback(card) end, i - 1)
+        end
+
         local card = deck.tag == 'Card' and deck
         if card then
             local collide = false
             local fast = true
             card.setPositionSmooth(nextPosition(), collide, fast)
+            card.setRotationSmooth(rotation, collide, fast)
             coroutine.yield(0)
-            while card.isSmoothMoving() do
-                coroutine.yield(0)
+            local function callback()
+                delayedTakeCallback(card)
             end
-            cloneAndDeal(card)
+            local function condition()
+                return not card.isSmoothMoving()
+            end
+            Wait.condition(callback, condition, 5, callback)
         else
             card = deck.takeObject({
                 position          = nextPosition(),
-                rotation          = deck.getRotation(),
-                callback_function = cloneAndDeal,
+                rotation          = rotation,
+                callback_function = delayedTakeCallback,
                 smooth            = true,
                 top               = true
             })
             deck = deck.remainder or deck
         end
-        coroutine.yield(0)
     end
 end
 
@@ -1428,7 +1437,7 @@ local function _applyContextMenuItems(card)
     if deckName then
         if string.match(deckName, ' Exploration$') then
             local name = card.getName()
-            if string.match(name, '^.* Relic Fragment %(.*%%)') then
+            if string.match(name, '^.* Relic Fragment %(.*%)$') then
                 purgable = true
             else
                 local purgeSet = {

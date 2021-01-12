@@ -518,8 +518,7 @@ function onStrategyCardButtonClicked(params)
 				local success = _assignSpeaker(color, option)
 				if success then
 					_dealPoliticsActionCards(color)
-					-- wait to deal agendas, then they arrive grouped in the hand.
-					Wait.frames(function() _dealPoliticsAgendas(color) end,3)
+					_dealPoliticsAgendas(color)
 
 					_workQueue[card]["done"][color] = true
 					if _useWorkQueue then
@@ -1420,13 +1419,12 @@ function _dealPoliticsActionCards(color)
 	})
 end
 
-
 function _dealPoliticsAgendas(color)
-_deckHelper.deal({
-	deck = 'Agenda',
-	count = 2,
-	color = color,
-})
+	_deckHelper.deal({
+		deck = 'Agenda',
+		count = 2,
+		color = color,
+	})
 end
 
 -------------------------------- Construction ----------------------------------

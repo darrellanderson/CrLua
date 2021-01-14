@@ -539,8 +539,8 @@ function onStrategyCardButtonClicked(params)
 				local success = _assignSpeaker(color, option)
 				if success then
 					_dealPoliticsActionCards(color)
-					-- wait to deal agendas, then they arrive grouped in the hand.
-					Wait.frames(function() _dealPoliticsAgendas(color) end,3)
+					_dealPoliticsAgendas(color)
+					
 					_closePopupUi(color, card.."Popup")
 				end
 			end

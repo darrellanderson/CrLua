@@ -786,6 +786,7 @@ function _closeMenu(color, card)
 end
 
 ------------------------------ build custom UI ---------------------------------
+local _defaultLayoutBackup
 
 function updateUiOnClick(player, option, alt)
 	local colorTable = {}
@@ -812,6 +813,15 @@ function updateUiOnClick(player, option, alt)
 	end
 
 	local layout = UI.getXmlTable()
+
+	-- save and reset visibility for default layout
+	if not _defaultLayoutBackup then
+		_defaultLayoutBackup = _deepcopy(layout)
+		for _,menu in ipairs(_defaultLayoutBackup) do
+			menu['attributes']['visibility'] = ""
+			menu['attributes']['active'] = "false"
+		end
+	end
 
 	-- adds the default "Primary, Secondary, Pass, Close" menu moves the research menu to technologyPopup
 	-- removes PoK Buttons from tech UI if not playing with PoK
@@ -1090,6 +1100,14 @@ function _updateColorSelector(layout, element, colorTable)
 	return layout
 end
 
+function onObjectEnterContainer(bag, enter_object)
+	--restore the default UI layout
+	if enter_object.getName() == self.getName() then
+		if _defaultLayoutBackup then
+			UI.setXmlTable(_defaultLayoutBackup)
+		end
+	end
+end
 
 ----------------------------- Leadership ---------------------------------------
 

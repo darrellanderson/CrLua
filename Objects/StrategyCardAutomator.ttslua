@@ -93,7 +93,7 @@ local _customLayout = {
 					color = "green",
 					textcolor = "black",
 					text = 'Technology Primary',
-					tooltip = "Open Technology Menu."
+					tooltip = "Open Technology Menu.",
 					onClick = "genericFollow(Technology Primary)"
 				}
 			},
@@ -122,25 +122,21 @@ local _customLayout = {
 			{
 				tag = "Button",
 				attributes = {
-					id = "technology_pass"
-					attributes = {
-						color = "red",
-						textcolor = "black",
-						text = "Pass",
-						onClick = "notFollow(Technology)"
-					}
+					id = "technology_pass",
+					color = "red",
+					textcolor = "black",
+					text = "Pass",
+					onClick = "notFollow(Technology)"
 				}
 			},
 			{
 				tag = "Button",
 				attributes = {
-					id = "technology_pass"
-					attributes = {
-						color = "red",
-						textcolor = "black",
-						text = "Pass",
-						onClick = "closeMenu(technology)"
-					}
+					id = "technology_close",
+					color = "black",
+					textcolor = "white",
+					text = "Close Menu",
+					onClick = "closeMenu(technology)"
 				}
 			},
 		}
@@ -297,16 +293,6 @@ Tech: Draws the card from tech deck, use Tech Board if available.
 Imperial - Score: Only writes message - Secret: Draws secret. - Secondary: Draws secret.
 ]]
 
-local _workQueue = {
-	["leadership"] = {},
-	["diplomacy"] = {},
-	["politics"] = {},
-	["construction"] = {},
-	["trade"] = {},
-	["warfare"] = {},
-	["technology"] = {},
-	["imperial"] = {}
-}
 
 local backManual = {
 	tag = "Panel",
@@ -379,21 +365,9 @@ local objectUI = {{
 
 }}
 
-local _useWorkQueue = false
+
 
 function onLoad()
-	local _colors = Player.getColors()
-
-	for card, _ in pairs(_workQueue) do
-		_workQueue[card]['primaryColor'] = nil
-		_workQueue[card]['done'] = {}
-		_workQueue[card]['job'] = {}
-
-		for _,c in pairs(_colors) do
-			_workQueue[card]['done'][c] = false
-			_workQueue[card]['job'][c] = false
-		end
-	end
 
 	--Description on Back of the Object.
 	self.UI.setXmlTable({backManual})
@@ -471,9 +445,6 @@ function onLoad()
 end
 
 
-function toggleWorkQueue(_, isOn)
-	_useWorkQueue = isOn
-end
 
 function doNothing()
 	return false
@@ -500,26 +471,16 @@ function onStrategyCardButtonClicked(params)
 
 	--take care of ALL pass and close
 	if (action == "close") or (action == "pass") then
-		_workQueue[card]['done'][color] = true
 		if card=="technology" then
 			_closePopupUi(color, color..card.."Popup")
-		else
-			_closePopupUi(color, card.."Popup")
 		end
-		local isOpen = UI.getAttribute(card, "active")
-		if not isOpen then
-			_clearWorkQueue(card)
-		end
+		_closePopupUi(color, card.."Popup")
 
 		if action == "pass" then
 			_closeMenu(color,card)
 		end
 
 		return
-	end
-
-	if (action == "primary") then
-		_workQueue[card]["primaryColor"] = color
 	end
 
 	-- all secondary actions consume a strategy token (except leadership).
@@ -582,23 +543,12 @@ function onStrategyCardButtonClicked(params)
 					_dealPoliticsActionCards(color)
 					-- wait to deal agendas, then they arrive grouped in the hand.
 					Wait.frames(function() _dealPoliticsAgendas(color) end,3)
-
-					_workQueue[card]["done"][color] = true
-					if _useWorkQueue then
-						_dealWorkQueueCards(card)
-					end
 					_closePopupUi(color, card.."Popup")
 				end
 			end
 		end
 		if (action == "secondary") and secondarySuccessful then
-			if _useWorkQueue then
-				_workQueue[card]["done"][color] = true
-				_workQueue[card]["job"][color] = true
-				_dealWorkQueueCards(card)
-			else
-				_dealPoliticsActionCards(color)
-			end
+			_dealPoliticsActionCards(color)
 			_closeMenu(color, card)
 		end
 	end
@@ -622,6 +572,7 @@ function onStrategyCardButtonClicked(params)
 
 			_closeMenu(color,card)
 		end
+		return
 	end
 
 	if card == "trade" then
@@ -636,14 +587,20 @@ function onStrategyCardButtonClicked(params)
 		elseif (action == "secondary") and secondarySuccessful then
 			_refreshCommodities(color)
 			_closeMenu(color, card)
-			return
 		end
+		return
 	end
 
 	-------------------------- Technology --------------------------------------
 
 	if card == "technology" then
 		-- we only have action == "generic" to work with here.
+
+		if action == "primary" or action == "secondary" then
+			_openPopupUi(color, "technologyPopup")
+			_closeMenu(color, card)
+		end
+
 		if action == "generic" then
 			-- passes the tech name as option
 			-- option "Faction Tech" opens the faction tech popup COLORtechnologyPopup
@@ -677,123 +634,11 @@ function onStrategyCardButtonClicked(params)
 				_dealImperialSecret(color)
 				_closeMenu(color, card)
 			end
-			if _useWorkQueue then
-				_dealWorkQueueCards(card)
-			end
 		elseif (action == "secondary") and secondarySuccessful then
-			if _useWorkQueue then
-				_workQueue[card]['job'][color] = true
-				_workQueue[card]['done'][color] = true
-				_dealWorkQueueCards(card)
-			else
-				_dealImperialSecret(color)
-			end
+			_dealImperialSecret(color)
 			_closeMenu(color, card)
 		end
-	end
-end
-
------------------------------ Work Queue ---------------------------------------
--- i dont like this code.
--- it makes no sense to deal cards in the turn order, as decks are shuffled anyway.
--- should probably take this out.
-
--- the way this works:
--- once a player has closed his window he is marked as "done" for this strategy card (_workQueue[card]["done"][color] = true)
--- the player who uses a primary action, is marked as the "primaryColor" for this strategy card (_workQueue[card]["primaryColor"] = color)
--- a player who uses the secondary is registered for the pending "job" (_workQueue[card]["job"][color] = true)
-
--- after each action "_dealWorkQueueCards" is called.
--- _dealWorkQueue iterates over all colors (twice) and searches for the "primaryColor".
--- if primaryColor is not set, the primary action is not done and no cards are dealt.
--- otherwise, starting with the player after primaryColor, while players are "done", cards are dealt if they are registered for a "job".
--- exits when someone in the order is not done yet.
-
--- when all players are done with the action, (vis == nil) all remaining "jobs" are iterated and get dealt cards,
--- and the workQueue is reset.
-
---------------------------------------------------------------------------------
-
-function _dealWorkQueueCards(card)
-	-- currently disabled
-	if not _useWorkQueue then
 		return
-	end
-
-	if not _workQueue[card]["primaryColor"] then
-		return
-	end
-
-	--duplicate the colorTable
-	local doubleTable = {}
-	doubleTable = getSeatedPlayers()
-	for _,v in ipairs(getSeatedPlayers()) do
-		table.insert(doubleTable, v)
-	end
-
-	local function _doWork(card, color)
-		if card == "imperial" then
-			_dealImperialSecret(color)
-		end
-		if card == "politics" then
-			_dealPoliticsActionCards(color)
-		end
-		return
-	end
-
-	local started = false
-	for index,color in ipairs(doubleTable) do
-
-		if color == _workQueue[card]['primaryColor'] then
-			started = true
-		end
-		if started then
-			if _workQueue[card]['done'][color] then
-				if _workQueue[card]['job'][color] then
-					_doWork(card, color)
-					_workQueue[card]['job'][color] = false
-				end
-			else
-				return
-			end
-		end
-	end
-end
-
-
-function _clearWorkQueue(card)
-	-- currently disabled
-	if not _useWorkQueue then
-		return
-	end
-
-	local function _doWork(card, color)
-		if card == "imperial" then
-			_dealImperialSecret(color)
-		end
-		if card == "politics" then
-			_dealPoliticsActionCards(color)
-		end
-		return
-	end
-
-	for color,job in pairs(_workQueue[card]['job']) do
-		for _,c in ipairs(getSeatedPlayers()) do
-			if c == color then
-				if job then
-					_doWork(card, color)
-				end
-			end
-		end
-	end
-
-	_workQueue[card]['primaryColor'] = nil
-	local _colors = _setupHelper.getSetupColors()
-	for _,c in ipairs(_colors) do
-		if _workQueue[card]['job'][c] then
-		end
-		_workQueue[card]['done'][c] = false
-		_workQueue[card]['job'][c] = false
 	end
 end
 
@@ -868,9 +713,8 @@ function _closeAllPopups(color)
 		if (not option == "secondaryPopup") then
 			if option == "technologyPopup" then
 				_closePopupUi(option, color..option)
-			else
-				_closePopupUi(option, color)
 			end
+			_closePopupUi(option, color)
 		end
 	end
 end
@@ -897,15 +741,11 @@ function _closeMenu(color, card)
 	-- try to close associated _popups
 	if not popup then
 
-		-- just to be double sure that "done" is registered correctly
-		_workQueue[card]['done'][color] = true
-
 		if card == "technology" then
 			_closeMenu(color, color..card.."Popup")
 		else
 			_closeMenu(color, card.."Popup")
 		end
-
 		-- reset visibility to true for all
 		if vis == nil or vis == "" then
 			local seatedPlayers = getSeatedPlayers()
@@ -942,9 +782,6 @@ function _closeMenu(color, card)
 		UI.setAttribute(card, "active", "false")
 		if not popup then
 			broadcastToAll("All players have responded", "Black")
-			if _useWorkQueue then
-				_clearWorkQueue(card)
-			end
 		end
 	end
 	UI.setAttribute(card, "visibility", newVis)
@@ -978,7 +815,7 @@ function updateUiOnClick(player, option, alt)
 
 	local layout = UI.getXmlTable()
 
-	-- adds a tech primary and secondary to automatically consume the stategy token
+	-- adds the default "Primary, Secondary, Pass, Close" menu moves the research menu to technologyPopup
 	-- removes PoK Buttons from tech UI if not playing with PoK
 	layout = _addTechnologyPrimarySecondary(layout)
 
@@ -1050,11 +887,23 @@ function _addTechnologyPrimarySecondary(layout)
 		end
 	end
 
-	--layout[technologyIndex]simpleTechnologyMenu
-	techMenu = _deepcopy(layout[technologyIndex])
-	techMenu['attributes']['id'] = 'technology_popup'
-	layout[technologyIndex] = _customLayout["technology_secondary"]
-	table.insert(layout, #layout - 1, _customLayout["simpleTechnologyMenu"])
+	-- move the researchTechnology menu to technologyPopup
+	local techMenu = _deepcopy(layout[technologyIndex])
+	techMenu['attributes']['id'] = 'technologyPopup'
+	
+	local counter = 1
+	local keepButtons = {}
+	-- remove the "Pass" option, as players may already have spent a strategy token to open this menu
+	for _,child in ipairs(techMenu["children"]) do
+		if not (child["attributes"]["id"] == "technology_pass") then
+			keepButtons[counter] = child
+			counter = counter + 1
+		end
+	end
+	techMenu["children"] = keepButtons
+	-- default technology menu is replaced by simple "Primary, Secondary, Pass, Close" menu
+	layout[technologyIndex] = _customLayout["simpleTechnologyMenu"]
+	table.insert(layout, #layout - 1, techMenu)
 
 	return layout
 end

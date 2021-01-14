@@ -104,6 +104,7 @@ function onLoad(saveState)
 
     self.addContextMenuItem('Add Clone To Tiles', addCloneMenuOptionToSystemTiles)
     self.addContextMenuItem('Rotate Map 180', rotateMap180)
+    self.addContextMenuItem('Rotate Hyperlanes 180', rotateHyperlanes)
 
     -- If any clones are still on the table, add them to the systems table.
     _clones = (saveState and string.len(saveState) > 0 and JSON.decode(saveState)) or {}
@@ -165,6 +166,30 @@ function rotateMap180()
             z = -p.z
         }
         object.setPositionSmooth(p, collide, fast)
+
+        if system.hyperlane then
+            local r = object.getRotation()
+            r = {
+                x = 0,
+                y = (r.y + 180) % 360,
+                z = 0
+            }
+            object.setRotationSmooth(r, collide, fast)
+        end
+    end
+    local function delayedLock()
+        for system, object in pairs(getPlacedSystemToObject(false)) do
+            object.setLock(true)
+        end
+    end
+    Wait.time(delayedLock, 5)
+end
+
+function rotateHyperlanes()
+    for system, object in pairs(getPlacedSystemToObject(false)) do
+        object.setLock(false)
+        local collide = false
+        local fast = true
 
         if system.hyperlane then
             local r = object.getRotation()
@@ -424,11 +449,14 @@ function placeTilesCoroutine()
         local position = positionIterator()
         local tile, ab, rotation = buildEntry.tile, buildEntry.ab, buildEntry.rotation
         if rotation then
-            rotation = { x = 0, y = rotation * 60, z = ab == 'B' and 180 or 0 }
+            rotation = rotation * 60
+            rotation = rotation + 180 -- 0 rotation is upside down for default player position
+            rotation = rotation % 360
+            rotation = { x = 0, y = rotation, z = ab == 'B' and 180 or 0 }
         else
             rotation = { x = 0, y = 180, z = 0 }
         end
-        if tile ~= 0 then
+        if tile > 0 then
             local system = tileToSystem[tile]
             if system and not system.home then
                 if placedTileSet[tile] then
@@ -601,8 +629,12 @@ function saveTilesCoroutine()
         local guid = assert(system.guid)
         local tile = system.tile
         if system.hyperlane then
+            local rotation = object.getRotation().y
+            rotation = rotation - 180  -- 180 is "normal", make 0 based for value
+            rotation = (rotation + 360) % 360
+            rotation = rotation + 15  -- in case not exact, gets closest
             tile = tile .. (object.is_face_down and 'B' or 'A')
-            tile = tile .. math.floor((object.getRotation().y / 60) + 0.5)
+            tile = tile .. math.floor(rotation / 60)
         end
         guidToTile[guid] = tile
         guidToPosition[guid] = object.getPosition()

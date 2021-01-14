@@ -444,8 +444,6 @@ function onLoad()
 	})
 end
 
-
-
 function doNothing()
 	return false
 end
@@ -488,8 +486,8 @@ function onStrategyCardButtonClicked(params)
 	-- or has Yssaril agent available with mahact agent in game.
 	-- would be nice to have alt key to choose to use alternative, but not possible in xml buttons.
 	if action == "secondary" and card ~= "leadership" then
-		local capatalizedCardName = string.gsub(card, "^%l", string.upper)
-		secondarySuccessful = _consumeStrategyToken(color, capatalizedCardName)
+		local capitalizedCardName = string.gsub(card, "^%l", string.upper)
+		secondarySuccessful = _consumeStrategyToken(color, capitalizedCardName)
 		if not secondarySuccessful then
 			return  -- consumeStrategyToken printed the error message
 		end
@@ -1331,13 +1329,12 @@ function _dealPoliticsActionCards(color)
 	})
 end
 
-
 function _dealPoliticsAgendas(color)
-_deckHelper.deal({
-	deck = 'Agenda',
-	count = 2,
-	color = color,
-})
+	_deckHelper.deal({
+		deck = 'Agenda',
+		count = 2,
+		color = color,
+	})
 end
 
 -------------------------------- Construction ----------------------------------
@@ -1516,38 +1513,40 @@ function queueResearchTech(color, cardName)
 	table.insert(techQueue, cardName)
 
 	local function servicePendingTechQueue()
-	local cardName = (#techQueue > 0) and table.remove(techQueue, 1)
-	if not cardName then
-		-- Queue is empty and AFTER last card finished, remove queue.
-		_colorToPendingTech[color] = nil
-		return
+		local cardName = (#techQueue > 0) and table.remove(techQueue, 1)
+		if not cardName then
+			-- Queue is empty and AFTER last card finished, remove queue.
+			_colorToPendingTech[color] = nil
+			return
+		end
+		-- Take the next tech, chain self when take finishes.
+		local guid = researchTech(color, cardName, servicePendingTechQueue)
+		if not guid then
+			-- If guid then use chain callback to get next, otherwise no take
+			-- happened so move on to the next right away.
+			servicePendingTechQueue()
+		end
 	end
-	-- Take the next tech, chain self when take finishes.
-	local guid = researchTech(color, cardName, servicePendingTechQueue)
-	if not guid then
-		-- If guid then use chain callback to get next, otherwise no take
-		-- happened so move on to the next right away.
-		servicePendingTechQueue()
-	end
-end
-servicePendingTechQueue()
+	servicePendingTechQueue()
 end
 
 function researchTech(color, cardName, chainCallback)
 	assert(type(color) == 'string')
-	assert(type(cardName) == "string")
+	assert(type(cardName) == 'string')
+
+	-- Chain callback is ONLY called if take succeeds, as part of the take
+	-- callback.  Otherwise return false so the caller knows it will not chain.
+	assert(not chainCallback or type(chainCallback) == 'function')
 
 	local faction = _factionHelper.fromColor(color)
 	if not faction then
 		broadcastToAll('Research Technology: no faction selected for ' .. color, 'Red')
-		chainCallback()
-		return
+		return false
 	end
 
 	-- "Faction Tech" handled by onStrategyCardButtonClicked.
 	if cardName == "Faction Tech" then
-		chainCallback()
-		return
+		return false
 
 		-- gain command tokens only available to necro
 	elseif cardName == "Command Tokens" then
@@ -1557,12 +1556,10 @@ function researchTech(color, cardName, chainCallback)
 		end
 		if abilitiesSet['Technological Singularity'] then
 			_dealLeadershipCommandTokens(color, 3, {x=0,y=0,z=0})
-			chainCallback()
-			return
+			return false
 		else
 			_safeBroadcastToColor("Can only gain command tokens as Nekro", color, "Red")
-			chainCallback()
-			return
+			return false
 		end
 	end
 
@@ -1574,15 +1571,13 @@ function researchTech(color, cardName, chainCallback)
 	local techType = _technologyHelper.getTechType(cardName)
 	if not techType then
 		log('_technologyHelper did not find "' .. cardName .. '"')
-		chainCallback()
-		return
+		return false
 	end
 
 	local techNameSet = _technologyHelper.getTechNameSet()
 	if not techNameSet then
 		log("_technologyHelper returned empty techNameSet")
-		chainCallback()
-		return
+		return false
 	end
 
 	for _,object in ipairs(getAllObjects()) do
@@ -1612,22 +1607,19 @@ function researchTech(color, cardName, chainCallback)
 		broadcastToAll('Research Technology: missing deckname ' .. deckName, color)
 		broadcastToAll("If you have researched all your available technologies: Congratulations to you " .. color .."!", color)
 		broadcastToAll("If not, please name your deck of remaining technology cards 'Technology Cards' and leave them in your zone.", color)
-		chainCallback()
-		return
+		return false
 	end
 
 	local factionSheet = getObjectFromGUID(faction.factionSheetGuid)
 	if not factionSheet then
 		broadcastToAll('Research Technology: missing ' .. color .. ' Faction Sheet', 'Red')
-		chainCallback()
-		return
+		return false
 	end
 
 	local guid = _getEntryGuid(techDeck, cardName) or _getEntryGuid(techDeck, cardName .. ' Ω')
 	if not guid then
 		_safeBroadcastToColor('Research Technology: ' .. cardName .. " not found in " .. techDeck.getName() .. " deck", color, "Red")
-		chainCallback()
-		return
+		return false
 	end
 
 	local function _getPosToTechDeck(cardName, techDeck)
@@ -1718,6 +1710,7 @@ function researchTech(color, cardName, chainCallback)
 	_sendOnNewTechnologyResearched(color, cardName)
 
 	-- Return the guid in case caller wants to wait for resting, etc.
+	-- This also means a take is in progress, will do the chain callback.
 	return params.guid
 end
 

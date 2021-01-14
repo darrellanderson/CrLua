@@ -887,6 +887,9 @@ function _removeCards(containerName, deckName, sourceName)
         --error('_removeCards: missing deck "' .. deckName .. '"')
         return -- this happens if the deck is already put away
     end
+    if deck.tag ~= 'Deck' then
+        error('"' .. deckName .. '" is not a deck')
+    end
 
     local nameList = _deckHelper.getCardsWithSource({ deckName = deckName, source = sourceName })
     if not nameList then

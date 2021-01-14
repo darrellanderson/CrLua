@@ -62,25 +62,87 @@ local _customLayout = {
 			onClick = "genericFollow(Politics Primary)"
 		}
 	},
-	['technology_primary'] = {
-		tag = "Button",
+	['simpleTechnologyMenu'] = {
+		tag = "VerticalLayout",
 		attributes = {
-			id = 'technology_primary',
-			color = "green",
-			textcolor = "black",
-			text = 'Technology Primary',
-			onClick = "genericFollow(Technology Primary)"
-		}
-	},
-	['technology_secondary'] = {
-		tag = "Button",
-		attributes = {
-			id = 'technology_secondary',
-			color = "green",
-			textcolor = "black",
-			text = 'Technology Secondary',
-			tooltip = "Consumes a strategy token from your strategy pool.",
-			onClick = "genericFollow(Technology Secondary)"
+			id = "technology",
+			height="300",
+			width="200",
+			allowDragging="true",
+			returnToOriginalPositionWhenReleased="false",
+			rectAlignment="UpperLeft",
+			offsetXY="1200 -80",
+			visibility="false"
+		},
+		children = {
+			{
+				tag = "Button",
+				attributes = {
+					id = "technology_primary",
+					color = "black",
+					textcolor = "white",
+					tooltip="+ Research 1 technology.&#xA;+ Spend 6 resources to research 1 technology.",
+					textAlignment="UpperLeft",
+					text = "Technology Primary Ability"
+				}
+			},
+			{				
+				tag = "Button",
+				attributes = {
+					id = 'technology_primary',
+					color = "green",
+					textcolor = "black",
+					text = 'Technology Primary',
+					tooltip = "Open Technology Menu."
+					onClick = "genericFollow(Technology Primary)"
+				}
+			},
+			{
+				tag = "Button",
+				attributes = {
+					id = "technology_secondary",
+					color = "black",
+					textcolor = "white",
+					tooltip="+ Spend 1 token from your strategy pool and 4 resources to research 1 technology.",
+					textAlignment="UpperLeft",
+					text = "Technology Secondary Ability"
+				}
+			},
+			{
+				tag = "Button",
+				attributes = {
+					id = 'technology_secondary',
+					color = "green",
+					textcolor = "black",
+					text = 'Technology Secondary',
+					tooltip = "Open Technology Menu. Consumes a strategy token from your strategy pool.",
+					onClick = "genericFollow(Technology Secondary)"
+				}
+			},
+			{
+				tag = "Button",
+				attributes = {
+					id = "technology_pass"
+					attributes = {
+						color = "red",
+						textcolor = "black",
+						text = "Pass",
+						onClick = "notFollow(Technology)"
+					}
+				}
+			},
+			{
+				tag = "Button",
+				attributes = {
+					id = "technology_pass"
+					attributes = {
+						color = "red",
+						textcolor = "black",
+						text = "Pass",
+						onClick = "closeMenu(technology)"
+					}
+				}
+			},
 		}
 	},
 	['politicsPopupTable'] = {
@@ -988,7 +1050,11 @@ function _addTechnologyPrimarySecondary(layout)
 		end
 	end
 
-	table.insert(layout[technologyIndex]["children"], #layout - 1, _customLayout["technology_secondary"])
+	--layout[technologyIndex]simpleTechnologyMenu
+	techMenu = _deepcopy(layout[technologyIndex])
+	techMenu['attributes']['id'] = 'technology_popup'
+	layout[technologyIndex] = _customLayout["technology_secondary"]
+	table.insert(layout, #layout - 1, _customLayout["simpleTechnologyMenu"])
 
 	return layout
 end

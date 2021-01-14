@@ -825,9 +825,6 @@ function updateUiOnClick(player, option, alt)
 	-- adds on "Assign Speaker" button to Politics menu which opens the politics Popup
 	layout = _addAutomationPoliticsPopup(layout)
 
-	-- not implemented
-	-- layout = _addAutomationSecondaryPopup(layout, colorTable)
-
 	-- add a choice between scoring mecatol rex and drawing a secret
 	layout = _addImperialPrimary(layout)
 
@@ -842,10 +839,10 @@ function updateUiOnClick(player, option, alt)
 end
 
 function _addTechnologyPrimarySecondary(layout)
-	-- adds a "Technology Primary" and "Technology Secondary" button to the tech menu.
-	-- The "Technology Primary" only announces "player uses Technology Primary" but does nothing
-	-- The "Technology Secondary" consumes a strategy token if necessary
-	-- If PoK not selected, remove PoK tech buttons from UI
+	-- Moves the default technology menu to technologyPopup and
+	-- replaces it with generic "Primary, Secondary, Pass, Close"
+	-- which opens the technologyPopup on demand.
+	-- If PoK not selected, remove PoK tech buttons from UI.
 
 	local technologyIndex = nil
 
@@ -941,14 +938,13 @@ function _addAutomationTechPopup(layout, colorTable)
 		return factionPopup
 	end
 
-	local inserted = false
 	for _,color in ipairs(colorTable) do
+		local inserted = false
 		for index,menu in ipairs(layout) do
 			if menu["attributes"]["id"] == (color.."technologyPopup") then
 				inserted = true
 				-- updates existing COLORtechnologyPopup table in case of changed faction? Just to be sure...
-				table.remove(layout, index)
-				table.insert(layout, index, _buildPopupTable(color))
+				layout[index] = _buildPopupTable(color)
 				break
 			end
 		end

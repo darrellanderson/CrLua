@@ -1259,7 +1259,7 @@ function SetupFaction.unpack(faction, factionBox, zone, isFranken)
                 position          = offsetPosition(zone.center, offset),
                 rotation          = zoneRotation(zone, offset),
                 callback_function = takeCallback,
-                smooth            = false,
+                smooth            = false,  -- if true infinite bags can glitch where hovering object is not above bag
             })
             nameToObject[object.getName()] = object
         end
@@ -1720,11 +1720,13 @@ function SetupFaction.placeScoreCounters(ownerTokensBag, zone, zoneIndex, color)
         sound             = false,
         callback_function = function(object) object.setLock(true) end,
     })
+    clone.setName(ownerTokensBag.getName())
     clone.setColorTint(Color.fromString(color))
     p.y = p.y + 3
     local token = ownerTokensBag.takeObject({
         position          = p,
         callback_function = function(object) clone.putObject(object) end,
+        smooth            = true,
     })
     coroutine.yield(0)
 

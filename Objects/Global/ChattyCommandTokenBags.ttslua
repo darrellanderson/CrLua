@@ -1,53 +1,56 @@
 -- Report when taking or putting command tokens.
 -- @author Darrell
+local ChattyCommandTokens = {
+    _playerColorToState = {},
+}
 
-local _ctTransactions = assert(_ctTransactions == nil) and {}
-local _ctWaitId = assert(_ctWaitId == nil) and false
-
-local function reportCommandTokenTransaction(container, object, quantity)
+function ChattyCommandTokens._process(container, object, transactionType)
+    assert(type(container) == 'userdata' and type(object) == 'userdata' and type(transactionType) == 'string')
     local isCommandTokenBag = string.match(container.getName(), 'Command Tokens Bag$')
-    local isCommandToken = string.match(object.getName(), 'Command Token$')
-    if not isCommandToken or not isCommandTokenBag then
-        return
-    end
-
-    -- Keep deposit and withdrawl transactions separate.  During clean up
-    -- a player will deposit tokens from the map, AND withdraw 2 (or 3).
-    local name = object.getName()
-    local type = (quantity > 0) and 'Deposited' or 'Withdrew'
-    local transactions = _ctTransactions[name]
-    if not transactions then
-        transactions = {}
-        _ctTransactions[name] = transactions
-    end
-    transactions[type] = (transactions[type] or 0) + math.abs(quantity)
-
-    -- Wait before reporting in case withdrawing or depositing several.
-    -- Restart the clock on each transaction.
-    local function delayedReport()
-        _ctWaitId = false
-        for name, transactions in pairs(_ctTransactions) do
-            local message = false
-            local total = 0
-            for type, quantity in pairs(transactions) do
-                if not message then
-                    message = type .. ' ' .. quantity
-                else
-                    message = message .. ', ' .. string.lower(type) .. ' ' .. quantity
-                end
-                total = total + quantity
+    if isCommandTokenBag then
+        local tokenName = string.match(object.getName(), '^(.*) Command Token$')
+        local faction = tokenName and _factionHelper.fromTokenName(tokenName)
+        local color = faction and faction.color
+        if color then
+            local state = ChattyCommandTokens._playerColorToState[color]
+            if not state then
+                state = {
+                    name = tokenName,
+                    transactions = {},
+                    waitId = false,
+                }
+                ChattyCommandTokens._playerColorToState[color] = state
             end
-            if total > 0 then
-                message = message .. ' ' .. name .. (total > 1 and 's' or '')
-                printToAll(message)
+            state.transactions[transactionType] = (state.transactions[transactionType] or 0) + 1
+            if state.waitId then
+                Wait.stop(state.waitId)
             end
+            state.waitId = Wait.time(function() ChattyCommandTokens._report(color) end, 5)
         end
-        _ctTransactions = {}
     end
-    if _ctWaitId then
-        Wait.stop(_ctWaitId)
+end
+
+function ChattyCommandTokens._report(color)
+    assert(type(color) == 'string')
+    local state = ChattyCommandTokens._playerColorToState[color]
+    ChattyCommandTokens._playerColorToState[color] = nil
+    if state then
+        local tranactionMessages = {}
+        local total = 0
+        for transactionType, quantity in pairs(state.transactions) do
+            table.insert(tranactionMessages, transactionType .. ' ' .. quantity)
+            total = total + quantity
+        end
+        if total > 0 then
+            local message = {
+                state.name,
+                table.concat(tranactionMessages, ', '),
+                'Command Token' .. (total > 1 and 's' or '')
+            }
+            message = table.concat(message, ' ')
+            printToAll(message, color)
+        end
     end
-    _ctWaitId = Wait.time(delayedReport, 5)
 end
 
 local originalOnObjectLeaveContainer = onObjectLeaveContainer
@@ -55,7 +58,7 @@ function onObjectLeaveContainer(container, leaveObject)
     if originalOnObjectLeaveContainer then
         originalOnObjectLeaveContainer(container, leaveObject)
     end
-    reportCommandTokenTransaction(container, leaveObject, -1)
+    ChattyCommandTokens._process(container, leaveObject, 'withdrew')
 end
 
 local originalOnObjectEnterContainer = onObjectEnterContainer
@@ -63,5 +66,5 @@ function onObjectEnterContainer(container, enterObject)
     if originalOnObjectEnterContainer then
         originalOnObjectEnterContainer(container, enterObject)
     end
-    reportCommandTokenTransaction(container, enterObject, 1)
+    ChattyCommandTokens._process(container, enterObject, 'deposited')
 end

@@ -778,7 +778,11 @@ function AttachLib.anchor(attachTokenObject)
         end
     end
 
+    if systemObject.is_face_down then
+        localPosition.y = -localPosition.y
+    end
     local position = systemObject.positionToWorld(localPosition)
+    position.y = position.y + 0.1  -- y was top of tile, move slightly above
     systemObject.setLock(true)
     local collide = false
     local fast = true
@@ -797,7 +801,10 @@ function AttachLib.anchor(attachTokenObject)
     local function action()
         attachTokenObject.setLock(true)
     end
-    local function timeout() end
+    local function timeout()
+        -- Did not come to rest?  Lock it anyhow.
+        attachTokenObject.setLock(true)
+    end
     Wait.condition(action, condition, 3, timeout)
 end
 

@@ -37,6 +37,8 @@ local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 local _unitHelper = getHelperClient('TI4_UNIT_HELPER')
 local _technologyHelper = getHelperClient('TI4_TECHNOLOGY_HELPER')
 
+local _active = false
+
 local _pointorder = {
 	["Flagship"] = 1,
 	["War Sun"] = 2,
@@ -279,6 +281,7 @@ local _customLayout = {
 		}
 	}
 }
+
 local _ObjectManual = [[
 Features:
 Leadership - Primary and Number: gain command tokens.
@@ -292,7 +295,6 @@ Tech: Draws the card from tech deck, use Tech Board if available.
 - Faction Tech: Opens a choice popup - Comm Tokens: gain tokens as Necro.
 Imperial - Score: Only writes message - Secret: Draws secret. - Secondary: Draws secret.
 ]]
-
 
 local backManual = {
 	tag = "Panel",
@@ -362,13 +364,9 @@ local objectUI = {{
 			}
 		}
 	}
-
 }}
 
-
-
 function onLoad()
-
 	--Description on Back of the Object.
 	self.UI.setXmlTable({backManual})
 	local descriptionText = [[
@@ -457,6 +455,10 @@ function onStrategyCardButtonClicked(params)
 	assert(type(params.strategyCard) == 'string')
 	assert(type(params.value) == 'string')
 
+	-- Player MUST click the button before automator takes any actions.
+	if not _active then
+		return
+	end
 
 	local card = string.match(params.strategyCard, "(.*)_.*")
 	local action = string.gsub(params.strategyCard, card.."_", "")
@@ -788,6 +790,8 @@ end
 local _defaultLayoutBackup
 
 function updateUiOnClick(player, option, alt)
+	_active = true
+
 	local colorTable = {}
 	local factionColors = {}
 	local missingFactionColors = false

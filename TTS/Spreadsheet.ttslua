@@ -12,7 +12,7 @@ CrLua.TTS.Spreadsheet = assert(not CrLua.TTS.Spreadsheet) and {
 }
 
 -- Google Apps Script proxy that pushes updates to the editable sheet.
-CrLua.TTS.Spreadsheet.GAS_PROXY = 'https://script.google.com/macros/s/AKfycbzx5wxUv3BG6EiYfIv0mC9YNnEJKMkSNh0uYSOMJlGOjCJ8Ak2s/exec'
+CrLua.TTS.Spreadsheet.GAS_PROXY = 'https://script.google.com/macros/s/AKfycbxOlBxlSJNWnwmd9r-4AcDAcdWOfOX5r3N9ox23DtNefgGbs_4nKrYR6A/exec'
 
 local _idToCells = {}
 
@@ -93,4 +93,33 @@ function CrLua.TTS.Spreadsheet.get(label, id, sheet, cell, callback)
     end
 
     WebRequest.get(url, callbackWrapper)
+end
+
+function CrLua.TTS.Spreadsheet.reserve(label, id, sheet, count, callback)
+    assert(type(label) == 'string' and type(id) == 'string' and type(count) == 'number')
+    assert(not sheet or type(sheet) == 'string')
+    assert(not callback or type(callback) == 'function')
+
+    local function callbackWrapper(webRequest)
+        if webRequest.is_error then
+            CrLua.Log.w(TAG, 'get failed ("' .. label .. '")')
+        else
+            CrLua.Log.i(TAG, 'get success ("' .. label .. '")')
+        end
+        if callback then
+            print('xx1 ' .. webRequest.text)
+            local rows = JSON.decode(webRequest.text)
+            print('xx2')
+            callback(rows)
+            print('xx3')
+        end
+    end
+
+    CrLua.Log.i(TAG, 'reserving ' .. count .. ' rows for "' .. label .. '"')
+    local postData = {
+        id = id,
+        sheet = sheet,
+        reserve = count,
+    }
+    WebRequest.post(CrLua.TTS.Spreadsheet.GAS_PROXY, JSON.encode(postData), callbackWrapper)
 end

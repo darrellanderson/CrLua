@@ -45,7 +45,7 @@ function CrLua.TTS.Spreadsheet.update(label, id, sheet, cells)
     -- Update persistent cells content ONLY ON SUCCESS.
     local function callback(webRequest)
         if webRequest.is_error or webRequest.text ~= 'ok' then
-            CrLua.Log.w(TAG, 'update "' .. label .. '" failed')
+            CrLua.Log.w(TAG, 'update "' .. label .. '" failed: ' .. (webRequest.text or '-'))
         else
             CrLua.Log.i(TAG, 'update "' .. label .. '" success')
             for k, v in pairs(updatedCells) do
@@ -107,11 +107,8 @@ function CrLua.TTS.Spreadsheet.reserve(label, id, sheet, count, callback)
             CrLua.Log.i(TAG, 'get success ("' .. label .. '")')
         end
         if callback then
-            print('xx1 ' .. webRequest.text)
             local rows = JSON.decode(webRequest.text)
-            print('xx2')
             callback(rows)
-            print('xx3')
         end
     end
 

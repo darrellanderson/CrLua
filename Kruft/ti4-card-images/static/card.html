@@ -15,16 +15,31 @@
                     <option value="action">Action</option>
                     <option value="action-c">Action (clean)</option>
                     <option value="action_codex">Action (Codex)</option>
+                    <option value="action_pok">Action (PoK)</option>
                     <option value="secret">Secret Objective</option>
                     <option value="secret-c">Secret Objective (clean)</option>
+                    <option value="secret_pok">Secret Objective (PoK)</option>
                     <option value="stage1">Stage 1 Public Objective</option>
                     <option value="stage1-c">Stage 1 Public Objective (clean)</option>
+                    <option value="stage1_pok">Stage 1 Public Objective (PoK)</option>
                     <option value="stage2">Stage 2 Public Objective</option>
                     <option value="stage2-c">Stage 2 Public Objective (clean)</option>
+                    <option value="stage2_pok">Stage 2 Public Objective (PoK)</option>
                     <option value="agenda">Agenda</option>
                     <option value="agenda-c">Agenda (clean)</option>
                     <option value="promissory-c">Promissory (clean)</option>
+                    <option value="exploration">Exploration</option>
                     <option value="nobility">Nobility</option>
+                    </select>
+                </li>
+                <li id="explorationTypeBlock">
+                    <label>Exploration type</label>
+                    <select name="explorationType" id="explorationType" class="field-select">
+                        <option value="cultural">Cultural</option>
+                        <option value="hazardous">Hazardous</option>
+                        <option value="industrial">Industrial</option>
+                        <option value="frontier">Frontier</option>
+                        <option value="relic">Relic</option>
                     </select>
                 </li>
                 <li>
@@ -36,7 +51,7 @@
                     <select name="type" id="type" class="field-select">
                         <option value="action phase|ff0000">Action Phase</option>
                         <option value="status phase|ffffff">Status Phase</option>
-                        <option value="agenda phase|ffffff">Agenda Phase</option>
+                        <option value="agenda phase|6666ff">Agenda Phase</option>
                         <option value="directive|ffff00">Directive</option>
                         <option value="law|ddad63">Law</option>
                     </select>
@@ -121,6 +136,9 @@
                         <option value="-15">-15</option>
                     </select>
                 </li>
+                <li id="gradualBlock">
+                    <input type="checkbox" id="gradual" name="gradual"> Gradual Shrink</input>
+                </li>
 
                 <li>
                     <input type="submit" value="Update" />
@@ -144,6 +162,7 @@
     <script>
         function updateCardImage() {
             var card = encodeURIComponent(document.getElementById("card").value)
+            var explorationType = encodeURIComponent(document.getElementById("explorationType").value)
             var title = encodeURIComponent(document.getElementById("title").value)
             var type = encodeURIComponent(document.getElementById("type").value)
             var body = encodeURIComponent(document.getElementById("body").value)
@@ -154,17 +173,19 @@
             var points = encodeURIComponent(document.getElementById("points").value)
             var titlesize = encodeURIComponent(document.getElementById("titlesize").value)
             var fontsize = encodeURIComponent(document.getElementById("fontsize").value)
+            var gradual = encodeURIComponent(document.getElementById("gradual").checked)
 
-            if (card == 'secret' || card == 'secret-c') {
+            if (card.startsWith('secret')) {
                 footer = 'Victory Point|dea3a9'
-            } else if (card == 'stage1' || card == 'stage1-c') {
+            } else if (card.startsWith('stage1')) {
                 footer = 'Victory Point|dfbc96'
-            } else if (card == 'stage2' || card == 'stage2-c') {
+            } else if (card.startsWith('stage2')) {
                 footer = 'Victory Points|e3f5f9'
             }
 
             var url = "/img"
             url = url + "?card=" + card
+            url = url + "&explorationType=" + explorationType
             url = url + "&title=" + title
             url = url + "&type=" + type
             url = url + "&body=" + body
@@ -174,6 +195,7 @@
             url = url + "&points=" + points
             url = url + "&titlesize=" + titlesize
             url = url + "&fontsize=" + fontsize
+            url = url + "&gradual=" + gradual
 
             var img = document.getElementById("cardimage")
             img.src = url
@@ -187,22 +209,28 @@
         function onSelectChanged() {
             var card = document.getElementById("card").value
 
+            document.getElementById("explorationTypeBlock").style.display = 'none';
             document.getElementById("subtitleBlock").style.display = 'none';
             document.getElementById("actionFlavorBlock").style.display = 'none';
             document.getElementById("colorBlock").style.display = 'none';
             document.getElementById("nobilityFooterBlock").style.display = 'none';
             document.getElementById("nobilityPointsBlock").style.display = 'none';
+            document.getElementById("gradualBlock").style.display = 'none';
 
-            if (card == 'action' || card == 'action_codex' || card == 'action-c') {
+            if (card.startsWith('action')) {
                 document.getElementById("actionFlavorBlock").style.display = 'block';
             }
-            if (card == 'secret' || card == 'secret-c') {
+            if (card == 'exploration') {
+                document.getElementById("explorationTypeBlock").style.display = 'block';
+            }
+            if (card.startsWith('secret')) {
                 document.getElementById("subtitleBlock").style.display = 'block';
             }
-            if (card == 'agenda' || card == 'agenda-c' || card == 'stage1' || card == 'stage1-c' || card == 'stage2' || card == 'stage2-c') {
+            if (card.startsWith('agenda') || card.startsWith('stage1') || card.startsWith('stage2')) {
                 document.getElementById("subtitleBlock").style.display = 'block';
+                document.getElementById("gradualBlock").style.display = 'block';
             }
-            if (card == 'promissory-c') {
+            if (card.startsWith('promissory')) {
                 document.getElementById("colorBlock").style.display = 'block';
             }
 

@@ -17,6 +17,7 @@ function getHelperClient(helperObjectName)
 	end
 	return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
+local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 -------------------------------------------------------------------------------
@@ -516,6 +517,39 @@ end
 
 -------------------------------------------------------------------------------
 
+function _testSpelling()
+	local techSet = _deepcopy(getTechNameSet())
+	local function foundTech(tech)
+		tech = string.gsub(tech, " Ω$", "")
+		assert(techSet[tech], 'missing "' .. tech .. '"')
+		techSet[tech] = nil
+	end
+
+	-- Find a tech deck.
+	local deck = false
+	for _, object in ipairs(getAllObjects()) do
+		if object.tag == 'Deck' and object.getName() == 'Technology Cards' then
+			deck = object
+		end
+	end
+	assert(deck, 'missing tech deck')
+
+	-- Verify tech.
+	for _, entry in ipairs(deck.getObjects()) do
+		foundTech(entry.name)
+	end
+	for _, faction in pairs(_factionHelper.allFactions(true)) do
+		for _, tech in ipairs(faction.factionTech or {}) do
+			foundTech(tech)
+		end
+	end
+
+	-- Any remaining?
+	for tech, _ in pairs(techSet) do
+		print('REMAINING: "' .. tech .. '"')
+	end
+end
+
 function onLoad(saveState)
     self.setColorTint({ r = 0.25, g = 0.25, b = 0.25 })
     self.setScale({ x = 2, y = 0.01, z = 2 })
@@ -531,6 +565,7 @@ function onLoad(saveState)
     end
     self.setInvisibleTo(invisibleTo)
 
+	self.addContextMenuItem('Test Spelling', _testSpelling)
 	self.addContextMenuItem('Test Nat Order', _testGetTechNaturalOrder)
 	self.addContextMenuItem('Test Player Techs', _testGetPlayerColorToTechs)
 end

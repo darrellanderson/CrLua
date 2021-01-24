@@ -735,7 +735,7 @@ end
 function changeUnitCountXml(player, value, id)
     if (not player.seated) or player.color == 'Grey' then
         return
-    elseif tonumber(value) == -3 then
+    elseif value == '-3' then
         return  -- middle button click
     end
     if id == string.match(id, ".+%.") .. "unitMainButton" then
@@ -767,7 +767,7 @@ end
 function onClickUnitAbility(player, value, id)
     if (not player.seated) or player.color == 'Grey' then
         return
-    elseif tonumber(value) == -3 then
+    elseif value == '-3' then
         return  -- middle button click
     end
     local unitType, abilityId = string.match(id, "^(.+)%.ability%.(.+)$")

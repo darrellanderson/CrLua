@@ -408,6 +408,16 @@ function placeTilesCoroutine()
 
     local buildList = parseMapString(mapString)
 
+    if #buildList > 0 and buildList[1].tile ~= MECATOL_TILE then
+        local system = assert(_systemHelper.systemFromTile(MECATOL_TILE))
+        local mecatolTile = getObjectFromGUID(system.guid)
+        if mecatolTile then
+            local blueBag = getObjectFromGUID(BLUE_BAG_GUID)
+            mecatolTile.setLock(false)
+            blueBag.putObject(mecatolTile)
+        end
+    end
+
     -- Build a map from tile number to system.
     local guidToSystem = _systemHelper.systems()
     local tileToSystem = {}
@@ -1140,9 +1150,13 @@ function parseMapString(input)
     assert(type(input) == 'string')
     local buildList = {}
 
-    local centerSystem = string.match(input, '^{(%d+)}')
+    local centerSystem, ab, rotation = string.match(input, '^{(%d+)([AB])(%d+)}')
     if centerSystem then
-        table.insert(buildList, { tile = tonumber(centerSystem) })
+        table.insert(buildList, {
+            tile = tonumber(centerSystem),
+            ab = ab,
+            rotation = rotation
+        })
         local a,b = string.find(input, '}')
         input = string.sub(input, b + 1)
     else

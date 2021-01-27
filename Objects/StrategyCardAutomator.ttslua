@@ -1175,13 +1175,16 @@ function _consumeStrategyToken(color, strategyCard)
 		return
 	end
 
-	abilitiesSet = {}
-	for _, ability in ipairs(faction.abilities) do
-		abilitiesSet[ability] = true
-	end
-	if abilitiesSet['Masters of Trade'] then
-		_safeBroadcastToColor(strategyCard .. ": ".. color .. " has the Master of Trade ability. No strategy token has been used." , color, color)
-		return true
+	-- Dont consume a strategy token for Trade with the "Master of Trade" ability
+	if strategyCard == "Trade" then
+		abilitiesSet = {}
+		for _, ability in ipairs(faction.abilities) do
+			abilitiesSet[ability] = true
+		end
+		if abilitiesSet['Masters of Trade'] then
+			_safeBroadcastToColor(strategyCard .. ": ".. color .. " has the Master of Trade ability. No strategy token has been used." , color, color)
+			return true
+		end
 	end
 
 	-- Find the command tokens bag and alternate payment methods.

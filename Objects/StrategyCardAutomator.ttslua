@@ -217,13 +217,45 @@ local _customLayout = {
 			}
 		}
 	},
-	["technologyPopupButton"] = {
+	['SecondaryPopupTable'] = {
+		tag = "VerticalLayout",
+		attributes = {
+			id = "COLORPLACEHOLDERCARDPLACEHOLDERSecondaryPopup",
+			height = "150",
+			offsetXY="1000 -80",
+			active="false",
+			visibility=""
+		},
+		children = {
+			{
+				tag = 'Button',
+				attributes = {
+					id = "CARDPLACEHOLDER_secondarypopup",
+					color = "black",
+					textcolor = "white",
+					text = "Select CARDPLACEHOLDER Secondary Payment."
+				}
+
+			},
+			{
+				tag = 'Button',
+				attributes = {
+					id = "CARDPLACEHOLDER_secondarypopup",
+					color = "black",
+					textcolor="white",
+					text = "Close Menu",
+					onClick = "genericSilent(close)"
+				}
+			}
+		}
+	},
+	["SecondaryPopupButton"] = {
 		tag = "Button",
 		attributes = {
-			id = "technology_generic",
-			onClick = "genericSilent(TECHPLACEHOLDER)",
+			id = "CARDPLACEHOLDER_secondarypopup",
+			onClick = "genericSilent(OPTIONPLACEHOLDER)",
 			textcolor = "black",
-			text = "TECHPLACEHOLDER",
+			text = "OPTIONPLACEHOLDER",
 			color = "white"
 		}
 	},
@@ -396,31 +428,13 @@ function onLoad()
 		tooltip = "Adds automation buttons (on first click) and updates Trade and Politics colors (on first click as well as future clicks).",
 		click_function = "updateUiOnClick",
 		function_owner = self,
-		position = {x=0, y=0.0, z=-0.2},
+		position = {x=0, y=0.0, z=0},
 		rotation = {x=0, y=0, z=180},
 		scale = rescale,
 		width = 900,
-		height = 300,
+		height = 400,
 		font_size = 100,
 		label = "Update UI",
-	})
-
-	self.createButton({
-		tooltip = [[Toggle Card Queue
-		------------
-		Politics and Imperial strategy cards automatically deal Secrets and Actioncards to players. 
-
-		Enabled: Wait for the correct players turn to draw cards. 
-		Disabled: Deal cards immediately. ]],
-		click_function = "toggleWorkQueue",
-		function_owner = self,
-		position = {x=0, y=0.0, z=0.54},
-		rotation = {x=0, y=0, z=180},
-		scale = rescale,
-		width = 900,
-		height = 200,
-		font_size = 90,
-		label = "Toggle Card Queue",
 	})
 
 	-- front text
@@ -442,7 +456,7 @@ function onLoad()
 		label = "Please click 'Update UI' after all\nplayers have chosen a faction.",
 		font_color = "Red",
 		rotation = {x=0, y=0, z=180},
-		position = {x=0, y=0.0, z=0.2},
+		position = {x=0, y=0.0, z=0.54},
 		scale = rescale,
 		click_function = "doNothing",
 		function_owner = self
@@ -507,10 +521,14 @@ function onStrategyCardButtonClicked(params)
 	-- would be nice to have alt key to choose to use alternative, but not possible in xml buttons.
 	if action == "secondary" and card ~= "leadership" then
 		local capitalizedCardName = string.gsub(card, "^%l", string.upper)
-		secondarySuccessful = _consumeStrategyToken(color, capitalizedCardName)
-		if not secondarySuccessful then
-			return  -- consumeStrategyToken printed the error message
-		end
+		local altPayment = _getStrategytokenAlternativeSet(color)
+		if not altPayment then
+			secondarySuccessful = _consumeStrategyToken(color, capitalizedCardName)
+			if not secondarySuccessful then
+				return  -- consumeStrategyToken printed the error message
+			end
+		else 
+			card = string.gsub(card, color.."Secondary" )
 	end
 
 	-------------------------- Diplomacy ---------------------------------------
@@ -827,7 +845,7 @@ function updateUiOnClick(player, option, alt)
 		end
 		table.insert(colorTable, color)
 	end
-	
+
 	if missingFactionColors then
 		local colors = table.concat(missingFactionColors, ', ')
 		broadcastToAll('Warning: no faction for ' .. colors .. '. Please repeat button click afterward to enable their faction technologies', 'Red')
@@ -1184,25 +1202,13 @@ end
 
 ------------------------------ secondary ---------------------------------------
 
-function _consumeStrategyToken(color, strategyCard)
-	assert(type(color) == 'string' and type(strategyCard) == 'string')
+function _getStrategytokenAlternativeSet(color)
+	assert(type(color) == 'string'))
 
 	local faction = _factionHelper.fromColor(color)
 	if not faction then
 		broadcastToAll('Consume Strategy tokens: no faction for ' .. color, 'Red')
 		return
-	end
-
-	-- Dont consume a strategy token for Trade with the "Master of Trade" ability
-	if strategyCard == "Trade" then
-		abilitiesSet = {}
-		for _, ability in ipairs(faction.abilities) do
-			abilitiesSet[ability] = true
-		end
-		if abilitiesSet['Masters of Trade'] then
-			_safeBroadcastToColor(strategyCard .. ": ".. color .. " has the Master of Trade ability. Not using a strategy token." , color, color)
-			return true
-		end
 	end
 
 	-- Find the command tokens bag and alternate payment methods.
@@ -1251,12 +1257,50 @@ function _consumeStrategyToken(color, strategyCard)
 		end
 	end
 	if #altPayment > 0 then
+		return altPayment
+	else
+		return false
+	end
+
+end
+
+
+function _consumeStrategyToken(color, strategyCard)
+	assert(type(color) == 'string' and type(strategyCard) == 'string')
+
+	local faction = _factionHelper.fromColor(color)
+	if not faction then
+		broadcastToAll('Consume Strategy tokens: no faction for ' .. color, 'Red')
+		return
+	end
+
+	-- Dont consume a strategy token for Trade with the "Master of Trade" ability
+	if strategyCard == "Trade" then
+		abilitiesSet = {}
+		for _, ability in ipairs(faction.abilities) do
+			abilitiesSet[ability] = true
+		end
+		if abilitiesSet['Masters of Trade'] then
+			_safeBroadcastToColor(strategyCard .. ": ".. color .. " has the Master of Trade ability. No strategy token has been used." , color, color)
+			return true
+		end
+	end
+
+	
+
+	-- Find the command tokens bag and alternate payment methods.
+	local commandTokensBagName = faction.tokenName .. ' Command Tokens Bag'
+	local commandTokensBag = _getByName(commandTokensBagName, 'Bag')
+	
+	local altPayment = _getStrategytokenAlternativeSet(color)
+	if altPayment then
 		altPayment = table.concat(altPayment, ', ')
 		_safeBroadcastToColor(strategyCard .. ': ' .. altPayment .. ' available to ' .. color .. ' instead of spending a strategy token.  To use it, retrieve the spent token and spend this instead.', color, color)
 		-- Proceed with normal payment.  This *could* return here and rely on
 		-- the player to spend the token, but if they're not paying attention
 		-- they may unintentionally not pay for following.
 	end
+		
 
 	if not commandTokensBag then
 		broadcastToAll('Consume Strategy tokens: missing ' .. faction.tokenName .. ' Command Tokens Bag', 'Red')

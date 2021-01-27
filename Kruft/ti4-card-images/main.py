@@ -272,8 +272,16 @@ def publicObjectiveCard(level, title, type, body, footer, cardImage, titlesize, 
     color = (12, 12, 14, 255)
     draw.rectangle([(x, y), (x+w, y+h)], color)
 
+    textColor = False
+    if level == 1:
+        textColor = ImageColor.getrgb('#ffb732')
+    elif level == 2:
+        textColor = ImageColor.getrgb('#9999ff')
+    elif level == 3:
+        textColor = ImageColor.getrgb('#9a4eae')
+
     # TITLE
-    color = ImageColor.getrgb('#ffb732') if level == 1 else ImageColor.getrgb('#9999ff')
+    color = textColor
     font = FontData('HandelGothicDBold.otf', 43 + titlesize, color)
     textBlock = TextBlock()
     textBlock.setFont(font)
@@ -317,13 +325,7 @@ def publicObjectiveCard(level, title, type, body, footer, cardImage, titlesize, 
     # FOOTER
     items = footer.split('|')
     footer = items[0]
-    color = False
-    if level == 1:
-        ImageColor.getrgb('#ffb732')
-    elif level == 2:
-        ImageColor.getrgb('#9999ff')
-    elif level == 3:
-        ImageColor.getrgb('#ffffff')
+    color = textColor
     font = FontData('HandelGothicDBold.otf', 32, color)
     textBlock = TextBlock()
     textBlock.setFont(font)

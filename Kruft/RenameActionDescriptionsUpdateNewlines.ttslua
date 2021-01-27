@@ -1,0 +1,44 @@
+function onLoad(save_state)
+    self.addContextMenuItem('do edits', function() startLuaCoroutine(self, 'doEditsCoroutine') end)
+end
+
+function doEditsCoroutine()
+    local deck = false
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Deck' and object.getName() == 'Actions' then
+            deck = object
+            break
+        end
+    end
+    assert(deck, 'missing actions')
+
+    local guids = {}
+    for _, entry in ipairs(deck.getObjects()) do
+        if string.find(entry.description, [[\n]]) then
+            table.insert(guids, entry.guid)
+        end
+    end
+
+    for i, guid in ipairs(guids) do
+        local card = deck.takeObject({
+            guid = guid,
+            position = deck.getPosition() + vector(0, 3, 0),
+            smooth = false
+        })
+        coroutine.yield(0)
+
+        local desc = card.getDescription()
+        --print('BEFORE ' .. desc)
+        desc = string.gsub(desc, [[\n]], '\n')
+        print(i .. ' ' .. card.getName() .. ' AFTER ' .. desc)
+        card.setDescription(desc)
+        coroutine.yield(0)
+
+        deck.putObject(card)
+        coroutine.yield(0)
+        coroutine.yield(0)
+        coroutine.yield(0)
+    end
+
+    return 1
+end

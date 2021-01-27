@@ -1182,7 +1182,7 @@ function _consumeStrategyToken(color, strategyCard)
 			abilitiesSet[ability] = true
 		end
 		if abilitiesSet['Masters of Trade'] then
-			_safeBroadcastToColor(strategyCard .. ": ".. color .. " has the Master of Trade ability. No strategy token has been used." , color, color)
+			_safeBroadcastToColor(strategyCard .. ": ".. color .. " has the Master of Trade ability. Not using a strategy token." , color, color)
 			return true
 		end
 	end

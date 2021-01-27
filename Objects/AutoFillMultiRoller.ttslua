@@ -689,6 +689,7 @@ function autoFillCoroutine()
     local selfUnitTypeToCount = _unitHelper.getUnitTypeToCount(selfUnitsInHex)
     local enemyUnitTypeToCount = _unitHelper.getUnitTypeToCount(enemyUnitsInHex)
     local selfAdjUnitTypeToCount = _unitHelper.getUnitTypeToCount(selfUnitsAdacent)
+    coroutine.yield(0)
 
     -- Is bombardment allowed?
     CrLua.Log.d(TAG, 'autoFillCoroutine: checking planetary shield')
@@ -855,55 +856,50 @@ function autoFillCoroutine()
         fillUnitTypeToCount['Flagship'] = unitTypeToAttrs['Flagship'].spaceCombat.dice
     end
 
-    -- Compute best PS unit based on available candidates.  Assigns extra die
-    -- to the best non-zero-count unit.
-    local psUnitType = false
-    local fillUnits = {}
-    for unitType, count in pairs(fillUnitTypeToCount) do
-        if count > 0 then
-            table.insert(fillUnits, { unitType = unitType, color = selfColor, count = 1 })
-        end
-    end
-    local fillUnitTypeToAttrs = getUnitAttrs(fillUnits, selfColor, enemyColor)
-    for unitType, attrs in pairs(fillUnitTypeToAttrs) do
-        if autofillTypeAttributes == AUTOFILL_TYPE.SPACE_CANNON_OFFENSE then
-            if attrs.spaceCannon and (attrs.spaceCannon.extraDice or 0) > 0 then
-                psUnitType = unitType
-                break
-            end
-        elseif autofillTypeAttributes == AUTOFILL_TYPE.BOMBARDMENT then
-            if attrs.bombardment and (attrs.bombardment.extraDice or 0) > 0 then
-                psUnitType = unitType
-                break
-            end
-        elseif autofillTypeAttributes == AUTOFILL_TYPE.SPACE_CANNON_DEFENSE then
-            if attrs.spaceCannon and (attrs.spaceCannon.extraDice or 0) > 0 then
-                psUnitType = unitType
-                break
-            end
-        end
-    end
-
-    -- Only bombard the first clicked planet.
-    local psAlreadyUsed = false
-    if autofillTypeAttributes == AUTOFILL_TYPE.BOMBARDMENT and psUnitType and _bombardmentPlasmaScoringOnPlanet and _bombardmentPlasmaScoringOnPlanet ~= planet then
-        psUnitType = false
-        psAlreadyUsed = true
-    end
-
-    -- Does enemy have PS/AMD?
+    -- Plasma scoring.  Using it, and for which unit?
     local plasmaScoring = false
-    local antimassDeflectors = false
     for _, modifier in ipairs(colorToUnitModifiers[selfColor] or {}) do
         if modifier == 'Plasma Scoring' then
             plasmaScoring = true
             break
         end
     end
-    for _, modifier in ipairs(colorToUnitModifiers[enemyColor] or {}) do
-        if modifier == 'Antimass Deflectors' then
-            antimassDeflectors = true
-            break
+
+    -- Disable plasma scoring when bombarding a second planet.
+    local psAlreadyUsed = false
+    if autofillTypeAttributes == AUTOFILL_TYPE.BOMBARDMENT and _bombardmentPlasmaScoringOnPlanet and _bombardmentPlasmaScoringOnPlanet ~= planet then
+        psAlreadyUsed = plasmaScoring
+        plasmaScoring = false
+    end
+
+    -- Compute best PS unit based on available candidates.  Assigns extra die
+    -- to the best non-zero-count unit.
+    local psUnitType = false
+    if plasmaScoring then
+        local fillUnits = {}
+        for unitType, count in pairs(fillUnitTypeToCount) do
+            if count > 0 then
+                table.insert(fillUnits, { unitType = unitType, color = selfColor, count = 1 })
+            end
+        end
+        local fillUnitTypeToAttrs = getUnitAttrs(fillUnits, selfColor, enemyColor)
+        for unitType, attrs in pairs(fillUnitTypeToAttrs) do
+            if autofillTypeAttributes == AUTOFILL_TYPE.SPACE_CANNON_OFFENSE then
+                if attrs.spaceCannon and (attrs.spaceCannon.extraDice or 0) > 0 then
+                    psUnitType = unitType
+                    break
+                end
+            elseif autofillTypeAttributes == AUTOFILL_TYPE.BOMBARDMENT then
+                if attrs.bombardment and (attrs.bombardment.extraDice or 0) > 0 then
+                    psUnitType = unitType
+                    break
+                end
+            elseif autofillTypeAttributes == AUTOFILL_TYPE.SPACE_CANNON_DEFENSE then
+                if attrs.spaceCannon and (attrs.spaceCannon.extraDice or 0) > 0 then
+                    psUnitType = unitType
+                    break
+                end
+            end
         end
     end
 
@@ -971,10 +967,6 @@ function autoFillCoroutine()
         table.insert(messages, '(Plasma Scoring was used on “' .. _bombardmentPlasmaScoringOnPlanet .. '”)')
     end
 
-    if antimassDeflectors then
-        table.insert(messages, enemyColor .. ' has Antimass Deflectors')
-    end
-
     if #messages > 0 then
         message = message .. table.concat(messages, ', ') .. '.'
     end
@@ -987,7 +979,6 @@ function autoFillCoroutine()
         vsColor = enemyColor,
         unitTypeToCount = fillUnitTypeToCount,
         plasmaScoring = plasmaScoring and true or false,
-        antimassDeflectors = antimassDeflectors and true or false,
         rollType = doClick and autofillTypeAttributes.rollType or false,
         extraModifiers = extraUnitModifiers or false,
         rollObjectGuid = _rollOnSelf and self.getGUID(),

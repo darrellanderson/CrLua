@@ -671,7 +671,7 @@ end
 function generateUnitAbility(unit_id, ability_id, ability_details)
     local onClickValue
     if type(ability_details) == 'table' then
-        onClickValue = "rollDiceForAbility(" .. string.sub(ability_id, 1, -1) .. ")"
+        onClickValue = "onClickUnitAbility"
     else
         onClickValue = "doNothing"
     end
@@ -735,6 +735,8 @@ end
 function changeUnitCountXml(player, value, id)
     if (not player.seated) or player.color == 'Grey' then
         return
+    elseif value == '-3' then
+        return  -- middle button click
     end
     if id == string.match(id, ".+%.") .. "unitMainButton" then
         if value == "-1" then
@@ -760,6 +762,16 @@ function changeUnitCountXml(player, value, id)
     if oldValue + newValue == 1 then
         updateAbilities()
     end
+end
+
+function onClickUnitAbility(player, value, id)
+    if (not player.seated) or player.color == 'Grey' then
+        return
+    elseif value == '-3' then
+        return  -- middle button click
+    end
+    local unitType, abilityId = string.match(id, "^(.+)%.ability%.(.+)$")
+    rollDiceForAbility(player, abilityId)
 end
 
 -------------------------------------------------------------------------------

@@ -1,0 +1,249 @@
+--- Upload anonymized per-player researched tech to a sheet.
+-- @author Darrell
+--
+-- Special method to write column headings.
+
+local SHEET_ID = '1NZZfHxZ9ATRrWSTjJEQmc_K9Ofeguc2bY3fcjUodfRA'
+local SHEET_NAME = 'Sheet1'
+
+local WRITE_COLUMN_LABELS = true
+local REQUIRE_N_TECHS = 10
+
+local _factionHelper = false
+local _techHelper = false
+local _unitHelper = false
+local _zoneHelper = false
+
+local _data = false
+
+function onLoad(saveState)
+    _factionHelper = CrLua.TTS.HelperClient.get('TI4_FACTION_HELPER')
+    _techHelper = CrLua.TTS.HelperClient.get('TI4_TECHNOLOGY_HELPER')
+    _unitHelper = CrLua.TTS.HelperClient.get('TI4_UNIT_HELPER')
+    _zoneHelper = CrLua.TTS.HelperClient.get('TI4_ZONE_HELPER')
+
+    -- Persist the reserved rows.
+    _data = saveState and string.len(saveState) > 0 and JSON.decode(saveState)
+    validateSelfOrReset()
+
+    createUi()
+end
+
+function onSave()
+    return _data and JSON.encode(_data)
+end
+
+-------------------------------------------------------------------------------
+
+function createUi()
+    self.clearButtons()
+
+    local y = self.getBoundsNormalized().size.y + 0.01
+    local scaleUpDown = 2
+
+    self.createButton({
+        label          = 'Tech Reporter',
+        click_function = 'doNothing',
+		function_owner = self,
+        position       = { x = 0, y = y, z = -0.63 },
+		rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+        width          = 0,
+        height         = 0,
+		font_size      = 100 * scaleUpDown,
+	})
+	self.createButton({
+        label          = 'Submit Tech',
+        tooltip        = 'Submit anonymized researched technologies for study',
+		click_function = 'submitTechnologies',
+		function_owner = self,
+		position       = { x = 0, y = y, z = 0 },
+		rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1/scaleUpDown, y = 1, z = 1/scaleUpDown },
+        width          = 600 * scaleUpDown,
+        height         = 300 * scaleUpDown,
+		font_size      = 100 * scaleUpDown,
+	})
+end
+
+function doNothing()
+end
+
+-------------------------------------------------------------------------------
+
+function validateSelfOrReset()
+    -- Verify any persisted state matches current game setup, reset if not.
+    local colors = _zoneHelper.zones()
+    local factionNames = {}
+    for _, color in ipairs(colors) do
+        local faction = _factionHelper.fromColor(color)
+        table.insert(factionNames, faction and faction.tokenName or '-')
+    end
+    local function verifyData()
+        if not _data then
+            return false
+        end
+        if (not _data.rows) or #_data.rows ~= #colors then
+            return false
+        end
+        if not _data.factionNames then
+            return false
+        end
+        local a = table.concat(_data.factionNames, ', ')
+        local b = table.concat(factionNames, ', ')
+        return a == b
+    end
+    if not verifyData() then
+        _data = {
+            factionNames = factionNames
+        }
+    end
+end
+
+--- Reserve rows in the sheet for this udpate.
+function reserveRows(count, callback)
+    assert(type(count) == 'number')
+    assert((not callback) or type(callback) == 'function')
+    local function innerCallback(rows)
+        assert(type(rows) == 'table' and #rows == count)
+        _data.rows = rows
+        if callback then
+            callback()
+        end
+    end
+    CrLua.TTS.Spreadsheet.reserve('Tech Stats', SHEET_ID, SHEET_NAME, count, innerCallback)
+end
+
+function submitTechnologies()
+    validateSelfOrReset()
+
+    local colors = _zoneHelper.zones()
+    local colorToTechs = _techHelper.getPlayerColorToTechs()
+
+    -- Watch out for curiousity clicks.
+    local nTechs = 0
+    for _, techs in pairs(colorToTechs) do
+        nTechs = nTechs + #techs
+    end
+    if nTechs < REQUIRE_N_TECHS then
+        printToAll('Tech Reporter: too few technologies, ignoring', 'Red')
+        return
+    end
+
+    if not _data.rows then
+        printToAll('Tech Reporter: reserving rows', 'Yellow')
+        reserveRows(#colors, submitTechnologies)
+        return
+    end
+
+    -- Rows.
+    local colorToRow = {}
+    for i, color in ipairs(colors) do
+        colorToRow[color] = assert(_data.rows[i])
+    end
+    local cells = {}
+
+    -- Columns.
+    local function getColumn(index)
+        local COLS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        index = index - 1
+        local outer = math.floor(index / 26)
+        local inner = (index % 26) + 1
+        local col = string.sub(COLS, inner, inner)
+        if outer > 0 then
+            col = string.sub(COLS, outer, outer) .. col
+        end
+        return col
+    end
+    local techOrder = _techHelper.getTechNaturalOrder()
+    local techToColumn = {}
+    for i, tech in ipairs(techOrder) do
+        assert(not techToColumn[tech])
+        techToColumn[tech] = getColumn(i + 3) -- reserve timestamp, faction, score
+    end
+
+    -- Column labels.
+    if WRITE_COLUMN_LABELS then
+        cells['A1'] = 'TIMESTAMP (UTC)'
+        cells['B1'] = 'FACTION'
+        cells['C1'] = 'SCORE'
+        for tech, col in pairs(techToColumn) do
+            cells[col .. '1'] = tech
+        end
+    end
+
+    -- Fill special columns.
+    local timestamp = os.date("!%c")
+    local nameToScoreObjects = CrLua.TI4.PlayerScore.getNameToScoreObjects()
+    local nameToOwnerTokens = CrLua.TI4.PlayerScore.nameToOwnerTokens(nameToScoreObjects)
+    local colorToScore = CrLua.TI4.PlayerScore.colorToScore(nameToScoreObjects, nameToOwnerTokens)
+    for color, row in pairs(colorToRow) do
+        cells['A' .. row] = timestamp
+        local faction = _factionHelper.fromColor(color)
+        cells['B' .. row] = faction and faction.tokenName or '-'
+        local score = colorToScore[color] or 0
+        cells['C' .. row] = score
+    end
+
+    -- On to the tech.  Initialize with zeros.
+    for _, row in pairs(colorToRow) do
+        for _, col in pairs(techToColumn) do
+            cells[col .. row] = 0
+        end
+    end
+
+    -- Per-player tech counts (one per line).
+    for _, color in ipairs(colors) do
+        local row = assert(colorToRow[color])
+        for _, tech in ipairs(colorToTechs[color] or {}) do
+            local col = assert(techToColumn[tech], 'missing tech "' .. tech .. '"')
+            cells[col .. row] = 1
+        end
+    end
+
+    -- When a faction tech overrides a unit tech, record faction tech name in that cell.
+    local unitOverrides = _unitHelper.getUnitOverrides()
+    local colorToUnits = _unitHelper.getColorToUnitOverrides()
+    for color, unitNames in pairs(colorToUnits) do
+        for _, unitName in ipairs(unitNames) do
+            local unitOverride = unitOverrides[unitName]
+            local upgrade = unitOverride and unitOverride.upgrade
+            if upgrade then
+                if not techToColumn[upgrade] then
+                    upgrade = upgrade .. ' II'
+                end
+                if techToColumn[upgrade] and upgrade ~= unitName then
+                    local row = assert(colorToRow[color])
+                    local col = assert(techToColumn[upgrade])
+                    cells[col .. row] = unitName
+                end
+            end
+        end
+    end
+
+    printToAll('Tech Reporter: submitting ' .. nTechs .. ' technologies', 'Yellow')
+    CrLua.TTS.Spreadsheet.update('Tech Stats', SHEET_ID, SHEET_NAME, cells)
+end
+
+-------------------------------------------------------------------------------
+
+#include <~/CrLua/CrLua>
+#include <~/CrLua/LockGlobals>
+
+#include <~/CrLua/LockTable>
+#include <~/CrLua/Log>
+
+#include <~/CrLua/TTS/HelperClient>
+#include <~/CrLua/TTS/Spreadsheet>
+
+#include <~/CrLua/TI4/PlayerScore>
+#include <~/CrLua/List>
+#include <~/CrLua/TTS/Overlap>
+
+--#include <~/CrLua/UnitTest>
+--CrLua.UnitTest.runTests('CrLua', CrLua, true)
+
+CrLua.Log.setLogLevel(CrLua.Log.LOG_LEVEL.INFO)
+
+CrLua.assertRequired({ 'TTS.HelperClient', 'TTS.Spreadsheet', 'TI4.PlayerScore' })
+CrLua.lock()

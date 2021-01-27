@@ -176,9 +176,12 @@ function onLoad(saveState)
     for _, color in ipairs(Player.getColors()) do
         _burnNameSet[color .. ' Mech'] = true
         _burnNameSet[color .. ' Carrier'] = true
+        _burnNameSet[color .. ' Cruiser'] = true
+        _burnNameSet[color .. ' Destroyer'] = true
         _burnNameSet[color .. ' Dreadnought'] = true
-        _burnNameSet[color .. ' War Sun'] = true
         _burnNameSet[color .. ' Flagship'] = true
+        _burnNameSet[color .. ' PDS'] = true
+        _burnNameSet[color .. ' War Sun'] = true
     end
     for color, faction in pairs(_factionHelper.allFactions()) do
         _burnNameSet[faction.flagship] = true

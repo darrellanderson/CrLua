@@ -70,31 +70,43 @@ local SetupGeneric = {
             { x = 26.50, y = -0.19, z = -9, lock = true, dx = 1.5, dz = -7.5 },
             { x = 26.50, y = -0.19, z = 9, lock = true, dx = 1.5, dz = 7.5 }
         },
-        ['^x3 Commodities/Tradegoods Bag$'] = {
+        ['^x3 Commodities/Tradegoods$'] = {
             { x = -29.50, y = -0.19, z = -1.5, lock = true, dx = -5 },
             { x = 29.50, y = -0.19, z = 3, lock = true, dx = 5 },
+            bagName = 'x3 Commodities/Tradegoods Bag', -- create bag around token
+            bagColor = 'E6E42B',
         },
-        ['^x1 Commodities/Tradegoods Bag$'] = {
+        ['^x1 Commodities/Tradegoods$'] = {
             { x = -29.50, y = -0.19, z = 1.5, lock = true, dx = -5 },
             { x = 29.50, y = -0.19, z = 6, lock = true, dx = 5 },
+            bagName = 'x1 Commodities/Tradegoods Bag', -- create bag around token
+            bagColor = 'E6E42B',
         },
-        ['^x3 Fighter Tokens Bag$'] = {
+        ['^x3 Fighter Token$'] = {
             { x = -26.50, y = -0.19, z = -1.5, lock = true, dx = -5 },
             { x = 26.50, y = -0.19, z = 3, lock = true, dx = 5 },
+            bagName = 'x3 Fighter Tokens Bag', -- create bag around token
+            bagColor = '1E87FF',
         },
-        ['^x1 Fighter Tokens Bag$'] = {
+        ['^x1 Fighter Token$'] = {
             { x = -26.50, y = -0.19, z = 1.5, lock = true, dx = -5 },
             { x = 26.50, y = -0.19, z = 6, lock = true, dx = 5 },
+            bagName = 'x1 Fighter Tokens Bag', -- create bag around token
+            bagColor = '1E87FF',
         },
-        ['^x3 Infantry Tokens Bag$'] = {
+        ['^x3 Infantry Token$'] = {
             { x = -23.50, y = -0.19, z = -1.5, lock = true, dx = -5 },
             { x = 23.50, y = -0.19, z = 3, lock = true, dx = 5 },
+            bagName = 'x3 Infantry Tokens Bag', -- create bag around token
+            bagColor = 'F3631C',
         },
-        ['^x1 Infantry Tokens Bag$'] = {
+        ['^x1 Infantry Token$'] = {
             { x = -23.50, y = -0.19, z = 1.5, lock = true, dx = -5 },
             { x = 23.50, y = -0.19, z = 6, lock = true, dx = 5 },
+            bagName = 'x1 Infantry Tokens Bag', -- create bag around token
+            bagColor = 'F3631C',
         },
-    }
+    },
 }
 
 local SetupColor = {
@@ -393,6 +405,15 @@ function SetupGeneric.pack(setupBag)
         nameToObjects[namePattern] = {}
     end
 
+    -- Remove bags created for tokens.
+    local deleSet = {}
+    for _, rule in pairs(SetupGeneric.NAME_TO_TABLE_POSITIONS) do
+        if rule.bagName then
+            deleSet[rule.bagName] = true
+        end
+    end
+
+    local deleList = {}
     for _, object in ipairs(getAllObjects()) do
         local name = object.getName()
         for namePattern, objects in pairs(nameToObjects) do
@@ -400,18 +421,35 @@ function SetupGeneric.pack(setupBag)
                 table.insert(objects, object)
             end
         end
+        if deleSet[name] then
+            table.insert(deleList, object)
+        end
     end
+    coroutine.yield(0)
+
+    for _, object in ipairs(deleList) do
+        _safeDestroyObject(object)
+    end
+    coroutine.yield(0)
 
     -- Pack only one copy of each object, delete the rest.
+    local delayedPutObjects = {}
     for namePattern, objects in pairs(nameToObjects) do
         for i, object in ipairs(objects) do
             if i == 1 and not getEntryGuid(setupBag, namePattern) then
                 object.setLock(false)
-                setupBag.putObject(object)
+                table.insert(delayedPutObjects, object)
             else
                 _safeDestroyObject(object)
             end
         end
+    end
+    coroutine.yield(0)  -- wait for unlock to finish
+    coroutine.yield(0)
+
+    for _, object in ipairs(delayedPutObjects) do
+        setupBag.putObject(object)
+        coroutine.yield(0)
     end
 end
 
@@ -442,7 +480,7 @@ function SetupGeneric.unpack(setupBag, extraRings)
     -- Get per-object json.  Leave the "master" copies of the objects in the
     -- setup bag, spawn new copies from the json.
     local pos = setupBag.getPosition()
-    local nameToJson = {}
+    local nameToLockedObject = {}
     for i, namePattern in ipairs(allNamePatterns(SetupGeneric)) do
         local guid = assert(getEntryGuid(setupBag, namePattern), 'setup bag missing ' .. namePattern)
         local object = setupBag.takeObject({
@@ -450,16 +488,25 @@ function SetupGeneric.unpack(setupBag, extraRings)
             position = { x = pos.x, y = pos.y + (5 * i), z = pos.z },
             smooth = false,
         })
+        coroutine.yield(0)
         object.setLock(true)
-        if object.tag == 'Infinite' then
-            -- Wait for spawn; otherwise infinite bags might glitch wrt contents
-            while object.spawning do
-                coroutine.yield(0)
+        nameToLockedObject[namePattern] = object
+    end
+    local function isBusy()
+        for _, object in pairs(nameToLockedObject) do
+            if object.spawning then
+                return true
             end
-            coroutine.yield(0)
         end
-        nameToJson[namePattern] = object.getJSON()
+    end
+    while isBusy() do
+        coroutine.yield(0)
+    end
+    coroutine.yield(0)
+    local nameToJson = {}
+    for namePattern, object in pairs(nameToLockedObject) do
         object.setLock(false)
+        nameToJson[namePattern] = object.getJSON()
         setupBag.putObject(object)
         coroutine.yield(0)
     end
@@ -508,16 +555,36 @@ function SetupGeneric.unpack(setupBag, extraRings)
     local tableY = _zoneHelper.getTableY()
     for namePattern, offsets in pairs(SetupGeneric.NAME_TO_TABLE_POSITIONS) do
         for _, offset in ipairs(offsets) do
+            local position = {
+                x = offset.x + (offset.dx or 0) * extraRings,
+                y = offset.y + tableY,
+                z = offset.z + (offset.dz or 0) * extraRings
+            }
+            local callback = function(object) object.setLock(offset.lock or false) end
+
+            if offsets.bagName then
+                -- Special case for creating an infinite bag using this token.
+                -- First create an infinite bag.
+                local bag = spawnObject({
+                    type              = 'Infinite_Bag',
+                    position          = position,
+                    rotation          = { x = 0, y = 0, z = 0 },
+                    sound             = false,
+                })
+                bag.setName(offsets.bagName)
+                bag.setColorTint(Color.fromHex('#' .. offsets.bagColor .. 'FF'))
+
+                -- Adjust the token spawn to be above the bag, then add.
+                position.y = position.y + 3
+                callback = function(object) bag.putObject(object) end
+            end
+
             local json = assert(nameToJson[namePattern], 'no json for ' .. namePattern)
             spawnObjectJSON({
                 json              = json,
-                position          = {
-                    x = offset.x + (offset.dx or 0) * extraRings,
-                    y = offset.y + tableY,
-                    z = offset.z + (offset.dz or 0) * extraRings
-                },
+                position          = position,
                 rotation          = { x = 0, y = 0, z = 0 },
-                callback_function = function(object) object.setLock(offset.lock or false) end,
+                callback_function = callback,
                 sound             = false,
             })
         end
@@ -581,6 +648,7 @@ function SetupColor.packColorBoxIntoSetupBag(setupBag, box)
     debugLog('SetupColor.packColorBox ' .. box.getName())
 
     box.setLock(false)
+    coroutine.yield(0)
     setupBag.putObject(box)
 end
 
@@ -1191,7 +1259,7 @@ function SetupFaction.unpack(faction, factionBox, zone, isFranken)
                 position          = offsetPosition(zone.center, offset),
                 rotation          = zoneRotation(zone, offset),
                 callback_function = takeCallback,
-                smooth            = false,
+                smooth            = false,  -- if true infinite bags can glitch where hovering object is not above bag
             })
             nameToObject[object.getName()] = object
         end
@@ -1643,14 +1711,23 @@ function SetupFaction.placeScoreCounters(ownerTokensBag, zone, zoneIndex, color)
         z = factionOrigin.z + zone.center.z * scale.z,
     }
 
-    -- Instead of tokens, place a token bag!
-    local clone = ownerTokensBag.clone({
-        position     = p,
-        snap_to_grid = false,
+    -- Actual clone has problems with the floating token above the bag.
+    -- Instead spawn a new one, and add a token.
+    local clone = spawnObject({
+        type              = 'Infinite_Bag',
+        position          = p,
+        scale             = ownerTokensBag.getScale(),
+        sound             = false,
+        callback_function = function(object) object.setLock(true) end,
     })
-    clone.setLock(false)
-    Wait.time(function() clone.setLock(true) end, 3)
-    coroutine.yield(0)
+    clone.setName(ownerTokensBag.getName())
+    clone.setColorTint(Color.fromString(color))
+    p.y = p.y + 3
+    local token = ownerTokensBag.takeObject({
+        position          = p,
+        callback_function = function(object) clone.putObject(object) end,
+        smooth            = true,
+    })
     coroutine.yield(0)
 
     -- Place token on score zero.

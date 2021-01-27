@@ -408,6 +408,7 @@ local DECKS = {
                 rotation = { x = 0, y = 0, z = 0 },
             }
         },
+        reportRemaining = true,
         cardNames = {
             ['PoK'] = {
                 'Industrial Relic Fragment (1)',
@@ -445,6 +446,7 @@ local DECKS = {
                 rotation = { x = 0, y = 0, z = 0 },
             }
         },
+        reportRemaining = true,
         cardNames = {
             ['PoK'] = {
                 'Hazardous Relic Fragment (1)',
@@ -482,6 +484,7 @@ local DECKS = {
                 rotation = { x = 0, y = 0, z = 0 },
             }
         },
+        reportRemaining = true,
         cardNames = {
             ['PoK'] = {
                 'Cultural Relic Fragment (1)',
@@ -519,6 +522,7 @@ local DECKS = {
                 rotation = { x = 0, y = 0, z = 0 },
             }
         },
+        reportRemaining = true,
         cardNames = {
             ['PoK'] = {
                 'Unknown Relic Fragment (1)',
@@ -546,6 +550,7 @@ local DECKS = {
                 rotation = { x = 0, y = 0, z = 180 },
             },
         },
+        reportRemaining = true,
         cardNames = {
             ['PoK'] = {
                 'Dominus Orb',
@@ -1094,8 +1099,8 @@ function dealCoroutine()
         end
 
         -- Deal as many cards as able.
+        local dealCount = 0
         if deck then
-            local dealCount = 0
             if deck.tag == 'Deck' then
                 dealCount = math.min(params.count, deck.getQuantity())
             elseif deck.tag == 'Card' then
@@ -1108,7 +1113,11 @@ function dealCoroutine()
             coroutine.yield(0)
 
             -- Wait a moment while any deal-in-progress cards move away.
-            local waitUntil = Time.time + 1
+            local delay = 1
+            if #_dealQueue > 0 and _dealQueue[1].color == params.color then
+                delay = delay + dealCount + 0.1 -- give this deal more time before another to same color
+            end
+            local waitUntil = Time.time + delay
             while Time.time < waitUntil do
                 _dealCoroutineHeartbeat = Time.time
                 coroutine.yield(0)
@@ -1133,8 +1142,8 @@ function dealCoroutine()
                 _dealCoroutineHeartbeat = Time.time
                 coroutine.yield(0)
 
-                -- Give set position smooth time to work.
-                local waitUntil = Time.time + 1
+                -- Give previous deal and set position smooth time to work.
+                local waitUntil = Time.time + dealCount + 0.1
                 while Time.time < waitUntil or discard.isSmoothMoving() do
                     _dealCoroutineHeartbeat = Time.time
                     coroutine.yield(0)
@@ -1145,6 +1154,10 @@ function dealCoroutine()
                 if discard.tag == 'Deck' then
                     discard.setName(params.deckAttributes.deckName)
                     discard.shuffle()
+                    if _hasContextMenuItems(discard) then
+                        discard.clearContextMenu()
+                        _applyContextMenuItems(discard)
+                    end
                     _dealCoroutineHeartbeat = Time.time
                     coroutine.yield(0)
                 end
@@ -1175,35 +1188,36 @@ function _dealHack(deck, count, playerColor)
 
     -- Move cards to player zones before clone swap.
     local zoneAttrs = _zoneHelper.zoneAttributes(playerColor)
-    local p = zoneAttrs and zoneAttrs.center or { x = 0, y = 1, z = 0 }
+    local p0 = zoneAttrs and zoneAttrs.center or { x = 0, y = 1, z = 0 }
     local nextPositionIndex = 0
     local function nextPosition()
         nextPositionIndex = nextPositionIndex + 1
         return {
-            x = p.x,
-            y = p.y + 3 + nextPositionIndex * 0.2,
-            z = p.z
+            x = p0.x,
+            y = p0.y + 3 + nextPositionIndex * 0.2,
+            z = p0.z
         }
     end
-
+    local rotation = {
+        x = 0,
+        y = zoneAttrs.rotation.y,
+        z = deck.getRotation().z
+    }
     local deletedItems = _getDeletedItemsBag()
-    local function cloneAndDeal(card)
-        assert(card.tag == 'Card')
+
+    local function spawnCallback(card)
+        assert(card and card.tag == 'Card')
+        card.deal(1, playerColor)
+    end
+    local function takeCallback(card)
+        assert(card and card.tag == 'Card')
+        card.setLock(false)
         -- Grab json and spawn a new one.  Clone is simpler but makes a sound.
         local cardJson = card.getJSON()
-
-        local function spawnCallback(object)
-            object.deal(1, playerColor)
-
-            -- Wait to delete the original until after the spawn is ready
-            -- (to make sure it does not reuse the guid).
-            card.setLock(false)
-            if deletedItems then
-                deletedItems.call('ignoreGuid', card.getGUID())
-            end
-            destroyObject(card)
+        if deletedItems then
+            deletedItems.call('ignoreGuid', card.getGUID())
         end
-
+        destroyObject(card)
         local clone = spawnObjectJSON({
             json              = cardJson,
             position          = nextPosition(),
@@ -1214,35 +1228,39 @@ function _dealHack(deck, count, playerColor)
             params            = nil,
             snap_to_grid      = false
         })
-
-        -- Lock the card for the moment to prevent falling, will be deleted
-        -- when spawn finishes.
-        card.setLock(true)
     end
 
-    -- This is called from a coroutine so it allowed to yield(0).
-    for _ = 1, count do
+    for i = 1, count do
+        local function delayedTakeCallback(card)
+            assert(card and card.tag == 'Card')
+            card.setLock(true)
+            Wait.time(function() takeCallback(card) end, i - 1)
+        end
+
         local card = deck.tag == 'Card' and deck
         if card then
             local collide = false
             local fast = true
             card.setPositionSmooth(nextPosition(), collide, fast)
+            card.setRotationSmooth(rotation, collide, fast)
             coroutine.yield(0)
-            while card.isSmoothMoving() do
-                coroutine.yield(0)
+            local function callback()
+                delayedTakeCallback(card)
             end
-            cloneAndDeal(card)
+            local function condition()
+                return not card.isSmoothMoving()
+            end
+            Wait.condition(callback, condition, 5, callback)
         else
             card = deck.takeObject({
                 position          = nextPosition(),
-                rotation          = deck.getRotation(),
-                callback_function = cloneAndDeal,
+                rotation          = rotation,
+                callback_function = delayedTakeCallback,
                 smooth            = true,
                 top               = true
             })
             deck = deck.remainder or deck
         end
-        coroutine.yield(0)
     end
 end
 
@@ -1384,6 +1402,29 @@ local function _purgeCard(card)
     end
 end
 
+local function _reportRemainingCards(playerColor, object)
+    assert(type(playerColor) == 'string' and type(object) == 'userdata' and object.tag == 'Deck')
+    local names = {}
+    local nameToCount = {}
+    for _, entry in ipairs(object.getObjects()) do
+        local name = string.match(entry.name, '(.*) %(%d+%)') or entry.name
+        local count = nameToCount[name] or 0
+        if count == 0 then
+            table.insert(names, name)
+        end
+        nameToCount[name] = count + 1
+    end
+    table.sort(names)
+    local message = {}
+    for _, name in ipairs(names) do
+        local count = assert(nameToCount[name])
+        count = count > 1 and (count .. ' ') or ''
+        table.insert(message, count .. name)
+    end
+    message = object.getName() .. ' remaining: ' .. table.concat(message, ', ') .. '.'
+    printToColor(message, playerColor, 'Yellow')
+end
+
 local _scoreDeckSet = false
 local _scoreCardSet = false
 local function _isScoreObjective(card)
@@ -1414,21 +1455,32 @@ local function _isScoreObjective(card)
     return _scoreDeckSet[deckName] or _scoreCardSet[cardName]
 end
 
-local function _applyContextMenuItems(card)
-    local deckName = card.tag == 'Card' and getDeckName(card.getName())
-    if deckName == 'Agenda' then
-        card.addContextMenuItem('Place Agenda Top', function(playerColor) _putAgendaTop(playerColor, card) end, false)
-        card.addContextMenuItem('Place Agenda Bottom', function(playerColor) _putAgendaBottom(playerColor, card) end, false)
+function _hasContextMenuItems(object)
+    if object.tag == 'Card' then
+        return true
+    elseif object.tag == 'Deck' then
+        local deckAttrs = _getDeckAttributesByType(object.getName())
+        return deckAttrs and deckAttrs.reportRemaining
+    elseif object.tag == 'Tile' then
+        return object.getName() == 'Custodians'
     end
-    if _isScoreObjective(card) then
-        card.addContextMenuItem('Score Objective', function(playerColor) _scoreObjective(playerColor, card) end, false)
+end
+
+function _applyContextMenuItems(object)
+    local objectName = object.getName()
+    local deckName = object.tag == 'Card' and getDeckName(objectName)
+    if deckName == 'Agenda' then
+        object.addContextMenuItem('Place Agenda Top', function(playerColor) _putAgendaTop(playerColor, object) end, false)
+        object.addContextMenuItem('Place Agenda Bottom', function(playerColor) _putAgendaBottom(playerColor, object) end, false)
+    end
+    if _isScoreObjective(object) then
+        object.addContextMenuItem('Score Objective', function(playerColor) _scoreObjective(playerColor, object) end, false)
     end
 
     local purgable = false
     if deckName then
         if string.match(deckName, ' Exploration$') then
-            local name = card.getName()
-            if string.match(name, '^.* Relic Fragment %(.*%%)') then
+            if string.match(objectName, '^.* Relic Fragment %(.*%)$') then
                 purgable = true
             else
                 local purgeSet = {
@@ -1437,8 +1489,24 @@ local function _applyContextMenuItems(card)
                     ['Enigmatic Device (1)'] = true,
                     ['Enigmatic Device (2)'] = true,
                     ['Mirage (Exploration)'] = true,
+                    ["Propulsion Research Facility"] = true,
+                    ["Cybernetic Research Facility"] = true,
+                    ["Biotic Research Facility"] = true,
+                    ["Warfare Research Facility"] = true,
+                    ["Lazax Survivors"] = true,
+                    ["Rich World"] = true,
+                    ["Mining World"] = true,
+                    ["Dyson Sphere"] = true,
+                    ["Paradise World"] = true,
+                    ["Tomb of Emphidia"] = true,
+                    ["Demilitarized Zone (PoK)"] = true,
+                    ["Gamma Wormhole"] = true,
+                    ["Gamma Relay"] = true,
+                    ["Mirage (Exploration)"] = true,
+                    ["Ion Storm"] = true,
+                    ["Stellar Converter"] = true,
                 }
-                purgable = purgeSet[card.getName()]
+                purgable = purgeSet[objectName]
             end
         elseif deckName == 'Relics' then
             local purgeSet = {
@@ -1447,18 +1515,23 @@ local function _applyContextMenuItems(card)
                 ['Dominus Orb'] = true,
                 ['Stellar Converter'] = true,
             }
-            purgable = purgeSet[card.getName()]
+            purgable = purgeSet[objectName]
         end
     end
     if purgable then
-        card.addContextMenuItem('Purge Card', function(playerColor) _purgeCard(card) end)
+        object.addContextMenuItem('Purge Card', function(playerColor) _purgeCard(object) end)
+    end
+
+    if object.tag == 'Deck' then
+        local deckAttrs = _getDeckAttributesByType(objectName)
+        if deckAttrs and deckAttrs.reportRemaining then
+            object.addContextMenuItem('Report Remaining', function(playerColor) _reportRemainingCards(playerColor, object) end, false)
+        end
     end
 end
 
 function onObjectSpawn(object)
-    if object.tag == 'Card' then
-        _applyContextMenuItems(object)
-    elseif object.tag == 'Tile' and object.getName() == 'Custodians' then
+    if _hasContextMenuItems(object) then
         _applyContextMenuItems(object)
     end
 end
@@ -1755,9 +1828,7 @@ function onLoad(saveState)
 
     local function delayedApplyContextMenuItems()
         for _, object in ipairs(getAllObjects()) do
-            if object.tag == 'Card' then
-                _applyContextMenuItems(object)
-            elseif object.tag == 'Tile' and object.getName() == 'Custodians' then
+            if _hasContextMenuItems(object) then
                 _applyContextMenuItems(object)
             end
         end

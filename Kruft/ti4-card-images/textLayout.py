@@ -19,11 +19,15 @@ class FontData:
         self._type = 'FontData'
         dir = os.path.dirname(__file__)
         static = os.path.join(dir, 'static')
-        file = os.path.join(static, fontName)
+        self._fontName = fontName
         self._fontSize = fontSize
-        self._font = ImageFont.truetype(file, fontSize)
         self._color = color
+        self._file = os.path.join(static, fontName)
+        self._font = ImageFont.truetype(self._file, self._fontSize)
         self._dy = 0
+
+    def clone(self):
+        return FontData(self._fontName, self._fontSize, self._color)
 
     def applyOffset(self, otherFontData):
         assert otherFontData._type == 'FontData'
@@ -45,6 +49,15 @@ class FontData:
     def draw(self, text, imageDraw, x, y, lineH):
         imageDraw.text((x, y + self._dy), text, font=self._font, fill=self._color)
 
+    def resize(self, delta):
+        self._fontSize += delta
+        result = True
+        if self._fontSize <= 0:
+            self._fontSize = 1
+            result = False
+        self._font = ImageFont.truetype(self._file, self._fontSize)
+        return result
+
 # -----------------------------------------------------------------------------
 
 class WordData:
@@ -58,10 +71,10 @@ class WordData:
     def __str__(self):
         return '{' + self._word + '}'
 
-    def resetFont(fontData):
+    def resetFont(self, fontData):
         assert fontData._type == 'FontData'
         self._fontData = fontData
-        self._width = fontData.width(word)
+        self._width = fontData.width(self._word)
 
     def width(self):
         return self._width
@@ -77,6 +90,9 @@ class WordData:
 
     def isSpace(self):
         return self._word == ' '
+
+    def isNewline(self):
+        return self._word == '\n'
 
 # -----------------------------------------------------------------------------
 
@@ -249,6 +265,21 @@ class Format:
 
         return result
 
+    @staticmethod
+    def unfold(lineDataList):
+        mergedLineData = LineData(0)
+        for lineData in lineDataList:
+            if not lineData.isEmpty():
+                lastWord = False
+                for wordData in lineData.getWords():
+                    if not wordData.isNewline():
+                        mergedLineData.addWord(wordData)
+                        lastWord = wordData
+                if lastWord:
+                    space = WordData(' ', lastWord._fontData)
+                    mergedLineData.addWord(space)
+        return mergedLineData
+
 # -----------------------------------------------------------------------------
 
 class TextBlock:
@@ -266,6 +297,7 @@ class TextBlock:
         self._boldStartFont = False
         self._overrideWordSet = False
         self._overrideFont = False
+        self._gradualShrink = False
 
     def setCenterH(self, value):
         self._centerH = value
@@ -314,7 +346,20 @@ class TextBlock:
         self._text = text
         return self
 
+    def setGradualShrink(self, value):
+        self._gradualShrink = value
+        return self
+
     def draw(self, imageDraw):
+        # If gradually shrinking text make a copy to mutate in place.
+        localLineH = self._lineH
+        if self._gradualShrink:
+            self._font = self._font.clone()
+            if self._boldStartFont:
+                self._boldStartFont = self._boldStartFont.clone()
+            if self._overrideFont:
+                self._overrideFont = self._overrideFont.clone()
+
         # Parse text, apply fonts.
         text = Parse.parseWordsAndPunctuation(self._text)
         lineData = Format.getLineData(text, self._font)
@@ -339,15 +384,35 @@ class TextBlock:
         elif self._alignBottom:
             y = b - h
 
-        for line in lineDataList:
+        while len(lineDataList) > 0:
+            line = lineDataList.pop(0)
             if line.isEmpty():
-                y += self._lineH * (self._newlineScale - 1)
+                y += localLineH * (self._newlineScale - 1)
             else:
                 x = l
                 if self._centerH:
                     x = ((l + r) / 2) - (line.width() / 2)
-                line.draw(imageDraw, x, y, self._lineH)
-                y += self._lineH
+                line.draw(imageDraw, x, y, localLineH)
+                y += localLineH
+
+            if self._gradualShrink:
+                # Shrink.
+                delta = min(-int(self._font._fontSize * 0.15), -1)
+                if not self._font.resize(delta):
+                    break
+                if self._boldStartFont:
+                    self._boldStartFont.resize(delta)
+                if self._overrideFont:
+                    self._overrideFont.resize(delta)
+                localLineH = int(self._font._fontSize * 1.3)
+
+                # Re-fold remaining text.
+                if len(lineDataList) > 0:
+                    lineData = Format.unfold(lineDataList)
+                    for wordData in lineData.getWords():
+                        wordData.resetFont(wordData._fontData)
+                    lineDataList = Format.fold(lineData, r - l - self._indent, self._indent)
+                    lineDataList[0]._indent = self._indent
 
         return y, h
 

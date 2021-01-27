@@ -13,23 +13,24 @@
 -- are deleted and replaced with a new GUID will need to
 -- have their information updated in System Helper.
 
+-- Nested tables are considered cross script.  Make a local copy.
+local function copyTable(t)
+    if t and type(t) == 'table' then
+        local copy = {}
+        for k, v in pairs(t) do
+            copy[k] = type(v) == 'table' and copyTable(v) or v
+        end
+        t = copy
+    end
+    return t
+end
+
 function getHelperClient(helperObjectName)
     local function getHelperObject()
         for _, object in ipairs(getAllObjects()) do
             if object.getName() == helperObjectName then return object end
         end
         error('missing object "' .. helperObjectName .. '"')
-    end
-    -- Nested tables are considered cross script.  Make a local copy.
-    local function copyTable(t)
-        if t and type(t) == 'table' then
-            local copy = {}
-            for k, v in pairs(t) do
-                copy[k] = type(v) == 'table' and copyTable(v) or v
-            end
-            t = copy
-        end
-        return t
     end
     local helperObject = false
     local function getCallWrapper(functionName)
@@ -39,10 +40,11 @@ function getHelperClient(helperObjectName)
     end
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
-local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
-local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 local _exploreHelper = getHelperClient('TI4_EXPLORE_HELPER')
+
+local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
+local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 local INPUT_LABEL_MAP_STRING = "Enter map string or press 'save' to save the current map"
 local SLICE_DATALABEL_NAME = "slice_data_label"
@@ -104,6 +106,7 @@ function onLoad(saveState)
 
     self.addContextMenuItem('Add Clone To Tiles', addCloneMenuOptionToSystemTiles)
     self.addContextMenuItem('Rotate Map 180', rotateMap180)
+    self.addContextMenuItem('Rotate Hyperlanes 180', rotateHyperlanes)
 
     -- If any clones are still on the table, add them to the systems table.
     _clones = (saveState and string.len(saveState) > 0 and JSON.decode(saveState)) or {}
@@ -165,6 +168,30 @@ function rotateMap180()
             z = -p.z
         }
         object.setPositionSmooth(p, collide, fast)
+
+        if system.hyperlane then
+            local r = object.getRotation()
+            r = {
+                x = 0,
+                y = (r.y + 180) % 360,
+                z = 0
+            }
+            object.setRotationSmooth(r, collide, fast)
+        end
+    end
+    local function delayedLock()
+        for system, object in pairs(getPlacedSystemToObject(false)) do
+            object.setLock(true)
+        end
+    end
+    Wait.time(delayedLock, 5)
+end
+
+function rotateHyperlanes()
+    for system, object in pairs(getPlacedSystemToObject(false)) do
+        object.setLock(false)
+        local collide = false
+        local fast = true
 
         if system.hyperlane then
             local r = object.getRotation()
@@ -383,6 +410,23 @@ function placeTilesCoroutine()
 
     local buildList = parseMapString(mapString)
 
+    -- If map string does not start with Mecatol put it away.
+    if #buildList > 0 and buildList[1].tile ~= MECATOL_TILE then
+        local system = assert(_systemHelper.systemFromTile(MECATOL_TILE))
+        local mecatolTile = getObjectFromGUID(system.guid)
+        if mecatolTile then
+            local blueBag = getObjectFromGUID(BLUE_BAG_GUID)
+            mecatolTile.setLock(false)
+            blueBag.putObject(mecatolTile)
+        end
+        coroutine.yield(0)
+        coroutine.yield(0)
+    end
+
+    -- Move home systems.
+    _moveHomeSystems(buildList)
+    coroutine.yield(0)
+
     -- Build a map from tile number to system.
     local guidToSystem = _systemHelper.systems()
     local tileToSystem = {}
@@ -415,20 +459,20 @@ function placeTilesCoroutine()
     end
     coroutine.yield(0)
 
-    local dy = 0.3
-    local positionIterator = getSystemPositionsStartingAtOriginIterator(dy)
-
     local placedTileSet = {}
-
+    local positionIterator = getSystemPositionsStartingAtOriginIterator(0.3)
     for i, buildEntry in ipairs(buildList) do
         local position = positionIterator()
         local tile, ab, rotation = buildEntry.tile, buildEntry.ab, buildEntry.rotation
         if rotation then
-            rotation = { x = 0, y = rotation * 60, z = ab == 'B' and 180 or 0 }
+            rotation = rotation * 60
+            rotation = rotation + 180 -- 0 rotation is upside down for default player position
+            rotation = rotation % 360
+            rotation = { x = 0, y = rotation, z = ab == 'B' and 180 or 0 }
         else
             rotation = { x = 0, y = 180, z = 0 }
         end
-        if tile ~= 0 then
+        if tile > 0 then
             local system = tileToSystem[tile]
             if system and not system.home then
                 if placedTileSet[tile] then
@@ -455,7 +499,7 @@ local function delayedLock(object)
     Wait.time(function() doLock(object) end, 3)
 end
 
-function placeTile(system, bag, position, rotation, ab)
+function placeTile(system, bag, position, rotation)
     assert(type(system) == 'table' and (not bag or type(bag) == 'userdata'))
     assert(type(position) == 'table' and type(rotation) == 'table')
 
@@ -601,14 +645,31 @@ function saveTilesCoroutine()
         local guid = assert(system.guid)
         local tile = system.tile
         if system.hyperlane then
+            local rotation = object.getRotation().y
+            rotation = rotation - 180  -- 180 is "normal", make 0 based for value
+            rotation = (rotation + 360) % 360
+            rotation = rotation + 15  -- in case not exact, gets closest
             tile = tile .. (object.is_face_down and 'B' or 'A')
-            tile = tile .. math.floor((object.getRotation().y / 60) + 0.5)
+            tile = tile .. math.floor(rotation / 60)
         end
         guidToTile[guid] = tile
         guidToPosition[guid] = object.getPosition()
     end
-    local guidToHex = _systemHelper.hexesFromPositions(guidToPosition)
     coroutine.yield(0)
+
+    -- Add home system placeholders.
+    for _, object in ipairs(getAllObjects()) do
+        local color = string.match(object.getName(), '^Home System Location %((.*)%)$')
+        if color then
+            local guid = object.getGUID()
+            guidToTile[guid] = 0
+            guidToPosition[guid] = object.getPosition()
+        end
+    end
+    coroutine.yield(0)
+
+    -- Translate positions to hexes.
+    local guidToHex = _systemHelper.hexesFromPositions(guidToPosition)
 
     -- Fill map from hex to map string index.
     local indexToPosition = {}
@@ -636,10 +697,10 @@ function saveTilesCoroutine()
     end
     coroutine.yield(0)
 
-    -- Make it a list (fill in any holes with zeros).
+    -- Make it a list (fill in any holes with -1).
     for i = 1, maxIndex do
         if not result[i] then
-            result[i] = 0
+            result[i] = -1
         end
     end
     coroutine.yield(0)
@@ -1108,9 +1169,13 @@ function parseMapString(input)
     assert(type(input) == 'string')
     local buildList = {}
 
-    local centerSystem = string.match(input, '^{(%d+)}')
+    local centerSystem, ab, rotation = string.match(input, '^{([-]?%d+)([A-H]?)(%d*)}$')
     if centerSystem then
-        table.insert(buildList, { tile = tonumber(centerSystem) })
+        table.insert(buildList, {
+            tile = assert(tonumber(centerSystem)),
+            ab = ab,
+            rotation = tonumber(rotation or 0)
+        })
         local a,b = string.find(input, '}')
         input = string.sub(input, b + 1)
     else
@@ -1119,11 +1184,14 @@ function parseMapString(input)
 
     -- %S is non-space
     for key in string.gmatch(input, '%S+') do
-        local tile, ab, rotation = string.match(key, '(%d+)([AB])(%d+)')
+        local tile, ab, rotation = string.match(key, '^([-]?%d+)([A-H]?)(%d*)$')
+        assert(tile, 'bad key1 "' .. key .. '"')
+        local tile = tile and tonumber(tile) or tonumber(key)
+        assert(tile, 'bad key2 "' .. key .. '"')
         table.insert(buildList, {
-            tile = tile and tonumber(tile) or tonumber(key),
+            tile = tonumber(tile),
             ab = ab,
-            rotation = rotation
+            rotation = tonumber(rotation or 0)
         })
     end
     return buildList
@@ -1209,6 +1277,109 @@ end
 
 function onButtonPlaceFrontier()
     _exploreHelper.placeFrontierTokens()
+end
+
+-------------------------------------------------------------------------------
+
+-- Optimize home system placement from available positions.
+function _moveHomeSystems(buildList)
+    assert(type(buildList) == 'table')
+
+    -- Get home system positions from map string.
+    local mapStringInfos = {}
+    local positionIterator = getSystemPositionsStartingAtOriginIterator(0.3)
+    for i, buildEntry in ipairs(buildList) do
+        local position = positionIterator()
+        if buildEntry.tile == 0 then
+            table.insert(mapStringInfos, {
+                position = position,
+            })
+        end
+    end
+
+    -- Get player area positions.
+    local zoneInfos = {}
+    local seen = {}
+    for _, zoneAttr in ipairs(_zoneHelper.zonesAttributes()) do
+        assert(not seen[zoneAttr.color])
+        seen[zoneAttr.color] = true
+        table.insert(zoneInfos, {
+            color = assert(zoneAttr.color),
+            position = assert(zoneAttr.center)
+        })
+    end
+
+    -- Get current home system positions based on movable placeholder tiles.
+    local tileInfos = {}
+    local seen = {}
+    for _, object in ipairs(getAllObjects()) do
+        local color = string.match(object.getName(), '^Home System Location %((.+)%)$')
+        if color then
+            assert(not seen[color])
+            seen[color] = true
+            table.insert(tileInfos, {
+                color = color,
+                object = object,
+                position = object.getPosition()
+            })
+        end
+    end
+
+    -- Require the same number of map string home systems, home system placeholder tiles, and player areas.
+    if #mapStringInfos ~= #tileInfos then
+        printToAll('Map: unable to move home systems, ' .. (#mapStringInfos) .. ' in map string but ' .. (#tileInfos) .. ' home system location tiles.', 'Red')
+        return false
+    elseif #mapStringInfos ~= #zoneInfos then
+        printToAll('Map: unable to move home systems, ' .. (#mapStringInfos) .. ' in map string but ' .. (#zoneInfos) .. ' player areas.', 'Red')
+        return false
+    end
+
+    -- Optimal placement is called "the assignment problem" and is tricky.
+    -- Make a simplifying assumption that tiles in clockwise order get the
+    -- player zone colors in clockwise order, choosing the best start.
+    local function sortFunction(a, b)
+        local a = math.atan2(a.position.z, a.position.x)
+        local b = math.atan2(b.position.z, b.position.x)
+        return a < b
+    end
+    table.sort(mapStringInfos, sortFunction)
+    table.sort(zoneInfos, sortFunction)
+    local best = false
+    local bestDistance = false
+    for _ = 1, #mapStringInfos - 1 do
+        local d = 0
+        for i = 1, #mapStringInfos do
+            local a = mapStringInfos[i].position
+            local b = zoneInfos[i].position
+            d = d + math.sqrt((a.x - b.x) ^ 2 + (a.z - b.z) ^ 2)
+        end
+        if (not best) or d < bestDistance then
+            best = copyTable(mapStringInfos)
+            bestDistance = d
+        end
+    end
+
+    -- Move any home systems.
+    local colorToTile = {}
+    for _, tileInfo in ipairs(tileInfos) do
+        colorToTile[tileInfo.color] = tileInfo.object
+    end
+    for i, entry in ipairs(best) do
+        local color = assert(zoneInfos[i].color)
+        local tile = assert(colorToTile[color])
+        local oldHex = _systemHelper.hexFromPosition(tile.getPosition())
+        local newHex = _systemHelper.hexFromPosition(entry.position)
+        if oldHex ~= newHex then
+            local collide = false
+            local fast = true
+            tile.setPositionSmooth(entry.position, collide, fast)
+            _zoneHelper.updateHomeSystemPosition({
+                color = color,
+                position = entry.position
+            })
+        end
+    end
+
 end
 
 -------------------------------------------------------------------------------

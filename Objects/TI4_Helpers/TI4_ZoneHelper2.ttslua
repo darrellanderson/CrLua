@@ -1018,18 +1018,29 @@ end
 function onObjectDrop(playerColor, droppedObject)
     local color = string.match(droppedObject.getName(), '^Home System Location %((.*)%)$')
     if color then
-        local zone = zoneAttributes(color)
-        if zone then
-            local hex = _systemHelper.hexFromPosition(droppedObject.getPosition())
-            local pos = _systemHelper.hexToPosition(hex)
-            zone.homeSystemPosition = {
-                x = pos.x,
-                y = getTableY(),
-                z = pos.z
-            }
-            _drawStaticVectorLines()
-            printToAll('Moved ' .. color .. ' home system location', color)
-        end
+        updateHomeSystemPosition({
+            color = color,
+            position = droppedObject.getPosition()
+        })
+    end
+end
+
+function updateHomeSystemPosition(params)
+    assert(type(params) == 'table', 'bad params')
+    assert(type(params.color) == 'string', 'bad color')
+    assert(type(params.position) == 'table', 'bad position')
+    local zone = zoneAttributes(params.color)
+    if zone then
+        -- Do not trust position to be exact, use hex center at table height.
+        local hex = _systemHelper.hexFromPosition(params.position)
+        local pos = _systemHelper.hexToPosition(hex)
+        zone.homeSystemPosition = {
+            x = pos.x,
+            y = getTableY(),
+            z = pos.z
+        }
+        _drawStaticVectorLines()
+        printToAll('Moved ' .. params.color .. ' home system location', params.color)
     end
 end
 

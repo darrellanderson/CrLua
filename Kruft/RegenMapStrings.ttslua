@@ -1,0 +1,43 @@
+--- rotation is now 0 for "up", etc.
+function _regenerateMapStringsWithNewHyperlaneEncodingCoroutine()
+    local tileAbRotPattern = '(%d+)([AB])(%d+)'
+
+    local guids = {}
+    for _, entry in ipairs(self.getObjects()) do
+        if string.match(entry.description, tileAbRotPattern) then
+            table.insert(guids, entry.guid)
+        end
+    end
+
+    for i, guid in ipairs(guids) do
+        local pos = self.getPosition()
+        pos.y = pos.y + 5 + i
+        local object = self.takeObject({
+            position          = pos,
+            callback_function = function(object) self.putObject(object) end,
+            smooth            = false,
+            guid              = guid
+        })
+        assert(object)
+        local buildList = {}
+        for key in string.gmatch(input, '%S+') do
+            local tile, ab, rotation = string.match(key, tileAbRotPattern)
+            if tile then
+                rotation = (rotation + 3) % 6
+                table.insert(buildList, tile .. ab .. rotation)
+            else
+                table.insert(buildList, key)
+            end
+        end
+        object.setDescription(table.concat(buildList, ' '))
+        coroutine.yield(0)
+        coroutine.yield(0)
+        coroutine.yield(0)
+    end
+
+    return 1
+end
+
+function onLoad(save_state)
+    self.addContextMenuItem('ROT HYPER', function() startLuaCoroutine(self, '_regenerateMapStringsWithNewHyperlaneEncodingCoroutine') end)
+end

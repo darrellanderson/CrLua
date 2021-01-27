@@ -33,104 +33,273 @@ local _setupHelper = getHelperClient('TI4_SETUP_HELPER')
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
---- Randomize to split/join stacks and replace units with tokens.
+-------------------------------------------------------------------------------
+
+-- Swap hovered/selected tokens, platic, and/or groups.
 -- @author original by GarnetBear October 18, 2019
--- @author updated by Darrell May 2020 to merge groups.
+-- @author updated by Darrell May 2020 to merge groups, revisited January 2021 to simplify.
+local SwapSplitJoin = {
+    -- Map from replaceable object name to bag name.
+    OBJECTNAME_TO_BAGNAME = {
+        ['x1 Fighter Token'] = 'x1 Fighter Tokens Bag',
+        ['x3 Fighter Token'] = 'x3 Fighter Tokens Bag',
+        ['x1 Infantry Token'] = 'x1 Infantry Tokens Bag',
+        ['x3 Infantry Token'] = 'x3 Infantry Tokens Bag',
+        ['x1 Commodities/Tradegoods'] = 'x1 Commodities/Tradegoods Bag',
+        ['x3 Commodities/Tradegoods'] = 'x3 Commodities/Tradegoods Bag',
+        ['$COLOR Fighter'] = '$COLOR Fighter',
+        ['$COLOR Infantry'] = '$COLOR Infantry'
+    },
 
--- Map from replaceable object name to bag name.
-local REPLACE_OBJECTNAME_TO_BAGNAME = {
-    ['x1 Fighter Token'] = 'x1 Fighter Tokens Bag',
-    ['x3 Fighter Token'] = 'x3 Fighter Tokens Bag',
-    ['x1 Infantry Token'] = 'x1 Infantry Tokens Bag',
-    ['x3 Infantry Token'] = 'x3 Infantry Tokens Bag',
-    ['x1 Commodities/Tradegoods'] = 'x1 Commodities/Tradegoods Bag',
-    ['x3 Commodities/Tradegoods'] = 'x3 Commodities/Tradegoods Bag',
-    ['$COLOR Fighter'] = '$COLOR Fighter',
-    ['$COLOR Infantry'] = '$COLOR Infantry'
+    -- Replace consumed items with produced items.  Repeatable entries happen as
+    -- much as possible from the input, and ONLY IF no repeatable do the first
+    -- non-repeatable (eagerly group, cautiously break apart).  Plastic color is
+    -- mandated by the player doing the 'r' randomizing for safety/simplicity.
+    REPLACE_RULES = {
+        {
+            repeatable = true,
+            consume = { count = 3, items = { 'x1 Fighter Token', '$COLOR Fighter' }},
+            produce = { item = 'x3 Fighter Token' },
+        },
+        {
+            repeatable = true,
+            consume = { count = 3, items = { 'x1 Infantry Token', '$COLOR Infantry' }},
+            produce = { item = 'x3 Infantry Token' },
+        },
+        {
+            repeatable = true,
+            requireFaceUp = true,
+            consume = { count = 3, item = 'x1 Commodities/Tradegoods' },
+            produce = { item = 'x3 Commodities/Tradegoods' },
+        },
+        {
+            repeatable = true,
+            requireFaceDown = true,
+            consume = { count = 3, item = 'x1 Commodities/Tradegoods' },
+            produce = { item = 'x3 Commodities/Tradegoods' },
+        },
+        {
+            consume = { item = 'x3 Fighter Token' },
+            produce = { count = 3, item = 'x1 Fighter Token' },
+        },
+        {
+            consume = { item = 'x3 Infantry Token' },
+            produce = { count = 3, item = 'x1 Infantry Token' },
+        },
+        {
+            requireFaceUp = true,
+            consume = { item = 'x3 Commodities/Tradegoods' },
+            produce = { count = 3, item = 'x1 Commodities/Tradegoods' },
+        },
+        {
+            requireFaceDown = true,
+            consume = { item = 'x3 Commodities/Tradegoods' },
+            produce = { count = 3, item = 'x1 Commodities/Tradegoods' },
+        },
+        {
+            consume = { item = 'x1 Fighter Token' },
+            produce = { item = '$COLOR Fighter' },
+        },
+        {
+            consume = { item = 'x1 Infantry Token' },
+            produce = { item = '$COLOR Infantry' },
+        },
+        {
+            consume = { item = '$COLOR Fighter' },
+            produce = { item = 'x1 Fighter Token' },
+        },
+        {
+            consume = { item = '$COLOR Infantry' },
+            produce = { item = 'x1 Infantry Token' },
+        },
+    },
+
+    WAIT_FRAMES = 3,
+
+    _playerColorToNamesAndGuids = {},
+    _playerColorToWaitId = {},
 }
 
--- Replace consumed items with produced items.  Repeatable entries happen as
--- much as possible from the input, and ONLY IF no repeatable do the first
--- non-repeatable (eagerly group, cautiously break apart).  Plastic color is
--- mandated by the player doing the 'r' randomizing for safety/simplicity.
-local REPLACE_RULES = {
-    {
-        repeatable = true,
-        consume = { count = 3, items = { 'x1 Fighter Token', '$COLOR Fighter' }},
-        produce = { item = 'x3 Fighter Token' },
-    },
-    {
-        repeatable = true,
-        consume = { count = 3, items = { 'x1 Infantry Token', '$COLOR Infantry' }},
-        produce = { item = 'x3 Infantry Token' },
-    },
-    {
-        repeatable = true,
-        splitFaceDown = true,
-        consume = { count = 3, item = 'x1 Commodities/Tradegoods' },
-        produce = { item = 'x3 Commodities/Tradegoods' },
-    },
-    {
-        consume = { item = 'x3 Fighter Token' },
-        produce = { count = 3, item = 'x1 Fighter Token' },
-    },
-    {
-        consume = { item = 'x3 Infantry Token' },
-        produce = { count = 3, item = 'x1 Infantry Token' },
-    },
-    {
-        splitFaceDown = true,
-        consume = { item = 'x3 Commodities/Tradegoods' },
-        produce = { count = 3, item = 'x1 Commodities/Tradegoods' },
-    },
-    {
-        consume = { item = 'x1 Fighter Token' },
-        produce = { item = '$COLOR Fighter' },
-    },
-    {
-        consume = { item = 'x1 Infantry Token' },
-        produce = { item = '$COLOR Infantry' },
-    },
-    {
-        consume = { item = '$COLOR Fighter' },
-        produce = { item = 'x1 Fighter Token' },
-    },
-    {
-        consume = { item = '$COLOR Infantry' },
-        produce = { item = 'x1 Infantry Token' },
-    },
-}
+--- Add an object to the player's pending set, schedule swap.
+function SwapSplitJoin.add(object, playerColor)
+    assert(type(object) == 'userdata' and type(playerColor) == 'string')
 
-local _pendingReplace = assert(not _pendingReplace) and false
+    -- Reject bags and decks (unit bags in particular).
+    if object.tag == 'Bag' or object.tag == 'Deck' then
+        return false
+    end
+
+    -- Get the anonymized object name, reject if none.
+    local name = object.getName()
+    name = string.gsub(name, playerColor, '$COLOR')
+    if not SwapSplitJoin.OBJECTNAME_TO_BAGNAME[name] then
+        return false
+    end
+
+    -- Add to the per-color list.  Reject if already there.
+    local namesAndGuids = SwapSplitJoin._playerColorToNamesAndGuids[playerColor]
+    if not namesAndGuids then
+        namesAndGuids = {}
+        SwapSplitJoin._playerColorToNamesAndGuids[playerColor] = namesAndGuids
+    end
+    local guid = object.getGUID()
+    for _, nameAndGuid in ipairs(namesAndGuids) do
+        if guid == nameAndGuid.guid then
+            return false
+        end
+    end
+    table.insert(namesAndGuids, {
+        name = name,
+        guid = guid
+    })
+
+    -- Wait a beat for other objects to get added to the set.
+    local waitId = SwapSplitJoin._playerColorToWaitId[playerColor]
+    if waitId then
+        Wait.stop(waitId)
+        waitId = nil
+    end
+    waitId = Wait.frames(function() SwapSplitJoin._consume(playerColor) end, SwapSplitJoin.WAIT_FRAMES)
+    SwapSplitJoin._playerColorToWaitId[playerColor] = waitId
+    return true
+end
+
+-- Get consumable items from entries (does not remove them from entries).
+-- @param rule: REPLACE_RULES value.
+-- @param namesAndGuids: list of {name, guid} tables.
+-- @return consumable: list of {name, guid} tables for consumable items.
+function SwapSplitJoin._getConsumable(rule, namesAndGuids)
+    assert(type(rule) == 'table' and rule.consume and type(namesAndGuids) == 'table')
+
+    -- Collect objects following rule.
+    local consumable = {}
+    local function maybeAdd(rule, consumeName, nameAndGuid)
+        assert(type(rule) == 'table' and type(consumeName) == 'string' and type(nameAndGuid) == 'table')
+        local object = getObjectFromGUID(nameAndGuid.guid)
+        if not object then
+            return false
+        elseif consumeName ~= nameAndGuid.name then
+            return false
+        elseif rule.requireFaceUp and object.is_face_down then
+            return false
+        elseif rule.requireFaceDown and not object.is_face_down then
+            return false
+        end
+        table.insert(consumable, nameAndGuid)
+    end
+
+    -- For multi-item rules add in item list order (prefer token to plastic when grouping).
+    for _, consumeName in ipairs(rule.consume.items or { rule.consume.item }) do
+        for _, nameAndGuid in ipairs(namesAndGuids) do
+            maybeAdd(rule, consumeName, nameAndGuid)
+        end
+    end
+    return consumable
+end
+
+-- Apply swap/split/join rule ONCE, remove items from namesAndGuids list.
+-- @param rule: REPLACE_RULES value.
+-- @param namesAndGuids: list of {name, guid} tables, modified to remove consumed items.
+-- @param playerColor: color string.
+-- @return boolean: true if a swap/split/join happened.
+function SwapSplitJoin._applyRule(rule, namesAndGuids, playerColor)
+    assert(type(rule) == 'table' and rule.consume and type(namesAndGuids) == 'table' and type(playerColor) == 'string')
+
+    -- Get consumable items, fail if not enough.
+    local consumable = SwapSplitJoin._getConsumable(rule, namesAndGuids)
+    if #consumable < (rule.consume.count or 1) then
+        return false
+    end
+
+    -- Fail if produce bag does not have sufficient quantity.
+    local produceBagName = assert(SwapSplitJoin.OBJECTNAME_TO_BAGNAME[rule.produce.item])
+    produceBagName = string.gsub(produceBagName, '$COLOR', playerColor)
+    local produceBag = assert(_getBag(produceBagName))
+    if produceBag.tag == 'Bag' and produceBag.getQuantity() < (rule.produce.count or 1) then
+        return false
+    end
+
+    -- Consume the proper number of items.
+    local pos = false
+    for _ = 1, (rule.consume.count or 1) do
+        local nameAndGuid = assert(table.remove(consumable, 1))
+        -- Remove from candidate items.
+        for i, candidate in ipairs(namesAndGuids) do
+            if candidate.guid == nameAndGuid.guid then
+                table.remove(namesAndGuids, i)
+            end
+        end
+        -- Consume object.
+        local object = assert(getObjectFromGUID(nameAndGuid.guid))
+        local bagName = assert(SwapSplitJoin.OBJECTNAME_TO_BAGNAME[nameAndGuid.name])
+        bagName = string.gsub(bagName, '$COLOR', playerColor)
+        local bag = assert(_getBag(bagName))
+        if not pos then
+            pos = object.getPosition()
+        end
+        bag.putObject(object)
+    end
+
+    -- Produce.
+    local name = assert(rule.produce.item)
+    local bagName = assert(SwapSplitJoin.OBJECTNAME_TO_BAGNAME[name])
+    for _ = 1, (rule.produce.count or 1) do
+        local rot = { x = 0, y = 0, z = (rule.requireFaceDown and 180 or 0) }
+        assert(produceBag.takeObject({
+            position = pos,
+            rotation = rot,
+            smooth = true,
+        }))
+        pos.z = pos.z + 0.5 * (pos.z > 0 and 1 or -1)
+        pos.y = pos.y + 0.5
+    end
+
+    return true
+end
+
+function SwapSplitJoin._consume(playerColor)
+    assert(type(playerColor) == 'string')
+
+    -- Get selected items.
+    local namesAndGuids = SwapSplitJoin._playerColorToNamesAndGuids[playerColor]
+    if not namesAndGuids then
+        return false
+    end
+    SwapSplitJoin._playerColorToNamesAndGuids[playerColor] = nil
+
+    -- Apply rules in order.  Once any rule is applied only repeatable rules can chain.
+    local didConsume = false
+    for _, rule in ipairs(SwapSplitJoin.REPLACE_RULES) do
+        if rule.repeatable then
+            -- Do all repeatable rules as many times as possible.
+            while SwapSplitJoin._applyRule(rule, namesAndGuids, playerColor) do
+                didConsume = true
+            end
+        elseif not didConsume then
+            -- If singleton and nothing consumed yet, consume ONLY FIRST APPLICABLE.
+            didConsume = SwapSplitJoin._applyRule(rule, namesAndGuids, playerColor)
+        end
+    end
+end
 
 -- Get absolute bag name from $COLOR-allowed item name.
-local function _getBag(itemName, playerColor)
-   assert(type(itemName) == 'string' and type(playerColor) == 'string')
-
-   -- Item name $COLOR points to (potentially with $COLOR) bag name.
-   -- Replace any bag name $COLOR for the absolute object name.
-   local bagName = REPLACE_OBJECTNAME_TO_BAGNAME[itemName]
-   assert(bagName, 'no bag for ' .. itemName)
-   bagName = string.gsub(bagName, '$COLOR', playerColor)
-
-   -- Remember bags for faster future lookups.
-   local bagGuidCache = REPLACE_OBJECTNAME_TO_BAGNAME._bagGuidCache
-   if not bagGuidCache then
-       bagGuidCache = {}
-       REPLACE_OBJECTNAME_TO_BAGNAME._bagGuidCache = bagGuidCache
-   end
-   local bagGuid = bagGuidCache[bagName]
+local _bagGuidCache = {}
+function _getBag(bagName)
+   assert(type(bagName) == 'string')
+   local bagGuid = _bagGuidCache[bagName]
    local bag = bagGuid and getObjectFromGUID(bagGuid)
    if not bag then
        for _, object in ipairs(getAllObjects()) do
            if (object.tag == 'Bag' or object.tag == 'Infinite') and object.getName() == bagName then
-               bagGuidCache[bagName] = object.getGUID()
+               _bagGuidCache[bagName] = object.getGUID()
                bag = object
                break
            end
        end
    end
-   assert(bag)
+   if not bag then
+       error('Global._getBag: missing bag "' .. bagName .. '"')
+   end
    return bag
 end
 
@@ -142,152 +311,15 @@ function onObjectRandomize(object, playerColor)
         originalOnObjectRandomize(object, playerColor)
     end
 
-    -- Only swap tokens/units, not unit bags.
-    if object.tag == 'Bag' then
-        return
-    end
-
-    -- Get consume items from entries (does not remove them from entries).
-    -- @param rule: REPLACE_RULES value.
-    -- @param entries: MAP from index to entry, may have holes!
-    -- @param splitFaceDown boolean: if true, generate separate face up/face down results.
-    -- @return consumable, consumableFaceDown: list of entries map keys to consumable entries.
-    local function getConsumable(rule, entries)
-        assert(rule.consume and type(entries) == 'table')
-        local consumable, consumableFaceDown = {}, {}
-
-        -- For multi-item rules add in item list order (prefer token to plastic when grouping).
-        for _, consumeName in ipairs(rule.consume.items or { rule.consume.item }) do
-            for i, entry in pairs(entries) do
-                if consumeName == entry.consumeName then
-                    if rule.splitFaceDown and entry.object.is_face_down then
-                        table.insert(consumableFaceDown, i)
-                    else
-                        table.insert(consumable, i)
-                    end
-                end
-            end
-        end
-        return consumable, consumableFaceDown
-    end
-
-    -- Consume once, removing consumed entries from collection.
-    -- @param rule: REPLACE_RULES value.
-    -- @param entries: MAP from index to entry, may have holes!  Gets mutated.
-    -- @param consumable: list of entries map keys to consumable entries.
-    -- @param boolean: did consume happen?
-    local function doConsume(rule, entries, consumable, playerColor)
-        assert(rule.consume and type(entries) == 'table' and type(consumable) == 'table' and type(playerColor) == 'string')
-
-        -- Verify consume units.
-        if #consumable < (rule.consume.count or 1) then
-            return false
-        end
-
-        -- Verify produce units are available.
-        local produceBag = _getBag(rule.produce.item, playerColor)
-        if not produceBag then
-            error('itemName=' .. rule.produce.item .. ' color=' .. playerColor)
-        end
-        if produceBag.tag == 'Bag' and produceBag.getQuantity() < (rule.produce.count or 1) then
-            return false
-        end
-
-        -- Om nom nom!
-        local consumeCounts = {}
-        local position, isFaceDown
-        for _ = 1, (rule.consume.count or 1) do
-            local i = table.remove(consumable, 1)  -- consume in list order
-            local entry = entries[i]
-            entries[i] = nil
-            local consumeObject = entry.object
-            local consumeBag = _getBag(entry.consumeName, playerColor)
-            consumeCounts[consumeObject.getName()] = (consumeCounts[consumeObject.getName()] or 0) + 1
-            position = position or consumeObject.getPosition()
-            isFaceDown = consumeObject.is_face_down
-            consumeBag.putObject(consumeObject)
-        end
-
-        -- Thppt!
-        local produceCounts = {}
-        for _ = 1, (rule.produce.count or 1) do
-            position.z = position.z + 0.5
-            position.y = position.y + 0.5
-            local produceObject = produceBag.takeObject({
-                position = position,
-                rotation = (rule.splitFaceDown and isFaceDown and {180,0,0}) or {0,0,0},
-            })
-            produceCounts[produceObject.getName()] = (produceCounts[produceObject.getName()] or 0) + 1
-        end
-
-        -- Report.
-        local function getMessage(nameCounts)
-            local message = {}
-            for name, count in pairs(nameCounts) do
-                if #message > 0 then table.insert(message, ', ') end
-                if count > 1 then table.insert(message, count .. ' ') end
-                table.insert(message, '“' .. name .. '”')
-            end
-            return table.concat(message, '')
-        end
-        --print('(R) { ' .. getMessage(consumeCounts) .. ' } -> { ' .. getMessage(produceCounts) .. ' }')
-
-        return true
-    end
-
-    local function delayedReplace()
-        for color, entries in pairs(_pendingReplace) do
-            local didConsume = false
-            for _, rule in ipairs(REPLACE_RULES) do
-                if rule.repeatable then
-                    -- Do all repeatable rules as many times as possible.
-                    local consumable1, consumable2 = getConsumable(rule, entries)
-                    while doConsume(rule, entries, consumable1, color) do
-                        didConsume = true
-                    end
-                    while doConsume(rule, entries, consumable2, color) do
-                        didConsume = true
-                    end
-                elseif not didConsume then
-                    -- If singleton and nothing consumed yet, consume ONLY FIRST APPLICABPLE.
-                    local consumable1, consumable2 = getConsumable(rule, entries)
-                    didConsume = doConsume(rule, entries, consumable1, color)
-                    if didConsume then
-                        break
-                    end
-                    didConsume = doConsume(rule, entries, consumable2, color)
-                    if didConsume then
-                        break
-                    end
-                end
-            end
-        end
-        _pendingReplace = false
-    end
-
-    -- If this looks like a replace candidate, queue for processing next frame.
-    -- (Waiting a frame lets randomizing a group gather all peers.)
-    local consumeName = string.gsub(object.getName(), playerColor, '$COLOR')
-    if REPLACE_OBJECTNAME_TO_BAGNAME[consumeName] then
-        if not _pendingReplace then
-            _pendingReplace = {}
-            Wait.frames(delayedReplace, 2)
-        end
-        local byColor = _pendingReplace[playerColor]
-        if not byColor then
-            byColor = {}
-            _pendingReplace[playerColor] = byColor
-        end
-        table.insert(byColor, { object = object, consumeName = consumeName, playerColor = playerColor })
-    end
+    SwapSplitJoin.add(object, playerColor)
 end
 
 -------------------------------------------------------------------------------
 
-local KEY_INDEX_TO_TOKEN = {
-    [1] = 'x1 Commodities/Tradegoods',
-    [2] = 'x1 Fighter Token',
-    [3] = 'x1 Infantry Token',
+local KEY_INDEX_TO_TOKEN_BAG = {
+    [1] = 'x1 Commodities/Tradegoods Bag',
+    [2] = 'x1 Fighter Tokens Bag',
+    [3] = 'x1 Infantry Tokens Bag',
 }
 
 local _graveyardGuid = false
@@ -314,10 +346,10 @@ function onScriptingButtonUp(index, playerColor)
         return
     end
 
-    local tokenBagName = KEY_INDEX_TO_TOKEN[index]
+    local tokenBagName = KEY_INDEX_TO_TOKEN_BAG[index]
     if tokenBagName then
         local pointerPosition = Player[playerColor].getPointerPosition()
-        local bag = _getBag(tokenBagName, playerColor)
+        local bag = assert(_getBag(tokenBagName))
         bag.takeObject({
             position = pointerPosition,
             smooth = true
@@ -639,6 +671,7 @@ function onObjectLeaveContainer(container, leaveObject)
 end
 
 local UNIT_NAMES = {
+    'Mech',
     'Infantry',
     'Fighter',
     'Space Dock',
@@ -673,54 +706,57 @@ end
 
 -- Report when taking or putting command tokens.
 -- @author Darrell
+local ChattyCommandTokens = {
+    _playerColorToState = {},
+}
 
-local _ctTransactions = assert(_ctTransactions == nil) and {}
-local _ctWaitId = assert(_ctWaitId == nil) and false
-
-local function reportCommandTokenTransaction(container, object, quantity)
+function ChattyCommandTokens._process(container, object, transactionType)
+    assert(type(container) == 'userdata' and type(object) == 'userdata' and type(transactionType) == 'string')
     local isCommandTokenBag = string.match(container.getName(), 'Command Tokens Bag$')
-    local isCommandToken = string.match(object.getName(), 'Command Token$')
-    if not isCommandToken or not isCommandTokenBag then
-        return
-    end
-
-    -- Keep deposit and withdrawl transactions separate.  During clean up
-    -- a player will deposit tokens from the map, AND withdraw 2 (or 3).
-    local name = object.getName()
-    local type = (quantity > 0) and 'Deposited' or 'Withdrew'
-    local transactions = _ctTransactions[name]
-    if not transactions then
-        transactions = {}
-        _ctTransactions[name] = transactions
-    end
-    transactions[type] = (transactions[type] or 0) + math.abs(quantity)
-
-    -- Wait before reporting in case withdrawing or depositing several.
-    -- Restart the clock on each transaction.
-    local function delayedReport()
-        _ctWaitId = false
-        for name, transactions in pairs(_ctTransactions) do
-            local message = false
-            local total = 0
-            for type, quantity in pairs(transactions) do
-                if not message then
-                    message = type .. ' ' .. quantity
-                else
-                    message = message .. ', ' .. string.lower(type) .. ' ' .. quantity
-                end
-                total = total + quantity
+    if isCommandTokenBag then
+        local tokenName = string.match(object.getName(), '^(.*) Command Token$')
+        local faction = tokenName and _factionHelper.fromTokenName(tokenName)
+        local color = faction and faction.color
+        if color then
+            local state = ChattyCommandTokens._playerColorToState[color]
+            if not state then
+                state = {
+                    name = tokenName,
+                    transactions = {},
+                    waitId = false,
+                }
+                ChattyCommandTokens._playerColorToState[color] = state
             end
-            if total > 0 then
-                message = message .. ' ' .. name .. (total > 1 and 's' or '')
-                printToAll(message)
+            state.transactions[transactionType] = (state.transactions[transactionType] or 0) + 1
+            if state.waitId then
+                Wait.stop(state.waitId)
             end
+            state.waitId = Wait.time(function() ChattyCommandTokens._report(color) end, 5)
         end
-        _ctTransactions = {}
     end
-    if _ctWaitId then
-        Wait.stop(_ctWaitId)
+end
+
+function ChattyCommandTokens._report(color)
+    assert(type(color) == 'string')
+    local state = ChattyCommandTokens._playerColorToState[color]
+    ChattyCommandTokens._playerColorToState[color] = nil
+    if state then
+        local tranactionMessages = {}
+        local total = 0
+        for transactionType, quantity in pairs(state.transactions) do
+            table.insert(tranactionMessages, transactionType .. ' ' .. quantity)
+            total = total + quantity
+        end
+        if total > 0 then
+            local message = {
+                state.name,
+                table.concat(tranactionMessages, ', '),
+                'Command Token' .. (total > 1 and 's' or '')
+            }
+            message = table.concat(message, ' ')
+            printToAll(message, color)
+        end
     end
-    _ctWaitId = Wait.time(delayedReport, 5)
 end
 
 local originalOnObjectLeaveContainer = onObjectLeaveContainer
@@ -728,7 +764,7 @@ function onObjectLeaveContainer(container, leaveObject)
     if originalOnObjectLeaveContainer then
         originalOnObjectLeaveContainer(container, leaveObject)
     end
-    reportCommandTokenTransaction(container, leaveObject, -1)
+    ChattyCommandTokens._process(container, leaveObject, 'withdrew')
 end
 
 local originalOnObjectEnterContainer = onObjectEnterContainer
@@ -736,7 +772,7 @@ function onObjectEnterContainer(container, enterObject)
     if originalOnObjectEnterContainer then
         originalOnObjectEnterContainer(container, enterObject)
     end
-    reportCommandTokenTransaction(container, enterObject, 1)
+    ChattyCommandTokens._process(container, enterObject, 'deposited')
 end
 
 -------------------------------------------------------------------------------
@@ -748,6 +784,9 @@ local function _help(clickerColor)
         '  !tealme : change to the teal seat (can see !COLOR whispers).',
         '  !seats : swap seated players into random seats (only works before faction unpack).',
         'numpad keys:',
+        '  1,2,3 : place tradegood, fighter, infantry token.',
+        '  4 : view combat roller.',
+        '  5 : view active system.',
         '  6 : view galaxy map.',
         '  7 : view score area.',
         '  8 : view agenda phase area.',
@@ -888,3 +927,14 @@ function onObjectNumberTyped(object, playerColor, number)
         return true  -- stop TTS from dealing the card(s)
     end
 end
+
+-------------------------------------------------------------------------------
+-- Index is only called when the key does not already exist.
+-- local _lockGlobalsMetaTable = {}
+-- function _lockGlobalsMetaTable.__index(table, key)
+--     error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+-- end
+-- function _lockGlobalsMetaTable.__newindex(table, key, value)
+--     error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+-- end
+-- setmetatable(_G, _lockGlobalsMetaTable)

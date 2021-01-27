@@ -1,7 +1,7 @@
 function doGet(e) {
   var getData = e.parameter;
   var result = processGetData(getData);
-  return ContentService.createTextOutput('value');
+  return ContentService.createTextOutput(result);
 }
 
 function doPost(e) {
@@ -9,7 +9,13 @@ function doPost(e) {
   var postData = e.postData.contents;
   postData = unescape(postData);
   postData = JSON.parse(postData);
-  var result = processPostData(postData);
+
+  var result
+  if (postData.hasOwnProperty('reserve')) {
+    result = processReserve(Number(postData['reserve']), postData);
+  } else {
+    result = processPostData(postData);
+  }
   return ContentService.createTextOutput(result);
 }
 
@@ -20,6 +26,7 @@ var Keys = {
   SHEET : { key : 'sheet', type : 'string', default : 'Sheet1' },
   CELLS : { key : 'cells', type : 'object' },
   CELL : { key : 'cell', type : 'string' },
+  RESERVE : { key : 'reserve', type : 'string', default : '' },
 };
 
 function getValue(object, keyData) {
@@ -67,8 +74,14 @@ function processPostData(postData) {
     // Get and sanity check inputs.
     var id = getValue(postData, Keys.ID);
     var sheetName = getValue(postData, Keys.SHEET);
+
+    // Is this a reserve request?
+    var reserve = getValue(postData, Keys.RESERVE);
+    if (reserve != '') {
+    }
+
     var cells = getValue(postData, Keys.CELLS);
-    for (cell in cells) {
+    for (var cell in cells) {
       if (!CELL_RE.test(cell)) {
         throw 'bad cell "' + cell + '"';
       }
@@ -95,18 +108,35 @@ function processPostData(postData) {
   }
 }
 
-function runTests() {
-  function assertEquals(observed, expected) {
-    if (observed != expected) {
-      Logger.log('runTest: expected "' + expected + '", observed "' + observed + '"');
+function processReserve(reserve, postData) {
+  try {
+    var id = getValue(postData, Keys.ID);
+    var sheetName = getValue(postData, Keys.SHEET);
+    var ss = SpreadsheetApp.openById(id);
+    var sheet = ss.getSheetByName(sheetName);
+    var rows = []
+    for (var i = 0; i < reserve; i++) {
+      sheet.appendRow(['reserve']);
+      rows.push(sheet.getLastRow());
     }
+    return JSON.stringify(rows);
+  } catch (err) {
+    return err;
   }
+}
 
+function assertEquals(observed, expected) {
+  if (observed != expected) {
+    Logger.log('runTest: expected "' + expected + '", observed "' + observed + '"');
+  }
+}
+
+function runTests() {
   assertEquals(processGetData({}), 'missing key "id"');
   assertEquals(processGetData({ id: [] }), 'bad type for "id": want "string" saw "object"');
   assertEquals(processGetData({ id: 'x' }), 'missing key "cell"');
   assertEquals(processGetData({ id: 'x', cell: 'aa' }), 'bad cell "aa"');
-  assertEquals(processGetData({ id: '', cell: 'a1' }), 'a');
+  assertEquals(processGetData({ id: 'x', cell: 'a1' }), 'a');
 
   assertEquals(processPostData({}), 'missing key "id"');
   assertEquals(processPostData({ id: [] }), 'bad type for "id": want "string" saw "object"');
@@ -116,6 +146,10 @@ function runTests() {
   assertEquals(processPostData({ id: 'x', cells: { 'aa' : 'foo' } }), 'bad cell "aa"');
   assertEquals(processPostData({ id: 'x', cells: { 'aa' : {} } }), 'bad cell "aa"');
   assertEquals(processPostData({ id: 'x', cells: { 'aa99' : 'foo' } }), 'ok (id x)');
-  assertEquals(processPostData({ id: '', cells: { 'a1' : 'foo3', 'a2' : 'bar' } }), 'ok')
+  assertEquals(processPostData({ id: 'x', cells: { 'a1' : 'foo3', 'a2' : 'bar' } }), 'ok')
   Logger.log('finished')
+}
+
+function testReserve() {
+  assertEquals(processReserve(3, { id: '1NZZfHxZ9ATRrWSTjJEQmc_K9Ofeguc2bY3fcjUodfRA', reserve: '1'}), '?');
 }

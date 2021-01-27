@@ -1190,7 +1190,6 @@ function _consumeStrategyToken(color, strategyCard)
 		end
 		local searchList = (object.tag == 'Card') and cardToObjects[name]
 		if searchList then
-			print('xxx found ' .. object.getName())
 			table.insert(searchList, object)
 		end
 	end

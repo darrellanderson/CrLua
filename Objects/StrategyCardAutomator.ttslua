@@ -1175,61 +1175,69 @@ function _consumeStrategyToken(color, strategyCard)
 		return
 	end
 
-	local SsruuActive = false
-	local JaeMirKanActive = false
-
-	-- find command token bag
-	-- also check if alternate command token payment method available.
-	-- if so, message the player and return true
-	local commandTokensBag
-
-	if not _setupHelper.getPoK() then
-		commandTokensBag = _getByName(faction.tokenName .. " Command Tokens Bag", "Bag")
-	else
-		for _, object in ipairs(getAllObjects()) do
-			local name = object.getName()
-			local guid = object.getGUID()
-			if object.tag == 'Bag' then
-				if name == faction.tokenName .. " Command Tokens Bag" then
-					commandTokensBag = object
-				end
-			end
-
-			if (name == "Jae Mir Kan") then
-				JaeMirKanActive = true
-				if (faction.name == "The Mahact Gene-Sorcerers") and (not object.is_face_down) then
-					_safeBroadcastToColor(strategyCard .. ": Jae Mir Kan is available to you. No Token has been used.", color,color)
-					return true
-				end
-			elseif (faction.name == "The Yssaril Tribes") and (name == "Ssruu") and (not object.is_face_down) then
-				SsruuActive = true
-			end
-
-			if (name == "Scepter of Emelpar") and (not object.is_face_down) then
-				local zoneColor = _zoneHelper.zoneFromPosition(object.getPosition())
-				if zoneColor == color then
-					_safeBroadcastToColor(strategyCard .. ": Scepter of Emelpar is available to you. No Token has been used.", color, color)
-					return true
-				end
-
-			end
+	-- Find the command tokens bag and alternate payment methods.
+	local commandTokensBagName = faction.tokenName .. ' Command Tokens Bag'
+	local commandTokensBag = false
+	local cardToObjects = {
+		['Jae Mir Kan'] = {},
+		['Scepter of Emelpar'] = {},
+		['Ssruu'] = {},
+	}
+	for _, object in ipairs(getAllObjects()) do
+		local name = object.getName()
+		if object.tag == 'Bag' and name == commandTokensBagName then
+			commandTokensBag = object
 		end
-
-		if (SsruuActive and JaeMirKanActive) then
-			_safeBroadcastToColor(strategyCard .. ": Ssruu is available to you. No Token has been used.", color, color)
-			return true
+		local searchList = (object.tag == 'Card') and cardToObjects[name]
+		if searchList then
+			print('xxx found ' .. object.getName())
+			table.insert(searchList, object)
 		end
+	end
+
+	-- Is a payment alternative available?  If so, tell the player about it
+	-- but go ahead and pay the strategy token normally.  If the player chooses
+	-- they can remove the spent token and use the alternative instead.
+	local altPayment = {}
+	for _, card in ipairs(cardToObjects['Scepter of Emelpar']) do
+		local zoneColor = _zoneHelper.zoneFromPosition(card.getPosition())
+		if zoneColor == color and (not card.is_face_down) then
+			table.insert(altPayment, '"Scepter of Emelpar"')
+			break
+		end
+	end
+	for _, card in ipairs(cardToObjects['Jae Mir Kan']) do
+		local zoneColor = _zoneHelper.zoneFromPosition(card.getPosition())
+		if zoneColor == color and (not card.is_face_down) then
+			table.insert(altPayment, '"Jae Mir Kan"')
+			break
+		end
+	end
+	for _, card in ipairs(cardToObjects['Ssruu']) do
+		local zoneColor = _zoneHelper.zoneFromPosition(card.getPosition())
+		local jaeMirKanAvailable = #cardToObjects['Jae Mir Kan'] > 0  -- does not need to be face up
+		if zoneColor == color and (not card.is_face_down) and jaeMirKanAvailable then
+			table.insert(altPayment, '"Ssruu" + "Jae Mir Kan"')
+			break
+		end
+	end
+	if #altPayment > 0 then
+		altPayment = table.concat(altPayment, ', ')
+		_safeBroadcastToColor(strategyCard .. ': ' .. altPayment .. ' available to ' .. color .. ' instead of spending a strategy token.  To use it, retrieve the spent token and spend this instead.', color, color)
+		-- Proceed with normal payment.  This *could* return here and rely on
+		-- the player to spend the token, but if they're not paying attention
+		-- they may unintentionally not pay for following.
 	end
 
 	if not commandTokensBag then
 		broadcastToAll('Consume Strategy tokens: missing ' .. faction.tokenName .. ' Command Tokens Bag', 'Red')
-		return
+		return false
 	end
 
 	local commandSheet = getObjectFromGUID(faction.commandSheetGuid)
 	if not commandSheet then
 		broadcastToAll('Consume Strategy tokens: missing ' .. color .. ' Command Sheet', 'Red')
-		return
+		return false
 	end
 
 	-- todo: change cast and use sheet.positionToLocal instead. check if z > 0 or < 0 or something.
@@ -1238,7 +1246,7 @@ function _consumeStrategyToken(color, strategyCard)
 	for _,object in ipairs(getAllObjects()) do
 		local name = object.getName()
 		if name == commandTokenName then
-			local rot = object.getRotation()['z']
+			local rot = object.getRotation().z
 			if rot < 90 or rot > 270 then
 				local pos = commandSheet.positionToLocal(object.getPosition())
 				if pos.x < 2 and pos.x > -4 and pos.z > -0.3 and pos.z < 3.5 then

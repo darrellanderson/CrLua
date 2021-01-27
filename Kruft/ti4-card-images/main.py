@@ -317,7 +317,13 @@ def publicObjectiveCard(level, title, type, body, footer, cardImage, titlesize, 
     # FOOTER
     items = footer.split('|')
     footer = items[0]
-    color = ImageColor.getrgb('#ffb732') if level == 1 else ImageColor.getrgb('#9999ff')
+    color = False
+    if level == 1:
+        ImageColor.getrgb('#ffb732')
+    elif level == 2:
+        ImageColor.getrgb('#9999ff')
+    elif level == 3:
+        ImageColor.getrgb('#ffffff')
     font = FontData('HandelGothicDBold.otf', 32, color)
     textBlock = TextBlock()
     textBlock.setFont(font)
@@ -426,7 +432,7 @@ def agendaCard(title, type, body, cardImage, titlesize, fontsize, gradual):
             textBlock.setText(line.strip())
             y, _ = textBlock.draw(draw)
             y += textBlock._lineH * (PARAGRAPH_LINE_HEIGHT_SCALE - 1)
-            
+
     else:
         textBlock = TextBlock()
         textBlock.setCenterH(True)
@@ -648,6 +654,11 @@ CARD_OPTIONS = {
         'cardImage' : 'Stage2PoK.jpg',
         'back' : 'Stage2_Back.jpg',
     },
+    'stage3-c' : {
+        'cardType' : 'public3',
+        'cardImage' : 'Stage3_c.jpg',
+        'back' : 'Stage3_Back.jpg',
+    },
     'agenda' : {
         'cardType' : 'agenda',
         'cardImage' : 'Agenda.jpg',
@@ -736,6 +747,8 @@ class CardHandler(webapp2.RequestHandler):
                 jpg = publicObjectiveCard(1, title, type, body, footer, cardImage, titlesize, fontsize)
             elif cardType == 'public2':
                 jpg = publicObjectiveCard(2, title, type, body, footer, cardImage, titlesize, fontsize)
+            elif cardType == 'public3':
+                jpg = publicObjectiveCard(3, title, type, body, footer, cardImage, titlesize, fontsize)
             elif cardType == 'agenda':
                 jpg = agendaCard(title, type, body, cardImage, titlesize, fontsize, gradual == 'true')
             elif cardType == 'promissory':

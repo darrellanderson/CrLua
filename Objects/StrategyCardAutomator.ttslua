@@ -1175,11 +1175,12 @@ function _consumeStrategyToken(color, strategyCard)
 		return
 	end
 
+	abilitiesSet = {}
 	for _, ability in ipairs(faction.abilities) do
 		abilitiesSet[ability] = true
 	end
 	if abilitiesSet['Masters of Trade'] then
-		_safebroadcastToColor(strategyCard .. ": ".. color .. " has the Master of Trade ability. No strategy token has been used." , color, color)
+		_safeBroadcastToColor(strategyCard .. ": ".. color .. " has the Master of Trade ability. No strategy token has been used." , color, color)
 		return true
 	end
 

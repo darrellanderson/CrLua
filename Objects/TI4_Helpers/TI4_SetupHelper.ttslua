@@ -195,6 +195,14 @@ local SetupFaction = {
     }
 }
 
+local SetupPlayerTools = {
+    NAME_TO_PLAYER_ZONE_OFFSET = {
+        ['Technology Board'] = { x = 0, y = 3, z = 11 },
+        ['Planet Board'] = { x = 0, y = 4, z = 11 },
+        ['Build Area'] = { x = 0, y = 5, z = 11, flip = true },
+    }
+}
+
 local SetupFranken = {}
 local SetupCards = {}
 
@@ -967,6 +975,56 @@ end
 
 -------------------------------------------------------------------------------
 
+function SetupPlayerTools.unpack()
+    -- Find the tools bag and any tools already on the table.
+    local toolsBag = false
+    local nameToJson = {}
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        if object.tag == 'Bag' and name == 'Tools and Helpers' then
+            toolsBag = object
+        end
+        if SetupPlayerTools.NAME_TO_PLAYER_ZONE_OFFSET[name] then
+            nameToJson[name] = object.getJSON()
+        end
+    end
+
+    -- Get JSON for tools in the tools bag.
+    for _, entry in ipairs(toolsBag and toolsBag.getObjects() or {}) do
+        if SetupPlayerTools.NAME_TO_PLAYER_ZONE_OFFSET[entry.name] and not nameToJson[entry.name] then
+            local object = toolsBag.takeObject({
+                position          = toolsBag.getPosition() + vector(0, 5, 0),
+                smooth            = false,
+                guid              = entry.guid
+            })
+            while object.spawning do
+                coroutine.yield(0)
+            end
+            nameToJson[entry.name] = object.getJSON()
+            toolsBag.putObject(object)
+            coroutine.yield(0)
+        end
+    end
+
+    -- Spawn for each player.
+    local zonesAttributes = _zoneHelper.zonesAttributes()
+    for _, zone in ipairs(zonesAttributes) do
+        for name, json in pairs(nameToJson) do
+            local offset = SetupPlayerTools.NAME_TO_PLAYER_ZONE_OFFSET[name]
+            spawnObjectJSON({
+                json              = json,
+                position          = offsetPosition(zone.center, offset),
+                rotation          = zoneRotation(zone, offset),
+                callback_function = function(object) object.setLock(offset.lock or false) end,
+                sound             = false,
+            })
+            coroutine.yield(0)
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
+
 -- Do NOT do this as part of normal setup, leaving cards out is sus af.
 -- Jefferson has seen some shit and doesn't trust people
 function dealObjectives()
@@ -1034,6 +1092,7 @@ function setup(params)
     assert(type(params.playerCount) == 'number')
     assert(not params.extraRings or type(params.extraRings) == 'number')
     assert(not params.includePoK or type(params.includePoK) == 'boolean')
+    assert(not params.playerTools or type(params.playerTools) == 'boolean')
 
     setPoK(params.includePoK or false)
 
@@ -1050,6 +1109,7 @@ function setupCoroutine()
     local playerCount = assert(params.playerCount)
     local extraRings = params.extraRings or 0
     local isRightClick = params.isRightClick
+    local playerTools = params.playerTools
 
     _zoneHelper.clearBordersVectorLines()
 
@@ -1093,6 +1153,11 @@ function setupCoroutine()
 
     _zoneHelper.drawBordersVectorLines()
     coroutine.yield(0)
+
+    if playerTools then
+        SetupPlayerTools.unpack()
+        coroutine.yield(0)
+    end
 
     print('Setup finished')  -- always print when done
 

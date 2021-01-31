@@ -22,6 +22,7 @@ function getHelperClient(helperObjectName)
     end
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
+local _exploreHelper = getHelperClient('TI4_EXPLORE_HELPER')
 local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
@@ -1467,6 +1468,39 @@ function _hasContextMenuItems(object)
     end
 end
 
+local _purgeCardNameSet = false
+function _isPurgableCard(cardName)
+    if not _purgeCardNameSet then
+        -- Initialize with Relics.
+        _purgeCardNameSet = {
+            ['Dominus Orb'] = true,
+            ['Enigmatic Device (1)'] = true,
+            ['Enigmatic Device (2)'] = true,
+            ['Maw of Worlds'] = true,
+            ['The Codex'] = true,
+        }
+
+        -- Add attachment cards.
+        for _, cardName in ipairs(_exploreHelper.getAttachmentCardNames()) do
+            _purgeCardNameSet[cardName] = true
+        end
+
+        -- Add Relic Fragments.
+        for deckName, attributes in pairs(DECKS) do
+            if string.match(deckName, ' Exploration$') then
+                for _, cardNames in pairs(attributes.cardNames) do
+                    for _, cardName in ipairs(cardNames) do
+                        if string.match(cardName, '^.* Relic Fragment %(.*%)$') then
+                            _purgeCardNameSet[cardName] = true
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return _purgeCardNameSet[cardName]
+end
+
 function _applyContextMenuItems(object)
     local objectName = object.getName()
     local deckName = object.tag == 'Card' and getDeckName(objectName)
@@ -1478,48 +1512,7 @@ function _applyContextMenuItems(object)
         object.addContextMenuItem('Score Objective', function(playerColor) _scoreObjective(playerColor, object) end, false)
     end
 
-    local purgable = false
-    if deckName then
-        if string.match(deckName, ' Exploration$') then
-            if string.match(objectName, '^.* Relic Fragment %(.*%)$') then
-                purgable = true
-            else
-                local purgeSet = {
-                    ['Gamma Wormhole'] = true,
-                    ['Gamma Relay'] = true,
-                    ['Enigmatic Device (1)'] = true,
-                    ['Enigmatic Device (2)'] = true,
-                    ['Mirage (Exploration)'] = true,
-                    ["Propulsion Research Facility"] = true,
-                    ["Cybernetic Research Facility"] = true,
-                    ["Biotic Research Facility"] = true,
-                    ["Warfare Research Facility"] = true,
-                    ["Lazax Survivors"] = true,
-                    ["Rich World"] = true,
-                    ["Mining World"] = true,
-                    ["Dyson Sphere"] = true,
-                    ["Paradise World"] = true,
-                    ["Tomb of Emphidia"] = true,
-                    ["Demilitarized Zone (PoK)"] = true,
-                    ["Gamma Wormhole"] = true,
-                    ["Gamma Relay"] = true,
-                    ["Mirage (Exploration)"] = true,
-                    ["Ion Storm"] = true,
-                    ["Stellar Converter"] = true,
-                }
-                purgable = purgeSet[objectName]
-            end
-        elseif deckName == 'Relics' then
-            local purgeSet = {
-                ['The Codex'] = true,
-                ['Maw of Worlds'] = true,
-                ['Dominus Orb'] = true,
-                ['Stellar Converter'] = true,
-            }
-            purgable = purgeSet[objectName]
-        end
-    end
-    if purgable then
+    if object.tag == 'Card' and _isPurgableCard(object.getName()) then
         object.addContextMenuItem('Purge Card', function(playerColor) _purgeCard(object) end)
     end
 

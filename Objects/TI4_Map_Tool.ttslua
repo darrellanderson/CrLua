@@ -107,6 +107,7 @@ function onLoad(saveState)
     self.addContextMenuItem('Add Clone To Tiles', addCloneMenuOptionToSystemTiles)
     self.addContextMenuItem('Rotate Map 180', rotateMap180)
     self.addContextMenuItem('Rotate Hyperlanes 180', rotateHyperlanes)
+    self.addContextMenuItem('Spawn Premade Map', spawnPremadeMap)
 
     -- If any clones are still on the table, add them to the systems table.
     _clones = (saveState and string.len(saveState) > 0 and JSON.decode(saveState)) or {}
@@ -1379,7 +1380,41 @@ function _moveHomeSystems(buildList)
             })
         end
     end
+end
 
+-------------------------------------------------------------------------------
+
+function spawnPremadeMap()
+    startLuaCoroutine(self, 'spawnPremadeMapCoroutine')
+end
+
+function spawnPremadeMapCoroutine()
+    saveTilesCoroutine()
+
+    local mapString = getMapString()
+    local commaDelimited = string.gsub(mapString, ' ', ',')
+    local url = 'http://ti4-card-images.appspot.com/map?tiles=' .. commaDelimited
+    print('url ' .. url)
+
+    local params = {
+        image = url,
+        type = 3, -- rounded
+        thickness = 0.1,
+    }
+    local tile = spawnObject({
+        type              = 'Custom_Tile',
+        position          = self.getPosition() + vector(0, 3, 0),
+        rotation          = self.getRotation(),
+        scale             = { x = 5.67, y = 1, z = 5.67 },
+        sound             = false,
+        params            = params,
+        snap_to_grid      = false
+    })
+    tile.setCustomObject(params)
+    tile.setName('MAP')
+    tile.setDescription(mapString)
+
+    return 1
 end
 
 -------------------------------------------------------------------------------

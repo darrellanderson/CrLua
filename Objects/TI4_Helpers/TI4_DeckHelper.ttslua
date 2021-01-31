@@ -695,18 +695,19 @@ function getDeckWithReshuffle(name)
         local deckDiscardTransform = _getTransform(deckAttributes, 'discard')
         local deckDiscard = _getDeck(deckDiscardTransform)
         if deckDiscard then
-            local bounds = deckDiscard.getBoundsNormalized()
-            local collide = false
-            local fast = true
             deckDiscard.setPosition({
                 x = deckTransform.position.x,
-                y = deckTransform.position.y + bounds.size.y / 2,
+                y = deckDiscard.getPosition().y,
                 z = deckTransform.position.z
-            }, collide, fast)
+            })
             deckDiscard.setRotation(deckTransform.rotation)
-            Wait.time(function() deckDiscard.setName(deckAttributes.deckName) end, 1)
+            deckDiscard.setName(deckAttributes.deckName)
             if deckDiscard.tag == 'Deck' then
                 deckDiscard.shuffle()
+            end
+            if _hasContextMenuItems(deckDiscard) then
+                deckDiscard.clearContextMenu()
+                _applyContextMenuItems(deckDiscard)
             end
             deck = deckDiscard
         end

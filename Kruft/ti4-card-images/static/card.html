@@ -25,6 +25,7 @@
                     <option value="stage2">Stage 2 Public Objective</option>
                     <option value="stage2-c">Stage 2 Public Objective (clean)</option>
                     <option value="stage2_pok">Stage 2 Public Objective (PoK)</option>
+                    <option value="stage3-c">Stage 3 Public Objective (clean)</option>
                     <option value="agenda">Agenda</option>
                     <option value="agenda-c">Agenda (clean)</option>
                     <option value="promissory-c">Promissory (clean)</option>
@@ -226,7 +227,7 @@
             if (card.startsWith('secret')) {
                 document.getElementById("subtitleBlock").style.display = 'block';
             }
-            if (card.startsWith('agenda') || card.startsWith('stage1') || card.startsWith('stage2')) {
+            if (card.startsWith('agenda') || card.startsWith('stage')) {
                 document.getElementById("subtitleBlock").style.display = 'block';
                 document.getElementById("gradualBlock").style.display = 'block';
             }

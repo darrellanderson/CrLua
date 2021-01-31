@@ -25,15 +25,19 @@ function onSystemActivation(system)
     self.clearContextMenu()
     for _, planet in ipairs(system.planets or {}) do
         local function wrapper(clickerColor)
-            fetchPlanet(clickerColor, planet.name)
+            fetchPlanet(clickerColor, planet.name, false)
+            if planet.legendaryCard then
+                fetchPlanet(clickerColor, planet.legendaryCard, true)
+            end
         end
         self.addContextMenuItem('Fetch ' .. planet.name, wrapper)
     end
 end
 
-function fetchPlanet(clickerColor, planetName)
+function fetchPlanet(clickerColor, planetName, isLegendaryCard)
     assert(type(clickerColor) == 'string' and type(planetName) == 'string')
 
+    -- Find the card, src and dst zones.  Abort if not changing zone.
     local card = _findPlanetCard(planetName)
     if not card then
         printToColor('Unable to find "' .. planetName .. '" card', clickerColor, 'Red')
@@ -46,7 +50,12 @@ function fetchPlanet(clickerColor, planetName)
         return
     end
 
+    -- Report card motion to all players.
     local message = { 'Moving "' .. planetName .. '"' }
+    if srcPlayer and isLegendaryCard then
+        local state = card.is_face_down and 'exhausted' or 'ready'
+        table.insert(message, '(' .. state .. ')')
+    end
     if srcPlayer then
         table.insert(message, 'from ' .. srcPlayer)
     end
@@ -56,8 +65,18 @@ function fetchPlanet(clickerColor, planetName)
     message = table.concat(message, ' ')
     broadcastToAll(message, clickerColor)
 
+    -- Move card.
     local position = self.getPosition() + vector(0, 3, 0)
-    local rotation = { x= 0, y = self.getRotation().y, z = 0 }
+    local rotation = { x = 0, y = self.getRotation().y, z = 180 }
+    if isLegendaryCard then
+        position.y = position.y + 3
+        rotation.y = (rotation.y + 270) % 360
+        if srcPlayer then
+            rotation.z = card.getRotation().z  -- preserve face up
+        else
+            rotation.z = 0  -- comes face up
+        end
+    end
     local collide = false
     local fast = false
     card.setPositionSmooth(position, collide, fast)
@@ -71,6 +90,17 @@ function _findPlanetCard(planetName)
         end
     end
     local deck = getObjectFromGUID(_deckHelper.getDeck('Planets'))
+    for _, entry in ipairs(deck and deck.getObjects() or {}) do
+        if entry.name == planetName then
+            return deck.takeObject({
+                position          = deck.getPosition() + vector(0, 3, 0),
+                rotation          = deck.getRotation(),
+                smooth            = false,
+                guid              = entry.guid
+            })
+        end
+    end
+    local deck = getObjectFromGUID(_deckHelper.getDeck('Legendary Planets'))
     for _, entry in ipairs(deck and deck.getObjects() or {}) do
         if entry.name == planetName then
             return deck.takeObject({

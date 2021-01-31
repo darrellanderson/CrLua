@@ -272,8 +272,16 @@ def publicObjectiveCard(level, title, type, body, footer, cardImage, titlesize, 
     color = (12, 12, 14, 255)
     draw.rectangle([(x, y), (x+w, y+h)], color)
 
+    textColor = False
+    if level == 1:
+        textColor = ImageColor.getrgb('#ffb732')
+    elif level == 2:
+        textColor = ImageColor.getrgb('#9999ff')
+    elif level == 3:
+        textColor = ImageColor.getrgb('#9a4eae')
+
     # TITLE
-    color = ImageColor.getrgb('#ffb732') if level == 1 else ImageColor.getrgb('#9999ff')
+    color = textColor
     font = FontData('HandelGothicDBold.otf', 43 + titlesize, color)
     textBlock = TextBlock()
     textBlock.setFont(font)
@@ -317,7 +325,7 @@ def publicObjectiveCard(level, title, type, body, footer, cardImage, titlesize, 
     # FOOTER
     items = footer.split('|')
     footer = items[0]
-    color = ImageColor.getrgb('#ffb732') if level == 1 else ImageColor.getrgb('#9999ff')
+    color = textColor
     font = FontData('HandelGothicDBold.otf', 32, color)
     textBlock = TextBlock()
     textBlock.setFont(font)
@@ -426,7 +434,7 @@ def agendaCard(title, type, body, cardImage, titlesize, fontsize, gradual):
             textBlock.setText(line.strip())
             y, _ = textBlock.draw(draw)
             y += textBlock._lineH * (PARAGRAPH_LINE_HEIGHT_SCALE - 1)
-            
+
     else:
         textBlock = TextBlock()
         textBlock.setCenterH(True)
@@ -648,6 +656,11 @@ CARD_OPTIONS = {
         'cardImage' : 'Stage2PoK.jpg',
         'back' : 'Stage2_Back.jpg',
     },
+    'stage3-c' : {
+        'cardType' : 'public3',
+        'cardImage' : 'Stage3_c.jpg',
+        'back' : 'Stage3_Back.jpg',
+    },
     'agenda' : {
         'cardType' : 'agenda',
         'cardImage' : 'Agenda.jpg',
@@ -736,6 +749,8 @@ class CardHandler(webapp2.RequestHandler):
                 jpg = publicObjectiveCard(1, title, type, body, footer, cardImage, titlesize, fontsize)
             elif cardType == 'public2':
                 jpg = publicObjectiveCard(2, title, type, body, footer, cardImage, titlesize, fontsize)
+            elif cardType == 'public3':
+                jpg = publicObjectiveCard(3, title, type, body, footer, cardImage, titlesize, fontsize)
             elif cardType == 'agenda':
                 jpg = agendaCard(title, type, body, cardImage, titlesize, fontsize, gradual == 'true')
             elif cardType == 'promissory':

@@ -1267,6 +1267,33 @@ function SetupFaction.unpack(faction, factionBox, zone, isFranken)
     return nameToObject
 end
 
+function SetupFaction.addLeaderSnapPoints(color)
+    assert(type(color) == 'string')
+
+    local function getLeaderSheet()
+        local leaderSheetName = 'Leader Sheet (' .. color .. ')'
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == leaderSheetName then
+                return object
+            end
+        end
+        error('unpack leaders: missing ' .. leaderSheetName)
+    end
+    local leaderSheet = getLeaderSheet()
+    coroutine.yield(0)
+
+    -- Add snap points.
+    local snapPoints = {}
+    for _, offset in pairs(SetupFaction.LEADER_OFFSET) do
+        table.insert(snapPoints, {
+            position = { x = offset.x or 0, y = offset.y or 0, z = offset.z or 0 },
+            rotation = { x = 0, y = 0, z = 0},
+            rotation_snap = true
+        })
+    end
+    leaderSheet.setSnapPoints(snapPoints)
+end
+
 function SetupFaction.unpackLeaders(color, faction, factionBox)
     assert(type(color) == 'string' and type(faction) == 'table' and type(factionBox) == 'userdata')
     if not _includePoK then
@@ -1284,17 +1311,6 @@ function SetupFaction.unpackLeaders(color, faction, factionBox)
         error('unpack leaders: missing ' .. leaderSheetName)
     end
     local leaderSheet = getLeaderSheet()
-
-    -- Add snap points.
-    local snapPoints = {}
-    for _, offset in pairs(SetupFaction.LEADER_OFFSET) do
-        table.insert(snapPoints, {
-            position = { x = offset.x or 0, y = offset.y or 0, z = offset.z or 0 },
-            rotation = { x = 0, y = 0, z = 0},
-            rotation_snap = true
-        })
-    end
-    leaderSheet.setSnapPoints(snapPoints)
     coroutine.yield(0)
 
     local function getLeaderBag()
@@ -1915,8 +1931,12 @@ function unpackFactionCoroutine()
         coroutine.yield(0)
     end
 
-    SetupFaction.unpackLeaders(color, faction, factionBox)
-    coroutine.yield(0)
+    if _includePoK then
+        SetupFaction.addLeaderSnapPoints(color)
+        coroutine.yield(0)
+        SetupFaction.unpackLeaders(color, faction, factionBox)
+        coroutine.yield(0)
+    end
 
     -- Make sure the faction helper knows about the faction before unpacking tokens.
     _factionHelper.updateFactions()
@@ -2107,6 +2127,7 @@ function unpackFrankenCoroutine()
     local color = params.color
     local zoneAttributes = _zoneHelper.zoneAttributes(color)
 
+    local factionSheet
     if params.factionTokenName then
         local faction = _factionHelper.fromTokenName(params.factionTokenName)
         local factionBox, factionBoxSrc = SetupFaction.unpackFactionBox(faction, zoneAttributes)
@@ -2122,23 +2143,30 @@ function unpackFrankenCoroutine()
         local nameToObject = SetupFaction.unpack(faction, factionBox, zoneAttributes, true)
         local commandTokensBag = nameToObject[faction.tokenName .. ' Command Tokens Bag']
         local ownerTokensBag = nameToObject[faction.tokenName .. ' Owner Tokens Bag']
-        local factionSheet = nameToObject[faction.name .. ' Sheet']
+        factionSheet = nameToObject[faction.name .. ' Sheet']
         nameToObject = nil
         while commandTokensBag.spawning or ownerTokensBag.spawning do
             coroutine.yield(0)
         end
         coroutine.yield(0)
 
-        if factionSheet then
-            SetupFaction.addFactionSheetUnitUpgradeSnapPoints(factionSheet)
-            coroutine.yield(0)
-        end
-
         if factionBoxSrc then
             factionBoxSrc.putObject(factionBox)
             coroutine.yield(0)
         end
         factionBox = nil
+    else
+        local faction = _factionHelper.fromColor(color)
+        factionSheet = faction and getObjectFromGUID(faction.factionSheetGuid)
+    end
+
+    if _includePoK then
+        SetupFaction.addLeaderSnapPoints(color)
+        coroutine.yield(0)
+    end
+    if factionSheet then
+        SetupFaction.addFactionSheetUnitUpgradeSnapPoints(factionSheet)
+        coroutine.yield(0)
     end
 
     local commandTokensBag = false

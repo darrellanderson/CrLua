@@ -233,6 +233,8 @@ function _createNavButtons(currentPanelImageType)
     local x = x0
     local z = z0
 
+    local defaultColor = { r = 1, g = 1, b = 1 }
+
     self.createButton({
         click_function = 'onClickBack',
         function_owner = self,
@@ -243,7 +245,7 @@ function _createNavButtons(currentPanelImageType)
         width          = w * scaleUpScaleDown,
         height         = h * scaleUpScaleDown,
         font_size      = fontSize * scaleUpScaleDown,
-        color          = nil,
+        color          = defaultColor,
         font_color     = nil,
         hover_color    = nil,
         press_color    = nil,
@@ -260,7 +262,7 @@ function _createNavButtons(currentPanelImageType)
         width          = w * scaleUpScaleDown,
         height         = h * scaleUpScaleDown,
         font_size      = fontSize * scaleUpScaleDown,
-        color          = currentPanelImageType == 'BaseInfo' and activeColor or nil,
+        color          = currentPanelImageType == 'BaseInfo' and activeColor or defaultColor,
         font_color     = nil,
         hover_color    = nil,
         press_color    = nil,
@@ -277,7 +279,7 @@ function _createNavButtons(currentPanelImageType)
         width          = w * scaleUpScaleDown,
         height         = h * scaleUpScaleDown,
         font_size      = fontSize * scaleUpScaleDown,
-        color          = currentPanelImageType == 'ExtraInfo' and activeColor or nil,
+        color          = currentPanelImageType == 'ExtraInfo' and activeColor or defaultColor,
         font_color     = nil,
         hover_color    = nil,
         press_color    = nil,
@@ -294,7 +296,7 @@ function _createNavButtons(currentPanelImageType)
         width          = w * scaleUpScaleDown,
         height         = h * scaleUpScaleDown,
         font_size      = fontSize * scaleUpScaleDown,
-        color          = nil,
+        color          = defaultColor,
         font_color     = nil,
         hover_color    = nil,
         press_color    = nil,

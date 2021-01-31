@@ -290,7 +290,7 @@ All other secondaries consume a (non fleet) strategy token (in strat. pool).
 Politics - Speaker: Moves speaker token, Draws 2 Action and Agendas. - Sec.: draws 2 Actioncards
 Construction - Allocate constructed units.
 Trade - Prim.: Allocates 3 resources, Refreshes commodities (removes all from comm. pool and gain correct #)
-- Color: Refreshes colors commodities - Sec.: Refreshes your commodities (without consuming the token as "Master of Trade"(Hacan))
+- Color: Refreshes colors commodities - Sec.: Refreshes your commodities (does not use a command token as "Master of Trade"(Hacan))
 Tech: Draws the card from tech deck, use Tech Board if available.
 - Faction Tech: Opens a choice popup - Comm Tokens: gain tokens as Necro.
 Imperial - Score: Only writes message - Secret: Draws secret. - Secondary: Draws secret.
@@ -370,7 +370,7 @@ function onLoad()
 	--Description on Back of the Object.
 	self.UI.setXmlTable({backManual})
 	local descriptionText = [[
-	Please click 'Update UI' to enable automation and no modify strategy card windows (such as choosing speaker, faction techology menus).
+	Please click 'Update UI' to enable automation and to modify strategy card windows (such as choosing speaker, faction techology menus).
 
 	Secondary actions consume a command token.
 
@@ -496,7 +496,6 @@ function onStrategyCardButtonClicked(params)
 	end
 
 	-------------------------- Diplomacy ---------------------------------------
-	-------------------------- Construction ------------------------------------
 	-------------------------- warfare -----------------------------------------
 	if (card == "diplomacy") or (card == "warfare") then
 		-- only keep open if secondary was not successful
@@ -553,7 +552,7 @@ function onStrategyCardButtonClicked(params)
 		end
 	end
 
-	--------------------------  Trade ------------------------------------------
+	-------------------------- Construction ------------------------------------
 
 	if card == "construction" then
 		local constructionSuccessful = false
@@ -573,6 +572,8 @@ function onStrategyCardButtonClicked(params)
 		end
 		return
 	end
+
+	--------------------------  Trade ------------------------------------------
 
 	if card == "trade" then
 		if action == "primary" then

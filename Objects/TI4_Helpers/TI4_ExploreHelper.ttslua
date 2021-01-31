@@ -781,7 +781,6 @@ function AttachLib.anchor(attachTokenObject)
                         z = localPosition.z + math.sin(phi) * r
                     }
                 end
-                break
             end
         end
     end
@@ -791,6 +790,10 @@ function AttachLib.anchor(attachTokenObject)
     end
     local position = systemObject.positionToWorld(localPosition)
     position.y = position.y + 0.1  -- y was top of tile, move slightly above
+    -- Mirage is also an attachment, move a little further up on top of it.
+    if planetName == 'Mirage' then
+        position.y = position.y + 0.2
+    end
     systemObject.setLock(true)
     local collide = false
     local fast = true

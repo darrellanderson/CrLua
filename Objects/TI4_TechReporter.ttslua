@@ -6,10 +6,11 @@
 local SHEET_ID = '1NZZfHxZ9ATRrWSTjJEQmc_K9Ofeguc2bY3fcjUodfRA'
 local SHEET_NAME = 'Sheet1'
 
-local WRITE_COLUMN_LABELS = true
+local WRITE_COLUMN_LABELS = false
 local REQUIRE_N_TECHS = 10
 
 local _factionHelper = false
+local _setupHelper = false
 local _techHelper = false
 local _unitHelper = false
 local _zoneHelper = false
@@ -18,6 +19,7 @@ local _data = false
 
 function onLoad(saveState)
     _factionHelper = CrLua.TTS.HelperClient.get('TI4_FACTION_HELPER')
+    _setupHelper = CrLua.TTS.HelperClient.get('TI4_SETUP_HELPER')
     _techHelper = CrLua.TTS.HelperClient.get('TI4_TECHNOLOGY_HELPER')
     _unitHelper = CrLua.TTS.HelperClient.get('TI4_UNIT_HELPER')
     _zoneHelper = CrLua.TTS.HelperClient.get('TI4_ZONE_HELPER')
@@ -159,7 +161,7 @@ function submitTechnologies()
     local techToColumn = {}
     for i, tech in ipairs(techOrder) do
         assert(not techToColumn[tech])
-        techToColumn[tech] = getColumn(i + 3) -- reserve timestamp, faction, score
+        techToColumn[tech] = getColumn(i + 5) -- reserve timestamp, faction, score, setup time, reserved
     end
 
     -- Column labels.
@@ -167,6 +169,8 @@ function submitTechnologies()
         cells['A1'] = 'TIMESTAMP (UTC)'
         cells['B1'] = 'FACTION'
         cells['C1'] = 'SCORE'
+        cells['D1'] = 'TIME (SECONDS)'
+        cells['E1'] = 'RESERVED'
         for tech, col in pairs(techToColumn) do
             cells[col .. '1'] = tech
         end
@@ -174,6 +178,7 @@ function submitTechnologies()
 
     -- Fill special columns.
     local timestamp = os.date("!%c")
+    local gameTimeSeconds = math.floor(_setupHelper.getGameLengthSeconds())
     local nameToScoreObjects = CrLua.TI4.PlayerScore.getNameToScoreObjects()
     local nameToOwnerTokens = CrLua.TI4.PlayerScore.nameToOwnerTokens(nameToScoreObjects)
     local colorToScore = CrLua.TI4.PlayerScore.colorToScore(nameToScoreObjects, nameToOwnerTokens)
@@ -181,8 +186,8 @@ function submitTechnologies()
         cells['A' .. row] = timestamp
         local faction = _factionHelper.fromColor(color)
         cells['B' .. row] = faction and faction.tokenName or '-'
-        local score = colorToScore[color] or 0
-        cells['C' .. row] = score
+        cells['C' .. row] = colorToScore[color] or 0
+        cells['D' .. row] = gameTimeSeconds
     end
 
     -- On to the tech.  Initialize with zeros.

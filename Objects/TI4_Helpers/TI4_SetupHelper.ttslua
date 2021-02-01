@@ -240,7 +240,10 @@ local function isPutPending()
 end
 
 function onObjectDestroy(dyingObject)
-    _putPendingGuidSet[dyingObject.getGUID()] = nil
+    local guid = dyingObject.getGUID()
+    if guid and _putPendingGuidSet[guid] then
+        _putPendingGuidSet[guid] = nil
+    end
 end
 
 -------------------------------------------------------------------------------

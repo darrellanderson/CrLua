@@ -1248,7 +1248,10 @@ function onObjectPickUp(_, pickedUpObject)
 end
 
 function onObjectDestroy(dyingObject)
-    _animatingGuids[dyingObject.getGUID()] = nil
+    local guid = dyingObject.getGUID()
+    if guid and _animatingGuids[guid] then
+        _animatingGuids[guid] = nil
+    end
 end
 
 

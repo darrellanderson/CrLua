@@ -135,7 +135,10 @@ end
 -------------------------------------------------------------------------------
 
 function onObjectDestroy(dyingObject)
-    _hasCloneMenuGuidSet[dyingObject.getGUID()] = nil
+    local guid = dyingObject.getGUID()
+    if guid and _hasCloneMenuGuidSet[guid] then
+        _hasCloneMenuGuidSet[guid] = nil
+    end
 end
 
 function addCloneMenuOptionToSystemTiles()

@@ -893,7 +893,7 @@ end
 
 function _clearUnallocatedCommandToken(object)
     local guid = object.getGUID()
-    if _allocatedTokenGuidToColor[guid] then
+    if guid and _allocatedTokenGuidToColor[guid] then
         _allocatedTokenGuidToColor[guid] = nil
         _resetUnallocatedCommandTokenSignal()
     end
@@ -973,7 +973,10 @@ function onObjectPickUp(playerColor, pickedUpObject)
 end
 
 function onObjectDestroy(dyingObject)
-    _putTokenGuidSet[dyingObject.getGUID()] = nil
+    local guid = dyingObject.getGUID()
+    if guid and _putTokenGuidSet[guid] then
+        _putTokenGuidSet[guid] = nil
+    end
     _clearUnallocatedCommandToken(dyingObject)
 end
 

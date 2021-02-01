@@ -206,6 +206,7 @@ local SetupPlayerTools = {
 local SetupFranken = {}
 local SetupCards = {}
 
+local _setupTime = false  -- use os.time() for a durable epoch-based timestamp, Time.time resets on TTS load
 local _includePoK = false
 local _putPendingGuidSet = {}
 local _deletedItemsBagGuid = false
@@ -219,6 +220,10 @@ end
 
 function getPoK()
     return _includePoK
+end
+
+function getGameLengthSeconds()
+    return _setupTime and math.max(os.time() - _setupTime, 0)
 end
 
 -------------------------------------------------------------------------------
@@ -1094,6 +1099,7 @@ function setup(params)
     assert(not params.includePoK or type(params.includePoK) == 'boolean')
     assert(not params.playerTools or type(params.playerTools) == 'boolean')
 
+    _setupTime = os.time()
     setPoK(params.includePoK or false)
 
     table.insert(_setupQueue, params)
@@ -2527,6 +2533,7 @@ function onLoad(saveState)
 
     local saveState = saveState and string.len(saveState) > 0 and JSON.decode(saveState)
     if saveState then
+        _setupTime = saveState._setupTime
         _includePoK = saveState._includePoK
     end
 
@@ -2535,6 +2542,7 @@ end
 
 function onSave()
     return JSON.encode({
+        _setupTime = _setupTime,
         _includePoK = _includePoK
     })
 end

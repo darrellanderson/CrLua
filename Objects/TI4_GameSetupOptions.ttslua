@@ -802,6 +802,7 @@ function packSelfIntoSetupBag()
     if tutorial then
         setupBag.putObject(tutorial)
     end
+    self.setLock(false)
     setupBag.putObject(self)
 end
 

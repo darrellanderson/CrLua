@@ -47,7 +47,6 @@ local PRINT_DEBUG_LOG_MESSAGES = false
 local SetupGeneric = {
     NAME_TO_PLAYER_ZONE_OFFSET = {
         ['^Technology Cards$'] = { x = 10, z = 2 },
-        --['^TI4 Unpacker$'] = { x = -10, z = 2 },
         ['Faction Selector'] = { x = 2.5, z = 11, lock = true },
         ['^Here/AFK$'] = { x = 1, z = 2 },
 
@@ -58,9 +57,9 @@ local SetupGeneric = {
         ['^Any Afters%?$'] = { x = -0.6, z = 3 },
     },
     NAME_TO_AGENDA_ZONE_OFFSET = {
-        ['^For:$'] = { x = 4.25, y = 0.3, lock = true },
-        ['^Against:$'] = { x = -4.25, y = 0.3, lock = true },
-        ['^Votes$'] = { x = -9 },
+        ['^For:$'] = { x = -4.25, y = 0.3, lock = true },
+        ['^Against:$'] = { x = 4.25, y = 0.3, lock = true },
+        ['^Votes$'] = { x = 9 },
         ['^Speaker Token %- Agenda$'] = { x = 0, y = 0.3, yRot = 180 },
     },
     NAME_TO_TABLE_POSITIONS = {
@@ -71,37 +70,37 @@ local SetupGeneric = {
             { x = 26.50, y = -0.19, z = 9, lock = true, dx = 1.5, dz = 7.5 }
         },
         ['^x3 Commodities/Tradegoods$'] = {
-            { x = -29.50, y = -0.19, z = -1.5, lock = true, dx = -5 },
+            { x = -29.50, y = -0.19, z = -1.5, lock = true, dx = -5, dz = 6 },
             { x = 29.50, y = -0.19, z = 3, lock = true, dx = 5 },
             bagName = 'x3 Commodities/Tradegoods Bag', -- create bag around token
             bagColor = 'E6E42B',
         },
         ['^x1 Commodities/Tradegoods$'] = {
-            { x = -29.50, y = -0.19, z = 1.5, lock = true, dx = -5 },
+            { x = -29.50, y = -0.19, z = 1.5, lock = true, dx = -5, dz = 6 },
             { x = 29.50, y = -0.19, z = 6, lock = true, dx = 5 },
             bagName = 'x1 Commodities/Tradegoods Bag', -- create bag around token
             bagColor = 'E6E42B',
         },
         ['^x3 Fighter Token$'] = {
-            { x = -26.50, y = -0.19, z = -1.5, lock = true, dx = -5 },
+            { x = -26.50, y = -0.19, z = -1.5, lock = true, dx = -5, dz = 6 },
             { x = 26.50, y = -0.19, z = 3, lock = true, dx = 5 },
             bagName = 'x3 Fighter Tokens Bag', -- create bag around token
             bagColor = '1E87FF',
         },
         ['^x1 Fighter Token$'] = {
-            { x = -26.50, y = -0.19, z = 1.5, lock = true, dx = -5 },
+            { x = -26.50, y = -0.19, z = 1.5, lock = true, dx = -5, dz = 6 },
             { x = 26.50, y = -0.19, z = 6, lock = true, dx = 5 },
             bagName = 'x1 Fighter Tokens Bag', -- create bag around token
             bagColor = '1E87FF',
         },
         ['^x3 Infantry Token$'] = {
-            { x = -23.50, y = -0.19, z = -1.5, lock = true, dx = -5 },
+            { x = -23.50, y = -0.19, z = -1.5, lock = true, dx = -5, dz = 6 },
             { x = 23.50, y = -0.19, z = 3, lock = true, dx = 5 },
             bagName = 'x3 Infantry Tokens Bag', -- create bag around token
             bagColor = 'F3631C',
         },
         ['^x1 Infantry Token$'] = {
-            { x = -23.50, y = -0.19, z = 1.5, lock = true, dx = -5 },
+            { x = -23.50, y = -0.19, z = 1.5, lock = true, dx = -5, dz = 6 },
             { x = 23.50, y = -0.19, z = 6, lock = true, dx = 5 },
             bagName = 'x1 Infantry Tokens Bag', -- create bag around token
             bagColor = 'F3631C',
@@ -317,10 +316,14 @@ end
 -- @return table : {x,y,z}.
 local function offsetPosition(position, offset)
     assert(type(position) == 'table' and type(offset) == 'table')
+    local dir = position.z > 0 and 1 or -1
+    if math.abs(position.z) < 1 then
+        dir = 1 -- close enough to center, use "natural" direction
+    end
     return {
-        x = position.x + (offset.x or 0) * (position.z > 0 and 1 or -1),
+        x = position.x + (offset.x or 0) * dir,
         y = position.y + (offset.y or 0),
-        z = position.z + (offset.z or 0) * (position.z > 0 and 1 or -1)
+        z = position.z + (offset.z or 0) * dir
     }
 end
 

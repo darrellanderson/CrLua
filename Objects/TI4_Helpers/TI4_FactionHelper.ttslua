@@ -678,7 +678,7 @@ local _factionAttributes = {
 }
 
 local _colorToFaction = {}
-local _tokenNameToFaction = {}
+local _lowerTokenNameToFaction = {}
 
 local _update = {
     time = false,
@@ -715,7 +715,7 @@ function fromTokenName(tokenName)
     tokenName = string.match(tokenName, '^(.*) .* Token$') or tokenName
     if string.len(tokenName) > 0 then
         _maybeUpdateFactions()
-        return _tokenNameToFaction[tokenName]
+        return _lowerTokenNameToFaction[string.lower(tokenName)]
     end
 end
 
@@ -868,10 +868,12 @@ function injectFaction(faction)
     end
 
     _factionAttributes[faction.name] = faction
-    _tokenNameToFaction[faction.name] = faction  -- some Franken components use
-    _tokenNameToFaction[faction.tokenName] = faction
-    if faction.frankenName and not _tokenNameToFaction[faction.frankenName] then
-        _tokenNameToFaction[faction.frankenName] = _tokenNameToFaction[faction.tokenName]
+    _lowerTokenNameToFaction[string.lower(faction.name)] = faction  -- index by all name flavors
+    if faction.tokenName then
+        _lowerTokenNameToFaction[string.lower(faction.tokenName)] = faction
+    end
+    if faction.frankenName then
+        _lowerTokenNameToFaction[string.lower(faction.frankenName)] = faction
     end
 end
 
@@ -980,6 +982,7 @@ function updateFactions()
     local guidToPosition = {}
     local commanderGuidToPosition = {}
     local heroGuidToPosition = {}
+    local commodityTileGuidToFactionTokenName = {}
     for _, object in ipairs(getAllObjects()) do
         local name = object.getName()
         local guid = object.getGUID()
@@ -1016,6 +1019,13 @@ function updateFactions()
             end
             if (object.tag == 'Tile' or object.tag == 'Card') and heroSet[name] then
                 heroGuidToPosition[guid] = object.getPosition()
+            end
+            local tileFactionName = string.match(name, '^(.*) Commodities$')
+            if tileFactionName then
+                guidToName[guid] = name
+                guidToPosition[guid] = object.getPosition()
+                commodityTileGuidToFactionTokenName[guid] = tileFactionName
+                -- do not attempt to get faction, that table is updated later
             end
         end
     end
@@ -1080,7 +1090,7 @@ function updateFactions()
     local colorToFactionSheetGuid = colorToClosestKey(factionSheetGuidToFactionSheet)
 
     _colorToFaction = {}
-    _tokenNameToFaction = {}
+    _lowerTokenNameToFaction = {}
     for color, factionSheetGuid in pairs(colorToFactionSheetGuid) do
         local factionName = factionSheetGuidToFactionName[factionSheetGuid]
         local attributes = {
@@ -1092,21 +1102,25 @@ function updateFactions()
             attributes[k] = v
         end
         _colorToFaction[color] = attributes
-        _tokenNameToFaction[attributes.tokenName] = attributes
+        _lowerTokenNameToFaction[string.lower(attributes.name)] = attributes
+        if attributes.tokenName then
+            _lowerTokenNameToFaction[string.lower(attributes.tokenName)] = attributes
+        end
+        if attributes.frankenName then
+            _lowerTokenNameToFaction[string.lower(attributes.frankenName)] = attributes
+        end
     end
 
     -- Add any missing factions to token name map.
     for factionName, attributes in pairs(_factionAttributes) do
-        if not _tokenNameToFaction[attributes.tokenName] then
-            _tokenNameToFaction[attributes.tokenName] = attributes
-        end
-    end
-
-    -- Also add using the Franken name (if different from token name).
-    -- The Franken name is the shorthand faction name for Franken tokens.
-    for factionName, attributes in pairs(_factionAttributes) do
-        if attributes.frankenName and not _tokenNameToFaction[attributes.frankenName] then
-            _tokenNameToFaction[attributes.frankenName] = _tokenNameToFaction[attributes.tokenName]
+        if not _lowerTokenNameToFaction[string.lower(attributes.tokenName)] then
+            _lowerTokenNameToFaction[string.lower(attributes.name)] = attributes
+            if attributes.tokenName then
+                _lowerTokenNameToFaction[string.lower(attributes.tokenName)] = attributes
+            end
+            if attributes.frankenName then
+                _lowerTokenNameToFaction[string.lower(attributes.frankenName)] = attributes
+            end
         end
     end
 
@@ -1136,6 +1150,7 @@ function updateFactions()
             faction.flagship = '?'
             faction.abilities = {}
             faction.units = {}
+            faction.commodities = false
             for guid, tileColor in pairs(guidToColor) do
                 local name = guidToName[guid]
                 if color == tileColor then
@@ -1143,6 +1158,10 @@ function updateFactions()
                         faction.flagship = name
                     elseif abilitySet[name] then
                         table.insert(faction.abilities, name)
+                    elseif commodityTileGuidToFactionTokenName[guid] then
+                        local tileFactionTokenName = commodityTileGuidToFactionTokenName[guid]
+                        local tileFaction = fromTokenName(tileFactionTokenName)
+                        faction.commodities = _factionAttributes[tileFaction.name].commodities
                     end
                 end
             end
@@ -2193,6 +2212,7 @@ function reportFactions()
                 'units={' .. table.concat(faction.units or {}, ', ') .. '}',
                 'commander={' .. (faction.commander or '-') .. '}',
                 'hero={' .. (faction.hero or '-') .. '}',
+                'commodities={' .. (faction.commodities or '-') .. '}',
             }, ' '))
         end
     end

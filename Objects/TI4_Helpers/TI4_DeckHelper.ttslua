@@ -622,6 +622,34 @@ local function _getDeckAttributes(cardName)
                 end
             end
         end
+        -- Add generic promissory notes, attributes point to color.
+        local genericPromissoryNotes = {
+            'Alliance ($COLOR)',
+            'Ceasefire ($COLOR)',
+            'Political Secret ($COLOR)',
+            'Support for the Throne ($COLOR)',
+            'Trade Agreement ($COLOR)',
+        }
+        for _, color in ipairs(Player.getColors()) do
+            local attributes = {
+                transform = {}, -- compute on demand
+                color = color
+            }
+            for _, cardName in ipairs(genericPromissoryNotes) do
+                cardName = string.gsub(cardName, '$COLOR', color)
+                _lowerCardNameToDeckAttributes[string.lower(cardName)] = attributes
+            end
+        end
+        -- Add faction promissory notes, attributes point to faction name.
+        for _, faction in pairs(_factionHelper.allFactions(true)) do
+            local attributes = {
+                transform = {}, -- compute on demand
+                factionName = faction.factionName
+            }
+            for _, cardName in ipairs(faction.promissoryNotes or {}) do
+                _lowerCardNameToDeckAttributes[string.lower(cardName)] = attributes
+            end
+        end
     end
     return _lowerCardNameToDeckAttributes[string.lower(cardName)]
 end
@@ -651,6 +679,52 @@ local function _getTransform(deckAttributes, deckOrDiscard)
                 z = transform.rotation.z + (parentRot and parentRot.z or 0),
             }
         }
+    end
+
+    -- Special case faction/color to current hand position.
+    if deckOrDiscard == 'player' then
+        local dealToColor = false
+        if deckAttributes.color then
+            dealToColor = deckAttributes.color
+        end
+        if deckAttributes.factionName then
+            local faction = _factionHelper.fromTokenName(deckAttributes.factionName)
+            dealToColor = faction.color
+        end
+        local zone = _zoneHelper.zoneAttributes(dealToColor)
+        if zone then
+            -- First look for a hand.
+            for _, player in ipairs(Player.getPlayers()) do
+                if player.color == dealToColor and player.getHandCount() > 0 then
+                    local hand = player.getHandTransform(1)
+                    return {
+                        position = {
+                            x = hand.position.x,
+                            y = hand.position.y,
+                            z = hand.position.z,
+                        },
+                        rotation = {
+                            x = 0,
+                            y = zone.rotation.y, -- hand rotation is flipped, use zone
+                            z = 0,
+                        }
+                    }
+                end
+            end
+            -- If no hand, use zone.
+            return {
+                position = {
+                    x = zone.center.x,
+                    y = zone.center.y,
+                    z = zone.center.z,
+                },
+                rotation = {
+                    x = 0,
+                    y = zone.rotation.y,
+                    z = 0
+                }
+            }
+        end
     end
 end
 
@@ -806,12 +880,14 @@ function _processCardDiscardQueue()
         return
     end
 
+    -- Where to put it?  Must be a transform to be a take object parameter.
     local deckAttributes = assert(params.deckAttributes)
     local transform = _getTransform(deckAttributes, 'discard')
+    transform = transform or _getTransform(deckAttributes, 'deck')
+    transform = transform or _getTransform(deckAttributes, 'player')
     if not transform then
-        transform = _getTransform(deckAttributes, 'deck')
+        error('Unable to find destination for "' .. params.name .. '"')
     end
-
     transform.position.y = transform.position.y + 5 + (params.index or 0) / 10
 
     local container = false

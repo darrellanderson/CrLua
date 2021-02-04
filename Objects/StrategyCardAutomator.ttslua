@@ -233,7 +233,7 @@ local _customLayout = {
 			id = "COLORPLACEHOLDERCARDPLACEHOLDERSecondaryPopup",
 			--height = "150",
 			height = "300",
-			offsetXY="1000 -80",
+			offsetXY="1400 -80",
 			active="false",
 			visibility=""
 		},
@@ -549,6 +549,9 @@ function onStrategyCardButtonClicked(params)
 		
 		local i,j
 		i,j = string.find(option," %[.*%]")
+		log('test')
+		log(option)
+		log(i)
 		if i and i<j then
 			localoption = string.sub(option,1,i-1)
 			option = "A "..string.sub(option,i+2,j-1)
@@ -671,7 +674,7 @@ function onStrategyCardButtonClicked(params)
 	if card == "technology" then
 		-- we only have action == "generic" to work with here.
 
-		if action == "primary" or action == "secondary" then
+		if action == "primary" or ((action == "secondary") and secondarySuccessful) then
 			_openPopupUi(color, "technologyPopup")
 			_closeMenu(color, card)
 		end
@@ -1086,7 +1089,6 @@ function _addSecondaryPopup(layout, colorTable)
 		optionsForColor[color] = {['Scepter of Emelpar']= true}
 		log(optionsForColor[color])
 	end
-	insertAll("Strategy Token")
 	local cardOptions = {["Jae Mir Kan"]= {}, ["Ssruu"]= {}}
 	local promissories = {'Acquiescence'}
 	local JaeMirKanFound = false
@@ -1117,7 +1119,8 @@ function _addSecondaryPopup(layout, colorTable)
 	for _,options in ipairs(optionsForColor) do
 		options["Ssruu"] = JaeMirKanFound and options["Ssruu"]
 	end
-
+	
+	insertAll("Strategy Token")
 	log("setting options:")
 	log(optionsForColor)
 
@@ -1497,15 +1500,15 @@ function _consumeStrategyToken(color, strategyCard)
 	local commandTokensBagName = faction.tokenName .. ' Command Tokens Bag'
 	local commandTokensBag = _getByName(commandTokensBagName, 'Bag')
 	
-	local altPayment = _getStrategytokenAlternativeSet(color)
+	-- local altPayment = _getStrategytokenAlternativeSet(color)
 
-	if altPayment then
-		altPayment = table.concat(altPayment, ', ')
-		_safeBroadcastToColor(strategyCard .. ': ' .. altPayment .. ' available to ' .. color .. ' instead of spending a strategy token.  To use it, retrieve the spent token and spend this instead.', color, color)
-		-- Proceed with normal payment.  This *could* return here and rely on
-		-- the player to spend the token, but if they're not paying attention
-		-- they may unintentionally not pay for following.
-	end
+	-- if altPayment then
+	-- 	altPayment = table.concat(altPayment, ', ')
+	-- 	_safeBroadcastToColor(strategyCard .. ': ' .. altPayment .. ' available to ' .. color .. ' instead of spending a strategy token.  To use it, retrieve the spent token and spend this instead.', color, color)
+	-- 	-- Proceed with normal payment.  This *could* return here and rely on
+	-- 	-- the player to spend the token, but if they're not paying attention
+	-- 	-- they may unintentionally not pay for following.
+	-- end
 
 	if not commandTokensBag then
 		broadcastToAll('Consume Strategy tokens: missing ' .. faction.tokenName .. ' Command Tokens Bag', 'Red')
@@ -1554,10 +1557,10 @@ function _useStrategytokenAlternative(color, strategyCard, option)
 		local object = _getByName(option, 'Card')
 		if (object ~= nil) and(not object.is_face_down) then
 			object.highlightOn("Yellow" , 3)
-			_safeBroadcastToColor(strategyCard .. ": used " .. option .. " for " .. color .. " instead of a strategy Token.", color, color)
+			_safeBroadcastToColor(strategyCard .. ": " .. color .. " used " .. option .. " instead of a strategy Token.", color, color)
 			return object.flip()
 		else
-			_safeBroadcastToColor(strategyCard .. ": " .. option .. " is not available to you.", color, color)
+			_safeBroadcastToColor(strategyCard .. ": " .. option .. " is not available to you.", color, "Red")
 			return false
 		end
 	end

@@ -47,7 +47,6 @@ local PRINT_DEBUG_LOG_MESSAGES = false
 local SetupGeneric = {
     NAME_TO_PLAYER_ZONE_OFFSET = {
         ['^Technology Cards$'] = { x = 10, z = 2 },
-        --['^TI4 Unpacker$'] = { x = -10, z = 2 },
         ['Faction Selector'] = { x = 2.5, z = 11, lock = true },
         ['^Here/AFK$'] = { x = 1, z = 2 },
 
@@ -58,9 +57,9 @@ local SetupGeneric = {
         ['^Any Afters%?$'] = { x = -0.6, z = 3 },
     },
     NAME_TO_AGENDA_ZONE_OFFSET = {
-        ['^For:$'] = { x = 4.25, y = 0.3, lock = true },
-        ['^Against:$'] = { x = -4.25, y = 0.3, lock = true },
-        ['^Votes$'] = { x = -9 },
+        ['^For:$'] = { x = -4.25, y = 0.3, lock = true },
+        ['^Against:$'] = { x = 4.25, y = 0.3, lock = true },
+        ['^Votes$'] = { x = 9 },
         ['^Speaker Token %- Agenda$'] = { x = 0, y = 0.3, yRot = 180 },
     },
     NAME_TO_TABLE_POSITIONS = {
@@ -71,37 +70,37 @@ local SetupGeneric = {
             { x = 26.50, y = -0.19, z = 9, lock = true, dx = 1.5, dz = 7.5 }
         },
         ['^x3 Commodities/Tradegoods$'] = {
-            { x = -29.50, y = -0.19, z = -1.5, lock = true, dx = -5 },
+            { x = -29.50, y = -0.19, z = -1.5, lock = true, dx = -5, dz = 6 },
             { x = 29.50, y = -0.19, z = 3, lock = true, dx = 5 },
             bagName = 'x3 Commodities/Tradegoods Bag', -- create bag around token
             bagColor = 'E6E42B',
         },
         ['^x1 Commodities/Tradegoods$'] = {
-            { x = -29.50, y = -0.19, z = 1.5, lock = true, dx = -5 },
+            { x = -29.50, y = -0.19, z = 1.5, lock = true, dx = -5, dz = 6 },
             { x = 29.50, y = -0.19, z = 6, lock = true, dx = 5 },
             bagName = 'x1 Commodities/Tradegoods Bag', -- create bag around token
             bagColor = 'E6E42B',
         },
         ['^x3 Fighter Token$'] = {
-            { x = -26.50, y = -0.19, z = -1.5, lock = true, dx = -5 },
+            { x = -26.50, y = -0.19, z = -1.5, lock = true, dx = -5, dz = 6 },
             { x = 26.50, y = -0.19, z = 3, lock = true, dx = 5 },
             bagName = 'x3 Fighter Tokens Bag', -- create bag around token
             bagColor = '1E87FF',
         },
         ['^x1 Fighter Token$'] = {
-            { x = -26.50, y = -0.19, z = 1.5, lock = true, dx = -5 },
+            { x = -26.50, y = -0.19, z = 1.5, lock = true, dx = -5, dz = 6 },
             { x = 26.50, y = -0.19, z = 6, lock = true, dx = 5 },
             bagName = 'x1 Fighter Tokens Bag', -- create bag around token
             bagColor = '1E87FF',
         },
         ['^x3 Infantry Token$'] = {
-            { x = -23.50, y = -0.19, z = -1.5, lock = true, dx = -5 },
+            { x = -23.50, y = -0.19, z = -1.5, lock = true, dx = -5, dz = 6 },
             { x = 23.50, y = -0.19, z = 3, lock = true, dx = 5 },
             bagName = 'x3 Infantry Tokens Bag', -- create bag around token
             bagColor = 'F3631C',
         },
         ['^x1 Infantry Token$'] = {
-            { x = -23.50, y = -0.19, z = 1.5, lock = true, dx = -5 },
+            { x = -23.50, y = -0.19, z = 1.5, lock = true, dx = -5, dz = 6 },
             { x = 23.50, y = -0.19, z = 6, lock = true, dx = 5 },
             bagName = 'x1 Infantry Tokens Bag', -- create bag around token
             bagColor = 'F3631C',
@@ -195,9 +194,18 @@ local SetupFaction = {
     }
 }
 
+local SetupPlayerTools = {
+    NAME_TO_PLAYER_ZONE_OFFSET = {
+        ['Technology Board'] = { x = 0, y = 3, z = 11 },
+        ['Planet Board'] = { x = 0, y = 4, z = 11 },
+        ['Build Area'] = { x = 0, y = 5, z = 11, flip = true },
+    }
+}
+
 local SetupFranken = {}
 local SetupCards = {}
 
+local _setupTime = false  -- use os.time() for a durable epoch-based timestamp, Time.time resets on TTS load
 local _includePoK = false
 local _putPendingGuidSet = {}
 local _deletedItemsBagGuid = false
@@ -211,6 +219,10 @@ end
 
 function getPoK()
     return _includePoK
+end
+
+function getGameLengthSeconds()
+    return _setupTime and math.max(os.time() - _setupTime, 0)
 end
 
 -------------------------------------------------------------------------------
@@ -227,7 +239,10 @@ local function isPutPending()
 end
 
 function onObjectDestroy(dyingObject)
-    _putPendingGuidSet[dyingObject.getGUID()] = nil
+    local guid = dyingObject.getGUID()
+    if guid and _putPendingGuidSet[guid] then
+        _putPendingGuidSet[guid] = nil
+    end
 end
 
 -------------------------------------------------------------------------------
@@ -301,10 +316,14 @@ end
 -- @return table : {x,y,z}.
 local function offsetPosition(position, offset)
     assert(type(position) == 'table' and type(offset) == 'table')
+    local dir = position.z > 0 and 1 or -1
+    if math.abs(position.z) < 1 then
+        dir = 1 -- close enough to center, use "natural" direction
+    end
     return {
-        x = position.x + (offset.x or 0) * (position.z > 0 and 1 or -1),
+        x = position.x + (offset.x or 0) * dir,
         y = position.y + (offset.y or 0),
-        z = position.z + (offset.z or 0) * (position.z > 0 and 1 or -1)
+        z = position.z + (offset.z or 0) * dir
     }
 end
 
@@ -967,6 +986,56 @@ end
 
 -------------------------------------------------------------------------------
 
+function SetupPlayerTools.unpack()
+    -- Find the tools bag and any tools already on the table.
+    local toolsBag = false
+    local nameToJson = {}
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        if object.tag == 'Bag' and name == 'Tools and Helpers' then
+            toolsBag = object
+        end
+        if SetupPlayerTools.NAME_TO_PLAYER_ZONE_OFFSET[name] then
+            nameToJson[name] = object.getJSON()
+        end
+    end
+
+    -- Get JSON for tools in the tools bag.
+    for _, entry in ipairs(toolsBag and toolsBag.getObjects() or {}) do
+        if SetupPlayerTools.NAME_TO_PLAYER_ZONE_OFFSET[entry.name] and not nameToJson[entry.name] then
+            local object = toolsBag.takeObject({
+                position          = toolsBag.getPosition() + vector(0, 5, 0),
+                smooth            = false,
+                guid              = entry.guid
+            })
+            while object.spawning do
+                coroutine.yield(0)
+            end
+            nameToJson[entry.name] = object.getJSON()
+            toolsBag.putObject(object)
+            coroutine.yield(0)
+        end
+    end
+
+    -- Spawn for each player.
+    local zonesAttributes = _zoneHelper.zonesAttributes()
+    for _, zone in ipairs(zonesAttributes) do
+        for name, json in pairs(nameToJson) do
+            local offset = SetupPlayerTools.NAME_TO_PLAYER_ZONE_OFFSET[name]
+            spawnObjectJSON({
+                json              = json,
+                position          = offsetPosition(zone.center, offset),
+                rotation          = zoneRotation(zone, offset),
+                callback_function = function(object) object.setLock(offset.lock or false) end,
+                sound             = false,
+            })
+            coroutine.yield(0)
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
+
 -- Do NOT do this as part of normal setup, leaving cards out is sus af.
 -- Jefferson has seen some shit and doesn't trust people
 function dealObjectives()
@@ -1034,7 +1103,9 @@ function setup(params)
     assert(type(params.playerCount) == 'number')
     assert(not params.extraRings or type(params.extraRings) == 'number')
     assert(not params.includePoK or type(params.includePoK) == 'boolean')
+    assert(not params.playerTools or type(params.playerTools) == 'boolean')
 
+    _setupTime = os.time()
     setPoK(params.includePoK or false)
 
     table.insert(_setupQueue, params)
@@ -1050,6 +1121,7 @@ function setupCoroutine()
     local playerCount = assert(params.playerCount)
     local extraRings = params.extraRings or 0
     local isRightClick = params.isRightClick
+    local playerTools = params.playerTools
 
     _zoneHelper.clearBordersVectorLines()
 
@@ -1093,6 +1165,11 @@ function setupCoroutine()
 
     _zoneHelper.drawBordersVectorLines()
     coroutine.yield(0)
+
+    if playerTools then
+        SetupPlayerTools.unpack()
+        coroutine.yield(0)
+    end
 
     print('Setup finished')  -- always print when done
 
@@ -2462,6 +2539,7 @@ function onLoad(saveState)
 
     local saveState = saveState and string.len(saveState) > 0 and JSON.decode(saveState)
     if saveState then
+        _setupTime = saveState._setupTime
         _includePoK = saveState._includePoK
     end
 
@@ -2470,6 +2548,7 @@ end
 
 function onSave()
     return JSON.encode({
+        _setupTime = _setupTime,
         _includePoK = _includePoK
     })
 end

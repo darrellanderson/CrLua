@@ -318,11 +318,11 @@ local _ObjectManual = [[
 Features:
 Leadership - Primary and Number: gain command tokens.
 All other secondaries consume a (non fleet) strategy token (in strat. pool).
-EXCEPTION: If you have Scepter of Emelpar, the Mahact Agent or the Yssaril with Mahact in game available.
+
 Politics - Speaker: Moves speaker token, Draws 2 Action and Agendas. - Sec.: draws 2 Actioncards
 Construction - Allocate constructed units.
 Trade - Prim.: Allocates 3 resources, Refreshes commodities (removes all from comm. pool and gain correct #)
-- Color: Refreshes colors commodities - Sec.: Refreshes your commodities.
+- Color: Refreshes colors commodities - Sec.: Refreshes your commodities (does not use a command token as "Master of Trade"(Hacan))
 Tech: Draws the card from tech deck, use Tech Board if available.
 - Faction Tech: Opens a choice popup - Comm Tokens: gain tokens as Necro.
 Imperial - Score: Only writes message - Secret: Draws secret. - Secondary: Draws secret.
@@ -402,15 +402,15 @@ function onLoad()
 	--Description on Back of the Object.
 	self.UI.setXmlTable({backManual})
 	local descriptionText = [[
-	Please click 'Update UI' to modify strategy card windows (such as choosing speaker, faction techology menus).
+	Please click 'Update UI' to enable automation and to modify strategy card windows (such as choosing speaker, faction techology menus).
 
-	Secondary actions consume a command token (if no alternative available).
+	Secondary actions consume a command token.
 
 	Leadership: gain command tokens.
 	Politics: move speaker, draw agenda and action cards.
 	Construction: allocate units/command token.
 	Trade: gain tradegoods and commodities.
-	Tech: draw tech cards (move unit upgrades to faction sheet).
+	Tech: draw tech cards (use Tech board if available).
 	Imperial: draw secret.
 
 	Place this object in a bag (or delete it) to stop getting strategy card automation.
@@ -532,7 +532,6 @@ function onStrategyCardButtonClicked(params)
 	end
 
 	-------------------------- Diplomacy ---------------------------------------
-	-------------------------- Construction ------------------------------------
 	-------------------------- warfare -----------------------------------------
 	if (card == "diplomacy") or (card == "warfare") then
 		-- only keep open if secondary was not successful
@@ -589,7 +588,7 @@ function onStrategyCardButtonClicked(params)
 		end
 	end
 
-	--------------------------  Trade ------------------------------------------
+	-------------------------- Construction ------------------------------------
 
 	if card == "construction" then
 		local constructionSuccessful = false
@@ -609,6 +608,8 @@ function onStrategyCardButtonClicked(params)
 		end
 		return
 	end
+
+	--------------------------  Trade ------------------------------------------
 
 	if card == "trade" then
 		if action == "primary" then

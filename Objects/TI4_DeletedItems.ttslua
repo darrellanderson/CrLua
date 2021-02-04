@@ -68,8 +68,9 @@ function onObjectDestroy(dyingObject)
         return
     end
 
-    if ignoreGuidSet[dyingObject.getGUID()] then
-        ignoreGuidSet[dyingObject.getGUID()] = nil
+    local guid = dyingObject.getGUID()
+    if guid and ignoreGuidSet[guid] then
+        ignoreGuidSet[guid] = nil
         return
     end
 

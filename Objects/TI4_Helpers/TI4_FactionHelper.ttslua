@@ -31,11 +31,12 @@ function getHelperClient(helperObjectName)
     end
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
-local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
-local _strategyCardHelper = getHelperClient('TI4_STRATEGY_CARD_HELPER')
+local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 local _exploreHelper = getHelperClient('TI4_EXPLORE_HELPER')
+local _strategyCardHelper = getHelperClient('TI4_STRATEGY_CARD_HELPER')
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _unitHelper = getHelperClient('TI4_UNIT_HELPER')
+local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 -- Per-faction attributes.  This helper will also add the following fields:
 -- - color (string) or nil if not in use.
@@ -56,7 +57,8 @@ local _factionAttributes = {
         units = { 'Letani Warrior I', 'Letani Warrior II', 'Letani Behemoth' },
         commander = 'Dirzuga Rophal',
         hero = 'Letani Miasmiala',
-        commodities = 3
+        commodities = 3,
+        promissoryNotes = { 'Stymie', 'Stymie Ω' },
     },
 
     ['The Barony Of Letnev'] = {
@@ -72,7 +74,8 @@ local _factionAttributes = {
         units = { 'Dunlain Reaper' },
         commander = 'Rear Admiral Farran',
         hero = 'Darktalon Treilla',
-        commodities = 2
+        commodities = 2,
+        promissoryNotes = { 'War Funding', 'War Funding Ω' },
     },
 
     ['The Clan Of Saar'] = {
@@ -88,7 +91,8 @@ local _factionAttributes = {
         units = { 'Floating Factory I', 'Floating Factory II', 'Scavenger Zeta' },
         commander = 'Rowl Sarrig',
         hero = 'Gurno Aggero',
-        commodities = 3
+        commodities = 3,
+        promissoryNotes = { "Ragh's Call" },
     },
 
     ['The Embers Of Muaat'] = {
@@ -104,7 +108,8 @@ local _factionAttributes = {
         units = { 'Prototype War Sun I', 'Prototype War Sun II', 'Ember Colossus' },
         commander = 'Magmus',
         hero = "Adjudicator Ba'al",
-        commodities = 4
+        commodities = 4,
+        promissoryNotes = { 'Fires of the Gashlai' },
     },
 
     ['The Emirates Of Hacan'] = {
@@ -120,7 +125,8 @@ local _factionAttributes = {
         units = { 'Pride of Kenara' },
         commander = 'Gila the Silvertongue',
         hero = 'Harrugh Gefhara',
-        commodities = 6
+        commodities = 6,
+        promissoryNotes = { 'Trade Convoys' },
     },
 
     ['The Federation Of Sol'] = {
@@ -136,7 +142,8 @@ local _factionAttributes = {
         units = { 'Advanced Carrier I', 'Advanced Carrier II', 'Spec Ops I', 'Spec Ops II', 'ZS Thunderbolt M2' },
         commander = 'Claire Gibson',
         hero = 'Jace X, 4th Air Legion',
-        commodities = 4
+        commodities = 4,
+        promissoryNotes = { 'Military Support' },
     },
 
     ['The Ghosts Of Creuss'] = {
@@ -152,7 +159,8 @@ local _factionAttributes = {
         units = { 'Icarus Drive' },
         commander = 'Sai Seravus',
         hero = 'Riftwalker Meian',
-        commodities = 4
+        commodities = 4,
+        promissoryNotes = { 'Creuss Iff' },
     },
 
     ['The L1Z1X Mindnet'] = {
@@ -168,7 +176,8 @@ local _factionAttributes = {
         units = { 'Super-Dreadnought I', 'Super-Dreadnought II', 'Annihilator' },
         commander = '2RAM',
         hero = 'The Helmsman',
-        commodities = 2
+        commodities = 2,
+        promissoryNotes = { 'Cybernetic Enhancements', 'Cybernetic Enhancements Ω' },
     },
 
     ['The Mentak Coalition'] = {
@@ -184,7 +193,8 @@ local _factionAttributes = {
         units = { 'Moll Terminus' },
         commander = "S'ula Mentarion",
         hero = 'Ipswitch, Loose Cannon',
-        commodities = 2
+        commodities = 2,
+        promissoryNotes = { 'Promise of Protection' },
     },
 
     ['The Naalu Collective'] = {
@@ -200,7 +210,8 @@ local _factionAttributes = {
         units = { 'Hybrid Crystal Fighter I', 'Hybrid Crystal Fighter II', 'Iconoclast' },
         commander = "M'aban",
         hero = 'The Oracle',
-        commodities = 3
+        commodities = 3,
+        promissoryNotes = { 'Gift of Prescience' },
     },
 
     ['The Nekro Virus'] = {
@@ -217,7 +228,8 @@ local _factionAttributes = {
         units = { 'Mordred' },
         commander = 'Nekro Acidos',
         hero = 'Unit.dsgn.FLAYESH',
-        commodities = 3
+        commodities = 3,
+        promissoryNotes = { 'Antivirus' },
     },
 
     ["The Sardakk N'orr"] = {
@@ -233,7 +245,8 @@ local _factionAttributes = {
         units = { 'Exotrireme I', 'Exotrireme II', 'Valkyrie Exoskeleton' },
         commander = "G'hom Sek'kus",
         hero = "Sh'val, Harbinger",
-        commodities = 3
+        commodities = 3,
+        promissoryNotes = { 'Tekklar Legion' },
     },
 
     ['The Universities of Jol-Nar'] = {
@@ -249,7 +262,8 @@ local _factionAttributes = {
         units = { 'Shield Paling' },
         commander = 'Ta Zern',
         hero = "Rin, the Master's Legacy",
-        commodities = 4
+        commodities = 4,
+        promissoryNotes = { 'Research Agreement' },
     },
 
     ['The Winnu'] = {
@@ -266,7 +280,8 @@ local _factionAttributes = {
         units = { 'Reclaimer' },
         commander = 'Rickar Rickani',
         hero = 'Mathis Mathinus',
-        commodities = 3
+        commodities = 3,
+        promissoryNotes = { 'Acquiescence', 'Acquiescence Ω' },
     },
 
     ['The Xxcha Kingdom'] = {
@@ -282,7 +297,8 @@ local _factionAttributes = {
         units = { 'Indomitus' },
         commander = 'Elder Qanoj',
         hero = 'Xxekir Grom',
-        commodities = 4
+        commodities = 4,
+        promissoryNotes = { 'Political Favor' },
     },
 
     ['The Yin Brotherhood'] = {
@@ -298,7 +314,8 @@ local _factionAttributes = {
         units = { "Moyin's Ashes" },
         commander = 'Brother Omar',
         hero = 'Dannel of the Tenth',
-        commodities = 2
+        commodities = 2,
+        promissoryNotes = { 'Greyfire Mutagen', 'Greyfire Mutagen Ω' },
     },
 
     ['The Yssaril Tribes'] = {
@@ -314,7 +331,8 @@ local _factionAttributes = {
         units = { 'Blackshade Infiltrator' },
         commander = 'So Ata',
         hero = 'Kyver, Blade and Key',
-        commodities = 3
+        commodities = 3,
+        promissoryNotes = { 'Spy Net' },
     },
 
     -- PoK Factions
@@ -332,7 +350,8 @@ local _factionAttributes = {
         units = { 'Memoria II', 'Quantum Manipulator' },
         commander = 'Navarch Feng',
         hero = 'Ahk-Syl Siven',
-        commodities = 4
+        commodities = 4,
+        promissoryNotes = { 'The Cavalry' },
     },
 
     ["The Vuil'raith Cabal"] = {
@@ -349,7 +368,8 @@ local _factionAttributes = {
         units = { 'Dimensional Tear I', 'Dimensional Tear II', 'Reanimator' },
         commander = 'That Which Molds Flesh',
         hero = 'It Feeds on Carrion',
-        commodities = 2
+        commodities = 2,
+        promissoryNotes = { 'Crucible' },
     },
 
     ['The Argent Flight'] = {
@@ -367,7 +387,8 @@ local _factionAttributes = {
         units = { 'Strike Wing Alpha I', 'Strike Wing Alpha II', 'Aerie Sentinel' },
         commander = 'Trrakan Aun Zulok',
         hero = 'Mirik Aun Sissiri',
-        commodities = 3
+        commodities = 3,
+        promissoryNotes = { 'Strike Wing Ambuscade' },
     },
 
     ['The Titans of Ul'] = {
@@ -384,7 +405,8 @@ local _factionAttributes = {
         units = { 'Saturn Engine I', 'Saturn Engine II', 'Hel-Titan I', 'Hel-Titan II', 'Hecatoncheires' },
         commander = 'Tungstantus',
         hero = 'Ul the Progenitor',
-        commodities = 2
+        commodities = 2,
+        promissoryNotes = { 'Terraform' },
     },
 
     ['The Empyrean'] = {
@@ -401,7 +423,8 @@ local _factionAttributes = {
         units = { 'Watcher' },
         commander = 'Xuange',
         hero = 'Conservator Procyon',
-        commodities = 4
+        commodities = 4,
+        promissoryNotes = { 'Blood Pact', 'Dark Pact' },
     },
 
     ['The Mahact Gene-Sorcerers'] = {
@@ -419,7 +442,8 @@ local _factionAttributes = {
         units = { 'Crimson Legionnaire I', 'Crimson Legionnaire II', 'Starlancer' },
         commander = 'Il Na Viroset',
         hero = 'Airo Shir Aur',
-        commodities = 3
+        commodities = 3,
+        promissoryNotes = { 'Scepter of Dominion' },
     },
 
     ['The Naaz-Rokha Alliance'] = {
@@ -436,7 +460,8 @@ local _factionAttributes = {
         units = { 'Eidolon' },
         commander = 'Dart and Tai',
         hero = 'Hesh and Prit',
-        commodities = 3
+        commodities = 3,
+        promissoryNotes = { 'Black Market Forgery' },
     },
 
     -- Tactic Blue's homebrew
@@ -874,6 +899,14 @@ function injectFaction(faction)
     end
     if faction.frankenName then
         _lowerTokenNameToFaction[string.lower(faction.frankenName)] = faction
+    end
+
+    -- Tell deck helper about promissory notes (for discard back to player).
+    for _, cardName in ipairs(faction.promissoryNotes or {}) do
+        _deckHelper.injectCard({
+            cardName = cardName,
+            factionName = faction.name
+        })
     end
 end
 

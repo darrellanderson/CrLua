@@ -526,6 +526,26 @@ function inHand()
     return result
 end
 
+--- Get zone closest to position (hands are outside zone areas).
+-- @param position table : {xyz} table.
+-- @return color string
+function closestZone(position)
+    assert(type(position) == 'table' and type(position.x) == 'number')
+    _maybeUpdateZoneColors()
+    local best = false
+    local bestDSq = false
+    local a = position
+    for _, zone in ipairs(_zones) do
+        local b = zone.center
+        local dSq = (a.x - b.x) ^ 2 + (a.z - b.z) ^ 2
+        if not bestDSq or dSq < bestDSq then
+            best = zone.color
+            bestDSq = dSq
+        end
+    end
+    return best
+end
+
 -------------------------------------------------------------------------------
 
 --- Get setVectorLines compatible lines from zone borders.

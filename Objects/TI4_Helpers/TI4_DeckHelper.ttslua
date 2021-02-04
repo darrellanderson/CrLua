@@ -644,7 +644,7 @@ local function _getDeckAttributes(cardName)
         for _, faction in pairs(_factionHelper.allFactions(true)) do
             local attributes = {
                 transform = {}, -- compute on demand
-                factionName = faction.factionName
+                factionName = faction.name
             }
             for _, cardName in ipairs(faction.promissoryNotes or {}) do
                 _lowerCardNameToDeckAttributes[string.lower(cardName)] = attributes
@@ -839,13 +839,13 @@ end
 -- E.g. _deckHelper.injectCard('Actions', 'My Action Card')
 function injectCard(params)
     assert(type(params) == 'table', 'params must be a table')
-    assert(type(params.deckName == 'string'), 'params.deckName must be a string')
     assert(type(params.cardName == 'string'), 'params.cardName must be a string')
+    assert((not params.deckName) or type(params.deckName == 'string'), 'deckName')
+    assert((not params.factionName) or type(params.factionName == 'string'), 'deckName')
 
     -- Make sure _lowerCardNameToDeckAttributes exists.
     _getDeckAttributes('bogus')
 
-    local deckAttributes = assert(DECKS[params.deckName], 'no such deck name "' .. params.deckName .. '"')
     _lowerCardNameToDeckAttributes[string.lower(params.cardName)] = deckAttributes
 end
 

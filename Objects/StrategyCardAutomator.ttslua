@@ -1010,22 +1010,11 @@ function _addSecondaryPopup(layout, colorTable)
 	-- local secondaryPopupButton
 	-- local secondaryPopup
 	local function _getPopupButton(color, card, option)
-		log("adding popup button")
-		log(card)
-		log(color)
-		log(option)
 		local secondaryPopupButton = _deepcopy(_customLayout['secondaryPopupButton'])
 		for key,attr in pairs(secondaryPopupButton["attributes"]) do
 			secondaryPopupButton["attributes"][key] = string.gsub(attr, "COLORPLACEHOLDER", color)
 			secondaryPopupButton["attributes"][key] = string.gsub(secondaryPopupButton["attributes"][key], "CARDPLACEHOLDER", card)
 			secondaryPopupButton["attributes"][key] = string.gsub(secondaryPopupButton["attributes"][key], "OPTIONPLACEHOLDER", option)
-		end
-		if card == "construction" then
-			log('logging construction button!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-			for key, attr in pairs(secondaryPopupButton["attributes"]) do
-				log(key)
-				log(attr)
-			end
 		end
 		return _deepcopy(secondaryPopupButton)
 	end
@@ -1034,7 +1023,6 @@ function _addSecondaryPopup(layout, colorTable)
 		color = params['color']
 		card = params['card']
 		local secondaryPopup = _deepcopy(_customLayout["secondaryPopupTable"])
-		log('build Popup table for '.. color .. " card ")
 		secondaryPopup["attributes"].id = string.gsub(secondaryPopup["attributes"].id, "COLORPLACEHOLDER", color)
 		secondaryPopup["attributes"].id = string.gsub(secondaryPopup["attributes"].id, "CARDPLACEHOLDER", card)
 		for _,menu in ipairs(secondaryPopup["children"]) do
@@ -1045,10 +1033,7 @@ function _addSecondaryPopup(layout, colorTable)
 			end
 		end
 
-		log(secondaryPopup["children"])
-		
 		for option,val in pairs(params["options"]) do
-			log('setting '..card .. " " .. color .. " ".. option)
 			if val then
 				local secondaryPopupButton = {}
 
@@ -1078,8 +1063,6 @@ function _addSecondaryPopup(layout, colorTable)
 
 	local function insertAll(option)
 		for _,color in ipairs(colorTable) do
-			log('all options for ' .. color)
-			log(optionsForColor[color])
 			optionsForColor[color][option] = true
 		end
 	end
@@ -1087,42 +1070,39 @@ function _addSecondaryPopup(layout, colorTable)
 	optionsForColor = {}
 	for _,color in ipairs(colorTable) do
 		optionsForColor[color] = {['Scepter of Emelpar']= true}
-		log(optionsForColor[color])
 	end
+	insertAll("Strategy Token")
 	local cardOptions = {["Jae Mir Kan"]= {}, ["Ssruu"]= {}}
-	local promissories = {'Acquiescence'}
+	local promissories = {['Acquiescence Ω'] = {}}
 	local JaeMirKanFound = false
 
 	-- search for all possible options availabe to a color and add them to optionsForColor
 	for _, object in ipairs(getAllObjects()) do
 		local name = object.getName()
 		-- add winnu promissory note
-		if (object.tag == 'Deck') and (object.getName() == "Promissory Notes Deck Name") then
-			for _,cardname in ipairs(object.getObjects()) do
-				for _,optionname in promissories do
-					if cardname == optionname then
-						insertAll(optionname)
-					end
+		if (object.tag == 'Deck') and (string.match(name, "Notes")) then
+			for _,cardObject in ipairs(object.getObjects()) do
+				if promissories[cardObject.name] then
+					insertAll(cardObject.name)
 				end
 			end
 		end
 		if (object.tag == "Card") then
-			if (cardOptions[name]) or (promissories[name]) then
+			if (cardOptions[name]) then
 				JaeMirKanFound = JaeMirKanFound or (name == "Jae Mir Kan")
 				local owner = _zoneHelper.zoneFromPosition(object.getPosition())
 				if owner then
 					optionsForColor[owner][name] = true
 				end
 			end
+			if promissories[object.getName()] then
+				insertAll(object.getName())
+			end
 		end
 	end
 	for _,options in ipairs(optionsForColor) do
 		options["Ssruu"] = JaeMirKanFound and options["Ssruu"]
 	end
-	
-	insertAll("Strategy Token")
-	log("setting options:")
-	log(optionsForColor)
 
 	local cards = {"diplomacy","politics","construction","trade","warfare","technology","imperial"}
 	for _,card in ipairs(cards) do
@@ -1147,16 +1127,6 @@ function _addSecondaryPopup(layout, colorTable)
 			end
 			if not inserted then
 				table.insert(layout, _deepcopy(popupLayout))
-			end
-			log('adding ' .. color .. card)
-			log(popupLayout)
-		end
-	end
-	for _,obj in ipairs(layout) do
-		if obj['attributes']['id'] == 'WhiteconstructionSecondaryPopup' then
-			for _,v in ipairs(obj['children']) do
-				log(v['id'])
-				log(v['children'])
 			end
 		end
 	end
@@ -1428,6 +1398,7 @@ function _getStrategytokenAlternativeSet(color)
 		['Jae Mir Kan'] = {},
 		['Scepter of Emelpar'] = {},
 		['Ssruu'] = {},
+		['Acquiescence Ω'] = {},
 	}
 	for _, object in ipairs(getAllObjects()) do
 		local name = object.getName()
@@ -1439,7 +1410,6 @@ function _getStrategytokenAlternativeSet(color)
 			table.insert(searchList, object)
 		end
 	end
-
 	-- Is a payment alternative available?  If so, tell the player about it
 	-- but go ahead and pay the strategy token normally.  If the player chooses
 	-- they can remove the spent token and use the alternative instead.
@@ -1463,6 +1433,13 @@ function _getStrategytokenAlternativeSet(color)
 		local jaeMirKanAvailable = #cardToObjects['Jae Mir Kan'] > 0  -- does not need to be face up
 		if zoneColor == color and (not card.is_face_down) and jaeMirKanAvailable then
 			table.insert(altPayment, '"Ssruu" + "Jae Mir Kan"')
+			break
+		end
+	end
+	for _, card in ipairs(cardToObjects['Acquiescence Ω']) do
+		local zoneColor = _zoneHelper.zoneFromPosition(card.getPosition())
+		if zoneColor == color then
+			table.insert(altPayment, '"Acquiescence  Ω"')
 			break
 		end
 	end
@@ -1548,10 +1525,10 @@ function _useStrategytokenAlternative(color, strategyCard, option)
 	assert(type(option) == "string")
 	log('using alternative')
 
-	local legaloptions = {"Jae Mir Kan", "Ssruu", "Aquiescence", "Scepter of Emelpar", "Strategy Token"}
+	local legaloptions = {"Jae Mir Kan", "Ssruu", "Acquiescence Ω", "Scepter of Emelpar", "Strategy Token"}
 	if option == "Strategy Token" then
 		return _consumeStrategyToken(color, strategyCard)
-	elseif option == "Aquiescence" then
+	elseif option == "Acquiescence Ω" then
 		return _returnPromissoryNote(color, option)
 	else
 		local object = _getByName(option, 'Card')
@@ -1579,7 +1556,7 @@ function _returnPromissoryNote(color, promissoryName)
 	local player = _getPlayerFromColor(color)
 	for i = 1, player.getHandCount() do
 		for _, object in ipairs(player.getHandObjects(i)) do
-			if object.name == promissoryName then
+			if (object.name == promissoryName) or (object.name == promissoryName.." Ω") then
 				local discardParams = {
 					guid = object.getGUID(),
 					name = object.getName(),

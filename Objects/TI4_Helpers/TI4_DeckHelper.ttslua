@@ -644,7 +644,7 @@ local function _getDeckAttributes(cardName)
         for _, faction in pairs(_factionHelper.allFactions(true)) do
             local attributes = {
                 transform = {}, -- compute on demand
-                factionName = faction.factionName
+                factionName = faction.name
             }
             for _, cardName in ipairs(faction.promissoryNotes or {}) do
                 _lowerCardNameToDeckAttributes[string.lower(cardName)] = attributes

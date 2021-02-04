@@ -156,7 +156,7 @@ local _customLayout = {
 			{
 				tag = 'Button',
 				attributes = {
-					id = "politics_popup",
+					id = "politics_Popup",
 					color = "black",
 					textcolor = "white",
 					text = "Assign Speaker"
@@ -166,7 +166,7 @@ local _customLayout = {
 			{
 				tag = 'Button',
 				attributes = {
-					id = "politics_popup",
+					id = "politics_Popup",
 					color = "green",
 					textcolor="black",
 					text = "Self",
@@ -176,7 +176,7 @@ local _customLayout = {
 			{
 				tag = 'Button',
 				attributes = {
-					id = "politics_popup",
+					id = "politics_Popup",
 					color = "black",
 					textcolor="white",
 					text = "Close",
@@ -198,7 +198,7 @@ local _customLayout = {
 			{
 				tag = 'Button',
 				attributes = {
-					id = "technology_popup",
+					id = "technology_Popup",
 					color = "black",
 					textcolor = "white",
 					text = "Select Faction Technology"
@@ -208,7 +208,7 @@ local _customLayout = {
 			{
 				tag = 'Button',
 				attributes = {
-					id = "technology_popup",
+					id = "technology_Popup",
 					color = "black",
 					textcolor="white",
 					text = "Close Menu",
@@ -217,11 +217,22 @@ local _customLayout = {
 			}
 		}
 	},
+	["technologyPopupButton"] = {
+		tag = "Button",
+		attributes = {
+			id = "technology_generic",
+			onClick = "genericSilent(TECHPLACEHOLDER)",
+			textcolor = "black",
+			text = "TECHPLACEHOLDER",
+			color = "white"
+		}
+	},
 	['secondaryPopupTable'] = {
 		tag = "VerticalLayout",
 		attributes = {
 			id = "COLORPLACEHOLDERCARDPLACEHOLDERSecondaryPopup",
-			height = "150",
+			--height = "150",
+			height = "300",
 			offsetXY="1000 -80",
 			active="false",
 			visibility=""
@@ -230,7 +241,7 @@ local _customLayout = {
 			{
 				tag = 'Button',
 				attributes = {
-					id = "CARDPLACEHOLDER_secondarypopup",
+					id = "CARDPLACEHOLDER_secondaryPopup",
 					color = "black",
 					textcolor = "white",
 					text = "Select CARDPLACEHOLDER Secondary Payment."
@@ -239,7 +250,7 @@ local _customLayout = {
 			{
 				tag = 'Button',
 				attributes = {
-					id = "CARDPLACEHOLDER_secondarypopup",
+					id = "CARDPLACEHOLDER_secondaryPopup",
 					color = "black",
 					textcolor="white",
 					text = "Close Menu",
@@ -251,7 +262,7 @@ local _customLayout = {
 	["secondaryPopupButton"] = {
 		tag = "Button",
 		attributes = {
-			id = "CARDPLACEHOLDER_secondarypopup",
+			id = "CARDPLACEHOLDER_secondaryPopup",
 			onClick = "genericSilent(OPTIONPLACEHOLDER)",
 			textcolor = "black",
 			text = "OPTIONPLACEHOLDER",
@@ -281,7 +292,7 @@ local _customLayout = {
 	},
 	["politicsPopupAttributes"] = {
 		tooltip = "Assign Speaker Token to COLORPLACEHOLDER",
-		id = "politics_popup",
+		id = "politics_Popup",
 		onClick = "genericSilent(COLORPLACEHOLDER)"
 	},
 	["imperial"] = {
@@ -528,18 +539,19 @@ function onStrategyCardButtonClicked(params)
 				return  -- consumeStrategyToken printed the error message
 			end
 		else 
-			_openPopupUi(color, color..card.."SecordaryPopup")
+			_openPopupUi(color, color..card.."SecondaryPopup")
 		end
 	end
 
-	if action == "secondarypopup" then
-		action = string.gsub(action, "popup", "")
+	if action == "secondaryPopup" then
+		action = string.gsub(action, "Popup", "")
 		local localoption = option
 		
-		local i,j = string.find(option," %(.*%)")
+		local i,j
+		i,j = string.find(option," %[.*%]")
 		if i and i<j then
-			localoption = string.sub(option,1,i)
-			option = "A "..string.sub(option,i+1,j)
+			localoption = string.sub(option,1,i-1)
+			option = "A "..string.sub(option,i+2,j-1)
 			log('setting localoption '.. localoption)
 			log('setting option '.. option)
 		end
@@ -550,7 +562,10 @@ function onStrategyCardButtonClicked(params)
 		elseif localoption == "Strategy Token" then
 			secondarySuccessful = _consumeStrategyToken(color, capitalizedCardName)
 		else 
-			secondarySuccessful = _useStrategytokenAlternative(color, localoption)
+			secondarySuccessful = _useStrategytokenAlternative(color, capitalizedCardName, localoption)
+		end
+		if secondarySuccessful then
+			_closePopupUi(color, color..card.."SecondaryPopup")
 		end
 	end
 
@@ -561,6 +576,7 @@ function onStrategyCardButtonClicked(params)
 		if (action == "secondary") and (not secondarySuccessful) then
 			return
 		else
+			log('hitting this close')
 			_closeMenu(color, card)
 			return
 		end
@@ -591,7 +607,7 @@ function onStrategyCardButtonClicked(params)
 			_closeMenu(color, card)
 		end
 		--popup has actions "close" and "primary"
-		if (action == "popup") then
+		if (action == "Popup") then
 			if option == "close" then
 				_closeMenu(color, card.."Popup")
 			else
@@ -662,13 +678,13 @@ function onStrategyCardButtonClicked(params)
 
 		if action == "generic" then
 			-- passes the tech name as option
-			-- option "Faction Tech" opens the faction tech popup COLORtechnologyPopup
+			-- option "Faction Tech" opens the faction tech Popup COLORtechnologyPopup
 			if option == "Faction Tech" then
 				_openPopupUi(color, color.."technologyPopup")
 			end
 			-- picks the tech card and takes care of necro command tokens
 			queueResearchTech(color, option)
-		elseif action == "popup" and option == "close" then
+		elseif action == "Popup" and option == "close" then
 			_closeMenu(color, color..card.."Popup")
 		end
 		return
@@ -703,25 +719,27 @@ end
 
 ------------------------------ Custom UI ---------------------------------------
 
-local _legalOptions = { "politicsPopup", "technologyPopup", "secondaryPopup" }
+local _legalOptions = { "politicsPopup", "technologyPopup", "SecondaryPopup" }
 
 function _testPopupOptions(option, color)
-	local legal = false
-	for _,o in pairs(_legalOptions) do
-		if (color..o == option) or (o == option) then
-			legal = true
-		end
-	end
-
-	if not legal then
-		return false
-	end
-
+	-- return true
+	-- 	local legal = false
+	-- 	for _,o in pairs(_legalOptions) do
+	-- 		if (color..o == option) or (o == option) then
+	-- 			legal = true
+	-- 		end
+	-- 	end
+	
+	-- 	if not legal then
+	-- 		return false
+	-- 	end
+	
 	if UI.getAttributes(option) == nil then
 		return false
 	else
 		return true
 	end
+	-- end
 end
 
 function _openPopupUi(color, option)
@@ -729,18 +747,22 @@ function _openPopupUi(color, option)
 	assert(type(option) == "string")
 
 	if not _testPopupOptions(option, color) then
-		log("Open popup: " .. option .. " not found", "Red")
+		log("Open Popup: " .. option .. " not found", "Red")
 		if option == color.."technologyPopup" then
 			broadcastToAll("Please use the 'Update UI' button on the Automation card.", "Red")
 		end
 		return
 	end
 
+	
 	vis = UI.getAttribute(option, "visibility")
 	act = UI.getAttribute(option, "active")
+	log(option)
+	log(vis)
+	log(act)
 	if vis == "" or vis == nil then
 		vis = color
-		assert(act=="false", option .. " is active but not visible")
+		assert(act~="true", option .. " is active but not visible")
 	else
 		local i,j = string.find(vis, color)
 		if i ~= nil and j ~= nil then
@@ -750,7 +772,7 @@ function _openPopupUi(color, option)
 	end
 
 	UI.setAttribute(option, "visibility", vis)
-	if act == "false" then
+	if (act == nil) or (act == "false") then
 		UI.setAttribute(option, "active", "true")
 		act = "true"
 	end
@@ -761,7 +783,7 @@ function _closePopupUi(color, option)
 	assert(type(option) == "string")
 	if (not _testPopupOptions(option, color)) then
 		return
-		--error("Close popup: " .. option .. " not found", "Red")
+		--error("Close Popup: " .. option .. " not found", "Red")
 	end
 	_closeMenu(color, option)
 end
@@ -780,15 +802,16 @@ end
 
 -- closeMenu (just like in global), but closes all associated Popups
 -- if the card is a Popup, we do not want to reset the visibility for all,
--- because we only make the popups selectively visible to players.
+-- because we only make the Popups selectively visible to players.
 --
 -- we should probably handle "color..cardPopups" generically, instead of checking for it separately with technology.
--- this would make the implementation of a popup window for secondary action (if alternatives to a strategy token are available) easier.
+-- this would make the implementation of a Popup window for secondary action (if alternatives to a strategy token are available) easier.
 function _closeMenu(color, card)
+	log('closing menu ' .. card .. " for ".. color)
 	local i, j = string.find(card, "Popup")
-	local popup = false
+	local Popup = false
 	if i ~= nil and j ~= nil then
-		popup = true
+		Popup = true
 		if (not _testPopupOptions(card, color)) then
 			return
 		end
@@ -797,9 +820,9 @@ function _closeMenu(color, card)
 	local vis = UI.getAttribute(card, "visibility")
 	local newVis = vis
 
-	-- try to close associated _popups
-	if not popup then
-
+	-- try to close associated _Popups
+	if not Popup then
+		log('menu ' .. card.. " is not a popup" )
 		if card == "technology" then
 			_closeMenu(color, color..card.."Popup")
 		else
@@ -816,7 +839,6 @@ function _closeMenu(color, card)
 				end
 			end
 		end
-
 	end
 
 
@@ -839,7 +861,7 @@ function _closeMenu(color, card)
 	end
 	if newVis == "" then
 		UI.setAttribute(card, "active", "false")
-		if not popup then
+		if not Popup then
 			broadcastToAll("All players have responded", "Black")
 		end
 	end
@@ -889,7 +911,7 @@ function updateUiOnClick(player, option, alt)
 	-- removes PoK Buttons from tech UI if not playing with PoK
 	layout = _addTechnologyPrimarySecondary(layout)
 
-	-- adds the faction tech popup menu
+	-- adds the faction tech Popup menu
 	layout = _addAutomationTechPopup(layout, factionColors)
 
 	-- adds on "Assign Speaker" button to Politics menu which opens the politics Popup
@@ -898,7 +920,7 @@ function updateUiOnClick(player, option, alt)
 	-- adds a choice between scoring mecatol rex and drawing a secret
 	layout = _addImperialPrimary(layout)
 
-	-- adds a popup for alternative payment methods for secondaries
+	-- adds a Popup for alternative payment methods for secondaries
 	layout = _addSecondaryPopup(layout, factionColors)
 
 	-- adjusts the colors Table for the assign speaker politicsPopup
@@ -982,24 +1004,45 @@ function _addSecondaryPopup(layout, colorTable)
 	if not _setupHelper.getPoK() then
 		return layout
 	end
-
+	-- local secondaryPopupButton
+	-- local secondaryPopup
 	local function _getPopupButton(color, card, option)
+		log("adding popup button")
+		log(card)
+		log(color)
+		log(option)
 		local secondaryPopupButton = _deepcopy(_customLayout['secondaryPopupButton'])
 		for key,attr in pairs(secondaryPopupButton["attributes"]) do
 			secondaryPopupButton["attributes"][key] = string.gsub(attr, "COLORPLACEHOLDER", color)
 			secondaryPopupButton["attributes"][key] = string.gsub(secondaryPopupButton["attributes"][key], "CARDPLACEHOLDER", card)
 			secondaryPopupButton["attributes"][key] = string.gsub(secondaryPopupButton["attributes"][key], "OPTIONPLACEHOLDER", option)
 		end
-		return secondaryPopupButton
+		if card == "construction" then
+			log('logging construction button!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+			for key, attr in pairs(secondaryPopupButton["attributes"]) do
+				log(key)
+				log(attr)
+			end
+		end
+		return _deepcopy(secondaryPopupButton)
 	end
 
 	local function _buildPopupTable(params)
 		color = params['color']
 		card = params['card']
-		local secondaryPopup = _deepcopy(_customLayout["secordaryPopupTable"])
-		
+		local secondaryPopup = _deepcopy(_customLayout["secondaryPopupTable"])
+		log('build Popup table for '.. color .. " card ")
 		secondaryPopup["attributes"].id = string.gsub(secondaryPopup["attributes"].id, "COLORPLACEHOLDER", color)
 		secondaryPopup["attributes"].id = string.gsub(secondaryPopup["attributes"].id, "CARDPLACEHOLDER", card)
+		for _,menu in ipairs(secondaryPopup["children"]) do
+			for key,attr in pairs(menu["attributes"]) do
+				attr = string.gsub(attr, "COLORPLACEHOLDER", color)
+				attr = string.gsub(attr, "CARDPLACEHOLDER", card)
+				menu["attributes"][key] = attr
+			end
+		end
+
+		log(secondaryPopup["children"])
 		
 		for option,val in pairs(params["options"]) do
 			log('setting '..card .. " " .. color .. " ".. option)
@@ -1015,7 +1058,7 @@ function _addSecondaryPopup(layout, colorTable)
 						attributes = { id = "constructionSecondaryPopup" },
 						children = {} 
 					}
-					for _,addoption in ipairs({" (PDS)"," (Space Dock)"}) do
+					for _,addoption in ipairs({" [PDS]"," [Space Dock]"}) do
 						table.insert(horizontalLayout['children'], _deepcopy(_getPopupButton(color,card,option..addoption)))
 					end
 					secondaryPopupButton = _deepcopy(horizontalLayout)
@@ -1027,17 +1070,21 @@ function _addSecondaryPopup(layout, colorTable)
 				table.insert(secondaryPopup["children"],2,secondaryPopupButton)
 			end
 		end
+		return secondaryPopup
 	end
 
 	local function insertAll(option)
 		for _,color in ipairs(colorTable) do
+			log('all options for ' .. color)
+			log(optionsForColor[color])
 			optionsForColor[color][option] = true
 		end
 	end
 
-	local optionsForColor = {}
+	optionsForColor = {}
 	for _,color in ipairs(colorTable) do
 		optionsForColor[color] = {['Scepter of Emelpar']= true}
+		log(optionsForColor[color])
 	end
 	insertAll("Strategy Token")
 	local cardOptions = {["Jae Mir Kan"]= {}, ["Ssruu"]= {}}
@@ -1097,6 +1144,16 @@ function _addSecondaryPopup(layout, colorTable)
 			end
 			if not inserted then
 				table.insert(layout, _deepcopy(popupLayout))
+			end
+			log('adding ' .. color .. card)
+			log(popupLayout)
+		end
+	end
+	for _,obj in ipairs(layout) do
+		if obj['attributes']['id'] == 'WhiteconstructionSecondaryPopup' then
+			for _,v in ipairs(obj['children']) do
+				log(v['id'])
+				log(v['children'])
 			end
 		end
 	end
@@ -1436,8 +1493,6 @@ function _consumeStrategyToken(color, strategyCard)
 		end
 	end
 
-	
-
 	-- Find the command tokens bag and alternate payment methods.
 	local commandTokensBagName = faction.tokenName .. ' Command Tokens Bag'
 	local commandTokensBag = _getByName(commandTokensBagName, 'Bag')
@@ -1451,7 +1506,6 @@ function _consumeStrategyToken(color, strategyCard)
 		-- the player to spend the token, but if they're not paying attention
 		-- they may unintentionally not pay for following.
 	end
-		
 
 	if not commandTokensBag then
 		broadcastToAll('Consume Strategy tokens: missing ' .. faction.tokenName .. ' Command Tokens Bag', 'Red')
@@ -1465,7 +1519,6 @@ function _consumeStrategyToken(color, strategyCard)
 	end
 
 	-- todo: change cast and use sheet.positionToLocal instead. check if z > 0 or < 0 or something.
-
 	local commandTokenName = faction.tokenName .. " Command Token"
 	for _,object in ipairs(getAllObjects()) do
 		local name = object.getName()
@@ -1483,6 +1536,57 @@ function _consumeStrategyToken(color, strategyCard)
 	end
 
 	_safeBroadcastToColor(strategyCard .. ": no command token in " .. color .. "'s strategy pool.", color, "Red")
+	return false
+end
+
+function _useStrategytokenAlternative(color, strategyCard, option)
+	assert(type(color) == "string")
+	assert(type(strategyCard) == "string")
+	assert(type(option) == "string")
+	log('using alternative')
+
+	local legaloptions = {"Jae Mir Kan", "Ssruu", "Aquiescence", "Scepter of Emelpar", "Strategy Token"}
+	if option == "Strategy Token" then
+		return _consumeStrategyToken(color, strategyCard)
+	elseif option == "Aquiescence" then
+		return _returnPromissoryNote(color, option)
+	else
+		local object = _getByName(option, 'Card')
+		if (object ~= nil) and(not object.is_face_down) then
+			object.highlightOn("Yellow" , 3)
+			_safeBroadcastToColor(strategyCard .. ": used " .. option .. " for " .. color .. " instead of a strategy Token.", color, color)
+			return object.flip()
+		else
+			_safeBroadcastToColor(strategyCard .. ": " .. option .. " is not available to you.", color, color)
+			return false
+		end
+	end
+	return false
+end
+
+function _returnPromissoryNote(color, promissoryName)
+	assert(type(color) == "string")
+	assert(type(promissoryName) == "string")
+
+	-- local ownercolor = _deckHelper.getPromissoryOwner(promissoryName)
+	-- if color == ownercolor then
+	-- 	return false
+	-- end
+
+	local player = _getPlayerFromColor(color)
+	for i = 1, player.getHandCount() do
+		for _, object in ipairs(player.getHandObjects(i)) do
+			if object.name == promissoryName then
+				local discardParams = {
+					guid = object.getGUID(),
+					name = object.getName(),
+				}
+				_deckHelper.discardCard(discardParams)
+				broadcastToAll(color .. " used the " .. promissoryName .. " promissory note.", color)
+				return true
+			end
+		end
+	end
 	return false
 end
 

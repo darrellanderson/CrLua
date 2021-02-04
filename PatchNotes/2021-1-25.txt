@@ -15,7 +15,13 @@ This change does not use any new TTS features introduced in TTS v13, and will wo
 - New setup option to place common tools in each player area (planet & tech boards, build area).
 - New map tool right click option to create a premade map tile.
 
-b:
+22b:
 - Fix setup issue purging codex cards.
 - Fix faction selector button visibility.
+- Fix some "exiting game" errors related to how the new TTS version unloads a game.
 - Added "tech reporter" to the tools bag to submit anonymized game statistics for analysis.
+
+22c:
+- Restore vote counter placement.
+- Franken + Strategy Card Automator "trade" now uses correct commodities value.
+- Discarding promissory notes (via a graveyard) now returns them to the owning player.

@@ -217,7 +217,7 @@ local _customLayout = {
 			}
 		}
 	},
-	['SecondaryPopupTable'] = {
+	['secondaryPopupTable'] = {
 		tag = "VerticalLayout",
 		attributes = {
 			id = "COLORPLACEHOLDERCARDPLACEHOLDERSecondaryPopup",
@@ -235,7 +235,6 @@ local _customLayout = {
 					textcolor = "white",
 					text = "Select CARDPLACEHOLDER Secondary Payment."
 				}
-
 			},
 			{
 				tag = 'Button',
@@ -249,14 +248,14 @@ local _customLayout = {
 			}
 		}
 	},
-	["SecondaryPopupButton"] = {
+	["secondaryPopupButton"] = {
 		tag = "Button",
 		attributes = {
 			id = "CARDPLACEHOLDER_secondarypopup",
 			onClick = "genericSilent(OPTIONPLACEHOLDER)",
 			textcolor = "black",
 			text = "OPTIONPLACEHOLDER",
-			color = "white"
+			color = "green"
 		}
 	},
 	['colorButton'] = {
@@ -519,8 +518,9 @@ function onStrategyCardButtonClicked(params)
 	-- EXCEPTION: if player has scepter of emelpar or is has mahact agent available
 	-- or has Yssaril agent available with mahact agent in game.
 	-- would be nice to have alt key to choose to use alternative, but not possible in xml buttons.
+	local capitalizedCardName = string.gsub(card, "^%l", string.upper)
+	
 	if action == "secondary" and card ~= "leadership" then
-		local capitalizedCardName = string.gsub(card, "^%l", string.upper)
 		local altPayment = _getStrategytokenAlternativeSet(color)
 		if not altPayment then
 			secondarySuccessful = _consumeStrategyToken(color, capitalizedCardName)
@@ -528,7 +528,30 @@ function onStrategyCardButtonClicked(params)
 				return  -- consumeStrategyToken printed the error message
 			end
 		else 
-			card = string.gsub(card, color.."Secondary" )
+			_openPopupUi(color, color..card.."SecordaryPopup")
+		end
+	end
+
+	if action == "secondarypopup" then
+		action = string.gsub(action, "popup", "")
+		local localoption = option
+		
+		local i,j = string.find(option," %(.*%)")
+		if i and i<j then
+			localoption = string.sub(option,1,i)
+			option = "A "..string.sub(option,i+1,j)
+			log('setting localoption '.. localoption)
+			log('setting option '.. option)
+		end
+
+		if localoption == "close" then
+			_closePopupUi(color, color..card.."SecondaryPopup")
+			return
+		elseif localoption == "Strategy Token" then
+			secondarySuccessful = _consumeStrategyToken(color, capitalizedCardName)
+		else 
+			secondarySuccessful = _useStrategytokenAlternative(color, localoption)
+		end
 	end
 
 	-------------------------- Diplomacy ---------------------------------------
@@ -824,11 +847,10 @@ function _closeMenu(color, card)
 end
 
 ------------------------------ build custom UI ---------------------------------
-local _defaultLayoutBackup
+local _defaultLayoutBackup = {}
 
 function updateUiOnClick(player, option, alt)
 	_active = true
-
 	local colorTable = {}
 	local factionColors = {}
 	local missingFactionColors = false
@@ -873,8 +895,11 @@ function updateUiOnClick(player, option, alt)
 	-- adds on "Assign Speaker" button to Politics menu which opens the politics Popup
 	layout = _addAutomationPoliticsPopup(layout)
 
-	-- add a choice between scoring mecatol rex and drawing a secret
+	-- adds a choice between scoring mecatol rex and drawing a secret
 	layout = _addImperialPrimary(layout)
+
+	-- adds a popup for alternative payment methods for secondaries
+	layout = _addSecondaryPopup(layout, factionColors)
 
 	-- adjusts the colors Table for the assign speaker politicsPopup
 	layout = _updateColorSelector(layout, "politicsPopup", colorTable)
@@ -891,7 +916,6 @@ function _addTechnologyPrimarySecondary(layout)
 	-- replaces it with generic "Primary, Secondary, Pass, Close"
 	-- which opens the technologyPopup on demand.
 	-- If PoK not selected, remove PoK tech buttons from UI.
-
 	local technologyIndex = nil
 
 	for majorIndex,menu in ipairs(layout) do
@@ -899,7 +923,6 @@ function _addTechnologyPrimarySecondary(layout)
 			technologyIndex = majorIndex
 		end
 	end
-
 	if not technologyIndex then
 		error("Add technology primary secondary: No technology item found in ui", 'Red')
 		return layout
@@ -953,6 +976,132 @@ function _addTechnologyPrimarySecondary(layout)
 	return layout
 end
 
+function _addSecondaryPopup(layout, colorTable)
+	assert(type(colorTable) == 'table')
+	log('go')
+	if not _setupHelper.getPoK() then
+		return layout
+	end
+
+	local function _getPopupButton(color, card, option)
+		local secondaryPopupButton = _deepcopy(_customLayout['secondaryPopupButton'])
+		for key,attr in pairs(secondaryPopupButton["attributes"]) do
+			secondaryPopupButton["attributes"][key] = string.gsub(attr, "COLORPLACEHOLDER", color)
+			secondaryPopupButton["attributes"][key] = string.gsub(secondaryPopupButton["attributes"][key], "CARDPLACEHOLDER", card)
+			secondaryPopupButton["attributes"][key] = string.gsub(secondaryPopupButton["attributes"][key], "OPTIONPLACEHOLDER", option)
+		end
+		return secondaryPopupButton
+	end
+
+	local function _buildPopupTable(params)
+		color = params['color']
+		card = params['card']
+		local secondaryPopup = _deepcopy(_customLayout["secordaryPopupTable"])
+		
+		secondaryPopup["attributes"].id = string.gsub(secondaryPopup["attributes"].id, "COLORPLACEHOLDER", color)
+		secondaryPopup["attributes"].id = string.gsub(secondaryPopup["attributes"].id, "CARDPLACEHOLDER", card)
+		
+		for option,val in pairs(params["options"]) do
+			log('setting '..card .. " " .. color .. " ".. option)
+			if val then
+				local secondaryPopupButton = {}
+
+				-- add two rows of buttons for construction to choose PDS or Space Dock.
+				-- choice is sent as option onClick("Jae Mir Kan (PDS)"). 
+				-- This is separated in onStrategyCardButtonClicked into localoption "Jae Mir Kan" and option "A PDS" for secondary activation.
+				if card == 'construction' then
+					local horizontalLayout = {
+						tag = "HorizontalLayout",
+						attributes = { id = "constructionSecondaryPopup" },
+						children = {} 
+					}
+					for _,addoption in ipairs({" (PDS)"," (Space Dock)"}) do
+						table.insert(horizontalLayout['children'], _deepcopy(_getPopupButton(color,card,option..addoption)))
+					end
+					secondaryPopupButton = _deepcopy(horizontalLayout)
+				
+				-- otherwise only the payment alternative "Jae Mir Kan" is passed as option
+				else
+					secondaryPopupButton = _deepcopy(_getPopupButton(color,card,option))
+				end
+				table.insert(secondaryPopup["children"],2,secondaryPopupButton)
+			end
+		end
+	end
+
+	local function insertAll(option)
+		for _,color in ipairs(colorTable) do
+			optionsForColor[color][option] = true
+		end
+	end
+
+	local optionsForColor = {}
+	for _,color in ipairs(colorTable) do
+		optionsForColor[color] = {['Scepter of Emelpar']= true}
+	end
+	insertAll("Strategy Token")
+	local cardOptions = {["Jae Mir Kan"]= {}, ["Ssruu"]= {}}
+	local promissories = {'Acquiescence'}
+	local JaeMirKanFound = false
+
+	-- search for all possible options availabe to a color and add them to optionsForColor
+	for _, object in ipairs(getAllObjects()) do
+		local name = object.getName()
+		-- add winnu promissory note
+		if (object.tag == 'Deck') and (object.getName() == "Promissory Notes Deck Name") then
+			for _,cardname in ipairs(object.getObjects()) do
+				for _,optionname in promissories do
+					if cardname == optionname then
+						insertAll(optionname)
+					end
+				end
+			end
+		end
+		if (object.tag == "Card") then
+			if (cardOptions[name]) or (promissories[name]) then
+				JaeMirKanFound = JaeMirKanFound or (name == "Jae Mir Kan")
+				local owner = _zoneHelper.zoneFromPosition(object.getPosition())
+				if owner then
+					optionsForColor[owner][name] = true
+				end
+			end
+		end
+	end
+	for _,options in ipairs(optionsForColor) do
+		options["Ssruu"] = JaeMirKanFound and options["Ssruu"]
+	end
+
+	log("setting options:")
+	log(optionsForColor)
+
+	local cards = {"diplomacy","politics","construction","trade","warfare","technology","imperial"}
+	for _,card in ipairs(cards) do
+		for _,color in ipairs(colorTable) do
+			local params = {['color']= color, ['card']= card, ['options']= {}}
+			for option, value in pairs(optionsForColor[color]) do
+				if value then
+					params['options'][option] = true
+				end
+			end
+
+			local popupLayout = _buildPopupTable(params)
+
+			local inserted = false
+			for index,menu in ipairs(layout) do
+				if menu["attributes"]["id"] == (color..card.."SecondaryPopup") then
+					inserted = true
+					-- updates existing COLORtechnologyPopup table in case of changed faction? Just to be sure...
+					layout[index] = _deepcopy(popupLayout)
+					break
+				end
+			end
+			if not inserted then
+				table.insert(layout, _deepcopy(popupLayout))
+			end
+		end
+	end
+	return layout
+end
 
 function _addAutomationTechPopup(layout, colorTable)
 	-- finds the faction technology from faction.factionTech and adds a popup that opens on click of "Faction Tech" button.
@@ -1204,7 +1353,7 @@ end
 ------------------------------ secondary ---------------------------------------
 
 function _getStrategytokenAlternativeSet(color)
-	assert(type(color) == 'string'))
+	assert((type(color) == 'string'))
 
 	local faction = _factionHelper.fromColor(color)
 	if not faction then
@@ -1277,7 +1426,7 @@ function _consumeStrategyToken(color, strategyCard)
 
 	-- Dont consume a strategy token for Trade with the "Master of Trade" ability
 	if strategyCard == "Trade" then
-		abilitiesSet = {}
+		local abilitiesSet = {}
 		for _, ability in ipairs(faction.abilities) do
 			abilitiesSet[ability] = true
 		end
@@ -1294,6 +1443,7 @@ function _consumeStrategyToken(color, strategyCard)
 	local commandTokensBag = _getByName(commandTokensBagName, 'Bag')
 	
 	local altPayment = _getStrategytokenAlternativeSet(color)
+
 	if altPayment then
 		altPayment = table.concat(altPayment, ', ')
 		_safeBroadcastToColor(strategyCard .. ': ' .. altPayment .. ' available to ' .. color .. ' instead of spending a strategy token.  To use it, retrieve the spent token and spend this instead.', color, color)

@@ -549,14 +549,9 @@ function onStrategyCardButtonClicked(params)
 		
 		local i,j
 		i,j = string.find(option," %[.*%]")
-		log('test')
-		log(option)
-		log(i)
 		if i and i<j then
 			localoption = string.sub(option,1,i-1)
 			option = "A "..string.sub(option,i+2,j-1)
-			log('setting localoption '.. localoption)
-			log('setting option '.. option)
 		end
 
 		if localoption == "close" then
@@ -579,7 +574,6 @@ function onStrategyCardButtonClicked(params)
 		if (action == "secondary") and (not secondarySuccessful) then
 			return
 		else
-			log('hitting this close')
 			_closeMenu(color, card)
 			return
 		end
@@ -750,7 +744,6 @@ function _openPopupUi(color, option)
 	assert(type(option) == "string")
 
 	if not _testPopupOptions(option, color) then
-		log("Open Popup: " .. option .. " not found", "Red")
 		if option == color.."technologyPopup" then
 			broadcastToAll("Please use the 'Update UI' button on the Automation card.", "Red")
 		end
@@ -760,9 +753,6 @@ function _openPopupUi(color, option)
 	
 	vis = UI.getAttribute(option, "visibility")
 	act = UI.getAttribute(option, "active")
-	log(option)
-	log(vis)
-	log(act)
 	if vis == "" or vis == nil then
 		vis = color
 		assert(act~="true", option .. " is active but not visible")
@@ -810,7 +800,6 @@ end
 -- we should probably handle "color..cardPopups" generically, instead of checking for it separately with technology.
 -- this would make the implementation of a Popup window for secondary action (if alternatives to a strategy token are available) easier.
 function _closeMenu(color, card)
-	log('closing menu ' .. card .. " for ".. color)
 	local i, j = string.find(card, "Popup")
 	local Popup = false
 	if i ~= nil and j ~= nil then
@@ -825,7 +814,6 @@ function _closeMenu(color, card)
 
 	-- try to close associated _Popups
 	if not Popup then
-		log('menu ' .. card.. " is not a popup" )
 		if card == "technology" then
 			_closeMenu(color, color..card.."Popup")
 		else
@@ -1003,7 +991,6 @@ end
 
 function _addSecondaryPopup(layout, colorTable)
 	assert(type(colorTable) == 'table')
-	log('go')
 	if not _setupHelper.getPoK() then
 		return layout
 	end
@@ -1210,15 +1197,6 @@ function _addAutomationPoliticsPopup(layout)
 	return layout
 end
 
-
-function _addAutomationSecondaryPopup(layout, factionTable)
-	-- UI.createButton not available for global UI. It would have been nice to use alt click,
-	-- to select alternative to using strategy token if available.
-	-- now consumeStrategyToken just exits if alternative is available to the player and tells the player what her alternative is.
-	log("_addAutomationSecondaryPopup not implemented yet")
-	assert(type(factionTable) == "table")
-	return layout
-end
 
 function _addImperialPrimary(layout)
 	-- adds the option to either score a point for mecatol rex (does nothing) or draw a secret
@@ -1437,7 +1415,7 @@ function _getStrategytokenAlternativeSet(color)
 		end
 	end
 	for _, card in ipairs(cardToObjects['Acquiescence Ω']) do
-		local zoneColor = _zoneHelper.zoneFromPosition(card.getPosition())
+		local zoneColor = _zoneHelper.closestZone(card.getPosition())
 		if zoneColor == color then
 			table.insert(altPayment, '"Acquiescence  Ω"')
 			break
@@ -1523,7 +1501,6 @@ function _useStrategytokenAlternative(color, strategyCard, option)
 	assert(type(color) == "string")
 	assert(type(strategyCard) == "string")
 	assert(type(option) == "string")
-	log('using alternative')
 
 	local legaloptions = {"Jae Mir Kan", "Ssruu", "Acquiescence Ω", "Scepter of Emelpar", "Strategy Token"}
 	if option == "Strategy Token" then
@@ -1552,20 +1529,16 @@ function _returnPromissoryNote(color, promissoryName)
 	-- if color == ownercolor then
 	-- 	return false
 	-- end
-
-	local player = _getPlayerFromColor(color)
-	for i = 1, player.getHandCount() do
-		for _, object in ipairs(player.getHandObjects(i)) do
-			if (object.name == promissoryName) or (object.name == promissoryName.." Ω") then
-				local discardParams = {
-					guid = object.getGUID(),
-					name = object.getName(),
-				}
-				_deckHelper.discardCard(discardParams)
-				broadcastToAll(color .. " used the " .. promissoryName .. " promissory note.", color)
-				return true
-			end
-		end
+	object = _getByName(promissoryName, 'Card')
+	if object then
+		object.setPosition(object.getPosition() + vector(0, 20, 0))
+		local discardParams = {
+			guid = object.getGUID(),
+			name = object.getName(),
+		}
+		_deckHelper.discardCard(discardParams)
+		broadcastToAll(color .. " used the " .. promissoryName .. " promissory note.", color)
+		return true
 	end
 	return false
 end

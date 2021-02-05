@@ -360,57 +360,91 @@ local backManual = {
 	}
 }
 
+local backManual = {
+	tag = "Panel",
+	attributes = {
+		position = '0 0 -20.5',
+		rotation = '0 0 180',
+		width = 200,
+		height = 270,
+		scale = '1.35 0.709 1.0',
+	},
+	children = {
+		{
+			tag = "Text",
+			attributes = {
+				resizeTextForBestFit = "true",
+				alignment = "UpperLeft",
+				horizontalOverflow = "wrap"
+			},
+			value = _ObjectManual
+		}
+	}
+}
+
 local _updateUiText = "Please click the 'Update UI' button after all players have chosen a faction. Adds automation features (on first use) and updates the colors listed under politics and trade."
 
-local objectUI = {{
+local objectUI = {
 	tag = "VerticalLayout",
 	attributes = {
-		position = '0 0 2',
-		rotation = '0 180 0',
+		position = '20 24 2',
+		rotation = '0 180 180',
 		width = 200,
-		height = 280,
+		height = 20,
 		padding = '10 10 10 10',
 		spacing = 10,
 		scale = '1.35 1.0 0.709'
 	},
 	children = {
 		{
-			tag ="Text",
+			tag = 'Toggle',
 			attributes = {
-				fontSize = 25,
-				textStyle = "Bold",
-				alignment = "MiddleCenter"
+				id = 'AutomateSecretsToggle',
+				onValueChanged = 'onToggleValueChanged',
+				default = 'false',
+				fontSize = 14,
 			},
-			value = "Strategy Card Automator"
-		},
+			value = "Don't deal Secrets"
+		}
+	},
+}
+
+local backUI = {
+	tag = "Panel",
+	attributes = {
+		position = '0 0 -20.5',
+		rotation = '0 0 180',
+		width = 200,
+		height = 270,
+		scale = '1.35 0.709 1.0',
+	},
+	children = {
 		{
-			tag = "Button",
+			tag = "Text",
 			attributes = {
-				onClick = "updateUiOnClick",
-				fontSize = 18
+				resizeTextForBestFit = "true",
+				alignment = "UpperLeft",
+				horizontalOverflow = "wrap"
 			},
-			value = "Update UI"
-		},
-		{
-			tag = "Panel",
-			children = {
-				{
-					tag = "Text",
-					attributes = {
-						resizeTextForBestFit = "true",
-						alignment = "UpperLeft",
-						horizontalOverflow = "wrap"
-					},
-					value = _updateUiText
-				}
-			}
+			value = _ObjectManual
 		}
 	}
-}}
+}
+
+function onToggleValueChanged(player, value, id)
+	local valueAsBool = string.lower(value) == 'true' and true or false
+	_dontDealSecrets = valueAsBool
+	if _dontDealSecrets then
+		broadcastToAll("No longer automatically dealing Secrets for Imperial Secondary.", 'Red')
+	else
+		broadcastToAll("Automatically dealing Secrets for Imperial Secondary.", 'Green')
+	end
+end
 
 function onLoad()
-	--Description on Back of the Object.
-	self.UI.setXmlTable({backManual})
+	_dontDealSecrets = false
+	--Description on Back of the Object.ff
+	self.UI.setXmlTable({objectUI,backUI})
 	local descriptionText = [[
 	Please click 'Update UI' to enable automation and to modify strategy card windows (such as choosing speaker, faction techology menus).
 
@@ -438,11 +472,11 @@ function onLoad()
 		tooltip = "Adds automation buttons (on first click) and updates Trade and Politics colors (on first click as well as future clicks).",
 		click_function = "updateUiOnClick",
 		function_owner = self,
-		position = {x=0, y=0.0, z=0},
+		position = {x=0, y=0.0, z=-0.1},
 		rotation = {x=0, y=0, z=180},
 		scale = rescale,
 		width = 900,
-		height = 400,
+		height = 350,
 		font_size = 100,
 		label = "Update UI",
 	})
@@ -454,7 +488,7 @@ function onLoad()
 		font_size = 120,
 		label = "Strategy Card\nAutomator",
 		rotation = {x=0, y=0, z=180},
-		position = {x=0, y=0.0, z=-0.63},
+		position = {x=0, y=0.0, z=-0.66},
 		scale = rescale,
 		click_function = "doNothing",
 		function_owner = self
@@ -466,7 +500,7 @@ function onLoad()
 		label = "Please click 'Update UI' after all\nplayers have chosen a faction.",
 		font_color = "Red",
 		rotation = {x=0, y=0, z=180},
-		position = {x=0, y=0.0, z=0.54},
+		position = {x=0, y=0.0, z=0.6},
 		scale = rescale,
 		click_function = "doNothing",
 		function_owner = self
@@ -477,11 +511,14 @@ function onLoad()
 		font_size = 40,
 		label = "Description of the automation on the back",
 		rotation = {x=0, y=0, z=180},
-		position = {x=0, y=0.0, z=0.8},
+		position = {x=0, y=0.0, z=0.85},
 		scale = rescale,
 		click_function = "doNothing",
 		function_owner = self
 	})
+
+
+	
 end
 
 function doNothing()
@@ -531,6 +568,7 @@ function onStrategyCardButtonClicked(params)
 	-- would be nice to have alt key to choose to use alternative, but not possible in xml buttons.
 	local capitalizedCardName = string.gsub(card, "^%l", string.upper)
 	
+
 	if action == "secondary" and card ~= "leadership" then
 		local altPayment = _getStrategytokenAlternative(color)
 		if not altPayment then
@@ -705,7 +743,9 @@ function onStrategyCardButtonClicked(params)
 				_closeMenu(color, card)
 			end
 		elseif (action == "secondary") and secondarySuccessful then
-			_dealImperialSecret(color)
+			if (not _dontDealSecret) then
+				_dealImperialSecret(color)
+			end
 			_closeMenu(color, card)
 		end
 		return
@@ -858,7 +898,7 @@ function _closeMenu(color, card)
 end
 
 ------------------------------ build custom UI ---------------------------------
-local _defaultLayoutBackup = {}
+local _defaultLayoutBackup = false
 
 function updateUiOnClick(player, option, alt)
 	_active = true

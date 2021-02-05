@@ -532,7 +532,7 @@ function onStrategyCardButtonClicked(params)
 	local capitalizedCardName = string.gsub(card, "^%l", string.upper)
 	
 	if action == "secondary" and card ~= "leadership" then
-		local altPayment = _getStrategytokenAlternativeSet(color)
+		local altPayment = _getStrategytokenAlternative(color)
 		if not altPayment then
 			secondarySuccessful = _consumeStrategyToken(color, capitalizedCardName)
 			if not secondarySuccessful then
@@ -557,15 +557,13 @@ function onStrategyCardButtonClicked(params)
 		if localoption == "close" then
 			_closePopupUi(color, color..card.."SecondaryPopup")
 			return
-		elseif localoption == "Strategy Token" then
-			secondarySuccessful = _consumeStrategyToken(color, capitalizedCardName)
-		else 
-			secondarySuccessful = _useStrategytokenAlternative(color, capitalizedCardName, localoption)
 		end
+		secondarySuccessful = _useStrategytokenAlternative(color, capitalizedCardName, localoption)
 		if secondarySuccessful then
 			_closePopupUi(color, color..card.."SecondaryPopup")
 		end
 	end
+
 
 	-------------------------- Diplomacy ---------------------------------------
 	-------------------------- warfare -----------------------------------------
@@ -1360,7 +1358,7 @@ end
 
 ------------------------------ secondary ---------------------------------------
 
-function _getStrategytokenAlternativeSet(color)
+function _getStrategytokenAlternative(color)
 	assert((type(color) == 'string'))
 
 	local faction = _factionHelper.fromColor(color)
@@ -1370,8 +1368,6 @@ function _getStrategytokenAlternativeSet(color)
 	end
 
 	-- Find the command tokens bag and alternate payment methods.
-	local commandTokensBagName = faction.tokenName .. ' Command Tokens Bag'
-	local commandTokensBag = false
 	local cardToObjects = {
 		['Jae Mir Kan'] = {},
 		['Scepter of Emelpar'] = {},
@@ -1380,9 +1376,6 @@ function _getStrategytokenAlternativeSet(color)
 	}
 	for _, object in ipairs(getAllObjects()) do
 		local name = object.getName()
-		if object.tag == 'Bag' and name == commandTokensBagName then
-			commandTokensBag = object
-		end
 		local searchList = (object.tag == 'Card') and cardToObjects[name]
 		if searchList then
 			table.insert(searchList, object)
@@ -1414,11 +1407,19 @@ function _getStrategytokenAlternativeSet(color)
 			break
 		end
 	end
-	for _, card in ipairs(cardToObjects['Acquiescence Ω']) do
-		local zoneColor = _zoneHelper.closestZone(card.getPosition())
-		if zoneColor == color then
-			table.insert(altPayment, '"Acquiescence  Ω"')
-			break
+	local ownerSelf = false
+	for _, factionNote in ipairs(faction.promissoryNotes) do
+		if "Acquiescence Ω" == factionNote then
+			ownerSelf = true
+		end
+	end
+	if not ownerSelf then
+		for _, card in ipairs(cardToObjects['Acquiescence Ω']) do
+			local zoneColor = _zoneHelper.closestZone(card.getPosition())
+			if (zoneColor == color) and (not string.match(card.getName(), color)) and (not card.is_face_down) then
+				table.insert(altPayment, '"Acquiescence  Ω"')
+				break
+			end
 		end
 	end
 	if #altPayment > 0 then
@@ -1426,7 +1427,6 @@ function _getStrategytokenAlternativeSet(color)
 	else
 		return false
 	end
-
 end
 
 
@@ -1446,7 +1446,7 @@ function _consumeStrategyToken(color, strategyCard)
 			abilitiesSet[ability] = true
 		end
 		if abilitiesSet['Masters of Trade'] then
-			_safeBroadcastToColor(strategyCard .. ": ".. color .. " has the Master of Trade ability. No strategy token has been used." , color, color)
+			_safeBroadcastToColor(strategyCard .. ": ".. color .. " has the Master of Trade ability. Not using a strategy token." , color, color)
 			return true
 		end
 	end
@@ -1455,7 +1455,7 @@ function _consumeStrategyToken(color, strategyCard)
 	local commandTokensBagName = faction.tokenName .. ' Command Tokens Bag'
 	local commandTokensBag = _getByName(commandTokensBagName, 'Bag')
 	
-	-- local altPayment = _getStrategytokenAlternativeSet(color)
+	-- local altPayment = _getStrategytokenAlternative(color)
 
 	-- if altPayment then
 	-- 	altPayment = table.concat(altPayment, ', ')
@@ -1506,7 +1506,11 @@ function _useStrategytokenAlternative(color, strategyCard, option)
 	if option == "Strategy Token" then
 		return _consumeStrategyToken(color, strategyCard)
 	elseif option == "Acquiescence Ω" then
-		return _returnPromissoryNote(color, option)
+		local success = _returnPromissoryNote(color, option)
+		if success then
+			broadcastToAll(color .. " resolved and returned ".. option..".", color)
+		end
+		return success
 	else
 		local object = _getByName(option, 'Card')
 		if (object ~= nil) and(not object.is_face_down) then
@@ -1537,7 +1541,6 @@ function _returnPromissoryNote(color, promissoryName)
 			name = object.getName(),
 		}
 		_deckHelper.discardCard(discardParams)
-		broadcastToAll(color .. " used the " .. promissoryName .. " promissory note.", color)
 		return true
 	end
 	return false
@@ -1787,22 +1790,80 @@ function _refreshCommodities(color)
 		end
 	end
 
+	--callback for commodities.takeObject. Send to "promissedCommandSheet."
+	local function sendToNewColor(obj)
+		Wait.condition(function() obj.flip() end, 
+			function() return obj.resting end,
+			5,
+			function() obj.flip() end)
+		Wait.frames(function() obj.setRotation(promissedCommandSheet.getRotation(),false,false) end, 3)
+		Wait.condition(
+			function() obj.setPositionSmooth(
+				promissedCommandSheet.positionToWorld({
+					x=0.5,
+					y=4+2*math.random(),
+					z=2.0
+				}), false,false) end, 
+			function() return obj.resting end, 
+			5,
+			function() obj.setPositionSmooth(
+				promissedCommandSheet.positionToWorld({
+					x=0.5,
+					y=4+2*math.random(),
+					z=2.0
+				}), false,false) end
+		)
+		return true
+	end
+
+	-- empty callback for commodities.takeObject
+	localCallback = function() end
+
+	-- if someone has color's tradeagreement set callback to send commodities to promissoryNoteColor instead
+	promissoryNoteColor = _getTradeAgreement(color)
+	if promissoryNoteColor then
+		local promissoryFaction = _factionHelper.fromColor(promissoryNoteColor)
+		if not promissoryFaction then
+			broadcastToAll('Dealing Tradegoods: no faction for promissory note holder ' .. promissoryNoteColor, 'Red')
+			return
+		end
+		promissedCommandSheet =  getObjectFromGUID(promissoryFaction.commandSheetGuid)
+		localCallback = sendToNewColor
+	end
+	
 	-- positions are relative to faction sheet
-	-- No idea what happens when command sheet is flipped. Dont think they land under the table (or hope not)
-	-- positions are neatly arranged on the commodities field
 	for i = 1,faction.commodities do
-		local token = commoditiesBag.takeObject({
+		commoditiesBag.takeObject({
 			position = factionSheet.positionToWorld({
 				x = -0.8-(0.15*math.ceil(i/2)),
 				y = 2 + (i*0.01),
 				z = 0.25 + ((i+1)%2)*0.16
 			}),
-			rotation = factionSheet.getRotation()
+			rotation = factionSheet.getRotation(),
+			callback_function = localCallback
 		})
+	end
+	
+	if promissoryNoteColor then
+		-- could have passed the guid of promissory note here, 
+		-- but returnPromissoryNote uses _getByName() so lookup shouldn't be too bad
+		broadcastToAll(promissoryNoteColor .. " resolved and returned ".. color.."'s Trade Agreement ("..color..").", color)
+		Wait.frames(function() _returnPromissoryNote(color, "Trade Agreement ("..color..")") end, 30)
 	end
 	_safeBroadcastToColor("Refreshed " .. color .. "'s commodities", color, color)
 end
 
+-- find Trade Agreement (color), and if faceup return holding players color to resolve and return it
+function _getTradeAgreement(color)
+	tradeAgreementObj = _getByName("Trade Agreement ("..color..")" , "Card")
+	if tradeAgreementObj and (not tradeAgreementObj.is_face_down) then
+		local zoneColor = _zoneHelper.closestZone(tradeAgreementObj.getPosition())
+		if zoneColor != color then
+			return zoneColor
+		end
+	end
+	return false
+end
 --------------------------------- Technology -----------------------------------
 
 -- Research pulling techs to a tech board checks what techs are already there.

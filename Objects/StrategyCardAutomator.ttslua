@@ -327,15 +327,10 @@ local _customLayout = {
 local _ObjectManual = [[
 Features:
 Leadership - Primary and Number: gain command tokens.
-All other secondaries consume a (non fleet) strategy token (in strat. pool).
-
-Politics - Speaker: Moves speaker token, Draws 2 Action and Agendas. - Sec.: draws 2 Actioncards
-Construction - Allocate constructed units.
-Trade - Prim.: Allocates 3 resources, Refreshes commodities (removes all from comm. pool and gain correct #)
-- Color: Refreshes colors commodities - Sec.: Refreshes your commodities (does not use a command token as "Master of Trade"(Hacan))
-Tech: Draws the card from tech deck, use Tech Board if available.
-- Faction Tech: Opens a choice popup - Comm Tokens: gain tokens as Necro.
-Imperial - Score: Only writes message - Secret: Draws secret. - Secondary: Draws secret.
+All other secondaries consume a (non fleet) strategy token (in strat. pool) or open a menu.
+Politics - Speaker: Moves speaker token, Draws 2 Action and Agendas. - Sec.: draws 2 Actioncards Construction - Allocate constructed units. Trade - Prim.: Allocates 3 resources, Refreshes commodities (removes all from comm. pool and gain correct #)- Color: Refreshes colors commodities - Sec.: Refreshes your commodities (does not use a command token as "Master of Trade"(Hacan)). 
+Tech: Draws the card from tech deck, use Tech Board if available. - Faction Tech: Opens a choice popup - Comm Tokens: gain tokens as Necro. Imperial - Score: Only writes message - Secret: Draws secret. - Secondary: Draws secret (if Toggled on). 
+Acquiescence and Trade Agreements are resolved if held face up.
 ]]
 
 local backManual = {
@@ -448,14 +443,16 @@ function onLoad()
 	local descriptionText = [[
 	Please click 'Update UI' to enable automation and to modify strategy card windows (such as choosing speaker, faction techology menus).
 
-	Secondary actions consume a command token.
+	Secondary actions consume a command token or open a menu to select an alternative.
 
 	Leadership: gain command tokens.
 	Politics: move speaker, draw agenda and action cards.
 	Construction: allocate units/command token.
 	Trade: gain tradegoods and commodities.
 	Tech: draw tech cards (use Tech board if available).
-	Imperial: draw secret.
+	Imperial: draw secret (if toggled on).
+
+	Acquiescence and Trade Agreements are resolved if face up.
 
 	Place this object in a bag (or delete it) to stop getting strategy card automation.
 	]]
@@ -743,7 +740,7 @@ function onStrategyCardButtonClicked(params)
 				_closeMenu(color, card)
 			end
 		elseif (action == "secondary") and secondarySuccessful then
-			if (not _dontDealSecret) then
+			if (not _dontDealSecrets) then
 				_dealImperialSecret(color)
 			end
 			_closeMenu(color, card)
@@ -1027,13 +1024,12 @@ function _addTechnologyPrimarySecondary(layout)
 	return layout
 end
 
+-- adds a menu entry color..card..SecondaryPopup for each combination in game.
+-- each entry consists of all alternatives that could possibly be available to the color, 
+-- based on faction, factions in game and PoK.
 function _addSecondaryPopup(layout, colorTable)
 	assert(type(colorTable) == 'table')
-	if not _setupHelper.getPoK() then
-		return layout
-	end
-	-- local secondaryPopupButton
-	-- local secondaryPopup
+
 	local function _getPopupButton(color, card, option)
 		local secondaryPopupButton = _deepcopy(_customLayout['secondaryPopupButton'])
 		for key,attr in pairs(secondaryPopupButton["attributes"]) do
@@ -1045,15 +1041,19 @@ function _addSecondaryPopup(layout, colorTable)
 	end
 
 	local function _buildPopupTable(params)
-		color = params['color']
-		card = params['card']
+		local color = params['color']
+		local card = params['card']
 		local secondaryPopup = _deepcopy(_customLayout["secondaryPopupTable"])
 		secondaryPopup["attributes"].id = string.gsub(secondaryPopup["attributes"].id, "COLORPLACEHOLDER", color)
 		secondaryPopup["attributes"].id = string.gsub(secondaryPopup["attributes"].id, "CARDPLACEHOLDER", card)
 		for _,menu in ipairs(secondaryPopup["children"]) do
 			for key,attr in pairs(menu["attributes"]) do
 				attr = string.gsub(attr, "COLORPLACEHOLDER", color)
-				attr = string.gsub(attr, "CARDPLACEHOLDER", card)
+				if key == 'text' then
+					attr = string.gsub(attr, "CARDPLACEHOLDER", string.gsub(card, "^%l", string.upper))
+				else
+					attr = string.gsub(attr, "CARDPLACEHOLDER", card)
+				end
 				menu["attributes"][key] = attr
 			end
 		end
@@ -1061,7 +1061,7 @@ function _addSecondaryPopup(layout, colorTable)
 		for option,val in pairs(params["options"]) do
 			if val then
 				local secondaryPopupButton = {}
-
+				
 				-- add two rows of buttons for construction to choose PDS or Space Dock.
 				-- choice is sent as option onClick("Jae Mir Kan (PDS)"). 
 				-- This is separated in onStrategyCardButtonClicked into localoption "Jae Mir Kan" and option "A PDS" for secondary activation.
@@ -1075,28 +1075,37 @@ function _addSecondaryPopup(layout, colorTable)
 						table.insert(horizontalLayout['children'], _deepcopy(_getPopupButton(color,card,option..addoption)))
 					end
 					secondaryPopupButton = _deepcopy(horizontalLayout)
-				
-				-- otherwise only the payment alternative "Jae Mir Kan" is passed as option
+					
+					-- otherwise only the payment alternative "Jae Mir Kan" is passed as option
 				else
 					secondaryPopupButton = _deepcopy(_getPopupButton(color,card,option))
 				end
-				table.insert(secondaryPopup["children"],2,secondaryPopupButton)
+				
+				-- pairs() does not guarantee order. pos sets 'Strategy Token' option to top, others below
+				local pos = #secondaryPopup["children"]
+				if (option == "Strategy Token") then
+					pos = 2
+				end
+				table.insert(secondaryPopup["children"],pos,secondaryPopupButton)
 			end
 		end
 		return secondaryPopup
 	end
-
+	
 	local function insertAll(option)
 		for _,color in ipairs(colorTable) do
 			optionsForColor[color][option] = true
 		end
 	end
-
+	
 	optionsForColor = {}
 	for _,color in ipairs(colorTable) do
-		optionsForColor[color] = {['Scepter of Emelpar']= true}
+		optionsForColor[color] = {["Strategy Token"] = true}
 	end
-	insertAll("Strategy Token")
+	if _setupHelper.getPoK() then
+		insertAll('Scepter of Emelpar')
+	end
+
 	local cardOptions = {["Jae Mir Kan"]= {}, ["Ssruu"]= {}}
 	local promissories = {['Acquiescence Ω'] = {}}
 	local JaeMirKanFound = false
@@ -1130,6 +1139,8 @@ function _addSecondaryPopup(layout, colorTable)
 	end
 
 	local cards = {"diplomacy","politics","construction","trade","warfare","technology","imperial"}
+
+	-- for each card and color add the respective popup
 	for _,card in ipairs(cards) do
 		for _,color in ipairs(colorTable) do
 			local params = {['color']= color, ['card']= card, ['options']= {}}
@@ -1140,7 +1151,7 @@ function _addSecondaryPopup(layout, colorTable)
 			end
 
 			local popupLayout = _buildPopupTable(params)
-
+			
 			local inserted = false
 			for index,menu in ipairs(layout) do
 				if menu["attributes"]["id"] == (color..card.."SecondaryPopup") then

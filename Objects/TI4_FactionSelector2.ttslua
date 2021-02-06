@@ -347,6 +347,8 @@ end
 -------------------------------------------------------------------------------
 
 function onLoad()
+    self.addContextMenuItem('Unpack faction token', doUnpackUsingFactionToken)
+
     -- Normal buttons are not as flexible, create a function for each.
     for _, idAndTokenName in ipairs(FACTION_ID_AND_TOKEN_NAMES) do
         local id = idAndTokenName.id
@@ -394,7 +396,6 @@ end
 function onClickUnpack(clickObject, clickerColor, altClick)
     assert(_chosenFactionId)
 
-    local color = _zoneHelper.zoneFromPosition(self.getPosition())
     local factionTokenName = false
     for _, idAndTokenName in ipairs(FACTION_ID_AND_TOKEN_NAMES) do
         if idAndTokenName.id == _chosenFactionId then
@@ -402,12 +403,12 @@ function onClickUnpack(clickObject, clickerColor, altClick)
             break
         end
     end
-    doUnpack(color, factionTokenName)
+    doUnpack(factionTokenName)
 end
 
 -------------------------------------------------------------------------------
 
-function doUnpack(color, factionTokenName)
+function doUnpack(factionTokenName)
     -- Abort if setup pending.  Cannot rearrange table after faction unpack.
     local function setupPending()
         for _, object in ipairs(getAllObjects()) do
@@ -422,6 +423,7 @@ function doUnpack(color, factionTokenName)
     end
 
     -- Abort if not in a player area.
+    local color = _zoneHelper.zoneFromPosition(self.getPosition())
     if not color then
         printToAll('Faction unpack: unpacker not in a player area, aborting.', 'Yellow')
         return
@@ -452,6 +454,29 @@ function doUnpack(color, factionTokenName)
             unpackButtonGuid = self.getGUID()  -- setup will delete this object
         })
     end
+end
+
+-- Unpack based on "$FACTION Faction Token" object in player area.
+function doUnpackUsingFactionToken()
+    local color = _zoneHelper.zoneFromPosition(self.getPosition())
+    local factionTokenName = false
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        local candidate = string.match(name, '^(.*) Faction Token$')
+        if candidate and (_zoneHelper.zoneFromPosition(object.getPosition()) == color) then
+            if factionTokenName then
+                printToAll('Faction unpack: multiple faction tokens found for ' .. color .. ', aborting', 'Yellow')
+                return
+            end
+            factionTokenName = candidate
+        end
+    end
+    if not factionTokenName then
+        printToAll('Faction unpack: no faction token found for ' .. color .. ', aborting', 'Yellow')
+        return
+    end
+
+    doUnpack(factionTokenName)
 end
 
 -------------------------------------------------------------------------------

@@ -328,8 +328,8 @@ local _ObjectManual = [[
 Features:
 Leadership - Primary and Number: gain command tokens.
 All other secondaries consume a (non fleet) strategy token (in strat. pool) or open a menu.
-Politics - Speaker: Moves speaker token, Draws 2 Action and Agendas. - Sec.: draws 2 Actioncards Construction - Allocate constructed units. Trade - Prim.: Allocates 3 resources, Refreshes commodities (removes all from comm. pool and gain correct #)- Color: Refreshes colors commodities - Sec.: Refreshes your commodities (does not use a command token as "Master of Trade"(Hacan)). 
-Tech: Draws the card from tech deck, use Tech Board if available. - Faction Tech: Opens a choice popup - Comm Tokens: gain tokens as Necro. Imperial - Score: Only writes message - Secret: Draws secret. - Secondary: Draws secret (if Toggled on). 
+Politics - Speaker: Moves speaker token, Draws 2 Action and Agendas. - Sec.: draws 2 Actioncards Construction - Allocate constructed units. Trade - Prim.: Allocates 3 resources, Refreshes commodities (removes all from comm. pool and gain correct #)- Color: Refreshes colors commodities - Sec.: Refreshes your commodities (does not use a command token as "Master of Trade"(Hacan)).
+Tech: Draws the card from tech deck, use Tech Board if available. - Faction Tech: Opens a choice popup - Comm Tokens: gain tokens as Necro. Imperial - Score: Only writes message - Secret: Draws secret. - Secondary: Draws secret (if Toggled on).
 Acquiescence and Trade Agreements are resolved if held face up.
 ]]
 
@@ -438,7 +438,7 @@ end
 
 function onLoad()
 	_dontDealSecrets = false
-	--Description on Back of the Object.ff
+	--Description on Back of the Object as well as Toggle on front.
 	self.UI.setXmlTable({objectUI,backUI})
 	local descriptionText = [[
 	Please click 'Update UI' to enable automation and to modify strategy card windows (such as choosing speaker, faction techology menus).
@@ -515,7 +515,7 @@ function onLoad()
 	})
 
 
-	
+
 end
 
 function doNothing()
@@ -564,7 +564,7 @@ function onStrategyCardButtonClicked(params)
 	-- or has Yssaril agent available with mahact agent in game.
 	-- would be nice to have alt key to choose to use alternative, but not possible in xml buttons.
 	local capitalizedCardName = string.gsub(card, "^%l", string.upper)
-	
+
 
 	if action == "secondary" and card ~= "leadership" then
 		local altPayment = _getStrategytokenAlternative(color)
@@ -573,7 +573,7 @@ function onStrategyCardButtonClicked(params)
 			if not secondarySuccessful then
 				return  -- consumeStrategyToken printed the error message
 			end
-		else 
+		else
 			_openPopupUi(color, color..card.."SecondaryPopup")
 		end
 	end
@@ -581,7 +581,7 @@ function onStrategyCardButtonClicked(params)
 	if action == "secondaryPopup" then
 		action = string.gsub(action, "Popup", "")
 		local localoption = option
-		
+
 		local i,j
 		i,j = string.find(option," %[.*%]")
 		if i and i<j then
@@ -754,24 +754,11 @@ end
 local _legalOptions = { "politicsPopup", "technologyPopup", "SecondaryPopup" }
 
 function _testPopupOptions(option, color)
-	-- return true
-	-- 	local legal = false
-	-- 	for _,o in pairs(_legalOptions) do
-	-- 		if (color..o == option) or (o == option) then
-	-- 			legal = true
-	-- 		end
-	-- 	end
-	
-	-- 	if not legal then
-	-- 		return false
-	-- 	end
-	
 	if UI.getAttributes(option) == nil then
 		return false
 	else
 		return true
 	end
-	-- end
 end
 
 function _openPopupUi(color, option)
@@ -785,7 +772,7 @@ function _openPopupUi(color, option)
 		return
 	end
 
-	
+
 	vis = UI.getAttribute(option, "visibility")
 	act = UI.getAttribute(option, "active")
 	if vis == "" or vis == nil then
@@ -811,7 +798,6 @@ function _closePopupUi(color, option)
 	assert(type(option) == "string")
 	if (not _testPopupOptions(option, color)) then
 		return
-		--error("Close Popup: " .. option .. " not found", "Red")
 	end
 	_closeMenu(color, option)
 end
@@ -831,9 +817,6 @@ end
 -- closeMenu (just like in global), but closes all associated Popups
 -- if the card is a Popup, we do not want to reset the visibility for all,
 -- because we only make the Popups selectively visible to players.
---
--- we should probably handle "color..cardPopups" generically, instead of checking for it separately with technology.
--- this would make the implementation of a Popup window for secondary action (if alternatives to a strategy token are available) easier.
 function _closeMenu(color, card)
 	local i, j = string.find(card, "Popup")
 	local Popup = false
@@ -1025,7 +1008,7 @@ function _addTechnologyPrimarySecondary(layout)
 end
 
 -- adds a menu entry color..card..SecondaryPopup for each combination in game.
--- each entry consists of all alternatives that could possibly be available to the color, 
+-- each entry consists of all alternatives that could possibly be available to the color,
 -- based on faction, factions in game and PoK.
 function _addSecondaryPopup(layout, colorTable)
 	assert(type(colorTable) == 'table')
@@ -1061,26 +1044,26 @@ function _addSecondaryPopup(layout, colorTable)
 		for option,val in pairs(params["options"]) do
 			if val then
 				local secondaryPopupButton = {}
-				
+
 				-- add two rows of buttons for construction to choose PDS or Space Dock.
-				-- choice is sent as option onClick("Jae Mir Kan (PDS)"). 
+				-- choice is sent as option onClick("Jae Mir Kan (PDS)").
 				-- This is separated in onStrategyCardButtonClicked into localoption "Jae Mir Kan" and option "A PDS" for secondary activation.
 				if card == 'construction' then
 					local horizontalLayout = {
 						tag = "HorizontalLayout",
 						attributes = { id = "constructionSecondaryPopup" },
-						children = {} 
+						children = {}
 					}
 					for _,addoption in ipairs({" [PDS]"," [Space Dock]"}) do
 						table.insert(horizontalLayout['children'], _deepcopy(_getPopupButton(color,card,option..addoption)))
 					end
 					secondaryPopupButton = _deepcopy(horizontalLayout)
-					
+
 					-- otherwise only the payment alternative "Jae Mir Kan" is passed as option
 				else
 					secondaryPopupButton = _deepcopy(_getPopupButton(color,card,option))
 				end
-				
+
 				-- pairs() does not guarantee order. pos sets 'Strategy Token' option to top, others below
 				local pos = #secondaryPopup["children"]
 				if (option == "Strategy Token") then
@@ -1091,13 +1074,13 @@ function _addSecondaryPopup(layout, colorTable)
 		end
 		return secondaryPopup
 	end
-	
+
 	local function insertAll(option)
 		for _,color in ipairs(colorTable) do
 			optionsForColor[color][option] = true
 		end
 	end
-	
+
 	optionsForColor = {}
 	for _,color in ipairs(colorTable) do
 		optionsForColor[color] = {["Strategy Token"] = true}
@@ -1151,7 +1134,7 @@ function _addSecondaryPopup(layout, colorTable)
 			end
 
 			local popupLayout = _buildPopupTable(params)
-			
+
 			local inserted = false
 			for index,menu in ipairs(layout) do
 				if menu["attributes"]["id"] == (color..card.."SecondaryPopup") then
@@ -1502,19 +1485,9 @@ function _consumeStrategyToken(color, strategyCard)
 		end
 	end
 
-	-- Find the command tokens bag and alternate payment methods.
+	-- Find the command tokens bag.
 	local commandTokensBagName = faction.tokenName .. ' Command Tokens Bag'
 	local commandTokensBag = _getByName(commandTokensBagName, 'Bag')
-	
-	-- local altPayment = _getStrategytokenAlternative(color)
-
-	-- if altPayment then
-	-- 	altPayment = table.concat(altPayment, ', ')
-	-- 	_safeBroadcastToColor(strategyCard .. ': ' .. altPayment .. ' available to ' .. color .. ' instead of spending a strategy token.  To use it, retrieve the spent token and spend this instead.', color, color)
-	-- 	-- Proceed with normal payment.  This *could* return here and rely on
-	-- 	-- the player to spend the token, but if they're not paying attention
-	-- 	-- they may unintentionally not pay for following.
-	-- end
 
 	if not commandTokensBag then
 		broadcastToAll('Consume Strategy tokens: missing ' .. faction.tokenName .. ' Command Tokens Bag', 'Red')
@@ -1576,14 +1549,10 @@ function _useStrategytokenAlternative(color, strategyCard, option)
 	return false
 end
 
+-- Blindly return promissory note. Handle checking and messaging by caller.
 function _returnPromissoryNote(color, promissoryName)
 	assert(type(color) == "string")
 	assert(type(promissoryName) == "string")
-
-	-- local ownercolor = _deckHelper.getPromissoryOwner(promissoryName)
-	-- if color == ownercolor then
-	-- 	return false
-	-- end
 	object = _getByName(promissoryName, 'Card')
 	if object then
 		object.setPosition(object.getPosition() + vector(0, 20, 0))
@@ -1843,7 +1812,7 @@ function _refreshCommodities(color)
 
 	--callback for commodities.takeObject. Send to "promissedCommandSheet."
 	local function sendToNewColor(obj)
-		Wait.condition(function() obj.flip() end, 
+		Wait.condition(function() obj.flip() end,
 			function() return obj.resting end,
 			5,
 			function() obj.flip() end)
@@ -1854,8 +1823,8 @@ function _refreshCommodities(color)
 					x=0.5,
 					y=4+2*math.random(),
 					z=2.0
-				}), false,false) end, 
-			function() return obj.resting end, 
+				}), false,false) end,
+			function() return obj.resting end,
 			5,
 			function() obj.setPositionSmooth(
 				promissedCommandSheet.positionToWorld({
@@ -1881,7 +1850,7 @@ function _refreshCommodities(color)
 		promissedCommandSheet =  getObjectFromGUID(promissoryFaction.commandSheetGuid)
 		localCallback = sendToNewColor
 	end
-	
+
 	-- positions are relative to faction sheet
 	for i = 1,faction.commodities do
 		commoditiesBag.takeObject({
@@ -1894,9 +1863,9 @@ function _refreshCommodities(color)
 			callback_function = localCallback
 		})
 	end
-	
+
 	if promissoryNoteColor then
-		-- could have passed the guid of promissory note here, 
+		-- could have passed the guid of promissory note here,
 		-- but returnPromissoryNote uses _getByName() so lookup shouldn't be too bad
 		broadcastToAll(promissoryNoteColor .. " resolved and returned ".. color.."'s Trade Agreement ("..color..").", color)
 		Wait.frames(function() _returnPromissoryNote(color, "Trade Agreement ("..color..")") end, 30)

@@ -846,7 +846,11 @@ function injectCard(params)
     -- Make sure _lowerCardNameToDeckAttributes exists.
     _getDeckAttributes('bogus')
 
-    _lowerCardNameToDeckAttributes[string.lower(params.cardName)] = deckAttributes
+    _lowerCardNameToDeckAttributes[string.lower(params.cardName)] = {
+        transform = {},
+        deckName = params.deckName,
+        factionName = params.factionName,
+    }
 end
 
 -------------------------------------------------------------------------------

@@ -502,6 +502,7 @@ local _unitModifiers = {
         leader = LEADER.COMMANDER, -- Yin
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
+        isCombat = false,
         apply = function(unitAttrs)
             local currentCost = unitAttrs['Infantry'].cost
             local currentProductionConsumed = unitAttrs['Infantry'].productionConsumed or 1
@@ -689,6 +690,7 @@ local _unitModifiers = {
         leader = LEADER.COMMANDER, -- Naalu
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
+        isCombat = false,
         apply = function(unitAttrs, params)
             local currentCost = unitAttrs['Fighter'].cost or 0.5
             local currentProductionConsumed = unitAttrs['Fighter'].productionConsumed or 1
@@ -768,6 +770,7 @@ local _unitModifiers = {
         leader = LEADER.COMMANDER, -- Nomad
         owner = OWNER.SELF,
         type = TYPE.ADJUST,
+        isCombat = false,
         apply = function(unitAttrs)
             unitAttrs['Flagship'].cost = 0
         end
@@ -848,6 +851,7 @@ local _unitModifiers = {
         description = 'Fighters and infantry cost 1 each',
         owner = OWNER.ANY,
         type = TYPE.MUTATE, -- set cost before additional adjustments
+        isCombat = false,
         apply = function(unitAttrs)
             unitAttrs['Fighter'].cost = 1
             unitAttrs['Infantry'].cost = 1
@@ -1017,6 +1021,7 @@ local _unitModifiers = {
         leader = LEADER.COMMANDER, -- Vuil'Raith
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,
+        isCombat = false,
         apply = function(unitAttrs, params)
             local bonusRemaining = 2
             for _, unitType in ipairs({'Infantry', 'Fighter'}) do
@@ -2182,6 +2187,7 @@ function _validateUnitModifier(name, unitModifier)
     assert(type(unitModifier.description) == 'string', 'missing ' .. name .. '.description')
     assert(type(unitModifier.owner) == 'string', 'missing ' .. name .. '.owner')
     assert(type(unitModifier.type) == 'string', 'missing ' .. name .. '.type')
+    assert(type(unitModifier.isCombat) == 'boolean', 'missing ' .. name .. '.isCombat')
 
     local legalOwnerSet = {}
     for _, value in pairs(OWNER) do

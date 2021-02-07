@@ -1811,43 +1811,50 @@ function _refreshCommodities(color)
 	end
 
 	--callback for commodities.takeObject. Send to "promissedCommandSheet."
+	local promissedCommandSheet = false
 	local function sendToNewColor(obj)
-		Wait.condition(function() obj.flip() end,
-			function() return obj.resting end,
-			5,
-			function() obj.flip() end)
-		Wait.frames(function() obj.setRotation(promissedCommandSheet.getRotation(),false,false) end, 3)
+		local function doMove()
+			local pos = promissedCommandSheet.positionToWorld({
+				x = 0.5,
+				y = 4,
+				z = 2.0
+			})
+			pos = {
+				x = pos.x, -- + (math.random() - 0.5) * 2,
+				y = pos.y + math.random() * 2,
+				z = pos.z -- + (math.random() - 0.5) * 2
+			}
+			local rot = {
+				x = 0,
+				y = promissedCommandSheet.getRotation().y,
+				z = 180  -- trade good side
+			}
+			local collide = false
+			local fast = false
+			obj.setRotationSmooth(rot, collide, fast)
+			obj.setPositionSmooth(pos, collide, fast)
+		end
 		Wait.condition(
-			function() obj.setPositionSmooth(
-				promissedCommandSheet.positionToWorld({
-					x=0.5,
-					y=4+2*math.random(),
-					z=2.0
-				}), false,false) end,
+			doMove,
 			function() return obj.resting end,
 			5,
-			function() obj.setPositionSmooth(
-				promissedCommandSheet.positionToWorld({
-					x=0.5,
-					y=4+2*math.random(),
-					z=2.0
-				}), false,false) end
+			doMove
 		)
 		return true
 	end
 
 	-- empty callback for commodities.takeObject
-	localCallback = function() end
+	local localCallback = function() end
 
 	-- if someone has color's tradeagreement set callback to send commodities to promissoryNoteColor instead
-	promissoryNoteColor = _getTradeAgreement(color)
+	local promissoryNoteColor = _getTradeAgreement(color)
 	if promissoryNoteColor then
 		local promissoryFaction = _factionHelper.fromColor(promissoryNoteColor)
 		if not promissoryFaction then
 			broadcastToAll('Dealing Tradegoods: no faction for promissory note holder ' .. promissoryNoteColor, 'Red')
 			return
 		end
-		promissedCommandSheet =  getObjectFromGUID(promissoryFaction.commandSheetGuid)
+		promissedCommandSheet = getObjectFromGUID(promissoryFaction.commandSheetGuid)
 		localCallback = sendToNewColor
 	end
 
@@ -1867,23 +1874,37 @@ function _refreshCommodities(color)
 	if promissoryNoteColor then
 		-- could have passed the guid of promissory note here,
 		-- but returnPromissoryNote uses _getByName() so lookup shouldn't be too bad
-		broadcastToAll(promissoryNoteColor .. " resolved and returned ".. color.."'s Trade Agreement ("..color..").", color)
-		Wait.frames(function() _returnPromissoryNote(color, "Trade Agreement ("..color..")") end, 30)
+		broadcastToAll(promissoryNoteColor .. " resolved and returned ".. color.."'s Trade Agreement.", color)
+		Wait.time(function() _returnPromissoryNote(color, "Trade Agreement ("..color..")") end, 1)
 	end
 	_safeBroadcastToColor("Refreshed " .. color .. "'s commodities", color, color)
 end
 
 -- find Trade Agreement (color), and if faceup return holding players color to resolve and return it
 function _getTradeAgreement(color)
-	tradeAgreementObj = _getByName("Trade Agreement ("..color..")" , "Card")
-	if tradeAgreementObj and (not tradeAgreementObj.is_face_down) then
-		local zoneColor = _zoneHelper.closestZone(tradeAgreementObj.getPosition())
-		if zoneColor != color then
-			return zoneColor
-		end
+	local tradeAgreementObj = _getByName("Trade Agreement ("..color..")" , "Card")
+
+	-- The card *should* be present somewhere.  Fail quietly if not.
+	if not tradeAgreementObj then
+		return false
 	end
-	return false
+
+	-- Require card face up on the table (not in hand).
+	local inHandGuidSet = _zoneHelper.inHand()
+	if tradeAgreementObj.is_face_down or inHandGuidSet[tradeAgreementObj.getGUID()] then
+		return false
+	end
+
+	-- Require card be in a zone other than the connected player.
+	local zoneColor = _zoneHelper.zoneFromPosition(tradeAgreementObj.getPosition())
+	if (not zoneColor) or zoneColor == color then
+		return false
+	end
+
+	-- Found card face up on the table in a different player's zone.
+	return zoneColor
 end
+
 --------------------------------- Technology -----------------------------------
 
 -- Research pulling techs to a tech board checks what techs are already there.

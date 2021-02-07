@@ -594,8 +594,12 @@ function SetupGeneric.unpack(setupBag, extraRings)
                 bag.setColorTint(Color.fromHex('#' .. offsets.bagColor .. 'FF'))
 
                 -- Adjust the token spawn to be above the bag, then add.
+                local function newCallback(object)
+                    bag.putObject(object)
+                    bag.setLock(offset.lock or false)
+                end
                 position.y = position.y + 3
-                callback = function(object) bag.putObject(object) end
+                callback = newCallback
             end
 
             local json = assert(nameToJson[namePattern], 'no json for ' .. namePattern)

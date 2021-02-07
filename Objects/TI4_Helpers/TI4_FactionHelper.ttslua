@@ -2246,6 +2246,7 @@ function reportFactions()
                 'commander={' .. (faction.commander or '-') .. '}',
                 'hero={' .. (faction.hero or '-') .. '}',
                 'commodities={' .. (faction.commodities or '-') .. '}',
+                'promissoryNotes={' .. table.concat(faction.promissoryNotes or {}, ', ') .. '}',
             }, ' '))
         end
     end

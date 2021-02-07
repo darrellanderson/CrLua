@@ -1266,6 +1266,7 @@ function SetupFaction.unpackFactionBox(faction, zone)
     local otherBoxNameSet = {
         ['Factions'] = true,
         ['Blue Space Faction Pack'] = true,
+        ['DS Factions'] = true,  -- Discordant Stars
     }
     for _, object in ipairs(getAllObjects()) do
         if object.tag == 'Bag' then

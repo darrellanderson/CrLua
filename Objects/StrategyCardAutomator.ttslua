@@ -330,7 +330,7 @@ Leadership - Primary and Number: gain command tokens.
 All other secondaries consume a (non fleet) strategy token (in strat. pool) or open a menu.
 Politics - Speaker: Moves speaker token, Draws 2 Action and Agendas. - Sec.: draws 2 Actioncards Construction - Allocate constructed units. Trade - Prim.: Allocates 3 resources, Refreshes commodities (removes all from comm. pool and gain correct #)- Color: Refreshes colors commodities - Sec.: Refreshes your commodities (does not use a command token as "Master of Trade"(Hacan)).
 Tech: Draws the card from tech deck, use Tech Board if available. - Faction Tech: Opens a choice popup - Comm Tokens: gain tokens as Necro. Imperial - Score: Only writes message - Secret: Draws secret. - Secondary: Draws secret (if Toggled on).
-Acquiescence and Trade Agreements are resolved if held face up.
+Acquiescence and Trade Agreements are resolved if face up in the player zone.
 ]]
 
 local backManual = {
@@ -452,7 +452,7 @@ function onLoad()
 	Tech: draw tech cards (use Tech board if available).
 	Imperial: draw secret (if toggled on).
 
-	Acquiescence and Trade Agreements are resolved if face up.
+	Acquiescence and Trade Agreements are resolved if face up in the player zone.
 
 	Place this object in a bag (or delete it) to stop getting strategy card automation.
 	]]
@@ -736,7 +736,9 @@ function onStrategyCardButtonClicked(params)
 				end
 			else
 				-- only called if "Mecatol Rex" not clicked.
-				_dealImperialSecret(color)
+				if (not _dontDealSecrets) then
+					_dealImperialSecret(color)
+				end
 				_closeMenu(color, card)
 			end
 		elseif (action == "secondary") and secondarySuccessful then

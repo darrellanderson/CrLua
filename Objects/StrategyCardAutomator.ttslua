@@ -736,7 +736,9 @@ function onStrategyCardButtonClicked(params)
 				end
 			else
 				-- only called if "Mecatol Rex" not clicked.
-				_dealImperialSecret(color)
+				if (not _dontDealSecrets) then
+					_dealImperialSecret(color)
+				end
 				_closeMenu(color, card)
 			end
 		elseif (action == "secondary") and secondarySuccessful then

@@ -817,15 +817,16 @@ function getDecksWithSource(source)
     return result
 end
 
---- Get card names from the given deck with the particular source.
+--- Get card names from the given deck with the optional source.
 function getCardsWithSource(params)
     local deckName = params.deckName
     local source = params.source
-    assert(type(deckName) == 'string' and type(source) == 'string')
+    assert(type(deckName) == 'string')
+    assert((not source) or (type(source) == 'string'))
     local deckAttributes = _getDeckAttributesByType(deckName)
     local result = {}
     for cardSource, cardNames in pairs(deckAttributes.cardNames) do
-        if cardSource == source then
+        if (not source) or (cardSource == source) then
             for _, cardName in ipairs(cardNames) do
                 table.insert(result, cardName)
             end

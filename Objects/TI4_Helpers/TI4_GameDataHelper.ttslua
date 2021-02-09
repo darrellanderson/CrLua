@@ -1,0 +1,743 @@
+--- Gather game data (score, tech, etc).
+-- @author Darrell
+-- #include <~/CrLua/Objects/TI4_Helpers/TI4_GameDataHelper>
+
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
+        return function(parameters) return helperObject.call(functionName, parameters) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+local _deckHelper = getHelperClient('TI4_DECK_HELPER')
+local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
+local _technologyHelper = getHelperClient('TI4_TECHNOLOGY_HELPER')
+local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
+local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
+
+local _state = {}
+
+-------------------------------------------------------------------------------
+-- Public methods are in this section.  These should be short methods returning
+-- maps from color to simple values.
+
+function colorToFactionName()
+    local result = {}
+    for _, color in ipairs(_zoneHelper.zones()) do
+        local faction = _factionHelper.fromColor(color)
+        result[color] = faction and faction.tokenName
+    end
+    return result
+end
+
+function colorToScore()
+    local tokens = Tokens.getTokens('Owner')
+    local result = {}
+    for _, color in ipairs(_zoneHelper.zones()) do
+        local colorTokens = Tokens.filterTokens(tokens, color)
+        result[color] = Score.getScore(colorTokens)
+    end
+    return result
+end
+
+function colorToResourcesInfluence()
+    local cards = Cards.getCards()
+    local colorToCards = Objects.groupByZone(cards)
+    local result = {}
+    for color, cards in pairs(colorToCards) do
+        local faceUp, faceDown = Objects.groupByFaceUpDown(cards)
+        local r, i = Cards.sumResourceInfluence(cards)
+        local availR, availI = Cards.sumResourceInfluence(faceUp)
+        result[color] = {
+            resources = r,
+            influence = i,
+            availableResources = availR,
+            availableInfluence = availI
+        }
+    end
+    return result
+end
+
+function colorToCommandTokens()
+    local tokens = Tokens.getTokens('Command')
+    local colorToTokens = Objects.groupByZone(tokens) -- do not filter, allow mix of factions
+    local result = {}
+    for color, tokens in pairs(colorToTokens) do
+        local numTactics, numFleet, numStrategy = Tokens.sumTacticFleetStrategy(tokens, color)
+        result[color] = {
+            tactics = numTactics,
+            fleet = numFleet,
+            strategy = numStrategy
+        }
+    end
+    return result
+end
+
+function colorToTradeGoodsCommodities()
+    local tokens = Tokens.getTradeGoodsCommodities()
+    local colorToTokens = Objects.groupByZone(tokens)
+    local result = {}
+    for color, tokens in pairs(colorToTokens) do
+        local faceUp, faceDown = Objects.groupByFaceUpDown(tokens)
+        result[color] = {
+            tradeGoods = Tokens.sumTradeGoodsCommodities(faceDown),
+            commodities = Tokens.sumTradeGoodsCommodities(faceUp),
+        }
+    end
+    return result
+end
+
+function colorToStrategyCards()
+    local strategyCards = StrategyCards.getStrategyCards()
+    local colorToStrategyCards = Objects.groupByZone(strategyCards)
+    local result = {}
+    for color, strategyCards in pairs(colorToStrategyCards) do
+        local names = {}
+        for _, strategyCard in ipairs(strategyCards) do
+            table.insert(names, StrategyCards.value(strategyCard))
+        end
+        table.sort(names)
+        result[color] = names
+    end
+    return result
+end
+
+function getObjectives()
+    local objectives = Objectives.getCards()
+    local deckNameToObjectives = Objectives.groupByDeckName(objectives)
+    local result = {}
+    for deckName, objectives in pairs(deckNameToObjectives) do
+        local entry = {}
+        for _, objective in ipairs(objectives) do
+            table.insert(entry, objective.getName())
+        end
+        table.sort(entry)
+        result[deckName] = entry
+    end
+    return result
+end
+
+function colorToObjectives()
+    local objectives = Objectives.getCards()
+    local tokens = Tokens.getTokens('Owner')
+    local result = {}
+    for _, color in ipairs(_zoneHelper.zones()) do
+        local colorTokens = Tokens.filterTokens(tokens, color)
+        local objectiveToOverlappingTokens = Objects.overlap(colorTokens, objectives)
+        local entry = {}
+        for objective, overlappingTokens in pairs(objectiveToOverlappingTokens) do
+            if #overlappingTokens > 0 then
+                table.insert(entry, objective.getName())
+            end
+        end
+        table.sort(entry)
+        result[color] = entry
+    end
+    return result
+end
+
+function colorToCustodiansPoints()
+    local tokens = Tokens.getTokens('Owner')
+    local custodiansToken = Objectives.getCustodiansToken()
+    local overlappingTokens = {}
+    if custodiansToken then
+        local objectToOverlappingTokens = Objects.overlap(tokens, { custodiansToken })
+        overlappingTokens = objectToOverlappingTokens[custodiansToken] or {}
+    end
+    local result = {}
+    for _, color in ipairs(_zoneHelper.zones()) do
+        local colorTokens = Tokens.filterTokens(overlappingTokens, color)
+        result[color] = #colorTokens
+    end
+    return result
+end
+
+function colorToTechnologies()
+    local technologies = Technologies.getCards()
+    local colorToTechnologies = Objects.groupByZone(technologies)
+    local result = {}
+    for color, technologies in pairs(colorToTechnologies) do
+        local list = {}
+        for _, technology in ipairs(technologies) do
+            local name = technology.getName()
+            name = string.match(name, '^(.*) Ω') or name
+            table.insert(list, name)
+        end
+        table.sort(list)
+        -- Preserve acquisition order.
+        _state.colorToTechnologies = _state.colorToTechnologies or {}
+        local oldList = _state.colorToTechnologies[color] or {}
+        list = Technologies.pruneAndAppendMissing(oldList, list)
+        _state.colorToTechnologies[color] = list
+        result[color] = list
+    end
+    return result
+end
+
+-------------------------------------------------------------------------------
+
+Objects = {}
+
+--- Group objects by player zone they are in, if any.
+-- @param objects : list of objects.
+-- @return table : map from color to in-color-zone objects.
+function Objects.groupByZone(objects)
+    assert(type(objects) == 'table')
+    local guidToPosition = {}
+    for _, object in ipairs(objects) do
+        guidToPosition[object.getGUID()] = object.getPosition()
+    end
+    local guidToZoneColor = _zoneHelper.zonesFromPositions(guidToPosition)
+    local colorToObjects = {}
+    for _, color in ipairs(_zoneHelper.zones()) do
+        colorToObjects[color] = {}
+    end
+    for _, object in ipairs(objects) do
+        local color = guidToZoneColor[object.getGUID()]
+        local entry = color and colorToObjects[color]
+        if entry then
+            table.insert(entry, object)
+        end
+    end
+    return colorToObjects
+end
+
+--- Split into face up / face down lists.
+-- @param objects table : list of objects.
+-- @return table, table : list of face up, list of face down.
+function Objects.groupByFaceUpDown(objects)
+    assert(type(objects) == 'table')
+    local faceUp = {}
+    local faceDown = {}
+    for _, object in ipairs(objects) do
+        if object.is_face_down then
+            table.insert(faceDown, object)
+        else
+            table.insert(faceUp, object)
+        end
+    end
+    return faceUp, faceDown
+end
+
+--- Build lists of "src" objects overlapping "dst" objects.
+-- @param srcs table : list of objects.
+-- @param dsts table : list of objects.
+-- @return table : map from dst object to overlapping src objects.
+function Objects.overlap(srcs, dsts)
+    assert(type(srcs) == 'table' and type(dsts) == 'table')
+
+    -- Cheap but potentially wrong inside check.  It will never have a false
+    -- positive so use this first to eliminate quickly, then move on to the
+    -- more expensive check to be sure.
+    local function maybeInside(bb, p)
+        return p.x >= bb.min.x and p.x <= bb.max.x and p.z >= bb.min.z and p.z <= bb.max.z
+    end
+
+    -- This is a more expensive but more thorough "inside" test.
+    local function definitelyInside(src, dst)
+        -- Fill this is later if needed, the bb check is correct assuming
+        -- objects are at 90 degree rotations about Y.
+        return true
+    end
+
+    local dstToSrcs = {}
+    for _, dst in ipairs(dsts) do
+        -- Compute a bounding box to fast-fail things outside it.
+        local bounds = dst.getBounds()
+        local bb = {
+            min = {
+                x = bounds.center.x - bounds.size.x / 2,
+                z = bounds.center.z - bounds.size.z / 2,
+            },
+            max = {
+                x = bounds.center.x + bounds.size.x / 2,
+                z = bounds.center.z + bounds.size.z / 2,
+            }
+        }
+        local overlaps = {}
+        for _, src in ipairs(srcs) do
+            if src ~= dst and maybeInside(bb, src.getPosition()) then
+                if definitelyInside(src, dst) then
+                    table.insert(overlaps, src)
+                end
+            end
+        end
+        dstToSrcs[dst] = overlaps
+    end
+    return dstToSrcs
+end
+
+-------------------------------------------------------------------------------
+
+Tokens = {}
+
+--- Get all tokens on the table.
+-- @param tokenType string : either "Command" or "Owner".
+-- @return table : list of command token objects.
+function Tokens.getTokens(tokenType)
+    assert(type(tokenType) == 'string')
+    assert(tokenType == 'Command' or tokenType == 'Owner')
+    local tokens = {}
+    local tokenPattern = ' ' .. tokenType .. ' Token$'
+    for _, object in ipairs(getAllObjects()) do
+        if string.match(object.getName(), tokenPattern) then
+            table.insert(tokens, object)
+        end
+    end
+    return tokens
+end
+
+--- Restrict to tokens for the color's faction.
+-- @param playerColor string : color.
+-- @param tokens table : list of command or owner token objects.
+-- @return table : list of token objects belonging to color's faction.
+function Tokens.filterTokens(tokens, playerColor)
+    assert(type(tokens) == 'table' and type(playerColor) == 'string')
+    local filtered = {}
+    local faction = color and _factionHelper.fromColor(playerColor)
+    if faction then
+        local tokenPattern = '^' .. faction.tokenName:gsub('-', '%%-')
+        for _, token in ipairs(tokens) do
+            if string.match(token.getName(), tokenPattern) then
+                table.insert(filtered, token)
+            end
+        end
+    end
+    return filtered
+end
+
+--- Count tokens in tactics, fleet, strategy areas.
+-- @param playerColor string : color.
+-- @param tokens table : list of command token objects.
+-- @return number, number, number: tactics, fleet, strategy token counts.
+function Tokens.sumTacticFleetStrategy(tokens, playerColor)
+    assert(type(tokens) == 'table' and type(playerColor) == 'string')
+    local faction = color and _factionHelper.fromColor(playerColor)
+    local commandSheet = faction and getObjectFromGUID(faction.commandSheetGuid)
+    local numTactics = 0
+    local numFleet = 0
+    local numStrategy = 0
+    if commandSheet then
+        for _, token in ipairs(tokens) do
+            local p = commandSheet.positionToLocal(token.getPosition())
+            local dSq = p.x * p.x + p.z * p.z
+            local degrees = (math.deg(math.atan2(p.z, p.x)) + 360) % 360
+            if dSq < 15 then
+                if 300 > degrees and degrees > 240 then
+                    numTactics = numTactics + 1
+                elseif 240 > degrees and degrees > 180 then
+                    numFleet = numFleet + 1
+                elseif 180 > degrees and degrees > 120 then
+                    numStrategy = numStrategy + 1
+                end
+            end
+        end
+    end
+    return numTactics, numFleet, numStrategy
+end
+
+--- Get commodities and trade good tokens.
+-- @return table : list of token objects.
+function Tokens.getTradeGoodsCommodities()
+    local tokens = {}
+    for _, object in ipairs(getAllObjects()) do
+        if string.match(object.getName(), '^x([13]) Commodities/Tradegoods$') then
+            table.insert(tokens, object)
+        end
+    end
+    return tokens
+end
+
+--- Sum the x1 and x3 values for tokens.
+-- @param tokens table : list of token objects.
+-- @return number : sum of x1 and x3 values.
+function Tokens.sumTradeGoodsCommodities(tokens)
+    assert(type(tokens) == 'table')
+    local result = 0
+    for _, object in ipairs(tokens) do
+        local value = string.match(object.getName(), '^x([13]) Commodities/Tradegoods$')
+        result = result + tonumber(value or 0)
+    end
+    return result
+end
+
+-------------------------------------------------------------------------------
+
+Cards = {
+    CACHE_TIMEOUT_SECONDS = 10,
+    _lowerNameToResInfTimestamp = false,
+    _lowerNameToResInf = false,
+}
+
+--- Get all cards on the table (face down ok, but NOT in hands).
+-- @return table : list of card objects.
+function Cards.getCards()
+    local cards = {}
+    local inHandGuidSet = _zoneHelper.inHand()
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Card' and not inHandGuidSet[object.getGUID()] then
+            table.insert(cards, object)
+        end
+    end
+    return cards
+end
+
+function Cards.sumResourceInfluence(cards)
+    assert(type(cards) == 'table')
+    local lowerNameToResInf = Cards._getLowerNameToResInf()
+    local resources = 0
+    local influence = 0
+    for _, card in ipairs(cards) do
+        local lowerName = string.lower(card.getName())
+        local resInf = lowerNameToResInf[lowerName]
+        if resInf then
+            resources = resources + resInf.resources
+            influence = influence + resInf.influence
+        end
+    end
+    return resources, influence
+end
+
+function Cards._getLowerNameToResInf()
+    if Cards._lowerNameToResInf and Cards._lowerNameToResInfTimestamp then
+        local age = Time.time - Cards._lowerNameToResInfTimestamp
+        if age > Cards.CACHE_TIMEOUT_SECONDS then
+            Cards._lowerNameToResInf = false
+        end
+    end
+    if not Cards._lowerNameToResInf then
+        Cards._lowerNameToResInfTimestamp = Time.time
+        Cards._lowerNameToResInf = {}
+        for lowerName, planet in pairs(_systemHelper.planets()) do
+            Cards._lowerNameToResInf[lowerName] = {
+                resources = planet.resources or 0,
+                influence = planet.influence or 0
+            }
+        end
+        for lowerName, attributes in pairs(_systemHelper.nonPlanetResourceInfluenceCards()) do
+            Cards._lowerNameToResInf[lowerName] = {
+                resources = attributes.resources or 0,
+                influence = attributes.influence or 0
+            }
+        end
+    end
+    return Cards._lowerNameToResInf
+end
+
+-------------------------------------------------------------------------------
+
+Score = {
+    _scoreboardGuid = false
+}
+
+--- Given a list of owner tokens, get the score from the best overlapping scoreboard.
+-- @params ownerTokens table : list of owner token objects.
+-- @return number : score, if found.
+function Score.getScore(ownerTokens)
+    assert(type(ownerTokens) == 'table')
+    local scoreboard = Score._getScoreboard()
+    local score = 0
+    for _, ownerToken in ipairs(ownerTokens) do
+        local candidate = Score._getScoreFromToken(scoreboard, ownerToken)
+        score = math.max(score, candidate or 0)
+    end
+    return score
+end
+
+function Score._getScoreboard()
+    local scoreboard = Score._scoreboardGuid and getObjectFromGUID(Score._scoreboardGuid)
+    if scoreboard then
+        return scoreboard
+    end
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        if name == 'Scoreboard' then
+            Score._scoreboardGuid = object.getGUID()
+            return object
+        end
+    end
+    error('Score.getScoreboard: missing scoreboard')
+end
+
+function Score._getScoreFromToken(scoreboard, ownerToken)
+    assert(type(scoreboard) == 'userdata' and type(ownerToken) == 'userdata')
+    local p = scoreboard.positionToLocal(ownerToken.getPosition())
+    if math.abs(p.z) > 0.5 then
+        return false
+    elseif math.abs(p.x) > 3.3 then
+        return false
+    end
+    local u = -(p.x - 3.25) / 6.5
+    local limit = 11
+    if scoreboard.is_face_down then
+        u = 1 - u
+        limit = 15
+    end
+    return math.floor(u * limit)
+end
+
+-------------------------------------------------------------------------------
+
+StrategyCards = {
+    OBJECT_NAME_TO_VALUE = {
+        ['Leadership'] = 'Leadership',
+        ['Diplomacy'] = 'Diplomacy',
+        ['Diplomacy (Revised)'] = 'Diplomacy',
+        ['Politics'] = 'Politics',
+        ['Construction'] = 'Construction',
+        ['Industry'] = 'Industry',
+        ['Trade'] = 'Trade',
+        ['Warfare'] = 'Warfare',
+        ['Trade (6)'] = 'Trade',
+        ['Technology'] = 'Technology',
+        ['Warfare (7)'] = 'Warfare',
+        ['Imperial'] = 'Imperial',
+        ['Logistics'] = 'Logistics',
+        ['Technology (9)'] = 'Technology',
+        ['Imperial (10)'] = 'Imperial',
+    }
+}
+
+--- Get strategy card objects.
+-- @return table : list of strategy card objects.
+function StrategyCards.getStrategyCards()
+    local result = {}
+    for _, object in ipairs(getAllObjects()) do
+        if StrategyCards.OBJECT_NAME_TO_VALUE[object.getName()] then
+            table.insert(result, object)
+        end
+    end
+    return result
+end
+
+--- Get canonical string name of a strategy card (accounting for variants).
+-- @param strategyCard : object.
+-- @return string : canonical string name, e.g. "Leadership".
+function StrategyCards.value(strategyCard)
+    assert(type(strategyCard) == 'userdata')
+    return StrategyCards.OBJECT_NAME_TO_VALUE[strategyCard.getName()]
+end
+
+-------------------------------------------------------------------------------
+
+Objectives = {
+    OBJECTIVE_DECKS = {
+        'Public Objectives I',
+        'Public Objectives II',
+        'Secret Objectives',
+    },
+    OTHER_OBJECTIVES = {
+        'Support for the Throne (White)',
+        'Support for the Throne (Blue)',
+        'Support for the Throne (Purple)',
+        'Support for the Throne (Yellow)',
+        'Support for the Throne (Red)',
+        'Support for the Throne (Green)',
+        'Support for the Throne (Orange)',
+        'Support for the Throne (Pink)',
+        'Support for the Throne (Brown)',
+        'Shard of the Throne',
+        'Shard of the Throne (PoK)',
+        'The Crown of Emphidia',
+        'The Crown of Emphidia (PoK)',
+        'Holy Planet of Ixth',
+        'Seed of an Empire',
+        'Mutiny',
+        'Imperial Rider',
+    },
+    CACHE_TIMEOUT_SECONDS = 10,
+    _objectiveToDeckName = false,
+    _objectiveToDeckNameTimestamp = false,
+}
+
+--- Get face-up objective card objects (ignoring held cards).
+-- @return table : list of objective card objects.
+function Objectives.getCards()
+    local cards = {}
+    local inHandGuidSet = _zoneHelper.inHand()
+    local objectiveToDeckName = Objectives._getObjectiveToDeckName()
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Card' and (not inHandGuidSet[object.getGUID()]) and (not object.is_face_down) and objectiveToDeckName[object.getName()] then
+            table.insert(cards, object)
+        end
+    end
+    return cards
+end
+
+--- Get the custodians token.
+-- @return object : custodians token game object.
+function Objectives.getCustodiansToken()
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Tile' and object.getName() == 'Custodians' then
+            return object
+        end
+    end
+end
+
+--- Group objective cards by the deck(s) they come from.
+-- @param objectives table : list of objective cards.
+-- @return table : map from deck name to list of objective cards.
+function Objectives.groupByDeckName(objectiveCards)
+    assert(type(objectiveCards) == 'table')
+    local deckNameToFoundObjectives = {}
+    for _, deckName in ipairs(Objectives.OBJECTIVE_DECKS) do
+        deckNameToFoundObjectives[deckName] = {}
+    end
+    local objectiveToDeckName = Objectives._getObjectiveToDeckName()
+    for _, objectiveCard in ipairs(objectiveCards) do
+        local deckName = objectiveToDeckName[objectiveCard.getName()]
+        table.insert(deckNameToFoundObjectives[deckName], objectiveCard)
+    end
+    return deckNameToFoundObjectives
+end
+
+function Objectives._getObjectiveToDeckName()
+    if Objectives._objectiveToDeckName and Objectives._objectiveToDeckNameTimestamp then
+        local age = Time.time - Objectives._objectiveToDeckNameTimestamp
+        if age > Objectives.CACHE_TIMEOUT_SECONDS then
+            Objectives._objectiveToDeckName = false
+        end
+    end
+    if not Objectives._objectiveToDeckName then
+        Objectives._objectiveToDeckNameTimestamp = Time.time
+        Objectives._objectiveToDeckName = {}
+        for _, deckName in ipairs(Objectives.OBJECTIVE_DECKS) do
+            for _, cardName in ipairs(_deckHelper.getCardsWithSource({ deckName = deckName })) do
+                Objectives._objectiveToDeckName[cardName] = deckName
+            end
+        end
+        for _, otherObjective in ipairs(Objectives.OTHER_OBJECTIVES) do
+            Objectives._objectiveToDeckName[otherObjective] = 'Other'
+        end
+    end
+    return Objectives._objectiveToDeckName
+end
+
+-------------------------------------------------------------------------------
+
+Technologies = {}
+
+--- Get face-up objective card objects (ignoring held cards).
+-- @return table : list of objective card objects.
+function Technologies.getCards()
+    local cards = {}
+    local inHandGuidSet = _zoneHelper.inHand()
+    local techNameSet = {}
+    for name, _ in pairs(_technologyHelper.getTechNameSet()) do
+        techNameSet[name] = true
+        techNameSet[name .. ' Ω'] = true
+    end
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Card' and (not inHandGuidSet[object.getGUID()]) and (not object.is_face_down) and techNameSet[object.getName()] then
+            table.insert(cards, object)
+        end
+    end
+    return cards
+end
+
+--- Given an updated list, append any new items not in the old list but
+-- otherwise preserve old list order.  Also remove any items in the old
+-- list that are not in the new list.
+-- @param oldList : use this item order.
+-- @param newList : append any new items not in old, remove any old items not in new.
+-- @return list : table with the add/prune modifications.
+function Technologies.pruneAndAppendMissing(oldList, newList)
+    assert(type(oldList) == 'table' and type(newList) == 'table')
+
+    local oldCounts = {}
+    for _, oldItem in ipairs(oldList) do
+        oldCounts[oldItem] = (oldCounts[oldItem] or 0) + 1
+    end
+    local newCounts = {}
+    for _, newItem in ipairs(newList) do
+        newCounts[newItem] = (newCounts[newItem] or 0) + 1
+    end
+
+    -- Start by copying over old items in order, prune any missing from new.
+    local result = {}
+    for _, item in ipairs(oldList) do
+        local newCount = newCounts[item]
+        if newCount then
+            newCounts[item] = newCount > 1 and (newCount - 1)
+            table.insert(result, item)
+        end
+    end
+
+    -- Then add any new entries.
+    for _, item in ipairs(newList) do
+        local oldCount = oldCounts[item]
+        if oldCount then
+            oldCounts[item] = oldCount > 1 and (oldCount - 1)
+        else
+            table.insert(result, item)
+        end
+    end
+
+    return result
+end
+
+-------------------------------------------------------------------------------
+
+function onLoad(saveState)
+    self.setColorTint({ r = 0.25, g = 0.25, b = 0.25 })
+    self.setScale({ x = 2, y = 0.01, z = 2 })
+    self.setName('TI4_GAME_DATA_HELPER')
+    self.setDescription('Shared helper functions used by other objects, PLEASE LEAVE ON TABLE! This object is only visible to the black (GM) player.')
+
+    -- Only the GM/black player can see this object.  Others can still interact!
+    local invisibleTo = {}
+    for _, color in ipairs(Player.getColors()) do
+        if color ~= 'Black' then
+            table.insert(invisibleTo, color)
+        end
+    end
+    self.setInvisibleTo(invisibleTo)
+
+    _state = saveState and string.len(saveState) > 0 and JSON.decode(saveState) or _state
+
+    self.addContextMenuItem('Report', _doReport)
+end
+
+function onSave()
+    return JSON.encode(_state)
+end
+
+function _doReport()
+    for k, v in pairs(_G) do
+        if string.match(k, '^colorTo') and type(v) == 'function' then
+            local result = v()
+            local message = {}
+            for color, value in pairs(result or {}) do
+                if type(value) == 'table' then
+                    local entry = {}
+                    for k, v in pairs(value) do
+                        table.insert(entry, k .. '=' .. v)
+                    end
+                    value = '{' .. table.concat(entry, ',') .. '}'
+                end
+                table.insert(message, color .. '=' .. tostring(value))
+            end
+            message = k .. ': ' .. table.concat(message, ', ')
+            print(message)
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

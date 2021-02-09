@@ -1,5 +1,6 @@
 --- Add various game stats to the "notes" panel.
 -- @author Darrell, PhilRoi
+-- #include <~/CrLua/Objects/TI4_StatsUpdater>
 
 local WINDOW_SIZE = {
     COLS = 40,
@@ -40,9 +41,6 @@ local _waitId = false
 local _logNext = false
 local _periodicUpdates = false
 
-local _lowerNameToResourcesAndInfluence = false
-local _lowerNameToResourcesAndInfluenceTimestamp = false
-
 -------------------------------------------------------------------------------
 
 function getHelperClient(helperObjectName)
@@ -60,272 +58,8 @@ function getHelperClient(helperObjectName)
     end
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
-local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
-local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
+local _gameDataHelper = getHelperClient('TI4_GAME_DATA_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
-
---- Group objects by player zone they are in, if any.
--- @param objects : list of objects.
--- @return table : map from color to in-color-zone objects.
-function groupByPlayerZone(objects)
-    assert(type(objects) == 'table')
-
-    local guidToPosition = {}
-    for _, object in ipairs(objects) do
-        guidToPosition[object.getGUID()] = object.getPosition()
-    end
-    local guidToZoneColor = _zoneHelper.zonesFromPositions(guidToPosition)
-
-    local colorToObjects = {}
-    for _, object in ipairs(objects) do
-        local color = guidToZoneColor[object.getGUID()]
-        if color then
-            local entry = colorToObjects[color]
-            if not entry then
-                entry = {}
-                colorToObjects[color] = entry
-            end
-            table.insert(entry, object)
-        end
-    end
-    return colorToObjects
-end
-
---- Split into face up / face down lists.
--- @param objects table : list of objects.
--- @return table, table : list of face up, list of face down.
-function groupByFaceUpDown(objects)
-    assert(type(objects) == 'table')
-
-    local faceUp = {}
-    local faceDown = {}
-    for _, object in ipairs(objects) do
-        if object.is_face_down then
-            table.insert(faceDown, object)
-        else
-            table.insert(faceUp, object)
-        end
-    end
-    return faceUp, faceDown
-end
-
---- Get all tokens on the table.
--- @param tokenType string : either "Command" or "Owner".
--- @return table : list of command token objects.
-function getTokens(tokenType)
-    assert(type(tokenType) == 'string')
-
-    local tokens = {}
-    local tokenPattern = '^(.*) ' .. tokenType .. ' Token$'
-    for _, object in ipairs(getAllObjects()) do
-        if string.match(object.getName(), tokenPattern) then
-            table.insert(tokens, object)
-        end
-    end
-    return tokens
-end
-
---- Restrict to tokens for the color's faction.
--- @param color string : color.
--- @param tokens table : list of token objects.
--- @return table : list of token objects belonging to color's faction.
-function filterTokens(color, tokens)
-    assert(type(color) == 'string' and type(tokens) == 'table')
-
-    local filtered = {}
-    local faction = color and _factionHelper.fromColor(color)
-    if faction then
-        local tokenPattern = '^' .. faction.tokenName:gsub('-', '%%-')
-        for _, token in ipairs(tokens) do
-            if string.match(token.getName(), tokenPattern) then
-                table.insert(filtered, token)
-            end
-        end
-    end
-    return filtered
-end
-
--------------------------------------------------------------------------------
-
---- Get tactic, fleet, and strategy token counts.
--- @param color string : color.
--- @param commandTokenPositions table : list of command token positions.
--- @return number, number, number: tactics, fleet, and strategy token allocations.
-function countCommandTokens(color, commandTokenPositions)
-    assert(type(color) == 'string' and type(commandTokenPositions) == 'table')
-
-    local numTactics = 0
-    local numFleet = 0
-    local numStrategy = 0
-
-    local faction = color and _factionHelper.fromColor(color)
-    local commandSheet = faction and getObjectFromGUID(faction.commandSheetGuid)
-    if commandSheet then
-        for _, commandTokenPosition in ipairs(commandTokenPositions) do
-            local p = commandSheet.positionToLocal(commandTokenPosition)
-            local dSq = p.x * p.x + p.z * p.z
-            local degrees = (math.deg(math.atan2(p.z, p.x)) + 360) % 360
-            if dSq < 15 then
-                if 300 > degrees and degrees > 240 then
-                    numTactics = numTactics + 1
-                elseif 240 > degrees and degrees > 180 then
-                    numFleet = numFleet + 1
-                elseif 180 > degrees and degrees > 120 then
-                    numStrategy = numStrategy + 1
-                end
-            end
-        end
-    end
-
-    return numTactics, numFleet, numStrategy
-end
-
--------------------------------------------------------------------------------
-
-function getLowerNameToResourcesAndInfluence()
-    if _lowerNameToResourcesAndInfluence and _lowerNameToResourcesAndInfluenceTimestamp then
-        local age = Time.time - _lowerNameToResourcesAndInfluenceTimestamp
-        if age > 10 then
-            _lowerNameToResourcesAndInfluence = false
-        end
-    end
-
-    if not _lowerNameToResourcesAndInfluence then
-        _lowerNameToResourcesAndInfluenceTimestamp = Time.time
-        _lowerNameToResourcesAndInfluence = {}
-        for lowerName, planet in pairs(_systemHelper.planets()) do
-            _lowerNameToResourcesAndInfluence[lowerName] = {
-                resources = planet.resources or 0,
-                influence = planet.influence or 0
-            }
-        end
-        for lowerName, attributes in pairs(_systemHelper.nonPlanetResourceInfluenceCards()) do
-            _lowerNameToResourcesAndInfluence[lowerName] = {
-                resources = attributes.resources or 0,
-                influence = attributes.influence or 0
-            }
-        end
-    end
-    return _lowerNameToResourcesAndInfluence
-end
-
---- Get planet cards (and other relevant cards) not in a player's hand.
--- @return table : list of card objects.
-function getCards()
-    local inHandGuidSet = _zoneHelper.inHand()
-    local cards = {}
-    for _, object in ipairs(getAllObjects()) do
-        if not inHandGuidSet[object.getGUID()] then
-            if object.tag == 'Card' then
-                table.insert(cards, object)
-            end
-        end
-    end
-    return cards
-end
-
-function getLowerCardNames(cards)
-    local lowerNameSet = getLowerNameToResourcesAndInfluence()
-    local lowerCardNames = {}
-    for _, card in ipairs(cards or {}) do
-        local lowerName = string.lower(card.getName())
-        if lowerNameSet[lowerName] then
-            table.insert(lowerCardNames, lowerName)
-        end
-    end
-    return lowerCardNames
-end
-
---- Get resources and influence from cards.
--- @param cards table : list of card objects.
--- @return number, number : total resources and influence.
-function countResourcesAndInfluence(lowerCardNames)
-    assert(type(lowerCardNames) == 'table')
-    local lowerNameToResourcesAndInfluence = getLowerNameToResourcesAndInfluence()
-
-    local resources = 0
-    local influence = 0
-    for _, lowerCardName in ipairs(lowerCardNames) do
-        local ri = lowerNameToResourcesAndInfluence[lowerCardName]
-        if ri then
-            resources = resources + ri.resources
-            influence = influence + ri.influence
-        end
-    end
-
-    return resources, influence
-end
-
--------------------------------------------------------------------------------
-
-local _scoreboardGuid = false
-
-function _getScoreboard()
-    local scoreboard = _scoreboardGuid and getObjectFromGUID(_scoreboardGuid)
-    if scoreboard then
-        return scoreboard
-    end
-    for _, object in ipairs(getAllObjects()) do
-        if object.getName() == 'Scoreboard' then
-            _scoreboardGuid = object.getGUID()
-            return object
-        end
-    end
-end
-
---- Get the score from owner token on the scoreboard.
--- @param ownerTokenPositions table : list of owner token {xyz} positions.
--- @return score number.
-function getScore(ownerTokenPositions)
-    local scoreboard = _getScoreboard()
-
-    local function scoreboardValue(ownerTokenPosition)
-        -- DO NOT USE THE SCOREBOARD BOUNDING BOX, IT DOES NOT MATCH VISUAL!!
-        local p = scoreboard.positionToLocal(ownerTokenPosition)
-        if math.abs(p.z) > 0.5 then
-            return false
-        elseif p.x < -3.3 or p.x > 3.3 then
-            return false
-        end
-        local u = -(p.x - 3.25) / 6.5
-        local limit = 11
-        if scoreboard.is_face_down then
-            u = 1 - u
-            limit = 15
-        end
-        return math.floor(u * limit)
-    end
-
-    local score = 0
-    for _, ownerTokenPosition in ipairs(ownerTokenPositions) do
-        score = math.max(score, scoreboardValue(ownerTokenPosition) or 0)
-    end
-
-    return score
-end
-
--------------------------------------------------------------------------------
-
-function getCommoditiesAndTradeGoods()
-    local result = {}
-    for _, object in ipairs(getAllObjects()) do
-        if string.match(object.getName(), '^x([13]) Commodities/Tradegoods$') then
-            table.insert(result, object)
-        end
-    end
-    return result
-end
-
-function sumTradeGoodsValue(tradeGoods)
-    assert(type(tradeGoods) == 'table')
-
-    local result = 0
-    for _, object in ipairs(tradeGoods) do
-        local value = string.match(object.getName(), '^x([13]) Commodities/Tradegoods$')
-        result = result + tonumber(value)
-    end
-    return result
-end
 
 -------------------------------------------------------------------------------
 
@@ -338,53 +72,16 @@ function updateNotesCoroutine()
     -- table scans for each category and process just that category same frame.
     -- Yield before moving on.
 
-    local commandTokens = getTokens('Command')
-    local colorToCommandTokenPositions = {}
-    for _, color in ipairs(_zoneHelper.zones()) do
-        local positions = {}
-        -- Do NOT filter these, allow tokens from other factions in a fleet pool for PoK.
-        for _, commandToken in ipairs(commandTokens) do
-            table.insert(positions, commandToken.getPosition())
-        end
-        colorToCommandTokenPositions[color] = positions
-    end
+    local colorToScore = _gameDataHelper.colorToScore()
     coroutine.yield(0)
 
-    local ownerTokens = getTokens('Owner')
-    local colorToOwnerTokenPositions = {}
-    for _, color in ipairs(_zoneHelper.zones()) do
-        local positions = {}
-        for _, ownerToken in ipairs(filterTokens(color, ownerTokens or {})) do
-            table.insert(positions, ownerToken.getPosition())
-        end
-        colorToOwnerTokenPositions[color] = positions
-    end
+    local colorToResourcesInfluence = _gameDataHelper.colorToResourcesInfluence()
     coroutine.yield(0)
 
-    local commoditiesAndTradeGoods = getCommoditiesAndTradeGoods()
-    local commodities, tradeGoods = groupByFaceUpDown(commoditiesAndTradeGoods)
-    local colorToCommodities = groupByPlayerZone(commodities)
-    local colorToTradeGoods = groupByPlayerZone(tradeGoods)
-    for _, color in ipairs(_zoneHelper.zones()) do
-        local commodities = colorToCommodities[color] or {}
-        colorToCommodities[color] = sumTradeGoodsValue(commodities)
-        local tradeGoods = colorToTradeGoods[color] or {}
-        colorToTradeGoods[color] = sumTradeGoodsValue(tradeGoods)
-    end
+    local colorToCommandTokens = _gameDataHelper.colorToCommandTokens()
     coroutine.yield(0)
 
-    local cards = getCards()
-    local cardsUp, cardsDown = groupByFaceUpDown(cards)
-    local colorToCardsUp = groupByPlayerZone(cardsUp)
-    local colorToCardsDown = groupByPlayerZone(cardsDown)
-    local colorToLowerCardNamesUp = {}
-    local colorToLowerCardNamesDown = {}
-    for _, color in ipairs(_zoneHelper.zones()) do
-        local cards = colorToCardsUp[color] or {}
-        colorToLowerCardNamesUp[color] = getLowerCardNames(cards)
-        local cards = colorToCardsDown[color] or {}
-        colorToLowerCardNamesDown[color] = getLowerCardNames(cards)
-    end
+    local colorToTradeGoodsCommodities = _gameDataHelper.colorToTradeGoodsCommodities()
     coroutine.yield(0)
 
     -- Assemble the collections of strings for each row.
@@ -399,21 +96,22 @@ function updateNotesCoroutine()
         }
     }
     for _, color in ipairs(_zoneHelper.zones()) do
-        local ownerTokenPositions = colorToOwnerTokenPositions[color]
-        local score = getScore(ownerTokenPositions)
+        local score = colorToScore[color] or 0
 
-        local lowerCardNamesUp = colorToLowerCardNamesUp[color] or {}
-        local resourcesUp, influenceUp = countResourcesAndInfluence(lowerCardNamesUp)
-        local lowerCardNamesDown = colorToLowerCardNamesDown[color] or {}
-        local resourcesDown, influenceDown = countResourcesAndInfluence(lowerCardNamesDown)
-        local resources = resourcesUp + resourcesDown
-        local influence = influenceUp + influenceDown
+        local resourcesInfluence = colorToResourcesInfluence[color] or {}
+        local resources = resourcesInfluence.resources or 0
+        local influence = resourcesInfluence.influence or 0
+        local resourcesUp = resourcesInfluence.availableResources or 0
+        local influenceUp = resourcesInfluence.availableInfluence or 0
 
-        local commodities = colorToCommodities[color] or 0
-        local tradeGoods = colorToTradeGoods[color] or 0
+        local tradeGoodsCommodities = colorToTradeGoodsCommodities[color] or {}
+        local commodities = tradeGoodsCommodities.commodities or 0
+        local tradeGoods = tradeGoodsCommodities.tradeGoods or 0
 
-        local commandTokenPositions = colorToCommandTokenPositions[color] or {}
-        local numTactics, numFleet, numStrategy = countCommandTokens(color, commandTokenPositions)
+        local commandTokens = colorToCommandTokens[color] or {}
+        local numTactics = commandTokens.tactics or 0
+        local numFleet = commandTokens.fleet or 0
+        local numStrategy = commandTokens.strategy or 0
 
         table.insert(rows, {
             PREFIX[color] .. '[' .. HEX_COLOR[color] .. ']' .. color,

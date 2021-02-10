@@ -24,10 +24,119 @@ local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 local _state = {}
+local _gameDataKey = false
+
+-------------------------------------------------------------------------------
+
+local _asyncGatherDataQueue = {}
+
+function asyncGatherData(params)
+    assert(type(params) == 'table')
+    assert(type(params.guid) == 'string')
+    assert(type(params.callbackFunctionName) == 'string')
+    table.insert(_asyncGatherDataQueue, params)
+    startLuaCoroutine(self, 'asyncGatherDataCoroutine')
+end
+
+function asyncGatherDataCoroutine()
+    local params = table.remove(_asyncGatherDataQueue)
+    if not params then
+        return
+    end
+
+    local result = {
+        timestamp = math.floor(os.time())
+    }
+    for _, color in ipairs(_zoneHelper.zones()) do
+        result[color] = {}
+    end
+
+    for color, steamName in pairs(colorToSteamName()) do
+        result[color].steamName = steamName
+    end
+    coroutine.yield(0)
+
+    for color, factionName in pairs(colorToFactionName()) do
+        result[color].factionName = factionName
+    end
+    coroutine.yield(0)
+
+    for color, score in pairs(colorToScore()) do
+        result[color].score = score
+    end
+    coroutine.yield(0)
+
+    for color, resourcesInfluence in pairs(colorToResourcesInfluence()) do
+        for k, v in pairs(resourcesInfluence) do
+            result[color][k] = v
+        end
+    end
+    coroutine.yield(0)
+
+    for color, commandTokens in pairs(colorToCommandTokens()) do
+        for k, v in pairs(commandTokens) do
+            result[color][k] = v
+        end
+    end
+    coroutine.yield(0)
+
+    for color, tradeGoodsCommodities in pairs(colorToTradeGoodsCommodities()) do
+        for k, v in pairs(tradeGoodsCommodities) do
+            result[color][k] = v
+        end
+    end
+    coroutine.yield(0)
+
+    for color, strategyCards in pairs(colorToStrategyCards()) do
+        result[color].strategyCards = strategyCards
+    end
+    coroutine.yield(0)
+
+    result.round = getRound()
+    coroutine.yield(0)
+
+    for deckName, publicObjectives in pairs(getPublicObjectives()) do
+        result[deckName] = publicObjectives
+    end
+    coroutine.yield(0)
+
+    for color, objectives in pairs(colorToObjectives()) do
+        result[color].objectives = objectives
+    end
+    coroutine.yield(0)
+
+    for color, custodiansPoints in pairs(colorToCustodiansPoints()) do
+        result[color].custodiansPoints = custodiansPoints
+    end
+    coroutine.yield(0)
+
+    for color, technologies in pairs(colorToTechnologies()) do
+        result[color].technologies = technologies
+    end
+    coroutine.yield(0)
+
+    local callbackObject = getObjectFromGUID(params.guid)
+    if callbackObject then
+        callbackObject.call(params.callbackFunctionName, result)
+    end
+    return 1
+end
 
 -------------------------------------------------------------------------------
 -- Public methods are in this section.  These should be short methods returning
 -- maps from color to simple values.
+
+function colorToSteamName()
+    local result = {}
+    local colorToName = {}
+    for _, player in ipairs(Player.getPlayers()) do
+        colorToName[player.color] = player.steam_name
+    end
+    for _, color in ipairs(_zoneHelper.zones()) do
+        result[color] = colorToName[color] or '-'
+    end
+    return result
+end
 
 function colorToFactionName()
     local result = {}
@@ -73,9 +182,9 @@ function colorToCommandTokens()
     for color, tokens in pairs(colorToTokens) do
         local numTactics, numFleet, numStrategy = Tokens.sumTacticFleetStrategy(tokens, color)
         result[color] = {
-            tactics = numTactics,
-            fleet = numFleet,
-            strategy = numStrategy
+            tacticsTokens = numTactics,
+            fleetTokens = numFleet,
+            strategyTokens = numStrategy
         }
     end
     return result
@@ -110,17 +219,23 @@ function colorToStrategyCards()
     return result
 end
 
-function getObjectives()
+function getRound()
+    return Objectives.getRound()
+end
+
+function getPublicObjectives()
     local objectives = Objectives.getCards()
     local deckNameToObjectives = Objectives.groupByDeckName(objectives)
     local result = {}
     for deckName, objectives in pairs(deckNameToObjectives) do
-        local entry = {}
-        for _, objective in ipairs(objectives) do
-            table.insert(entry, objective.getName())
+        if string.match(deckName, '^Public Objectives') then
+            local entry = {}
+            for _, objective in ipairs(objectives) do
+                table.insert(entry, objective.getName())
+            end
+            table.sort(entry)
+            result[deckName] = entry
         end
-        table.sort(entry)
-        result[deckName] = entry
     end
     return result
 end
@@ -534,6 +649,7 @@ Objectives = {
         'Public Objectives II',
         'Secret Objectives',
     },
+    OTHER_DECK_NAME = 'OTHER',
     OTHER_OBJECTIVES = {
         'Support for the Throne (White)',
         'Support for the Throne (Blue)',
@@ -587,7 +703,9 @@ end
 -- @return table : map from deck name to list of objective cards.
 function Objectives.groupByDeckName(objectiveCards)
     assert(type(objectiveCards) == 'table')
-    local deckNameToFoundObjectives = {}
+    local deckNameToFoundObjectives = {
+        [Objectives.OTHER_DECK_NAME] = {}
+    }
     for _, deckName in ipairs(Objectives.OBJECTIVE_DECKS) do
         deckNameToFoundObjectives[deckName] = {}
     end
@@ -610,15 +728,45 @@ function Objectives._getObjectiveToDeckName()
         Objectives._objectiveToDeckNameTimestamp = Time.time
         Objectives._objectiveToDeckName = {}
         for _, deckName in ipairs(Objectives.OBJECTIVE_DECKS) do
-            for _, cardName in ipairs(_deckHelper.getCardsWithSource({ deckName = deckName })) do
+            local cardNames = _deckHelper.getCardsWithSource({ deckName = deckName })
+            for _, cardName in ipairs(cardNames) do
                 Objectives._objectiveToDeckName[cardName] = deckName
             end
         end
         for _, otherObjective in ipairs(Objectives.OTHER_OBJECTIVES) do
-            Objectives._objectiveToDeckName[otherObjective] = 'Other'
+            Objectives._objectiveToDeckName[otherObjective] = Objectives.OTHER_DECK_NAME
         end
     end
     return Objectives._objectiveToDeckName
+end
+
+function Objectives.getRound()
+    local objectiveToDeckName = Objectives._getObjectiveToDeckName()
+    local publicObjectiveNameSet = {}
+    for objective, deckName in pairs(objectiveToDeckName) do
+        if deckName == 'Public Objectives I' or deckName == 'Public Objectives II' then
+            publicObjectiveNameSet[objective] = true
+        end
+    end
+    local inHandGuidSet = _zoneHelper.inHand()
+    local numObjectives = 0
+    local incentiveProgram = false
+    for _, object in ipairs(getAllObjects()) do
+        if not inHandGuidSet[object.getGUID()] then
+            local name = object.getName()
+            if publicObjectiveNameSet[name] then
+                numObjectives = numObjectives + 1
+            end
+            if name == 'Incentive Program' and not object.is_face_down then
+                incentiveProgram = true
+            end
+        end
+    end
+    local round = numObjectives - 1
+    if incentiveProgram then
+        round = round - 1
+    end
+    return math.max(round, 1)
 end
 
 -------------------------------------------------------------------------------
@@ -710,25 +858,95 @@ function onSave()
     return JSON.encode(_state)
 end
 
-function _doReport()
-    for k, v in pairs(_G) do
-        if string.match(k, '^colorTo') and type(v) == 'function' then
-            local result = v()
-            local message = {}
-            for color, value in pairs(result or {}) do
-                if type(value) == 'table' then
-                    local entry = {}
-                    for k, v in pairs(value) do
-                        table.insert(entry, k .. '=' .. v)
-                    end
-                    value = '{' .. table.concat(entry, ',') .. '}'
-                end
-                table.insert(message, color .. '=' .. tostring(value))
+function onPlayerTurnStart(player_color_start, player_color_previous)
+    _uploadGameData()
+end
+
+function onChat(message, srcPlayer)
+    local key = string.match(message, '!gamedata(.*)$')
+    if key then
+        if srcPlayer.admin or srcPlayer.promoted then
+            key = string.match(key, ' (.*)')
+            if key then
+                -- "!gamedata <key>" enables it.
+                printToAll('!gamedata enabled by ' .. srcPlayer.color, 'Yellow')
+                _gameDataKey = key
+                _uploadGameData()
+            else
+                -- "!gamedata" without a key disables it.
+                _gameDataKey = false
+                printToAll('!gamedata disabled by ' .. srcPlayer.color, 'Yellow')
             end
-            message = k .. ': ' .. table.concat(message, ', ')
-            print(message)
+        else
+            printToAll('!gamedata failed for ' .. srcPlayer.color .. ', must be promoted to use', 'Red')
+        end
+        return false
+    end
+end
+
+-------------------------------------------------------------------------------
+
+function _uploadGameData()
+    if not _gameDataKey then
+        return
+    end
+    asyncGatherData({
+        guid = self.getGUID(),
+        callbackFunctionName = '_uploadGameDataCallback'
+    })
+end
+
+function _uploadGameDataCallback(data)
+    if not _gameDataKey then
+        return
+    end
+    data = JSON.encode(data)
+    --local url = 'http://localhost:8080/data?key=' .. _gameDataKey
+    local url = 'http://ti4-game-data.appspot.com/data?key=' .. _gameDataKey
+    local function callback(result)
+        if result.is_error then
+            print('Upload failed: ' .. result.error)
         end
     end
+    WebRequest.post(url, data, callback)
+end
+
+-------------------------------------------------------------------------------
+
+function _doReport()
+    asyncGatherData({
+        guid = self.getGUID(),
+        callbackFunctionName = '_doReportCallback'
+    })
+end
+
+function _doReportCallback(data)
+    local function _logTable(message, table, depth)
+        assert(type(message) == 'string' and type(table) == 'table' and type(depth) == 'number')
+        local indent = '   '
+        local prefix = ''
+        if depth > 1 then
+            for i = 2, depth do
+                prefix = prefix .. indent
+            end
+        end
+        local indentedPrefix = prefix .. '   '
+        print(prefix .. message .. ' = {')
+        if depth < 4 then
+            for k, v in pairs(table) do
+                if type(v) == 'table' then
+                    _logTable(tostring(k), v, depth + 1)
+                else
+                    print(indentedPrefix .. tostring(k) .. ' = ' .. tostring(v))
+                end
+            end
+        else
+            -- Stop once too deep (also prevents infinite loops if cycles).
+            print(indentedPrefix .. '...')
+        end
+        print(prefix .. '}')
+    end
+    _logTable(self.getName(), data, 1)
 end
 
 -------------------------------------------------------------------------------

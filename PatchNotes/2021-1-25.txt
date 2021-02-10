@@ -25,3 +25,15 @@ This change does not use any new TTS features introduced in TTS v13, and will wo
 - Restore vote counter placement.
 - Franken + Strategy Card Automator "trade" now uses correct commodities value.
 - Discarding promissory notes (via a graveyard) now returns them to the owning player.
+- Strategy Card Automator now presents options when strategy token alternatives are available.
+- Strategy Card Automator now returns trade agreements and moves commodities when refreshing AND the trade agreement is face up in a player area (not in hand).
+- Strategy Card Automator now has a "draw secrets" setting, will only draw the card when enabled.
+- Faction Selector now has a right-click option to unpack via the faction token in the player zone.
+
+22d:
+- Lock token bags on setup.
+- Strategy Card Automator now requires trade agreements be face up on the table (not hand) during refresh to pass commodities to the agreement holder.
+- Strategy Card Automator no longer deals secrets for Imperial primary when dealing secrets is disabled.
+- Fix some issues with homebrew faction and unit modifier injection.
+- Updated Cabal token art to be more distinct from Nekro.
+- Generic "spreadsheet update" data instead of spreadsheet format.

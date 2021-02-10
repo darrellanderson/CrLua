@@ -99,10 +99,10 @@ function updateNotesCoroutine()
         local score = colorToScore[color] or 0
 
         local resourcesInfluence = colorToResourcesInfluence[color] or {}
-        local resources = resourcesInfluence.resources or 0
-        local influence = resourcesInfluence.influence or 0
-        local resourcesUp = resourcesInfluence.availableResources or 0
-        local influenceUp = resourcesInfluence.availableInfluence or 0
+        local resources = resourcesInfluence.resources.total or 0
+        local influence = resourcesInfluence.influence.total or 0
+        local resourcesUp = resourcesInfluence.resources.avail or 0
+        local influenceUp = resourcesInfluence.influence.avail or 0
 
         local tradeGoodsCommodities = colorToTradeGoodsCommodities[color] or {}
         local commodities = tradeGoodsCommodities.commodities or 0

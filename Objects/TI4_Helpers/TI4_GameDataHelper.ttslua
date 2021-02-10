@@ -240,15 +240,7 @@ function colorToResourcesInfluence()
     local colorToCards = Objects.groupByZone(cards)
     local result = {}
     for color, cards in pairs(colorToCards) do
-        local faceUp, faceDown = Objects.groupByFaceUpDown(cards)
-        local sumTotal = Cards.sumAttrs(cards)
-        local sumFaceUp = Cards.sumAttrs(faceUp)
-        result[color] = {
-            resources = sumTotal.resources,
-            influence = sumTotal.influence,
-            availableResources = sumFaceUp.resources,
-            availableInfluence = sumFaceUp.influence
-        }
+        result[color] = Cards.sumAttrs(cards)
     end
     return result
 end

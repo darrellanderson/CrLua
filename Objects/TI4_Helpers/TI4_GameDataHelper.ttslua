@@ -25,8 +25,7 @@ local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 local _state = {}
 local _gameDataKey = false
-local _delayedUploadWaitId = false
-
+local _timerId = false
 
 -------------------------------------------------------------------------------
 
@@ -47,75 +46,126 @@ function asyncGatherDataCoroutine()
     end
 
     local result = {
+        laws = getLaws(),
         timestamp = math.floor(os.time()),
-        turn = Turns.turn_color or '-',
+        turn = Turns.turn_color or '',
+        players = {},
     }
+    local colorToPlayerResult = {}
     for _, color in ipairs(_zoneHelper.zones()) do
-        result[color] = {}
+        local playerResult = {
+            color = color,
+        }
+        colorToPlayerResult[color] = playerResult
+        table.insert(result.players, playerResult)
     end
 
+    -- Global items.
+
+    result.round = getRound()
+    coroutine.yield(0)
+    coroutine.yield(0)
+
+    result.objectives = getObjectives()
+    coroutine.yield(0)
+    coroutine.yield(0)
+
+    result.speaker = getSpeakerColor() or ''
+    coroutine.yield(0)
+    coroutine.yield(0)
+
+    -- Per-player items.
+
     for color, steamName in pairs(colorToSteamName()) do
-        result[color].steamName = steamName
+        colorToPlayerResult[color].steamName = steamName
     end
+    coroutine.yield(0)
     coroutine.yield(0)
 
     for color, factionName in pairs(colorToFactionName()) do
-        result[color].factionName = factionName
+        colorToPlayerResult[color].factionName = factionName
     end
+    coroutine.yield(0)
     coroutine.yield(0)
 
     for color, score in pairs(colorToScore()) do
-        result[color].score = score
+        colorToPlayerResult[color].score = score
     end
     coroutine.yield(0)
+    coroutine.yield(0)
 
-    for color, resourcesInfluence in pairs(colorToResourcesInfluence()) do
-        for k, v in pairs(resourcesInfluence) do
-            result[color][k] = v
-        end
+    for color, active in pairs(colorToActive()) do
+        colorToPlayerResult[color].active = active
     end
+    coroutine.yield(0)
+    coroutine.yield(0)
+
+    for color, planetTotals in pairs(colorToPlanetTotals()) do
+        colorToPlayerResult[color].planetTotals = planetTotals
+    end
+    coroutine.yield(0)
     coroutine.yield(0)
 
     for color, commandTokens in pairs(colorToCommandTokens()) do
-        for k, v in pairs(commandTokens) do
-            result[color][k] = v
-        end
+        colorToPlayerResult[color].commandTokens = commandTokens
     end
+    coroutine.yield(0)
     coroutine.yield(0)
 
     for color, tradeGoodsCommodities in pairs(colorToTradeGoodsCommodities()) do
         for k, v in pairs(tradeGoodsCommodities) do
-            result[color][k] = v
+            colorToPlayerResult[color][k] = v
         end
     end
     coroutine.yield(0)
+    coroutine.yield(0)
 
     for color, strategyCards in pairs(colorToStrategyCards()) do
-        result[color].strategyCards = strategyCards
+        colorToPlayerResult[color].strategyCards = strategyCards
     end
     coroutine.yield(0)
-
-    result.round = getRound()
-    coroutine.yield(0)
-
-    for deckName, publicObjectives in pairs(getPublicObjectives()) do
-        result[deckName] = publicObjectives
-    end
     coroutine.yield(0)
 
     for color, objectives in pairs(colorToObjectives()) do
-        result[color].objectives = objectives  -- TODO annotate stage 1, 2, secret, other?
+        colorToPlayerResult[color].objectives = objectives
     end
+    coroutine.yield(0)
     coroutine.yield(0)
 
     for color, custodiansPoints in pairs(colorToCustodiansPoints()) do
-        result[color].custodiansPoints = custodiansPoints
+        colorToPlayerResult[color].custodiansPoints = custodiansPoints
     end
+    coroutine.yield(0)
+    coroutine.yield(0)
+
+    for color, leaderUnlocks in pairs(colorToLeaderUnlocks()) do
+        colorToPlayerResult[color].leaders = leaderUnlocks
+    end
+    coroutine.yield(0)
+    coroutine.yield(0)
+
+    for color, alliances in pairs(colorToAlliances()) do
+        colorToPlayerResult[color].alliances = alliances
+    end
+    coroutine.yield(0)
+    coroutine.yield(0)
+
+    for color, laws in pairs(colorToLaws()) do
+        colorToPlayerResult[color].laws = laws
+    end
+    coroutine.yield(0)
     coroutine.yield(0)
 
     for color, technologies in pairs(colorToTechnologies()) do
-        result[color].technologies = technologies
+        colorToPlayerResult[color].technologies = technologies
     end
+    coroutine.yield(0)
+    coroutine.yield(0)
+
+    for color, handSummary in pairs(colorToHandSummary()) do
+        colorToPlayerResult[color].handSummary = handSummary
+    end
+    coroutine.yield(0)
     coroutine.yield(0)
 
     local callbackObject = getObjectFromGUID(params.guid)
@@ -136,7 +186,7 @@ function colorToSteamName()
         colorToName[player.color] = player.steam_name
     end
     for _, color in ipairs(_zoneHelper.zones()) do
-        result[color] = colorToName[color] or '-'
+        result[color] = colorToName[color] or ''
     end
     return result
 end
@@ -160,19 +210,44 @@ function colorToScore()
     return result
 end
 
+function getSpeakerColor()
+    local token = Players.getSpeakerToken()
+    return token and _zoneHelper.zoneFromPosition(token.getPosition())
+end
+
+function colorToActive()
+    local tokens = Players.getActivePassedTokens()
+    local result = {}
+    for _, token in ipairs(tokens) do
+        local color = string.match(token.getName(), '^Active/Passed %((.*)%)')
+        result[color] = not token.is_face_down
+    end
+    return result
+end
+
+function colorToPlanetTotals()
+    local cards = Cards.getCards()
+    local colorToCards = Objects.groupByZone(cards)
+    local result = {}
+    for color, cards in pairs(colorToCards) do
+        result[color] = Cards.sumAttrs(cards)
+    end
+    return result
+end
+
 function colorToResourcesInfluence()
     local cards = Cards.getCards()
     local colorToCards = Objects.groupByZone(cards)
     local result = {}
     for color, cards in pairs(colorToCards) do
         local faceUp, faceDown = Objects.groupByFaceUpDown(cards)
-        local r, i = Cards.sumResourceInfluence(cards)
-        local availR, availI = Cards.sumResourceInfluence(faceUp)
+        local sumTotal = Cards.sumAttrs(cards)
+        local sumFaceUp = Cards.sumAttrs(faceUp)
         result[color] = {
-            resources = r,
-            influence = i,
-            availableResources = availR,
-            availableInfluence = availI
+            resources = sumTotal.resources,
+            influence = sumTotal.influence,
+            availableResources = sumFaceUp.resources,
+            availableInfluence = sumFaceUp.influence
         }
     end
     return result
@@ -185,9 +260,9 @@ function colorToCommandTokens()
     for color, tokens in pairs(colorToTokens) do
         local numTactics, numFleet, numStrategy = Tokens.sumTacticFleetStrategy(tokens, color)
         result[color] = {
-            tacticsTokens = numTactics,
-            fleetTokens = numFleet,
-            strategyTokens = numStrategy
+            tactics = numTactics,
+            fleet = numFleet,
+            strategy = numStrategy,
         }
     end
     return result
@@ -226,19 +301,19 @@ function getRound()
     return Objectives.getRound()
 end
 
-function getPublicObjectives()
+function getObjectives()
     local objectives = Objectives.getCards()
     local deckNameToObjectives = Objectives.groupByDeckName(objectives)
     local result = {}
     for deckName, objectives in pairs(deckNameToObjectives) do
-        if string.match(deckName, '^Public Objectives') then
-            local entry = {}
-            for _, objective in ipairs(objectives) do
-                table.insert(entry, objective.getName())
-            end
-            table.sort(entry)
-            result[deckName] = entry
+        local entry = {}
+        for _, objective in ipairs(objectives) do
+            local name = objective.getName()
+            name = string.match(name, '^(.*) %(PoK%)$') or name
+            table.insert(entry, name)
         end
+        -- Do NOT sort, objectives are in discovery order (newly flipped at end).
+        result[deckName] = entry
     end
     return result
 end
@@ -253,7 +328,9 @@ function colorToObjectives()
         local entry = {}
         for objective, overlappingTokens in pairs(objectiveToOverlappingTokens) do
             if #overlappingTokens > 0 then
-                table.insert(entry, objective.getName())
+                local name = objective.getName()
+                name = string.match(name, '^(.*) %(PoK%)$') or name
+                table.insert(entry, name)
             end
         end
         table.sort(entry)
@@ -278,24 +355,128 @@ function colorToCustodiansPoints()
     return result
 end
 
+function colorToLeaderUnlocks()
+    local cards = Factions.getLeaderCards()
+    local colorToCards = Objects.groupByZone(cards)
+    local result = {}
+    for color, cards in pairs(colorToCards) do
+        result[color] = {}
+        local faction = _factionHelper.fromColor(color)
+        if faction then
+            local cardNameToCard = {}
+            for _, card in ipairs(cards) do
+                cardNameToCard[card.getName()] = card
+            end
+            local function leaderStatus(name)
+                local card = cardNameToCard[name]
+                if card then
+                    if card.is_face_down then
+                        return 'locked'
+                    else
+                        return 'unlocked'
+                    end
+                end
+                return 'purged'
+            end
+            if faction.commander then
+                result[color].commander = leaderStatus(faction.commander)
+            end
+            if faction.hero then
+                result[color].hero = leaderStatus(faction.hero)
+            end
+        end
+    end
+    return result
+end
+
+function colorToAlliances()
+    local cards = Factions.getAllianceCards()
+    local colorToCards = Objects.groupByZone(cards)
+    local result = {}
+    for color, cards in pairs(colorToCards) do
+        result[color] = {}
+        local seen = {}
+        for _, card in ipairs(cards) do
+            local alliance = string.match(card.getName(), '^Alliance %((.*)%)$')
+            if alliance and not seen[alliance] then
+                seen[alliance] = true
+                table.insert(result[color], alliance)
+            end
+        end
+        table.sort(result[color])
+    end
+    return result
+end
+
 function colorToTechnologies()
     local technologies = Technologies.getCards()
     local colorToTechnologies = Objects.groupByZone(technologies)
     local result = {}
     for color, technologies in pairs(colorToTechnologies) do
         local list = {}
+        local seen = {}
         for _, technology in ipairs(technologies) do
             local name = technology.getName()
             name = string.match(name, '^(.*) Ω') or name
-            table.insert(list, name)
+            if not seen[name] then
+                seen[name] = true
+                table.insert(list, name)
+            end
         end
-        table.sort(list)
         -- Preserve acquisition order.
         _state.colorToTechnologies = _state.colorToTechnologies or {}
         local oldList = _state.colorToTechnologies[color] or {}
         list = Technologies.pruneAndAppendMissing(oldList, list)
         _state.colorToTechnologies[color] = list
         result[color] = list
+    end
+    return result
+end
+
+function getLaws()
+    local cards = Laws.getLawCards()
+    local result = {}
+    for _, card in ipairs(cards) do
+        local name = card.getName()
+        table.insert(result, name)
+    end
+    return result
+end
+
+function colorToLaws()
+    local cards = Laws.getLawCards()
+    local ownerTokens = Tokens.getTokens('Owner')
+    local lawToOwners = Laws.getOwners(cards, ownerTokens)
+    local result = {}
+    for _, color in ipairs(_zoneHelper.zones()) do
+        result[color] = {}
+    end
+    for law, owners in pairs(lawToOwners) do
+        local name = law.getName()
+        for _, owner in ipairs(owners) do
+            table.insert(result[owner], name)
+        end
+    end
+    return result
+end
+
+function colorToHandSummary()
+    local result = {}
+    for _, color in ipairs(_zoneHelper.zones()) do
+        result[color] = {}
+    end
+    for _, player in ipairs(Player.getPlayers()) do
+        if result[player.color] then
+            local cards = {}
+            for i = 1, player.getHandCount() do
+                for _, object in ipairs(player.getHandObjects(i)) do
+                    if object.tag == 'Card' then
+                        table.insert(cards, object)
+                    end
+                end
+            end
+            result[player.color] = Cards.summarize(cards)
+        end
     end
     return result
 end
@@ -491,8 +672,9 @@ end
 
 Cards = {
     CACHE_TIMEOUT_SECONDS = 10,
-    _lowerNameToResInfTimestamp = false,
-    _lowerNameToResInf = false,
+    _attrCacheTimestamp = false,
+    _lowerNameToAttrs = false,
+    _promissoryNoteSet = false,
 }
 
 --- Get all cards on the table (face down ok, but NOT in hands).
@@ -508,46 +690,97 @@ function Cards.getCards()
     return cards
 end
 
-function Cards.sumResourceInfluence(cards)
+function Cards.sumAttrs(cards)
     assert(type(cards) == 'table')
-    local lowerNameToResInf = Cards._getLowerNameToResInf()
-    local resources = 0
-    local influence = 0
+    local sum = {
+        resources = { avail = 0, total = 0 },
+        influence = { avail = 0, total = 0 },
+        legendary = 0,
+        traits = {
+            cultural = 0,
+            industrial = 0,
+            hazardous = 0,
+        },
+        techs = {
+            blue = 0,
+            green = 0,
+            red = 0,
+            yellow = 0,
+        },
+    }
+    local lowerNameToAttrs = Cards._getLowerNameToAttrs()
     for _, card in ipairs(cards) do
         local lowerName = string.lower(card.getName())
-        local resInf = lowerNameToResInf[lowerName]
-        if resInf then
-            resources = resources + resInf.resources
-            influence = influence + resInf.influence
+        local attrs = lowerNameToAttrs[lowerName]
+        if attrs then
+            sum.resources.total = sum.resources.total + (attrs.resources or 0)
+            sum.influence.total = sum.influence.total + (attrs.influence or 0)
+            if not card.is_face_down then
+                sum.resources.avail = sum.resources.avail + (attrs.resources or 0)
+                sum.influence.avail = sum.influence.avail + (attrs.influence or 0)
+            end
+            if attrs.legendary then
+                sum.legendary = sum.legendary + 1
+            end
+            if attrs.trait then
+                sum.traits[attrs.trait] = sum.traits[attrs.trait] + 1
+            end
+            if attrs.tech then
+                sum.techs[attrs.tech] = sum.techs[attrs.tech] + 1
+            end
         end
     end
-    return resources, influence
+    return sum
 end
 
-function Cards._getLowerNameToResInf()
-    if Cards._lowerNameToResInf and Cards._lowerNameToResInfTimestamp then
-        local age = Time.time - Cards._lowerNameToResInfTimestamp
+function Cards._getLowerNameToAttrs()
+    if Cards._lowerNameToAttrs and Cards._attrCacheTimestamp then
+        local age = Time.time - Cards._attrCacheTimestamp
         if age > Cards.CACHE_TIMEOUT_SECONDS then
-            Cards._lowerNameToResInf = false
+            Cards._lowerNameToAttrs = false
         end
     end
-    if not Cards._lowerNameToResInf then
-        Cards._lowerNameToResInfTimestamp = Time.time
-        Cards._lowerNameToResInf = {}
+    if not Cards._lowerNameToAttrs then
+        Cards._attrCacheTimestamp = Time.time
+        Cards._lowerNameToAttrs = {}
         for lowerName, planet in pairs(_systemHelper.planets()) do
-            Cards._lowerNameToResInf[lowerName] = {
-                resources = planet.resources or 0,
-                influence = planet.influence or 0
-            }
+            Cards._lowerNameToAttrs[lowerName] = planet
         end
         for lowerName, attributes in pairs(_systemHelper.nonPlanetResourceInfluenceCards()) do
-            Cards._lowerNameToResInf[lowerName] = {
-                resources = attributes.resources or 0,
-                influence = attributes.influence or 0
-            }
+            Cards._lowerNameToAttrs[lowerName] = attributes
         end
     end
-    return Cards._lowerNameToResInf
+    return Cards._lowerNameToAttrs
+end
+
+function Cards.summarize(cards)
+    if not Cards._promissoryNoteSet then
+        Cards._promissoryNoteSet = {}
+        for _, faction in pairs(_factionHelper.allFactions(true)) do
+            for _, name in ipairs(faction.promissoryNotes or {}) do
+                Cards._promissoryNoteSet[name] = true
+            end
+        end
+        for _, color in ipairs(Player.getColors()) do
+            Cards._promissoryNoteSet['Alliance (' .. color .. ')'] = true
+            Cards._promissoryNoteSet['Trade Agreement (' .. color .. ')'] = true
+            Cards._promissoryNoteSet['Ceasefire (' .. color .. ')'] = true
+            Cards._promissoryNoteSet['Support for the Throne (' .. color .. ')'] = true
+            Cards._promissoryNoteSet['Political Secret (' .. color .. ')'] = true
+        end
+    end
+    local result = {}
+    for _, card in ipairs(cards) do
+        local name = card.getName()
+        local deckName = _deckHelper.getDeckName(name)
+        if not deckName and Cards._promissoryNoteSet[name] then
+            deckName = 'Promissory'
+        end
+        if deckName then
+            result[deckName] = (result[deckName] or 0) + 1
+        end
+    end
+    return result
 end
 
 -------------------------------------------------------------------------------
@@ -677,20 +910,6 @@ Objectives = {
     _objectiveToDeckNameTimestamp = false,
 }
 
---- Get face-up objective card objects (ignoring held cards).
--- @return table : list of objective card objects.
-function Objectives.getCards()
-    local cards = {}
-    local inHandGuidSet = _zoneHelper.inHand()
-    local objectiveToDeckName = Objectives._getObjectiveToDeckName()
-    for _, object in ipairs(getAllObjects()) do
-        if object.tag == 'Card' and (not inHandGuidSet[object.getGUID()]) and (not object.is_face_down) and objectiveToDeckName[object.getName()] then
-            table.insert(cards, object)
-        end
-    end
-    return cards
-end
-
 --- Get the custodians token.
 -- @return object : custodians token game object.
 function Objectives.getCustodiansToken()
@@ -699,6 +918,36 @@ function Objectives.getCustodiansToken()
             return object
         end
     end
+end
+
+--- Get face-up objective card objects (ignoring held cards).
+-- Preserves discovery order.
+-- @return table : list of objective card objects.
+function Objectives.getCards()
+    local cardNames = {}
+    local nameToCard = {}
+    local inHandGuidSet = _zoneHelper.inHand()
+    local objectiveToDeckName = Objectives._getObjectiveToDeckName()
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Card' and (not inHandGuidSet[object.getGUID()]) and (not object.is_face_down) then
+            local name = object.getName()
+            if objectiveToDeckName[name] and not nameToCard[name] then
+                table.insert(cardNames, name)
+                nameToCard[name] = object
+            end
+        end
+    end
+    -- Preserve discovery order.
+    local oldList = _state.objectives or {}
+    cardNames = Technologies.pruneAndAppendMissing(oldList, cardNames)
+    _state.objectives = cardNames
+    -- Generate object list.
+    local cards = {}
+    for _, cardName in ipairs(cardNames) do
+        local card = nameToCard[cardName]
+        table.insert(cards, card)
+    end
+    return cards
 end
 
 --- Group objective cards by the deck(s) they come from.
@@ -776,18 +1025,123 @@ end
 
 -------------------------------------------------------------------------------
 
-Laws = {}
+Laws = {
+    _lawNameSet = false,
+}
 
-function Laws.getLaws()
-    -- TODO
+function Laws.getLawCards()
+    if not Laws._lawNameSet then
+        Laws._lawNameSet = {}
+        local lawNames = _deckHelper.getCardsWithSource({ deckName = 'Agenda' })
+        for _, lawName in ipairs(lawNames) do
+            Laws._lawNameSet[lawName] = true
+        end
+    end
+    local cardNames = {}
+    local nameToCard = {}
+    local inHandGuidSet = _zoneHelper.inHand()
+    local objectiveToDeckName = Objectives._getObjectiveToDeckName()
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Card' and (not inHandGuidSet[object.getGUID()]) and (not object.is_face_down) then
+            local name = object.getName()
+            if Laws._lawNameSet[name] and not nameToCard[name] then
+                table.insert(cardNames, name)
+                nameToCard[name] = object
+            end
+        end
+    end
+    -- Preserve discovery order.
+    local oldList = _state.laws or {}
+    cardNames = Technologies.pruneAndAppendMissing(oldList, cardNames)
+    _state.laws = cardNames
+    -- Generate object list.
+    local cards = {}
+    for _, cardName in ipairs(cardNames) do
+        local card = nameToCard[cardName]
+        table.insert(cards, card)
+    end
+    return cards
+end
+
+function Laws.getOwners(lawCards, ownerTokens)
+    local cardToOverlappingTokens = Objects.overlap(ownerTokens, lawCards)
+    local result = {}
+    for _, lawCard in ipairs(lawCards) do
+        local tokens = cardToOverlappingTokens[lawCard] or {}
+        local owners = {}
+        local seen = {}
+        for _, token in ipairs(tokens) do
+            local faction = _factionHelper.fromTokenName(token.getName())
+            local owner = faction and faction.color
+            if owner and not seen[owner] then
+                seen[owner] = true
+                table.insert(owners, owner)
+            end
+        end
+        result[lawCard] = owners
+    end
+    return result
 end
 
 -------------------------------------------------------------------------------
 
 Players = {}
 
-function Players.getActivePassed()
-    -- TODO
+function Players.getActivePassedTokens()
+    local activePassedTokens = {}
+    for _, object in ipairs(getAllObjects()) do
+        local color = string.match(object.getName(), '^Active/Passed %((.*)%)')
+        if color then
+            table.insert(activePassedTokens, object)
+        end
+    end
+    return activePassedTokens
+end
+
+function Players.getSpeakerToken()
+    for _, object in ipairs(getAllObjects()) do
+        if object.getName() == 'Speaker Token' then
+            return object
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
+
+Factions = {}
+
+function Factions.getLeaderCards()
+    local leaderNameSet = {}
+    for _, faction in pairs(_factionHelper.allFactions()) do
+        if faction.commander then
+            leaderNameSet[faction.commander] = true
+        end
+        if faction.hero then
+            leaderNameSet[faction.hero] = true
+        end
+    end
+    local inHandGuidSet = _zoneHelper.inHand()
+    local cards = {}
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Card' and (not inHandGuidSet[object.getGUID()]) and leaderNameSet[object.getName()] then
+            table.insert(cards, object)
+        end
+    end
+    return cards
+end
+
+function Factions.getAllianceCards()
+    local inHandGuidSet = _zoneHelper.inHand()
+    local cards = {}
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Card' and (not inHandGuidSet[object.getGUID()]) then
+            local color = string.match(object.getName(), '^Alliance %((.*)%)$')
+            if color then
+                table.insert(cards, object)
+            end
+        end
+    end
+    return cards
 end
 
 -------------------------------------------------------------------------------
@@ -879,13 +1233,6 @@ function onSave()
     return JSON.encode(_state)
 end
 
-function onPlayerTurnStart(player_color_start, player_color_previous)
-    if _delayedUploadWaitId then
-        Wait.stop(_delayedUploadWaitId)
-    end
-    _delayedUploadWaitId = Wait.time(_uploadGameData, 2)
-end
-
 function onChat(message, srcPlayer)
     local key = string.match(message, '!gamedata(.*)$')
     if key then
@@ -895,16 +1242,47 @@ function onChat(message, srcPlayer)
                 -- "!gamedata <key>" enables it.
                 printToAll('!gamedata enabled by ' .. srcPlayer.color, 'Yellow')
                 _gameDataKey = key
-                _uploadGameData()
+                _startPeriodicUploads()
             else
                 -- "!gamedata" without a key disables it.
-                _gameDataKey = false
                 printToAll('!gamedata disabled by ' .. srcPlayer.color, 'Yellow')
+                _gameDataKey = false
+                _stopPeriodicUploads()
             end
         else
             printToAll('!gamedata failed for ' .. srcPlayer.color .. ', must be promoted to use', 'Red')
         end
         return false
+    end
+end
+
+-------------------------------------------------------------------------------
+
+function _startPeriodicUploads()
+    -- Stop any existing timer.
+    if _timerId then
+        Timer.destroy(_timerId)
+        _timerId = false
+    end
+
+    -- Start a new timer.
+    _timerId = self.getGUID() .. '_periodicUploads'
+    Timer.create({
+        identifier = _timerId,
+        function_name = '_uploadGameData',
+        function_owner = self,
+        delay = 60,
+        repetitions = 0,  -- until stopped
+    })
+
+    -- Timer does not trigger until delay, do an upload now.
+    _uploadGameData()
+end
+
+function _stopPeriodicUploads()
+    if _timerId then
+        Timer.destroy(_timerId)
+        _timerId = false
     end
 end
 
@@ -925,8 +1303,8 @@ function _uploadGameDataCallback(data)
         return
     end
     data = JSON.encode(data)
-    --local url = 'http://localhost:8080/data?key=' .. _gameDataKey
-    local url = 'http://ti4-game-data.appspot.com/data?key=' .. _gameDataKey
+    local url = 'http://localhost:8080/data?key=' .. _gameDataKey
+    --local url = 'http://ti4-game-data.appspot.com/data?key=' .. _gameDataKey
     local function callback(result)
         if result.is_error then
             print('Upload failed: ' .. result.error)

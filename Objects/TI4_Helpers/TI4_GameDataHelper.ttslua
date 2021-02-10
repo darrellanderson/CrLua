@@ -1303,8 +1303,8 @@ function _uploadGameDataCallback(data)
         return
     end
     data = JSON.encode(data)
-    local url = 'http://localhost:8080/data?key=' .. _gameDataKey
-    --local url = 'http://ti4-game-data.appspot.com/data?key=' .. _gameDataKey
+    --local url = 'http://localhost:8080/data?key=' .. _gameDataKey
+    local url = 'http://ti4-game-data.appspot.com/data?key=' .. _gameDataKey
     local function callback(result)
         if result.is_error then
             print('Upload failed: ' .. result.error)

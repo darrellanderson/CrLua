@@ -25,6 +25,8 @@ local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 local _state = {}
 local _gameDataKey = false
+local _delayedUploadWaitId = false
+
 
 -------------------------------------------------------------------------------
 
@@ -45,7 +47,8 @@ function asyncGatherDataCoroutine()
     end
 
     local result = {
-        timestamp = math.floor(os.time())
+        timestamp = math.floor(os.time()),
+        turn = Turns.turn_color or '-',
     }
     for _, color in ipairs(_zoneHelper.zones()) do
         result[color] = {}
@@ -101,7 +104,7 @@ function asyncGatherDataCoroutine()
     coroutine.yield(0)
 
     for color, objectives in pairs(colorToObjectives()) do
-        result[color].objectives = objectives
+        result[color].objectives = objectives  -- TODO annotate stage 1, 2, secret, other?
     end
     coroutine.yield(0)
 
@@ -751,13 +754,15 @@ function Objectives.getRound()
     local inHandGuidSet = _zoneHelper.inHand()
     local numObjectives = 0
     local incentiveProgram = false
+    local seen = {}
     for _, object in ipairs(getAllObjects()) do
-        if not inHandGuidSet[object.getGUID()] then
+        if object.tag == 'Card' and (not object.is_face_down) and (not inHandGuidSet[object.getGUID()]) then
             local name = object.getName()
-            if publicObjectiveNameSet[name] then
+            if publicObjectiveNameSet[name] and not seen[name] then
+                seen[name] = true
                 numObjectives = numObjectives + 1
             end
-            if name == 'Incentive Program' and not object.is_face_down then
+            if name == 'Incentive Program' then
                 incentiveProgram = true
             end
         end
@@ -767,6 +772,22 @@ function Objectives.getRound()
         round = round - 1
     end
     return math.max(round, 1)
+end
+
+-------------------------------------------------------------------------------
+
+Laws = {}
+
+function Laws.getLaws()
+    -- TODO
+end
+
+-------------------------------------------------------------------------------
+
+Players = {}
+
+function Players.getActivePassed()
+    -- TODO
 end
 
 -------------------------------------------------------------------------------
@@ -859,7 +880,10 @@ function onSave()
 end
 
 function onPlayerTurnStart(player_color_start, player_color_previous)
-    _uploadGameData()
+    if _delayedUploadWaitId then
+        Wait.stop(_delayedUploadWaitId)
+    end
+    _delayedUploadWaitId = Wait.time(_uploadGameData, 2)
 end
 
 function onChat(message, srcPlayer)

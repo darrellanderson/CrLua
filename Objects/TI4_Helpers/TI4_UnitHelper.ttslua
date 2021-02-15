@@ -90,17 +90,20 @@ local _unitTypes = {
         spaceCombat = { dice = 1, hit = 9 },
         move = 1,
         capacity = 4,
+        ship = true,
     },
     ['Cruiser'] = {
         cost = 2,
         spaceCombat = { dice = 1, hit = 7 },
         move = 2,
+        ship = true,
     },
     ['Destroyer'] = {
         antiFighterBarrage = { dice = 2, hit = 9 },
         cost = 1,
         spaceCombat = { dice = 1, hit = 9 },
         move = 2,
+        ship = true,
     },
     ['Dreadnought'] = {
         sustainDamage = true,
@@ -109,16 +112,19 @@ local _unitTypes = {
         spaceCombat = { dice = 1, hit = 5 },
         move = 1,
         capacity = 1,
+        ship = true,
     },
     ['Fighter'] = {
         cost = 0.5,
         spaceCombat = { dice = 1, hit = 9 },
+        ship = true,
     },
     ['Flagship'] = {
         sustainDamage = true,
         cost = 8,
         move = 1,
         capacity = 3,
+        ship = true,
     },
     ['Infantry'] = {
         cost = 0.5,
@@ -138,7 +144,9 @@ local _unitTypes = {
         production = -2,
         structure = true,
     },
-    ['War Sun'] = {},
+    ['War Sun'] = {
+        ship = true,
+    },
 }
 
 -- "override" replaces base unit, "upgrade" requires unit upgrade card.
@@ -377,7 +385,7 @@ local _flagshipModifiers = {
                 count = 0
                 local opponentUnitTypeToCount = params.opponentUnitTypeToCount or {}
                 for unitType, attr in pairs(unitAttrs) do
-                    if unitType ~= 'Fighter' and unitType ~= 'Infantry' and attr.spaceCombat then
+                    if attr.ship and (unitType ~= 'Fighter') and attr.spaceCombat then
                         count = count + (opponentUnitTypeToCount[unitType] or 0)
                     end
                 end
@@ -490,7 +498,7 @@ local _unitModifiers = {
         isCombat = true,
         apply = function(unitAttrs)
             for unitType, attr in pairs(unitAttrs) do
-                if unitType ~= 'Fighter' and attr.spaceCombat and not attr.bombardment then
+                if attr.ship and (unitType ~= 'Fighter') and not attr.bombardment then
                     attr.bombardment = { dice = 1, hit = 6 }
                 end
             end

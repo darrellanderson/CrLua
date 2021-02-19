@@ -1725,11 +1725,16 @@ function _refreshCommodities(color)
 	-- gets the number of commodities from the faction.commodities value
 	-- cache commodities bag. and while we're at it, maybe cache command token bags. and while we're at it, maybe cache everything else aswell.
 
-	local commoditiesBag = _getByName("x1 Commodities/Tradegoods Bag", "Infinite")
+	local commoditiesBags = {
+		["x1 Commodities/Tradegoods"] = _getByName("x1 Commodities/Tradegoods Bag", "Infinite"),
+		["x3 Commodities/Tradegoods"] = _getByName("x3 Commodities/Tradegoods Bag", "Infinite")
+	}
 
-	if not commoditiesBag then
-		broadcastToAll('Refresh commodities: missing x1 Commodities/Tradegoods Bag TEST', 'Red')
-		return
+	for key,v in pairs(commoditiesBags) do
+		if not v then
+			broadcastToAll('Refresh commodities: missing ' .. key .. ' Bag.', 'Red')
+			return
+		end
 	end
 
 	local faction = _factionHelper.fromColor(color)
@@ -1761,7 +1766,7 @@ function _refreshCommodities(color)
 	for _, v in pairs(hitlist) do
 		local name = v.hit_object.getName()
 		if name == string.match(name, ".*Commodities/Tradegoods$") then
-			commoditiesBag.putObject(v.hit_object)
+			commoditiesBags[name].putObject(v.hit_object)
 		end
 	end
 
@@ -1815,7 +1820,7 @@ function _refreshCommodities(color)
 
 	-- positions are relative to faction sheet
 	for i = 1,faction.commodities do
-		commoditiesBag.takeObject({
+		commoditiesBags["x1 Commodities/Tradegoods"].takeObject({
 			position = factionSheet.positionToWorld({
 				x = -0.8-(0.15*math.ceil(i/2)),
 				y = 2 + (i*0.01),

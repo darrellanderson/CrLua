@@ -20,8 +20,12 @@ end
 local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 local _technologyHelper = getHelperClient('TI4_TECHNOLOGY_HELPER')
+local _setupHelper = getHelperClient('TI4_SETUP_HELPER')
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
+
+local GAME_DATA_HOST = 'http://ti4-game-data.appspot.com'
+--local GAME_DATA_HOST = 'http://localhost:8080'
 
 local _state = {}
 local _gameDataKey = false
@@ -50,6 +54,9 @@ function asyncGatherDataCoroutine()
         laws = getLaws(),
         timestamp = math.floor(os.time()),
         turn = Turns.turn_color or '',
+        isPoK = _setupHelper.getPoK() and true or false,
+        isFranken = _factionHelper.isFrankenEnabled() and true or false,
+        scoreboard = Score._getScoreboard().is_face_down and 14 or 10,
         players = {},
     }
     local colorToPlayerResult = {}
@@ -873,34 +880,7 @@ end
 -------------------------------------------------------------------------------
 
 Objectives = {
-    OBJECTIVE_DECKS = {
-        'Public Objectives I',
-        'Public Objectives II',
-        'Secret Objectives',
-    },
-    OTHER_DECK_NAME = 'OTHER',
-    OTHER_OBJECTIVES = {
-        'Support for the Throne (White)',
-        'Support for the Throne (Blue)',
-        'Support for the Throne (Purple)',
-        'Support for the Throne (Yellow)',
-        'Support for the Throne (Red)',
-        'Support for the Throne (Green)',
-        'Support for the Throne (Orange)',
-        'Support for the Throne (Pink)',
-        'Support for the Throne (Brown)',
-        'Shard of the Throne',
-        'Shard of the Throne (PoK)',
-        'The Crown of Emphidia',
-        'The Crown of Emphidia (PoK)',
-        'Holy Planet of Ixth',
-        'Seed of an Empire',
-        'Imperial Rider',
-        'Mutiny',
-        'Mutiny (For)',  -- right click to rename
-        'Mutiny (Against)',  -- right click to rename
-    },
-    CACHE_TIMEOUT_SECONDS = 10,
+    CACHE_TIMEOUT_SECONDS = 60,
     _objectiveToDeckName = false,
     _objectiveToDeckNameTimestamp = false,
 }
@@ -950,16 +930,16 @@ end
 -- @return table : map from deck name to list of objective cards.
 function Objectives.groupByDeckName(objectiveCards)
     assert(type(objectiveCards) == 'table')
-    local deckNameToFoundObjectives = {
-        [Objectives.OTHER_DECK_NAME] = {}
-    }
-    for _, deckName in ipairs(Objectives.OBJECTIVE_DECKS) do
-        deckNameToFoundObjectives[deckName] = {}
-    end
+    local deckNameToFoundObjectives = {}
     local objectiveToDeckName = Objectives._getObjectiveToDeckName()
     for _, objectiveCard in ipairs(objectiveCards) do
         local deckName = objectiveToDeckName[objectiveCard.getName()]
-        table.insert(deckNameToFoundObjectives[deckName], objectiveCard)
+        local entry = deckNameToFoundObjectives[deckName]
+        if not entry then
+            entry = {}
+            deckNameToFoundObjectives[deckName] = entry
+        end
+        table.insert(entry, objectiveCard)
     end
     return deckNameToFoundObjectives
 end
@@ -974,14 +954,9 @@ function Objectives._getObjectiveToDeckName()
     if not Objectives._objectiveToDeckName then
         Objectives._objectiveToDeckNameTimestamp = Time.time
         Objectives._objectiveToDeckName = {}
-        for _, deckName in ipairs(Objectives.OBJECTIVE_DECKS) do
-            local cardNames = _deckHelper.getCardsWithSource({ deckName = deckName })
-            for _, cardName in ipairs(cardNames) do
-                Objectives._objectiveToDeckName[cardName] = deckName
-            end
-        end
-        for _, otherObjective in ipairs(Objectives.OTHER_OBJECTIVES) do
-            Objectives._objectiveToDeckName[otherObjective] = Objectives.OTHER_DECK_NAME
+        for cardName, _ in pairs(_deckHelper.getScoreCardNameSet()) do
+            local deckName = _deckHelper.getDeckName(cardName) or 'OTHER'
+            Objectives._objectiveToDeckName[cardName] = deckName
         end
     end
     return Objectives._objectiveToDeckName
@@ -1229,6 +1204,59 @@ function onSave()
     return JSON.encode(_state)
 end
 
+local _setupParams = false
+
+--- Called by TI4_SETUP_HELPER when setup finishes.
+-- Params:
+-- - playerCount (number).
+-- - extraRings (nil or number).
+-- - includePoK (nil or boolean).
+-- - playerTools (nil or boolean).
+function onSetupHelperSetupFinished(params)
+    _setupParams = params
+end
+
+--- The first time a turn starts after setup send anonymized game setup data.
+function onPlayerTurnStart(player_color_start, player_color_previous)
+    -- Only record the first time after setup.
+    if not _setupParams then
+        return
+    end
+
+    -- Ignore if only one player, developer testing?
+    local seated = getSeatedPlayers()
+    if (not seated) or #seated < 2 then
+        return
+    end
+
+    -- Build anonymized data.
+    local factions = {}
+    for _, color in ipairs(_zoneHelper.zones()) do
+        local faction = _factionHelper.fromColor(color)
+        table.insert(factions, faction and faction.name or '-')
+    end
+    local data = {
+        timestamp = math.floor(os.time()),
+        isPoK = _setupHelper.getPoK() and true or false,
+        isFranken = _factionHelper.isFrankenEnabled() and true or false,
+        scoreboard = Score._getScoreboard().is_face_down and 14 or 10,
+        seatedCount = #seated,
+        playerCount = _zoneHelper.getPlayerCount(),
+        factions = factions
+    }
+
+    -- Suppress future calls.
+    _setupParams = false
+
+    local url = GAME_DATA_HOST .. '/setup'
+    local function callback(result)
+        if result.is_error then
+            print('Upload failed: ' .. result.error)
+        end
+    end
+    WebRequest.post(url, JSON.encode(data), callback)
+end
+
 -------------------------------------------------------------------------------
 
 function startPeriodicUpdates(params)
@@ -1287,15 +1315,13 @@ function _uploadGameDataCallback(data)
     if not _gameDataKey then
         return
     end
-    data = JSON.encode(data)
-    --local url = 'http://localhost:8080/data?key=' .. _gameDataKey
-    local url = 'http://ti4-game-data.appspot.com/data?key=' .. _gameDataKey
+    local url = GAME_DATA_HOST .. '/data?key=' .. _gameDataKey
     local function callback(result)
         if result.is_error then
             print('Upload failed: ' .. result.error)
         end
     end
-    WebRequest.post(url, data, callback)
+    WebRequest.post(url, JSON.encode(data), callback)
 end
 
 -------------------------------------------------------------------------------
@@ -1308,32 +1334,34 @@ function _doReport()
 end
 
 function _doReportCallback(data)
-    local function _logTable(message, table, depth)
-        assert(type(message) == 'string' and type(table) == 'table' and type(depth) == 'number')
-        local indent = '   '
-        local prefix = ''
-        if depth > 1 then
-            for i = 2, depth do
-                prefix = prefix .. indent
-            end
+    _logTable(self.getName(), data)
+end
+
+function _logTable(message, table, depth)
+    depth = depth or 1
+    assert(type(message) == 'string' and type(table) == 'table' and type(depth) == 'number')
+    local indent = '   '
+    local prefix = ''
+    if depth > 1 then
+        for i = 2, depth do
+            prefix = prefix .. indent
         end
-        local indentedPrefix = prefix .. '   '
-        print(prefix .. message .. ' = {')
-        if depth < 4 then
-            for k, v in pairs(table) do
-                if type(v) == 'table' then
-                    _logTable(tostring(k), v, depth + 1)
-                else
-                    print(indentedPrefix .. tostring(k) .. ' = ' .. tostring(v))
-                end
-            end
-        else
-            -- Stop once too deep (also prevents infinite loops if cycles).
-            print(indentedPrefix .. '...')
-        end
-        print(prefix .. '}')
     end
-    _logTable(self.getName(), data, 1)
+    local indentedPrefix = prefix .. '   '
+    print(prefix .. message .. ' = {')
+    if depth < 4 then
+        for k, v in pairs(table) do
+            if type(v) == 'table' then
+                _logTable(tostring(k), v, depth + 1)
+            else
+                print(indentedPrefix .. tostring(k) .. ' = ' .. tostring(v))
+            end
+        end
+    else
+        -- Stop once too deep (also prevents infinite loops if cycles).
+        print(indentedPrefix .. '...')
+    end
+    print(prefix .. '}')
 end
 
 -------------------------------------------------------------------------------

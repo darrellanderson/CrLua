@@ -425,7 +425,7 @@ local backUI = {
 		}
 	}
 }
-
+local _dontDealSecrets = false
 function onToggleValueChanged(player, value, id)
 	local valueAsBool = string.lower(value) == 'true' and true or false
 	_dontDealSecrets = valueAsBool
@@ -774,9 +774,8 @@ function _openPopupUi(color, option)
 		return
 	end
 
-
-	vis = UI.getAttribute(option, "visibility")
-	act = UI.getAttribute(option, "active")
+	local vis = UI.getAttribute(option, "visibility")
+	local act = UI.getAttribute(option, "active")
 	if vis == "" or vis == nil then
 		vis = color
 		assert(act~="true", option .. " is active but not visible")
@@ -977,7 +976,7 @@ function _addTechnologyPrimarySecondary(layout)
 				local horizontalKeep = {}
 				for ibutton,button in ipairs(o["children"]) do
 					local techName = button['attributes']['onClick']
-					source = _techSourceSet[string.sub(techName, 10, -2)]
+					local source = _techSourceSet[string.sub(techName, 10, -2)]
 					if not (source == "PoK") then
 						horizontalKeep[counter] = button
 						counter = counter + 1
@@ -1077,18 +1076,18 @@ function _addSecondaryPopup(layout, colorTable)
 		return secondaryPopup
 	end
 
-	local function insertAll(option)
+	local function insertAll(option, optionTable)
 		for _,color in ipairs(colorTable) do
-			optionsForColor[color][option] = true
+			optionTable[color][option] = true
 		end
 	end
-
-	optionsForColor = {}
+ 
+	local optionsForColor = {}
 	for _,color in ipairs(colorTable) do
 		optionsForColor[color] = {["Strategy Token"] = true}
 	end
 	if _setupHelper.getPoK() then
-		insertAll('Scepter of Emelpar')
+		insertAll('Scepter of Emelpar', optionsForColor)
 	end
 
 	local cardOptions = {["Jae Mir Kan"]= {}, ["Ssruu"]= {}}
@@ -1102,7 +1101,7 @@ function _addSecondaryPopup(layout, colorTable)
 		if (object.tag == 'Deck') and (string.match(name, "Notes")) then
 			for _,cardObject in ipairs(object.getObjects()) do
 				if promissories[cardObject.name] then
-					insertAll(cardObject.name)
+					insertAll(cardObject.name, optionsForColor)
 				end
 			end
 		end
@@ -1115,7 +1114,7 @@ function _addSecondaryPopup(layout, colorTable)
 				end
 			end
 			if promissories[object.getName()] then
-				insertAll(object.getName())
+				insertAll(object.getName(), optionsForColor)
 			end
 		end
 	end
@@ -1288,7 +1287,7 @@ function _updateColorSelector(layout, element, colorTable)
 
 	local function _getColorButton(element, color)
 		local yourbutton = _deepcopy(_customLayout["colorButton"])
-		attributes = _deepcopy(_customLayout[element.."Attributes"])
+		local attributes = _deepcopy(_customLayout[element.."Attributes"])
 		for key,value in pairs(attributes) do
 			yourbutton["attributes"][key] = value
 		end
@@ -1555,7 +1554,7 @@ end
 function _returnPromissoryNote(color, promissoryName)
 	assert(type(color) == "string")
 	assert(type(promissoryName) == "string")
-	object = _getByName(promissoryName, 'Card')
+	local object = _getByName(promissoryName, 'Card')
 	if object then
 		object.setPosition(object.getPosition() + vector(0, 20, 0))
 		local discardParams = {
@@ -1578,7 +1577,7 @@ function _moveSpeakerToken(color)
 		return
 	end
 
-	zone = _zoneHelper.zoneAttributes(color)
+	local zone = _zoneHelper.zoneAttributes(color)
 	if not zone then
 		broadcastToAll('Assign speaker token: missing ' .. color .. ' player area', 'Red')
 		return
@@ -1995,7 +1994,7 @@ function researchTech(color, cardName, chainCallback)
 	end
 
 	for _,object in ipairs(getAllObjects()) do
-		name = object.getName()
+		local name = object.getName()
 		if techNameSet[string.gsub(name, " Ω$","")]then
 			guidToPosTechOnTable[object.getGUID()] = object.getPosition()
 		end
@@ -2075,7 +2074,7 @@ function researchTech(color, cardName, chainCallback)
 		-- copy unitUpgrade technology card and send it to respective position on faction sheet.
 		local positionTable = {}
 		positionTable.position = _getPosToFactionSheet(cardName, factionSheet, techDeck).position
-		clone = cardObject.clone(positionTable)
+		local clone = cardObject.clone(positionTable)
 		clone.setRotation(factionSheet.getRotation())
 		clone.highlightOn(color, 1)
 	end
@@ -2270,3 +2269,13 @@ function _getByName(name, tag)
 		end
 	end
 end
+
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+	error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+	error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

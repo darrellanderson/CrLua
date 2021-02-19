@@ -233,7 +233,7 @@ local DECKS = {
                 'Shared Research',
                 'Swords to Plowshares',
                 'Terraforming Initiative',
-                'The Crown of Emphidia',
+                ['The Crown of Emphidia'] = { score = true },
                 'The Crown of Thalnos',
                 'Unconventional Measures',
                 'Wormhole Reconstruction',
@@ -626,16 +626,11 @@ local function _getDeckAttributes(cardName)
     assert(type(cardName) == 'string')
     if not _cardNameToDeckAttributes then
         _cardNameToDeckAttributes = {}
-        for _, deckAttributes in pairs(DECKS) do
-            for _, cardNames in pairs(deckAttributes.cardNames) do
-                -- Get cards from ipairs value AND pairs key (mixed table).
-                for _, cardName in ipairs(cardNames) do
+        for deckName, deckAttributes in pairs(DECKS) do
+            for cardSource, cardNames in pairs(deckAttributes.cardNames) do
+                for k, v in pairs(cardNames) do
+                    local cardName = type(k) == 'string' and k or v
                     _cardNameToDeckAttributes[cardName] = deckAttributes
-                end
-                for cardName, cardAttributes in pairs(cardNames) do
-                    if type(cardName) == 'string' and type(cardAttributes) == 'table' then
-                        _cardNameToDeckAttributes[cardName] = deckAttributes
-                    end
                 end
             end
         end
@@ -803,7 +798,14 @@ end
 
 --- Expose scorable card names.
 function getScoreCardNameSet()
+    _getDeckAttributes('bogus')  -- make sure table exists
+    _getCardAttributes('bogus')  -- make sure table exists
     local result = {}
+    for cardName, deckAttrs in pairs(_cardNameToDeckAttributes) do
+        if deckAttrs.score then
+            result[cardName] = true
+        end
+    end
     for cardName, cardAttrs in pairs(_cardNameToCardAttributes) do
         if cardAttrs.score then
             result[cardName] = true
@@ -887,7 +889,8 @@ function getCardsWithSource(params)
     local result = {}
     for cardSource, cardNames in pairs(deckAttributes.cardNames) do
         if (not source) or (cardSource == source) then
-            for _, cardName in ipairs(cardNames) do
+            for k, v in pairs(cardNames) do
+                local cardName = type(k) == 'string' and k or v
                 table.insert(result, cardName)
             end
         end
@@ -1687,7 +1690,8 @@ local function _splitDecks()
     for deckName, deckAttributes in pairs(DECKS) do
         deckNameToSources[deckName] = {}
         for source, cardNames in pairs(deckAttributes.cardNames) do
-            for _, cardName in ipairs(cardNames) do
+            for k, v in pairs(cardNames) do
+                local cardName = type(k) == 'string' and k or v
                 cardNameToInfo[cardName] = {
                     cardName = cardName,
                     deckName = deckName,

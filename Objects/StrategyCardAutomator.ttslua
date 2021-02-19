@@ -1745,6 +1745,7 @@ function _refreshCommodities(color)
 
 	if not faction.commodities then
 		broadcastToAll("Refresh commodities: commodities not implemented for " .. color, "Red")
+		return
 	end
 
 	local factionSheet = getObjectFromGUID(faction.factionSheetGuid)

@@ -207,6 +207,8 @@ local DECKS = {
                 'Minister of War',
                 'Miscount Disclosed',
                 'Mutiny',
+                'Mutiny (For)',  -- right click rename
+                'Mutiny (Against)',  -- right click rename
                 'New Constitution',
                 'Prophecy of Ixth',
                 'Public Execution',
@@ -1588,6 +1590,11 @@ function _applyContextMenuItems(object)
     if deckName == 'Agenda' then
         object.addContextMenuItem('Place Agenda Top', function(playerColor) _putAgendaTop(playerColor, object) end, false)
         object.addContextMenuItem('Place Agenda Bottom', function(playerColor) _putAgendaBottom(playerColor, object) end, false)
+        if string.match(objectName, '^Mutiny') then
+            object.addContextMenuItem('Set For', function(playerColor) object.setName('Mutiny (For)') end, false)
+            object.addContextMenuItem('Set Against', function(playerColor) object.setName('Mutiny (Against)') end, false)
+            object.addContextMenuItem('Clear For/Against', function(playerColor) object.setName('Mutiny') end, false)
+        end
     end
     if _isScoreObjective(object) then
         object.addContextMenuItem('Score Objective', function(playerColor) _scoreObjective(playerColor, object) end, false)

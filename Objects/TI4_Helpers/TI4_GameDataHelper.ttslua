@@ -46,6 +46,7 @@ function asyncGatherDataCoroutine()
     end
 
     local result = {
+        load = _state.loadTimestamp,
         laws = getLaws(),
         timestamp = math.floor(os.time()),
         turn = Turns.turn_color or '',
@@ -894,8 +895,10 @@ Objectives = {
         'The Crown of Emphidia (PoK)',
         'Holy Planet of Ixth',
         'Seed of an Empire',
-        'Mutiny',
         'Imperial Rider',
+        'Mutiny',
+        'Mutiny (For)',  -- right click to rename
+        'Mutiny (Against)',  -- right click to rename
     },
     CACHE_TIMEOUT_SECONDS = 10,
     _objectiveToDeckName = false,
@@ -1217,6 +1220,7 @@ function onLoad(saveState)
     self.setInvisibleTo(invisibleTo)
 
     _state = saveState and string.len(saveState) > 0 and JSON.decode(saveState) or _state
+    _state.loadTimestamp = math.floor(os.time())
 
     self.addContextMenuItem('Report', _doReport)
 end
@@ -1225,32 +1229,18 @@ function onSave()
     return JSON.encode(_state)
 end
 
-function onChat(message, srcPlayer)
-    local key = string.match(message, '!gamedata(.*)$')
-    if key then
-        if srcPlayer.admin or srcPlayer.promoted then
-            key = string.match(key, ' (.*)')
-            if key then
-                -- "!gamedata <key>" enables it.
-                printToAll('!gamedata enabled by ' .. srcPlayer.color, 'Yellow')
-                _gameDataKey = key
-                _startPeriodicUploads()
-            else
-                -- "!gamedata" without a key disables it.
-                printToAll('!gamedata disabled by ' .. srcPlayer.color, 'Yellow')
-                _gameDataKey = false
-                _stopPeriodicUploads()
-            end
-        else
-            printToAll('!gamedata failed for ' .. srcPlayer.color .. ', must be promoted to use', 'Red')
-        end
-        return false
-    end
-end
-
 -------------------------------------------------------------------------------
 
-function _startPeriodicUploads()
+function startPeriodicUpdates(params)
+    assert(type(params) == 'table')
+    assert(type(params.key) == 'string')
+    assert((not params.delay) or (type(params.delay) == 'number'))
+
+    _gameDataKey = params.key
+    local delay = params.delay or 60
+    delay = math.max(delay, 30)
+    delay = math.min(delay, 300)
+
     -- Stop any existing timer.
     if _timerId then
         Timer.destroy(_timerId)
@@ -1263,15 +1253,18 @@ function _startPeriodicUploads()
         identifier = _timerId,
         function_name = '_uploadGameData',
         function_owner = self,
-        delay = 60,
+        delay = delay,
         repetitions = 0,  -- until stopped
     })
 
     -- Timer does not trigger until delay, do an upload now.
     _uploadGameData()
+
+    return delay  -- tell caller the update delay
 end
 
-function _stopPeriodicUploads()
+function stopPeriodicUpdates()
+    _gameDataKey = false
     if _timerId then
         Timer.destroy(_timerId)
         _timerId = false

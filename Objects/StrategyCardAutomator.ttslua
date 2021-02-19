@@ -753,24 +753,11 @@ end
 
 ------------------------------ Custom UI ---------------------------------------
 
-local _legalOptions = { "politicsPopup", "technologyPopup", "SecondaryPopup" }
-
-function _testPopupOptions(option, color)
-	if UI.getAttributes(option) == nil then
-		return false
-	else
-		return true
-	end
-end
-
 function _openPopupUi(color, option)
 	assert(type(color) == "string")
 	assert(type(option) == "string")
 
-	if not _testPopupOptions(option, color) then
-		if option == color.."technologyPopup" then
-			broadcastToAll("Please use the 'Update UI' button on the Automation card.", "Red")
-		end
+	if (UI.getAttributes(option) == nil) then
 		return
 	end
 
@@ -797,22 +784,10 @@ end
 function _closePopupUi(color, option)
 	assert(type(color) == "string")
 	assert(type(option) == "string")
-	if (not _testPopupOptions(option, color)) then
+	if (UI.getAttributes(option) == nil) then
 		return
 	end
 	_closeMenu(color, option)
-end
-
-function _closeAllPopups(color)
-	for _,option in pairs(_legalOptions) do
-		--not implemented yet !!!!!!!!!!!!!!!!
-		if (not option == "secondaryPopup") then
-			if option == "technologyPopup" then
-				_closePopupUi(option, color..option)
-			end
-			_closePopupUi(option, color)
-		end
-	end
 end
 
 -- closeMenu (just like in global), but closes all associated Popups
@@ -823,34 +798,13 @@ function _closeMenu(color, card)
 	local Popup = false
 	if i ~= nil and j ~= nil then
 		Popup = true
-		if (not _testPopupOptions(card, color)) then
+		if (UI.getAttributes(card) == nil) then
 			return
 		end
 	end
 
 	local vis = UI.getAttribute(card, "visibility")
 	local newVis = vis
-
-	-- try to close associated _Popups
-	if not Popup then
-		if card == "technology" then
-			_closeMenu(color, color..card.."Popup")
-		else
-			_closeMenu(color, card.."Popup")
-		end
-		-- reset visibility to true for all
-		if vis == nil or vis == "" then
-			local seatedPlayers = getSeatedPlayers()
-			for p, player in pairs(seatedPlayers) do
-				if vis == nil or vis == "" then
-					vis = player
-				else
-					vis = vis .. "|" .. player
-				end
-			end
-		end
-	end
-
 
 	local i, j = string.find(vis, color)
 	local l = string.len(vis)

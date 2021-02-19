@@ -425,7 +425,7 @@ local backUI = {
 		}
 	}
 }
-
+local _dontDealSecrets = false
 function onToggleValueChanged(player, value, id)
 	local valueAsBool = string.lower(value) == 'true' and true or false
 	_dontDealSecrets = valueAsBool
@@ -753,30 +753,16 @@ end
 
 ------------------------------ Custom UI ---------------------------------------
 
-local _legalOptions = { "politicsPopup", "technologyPopup", "SecondaryPopup" }
-
-function _testPopupOptions(option, color)
-	if UI.getAttributes(option) == nil then
-		return false
-	else
-		return true
-	end
-end
-
 function _openPopupUi(color, option)
 	assert(type(color) == "string")
 	assert(type(option) == "string")
 
-	if not _testPopupOptions(option, color) then
-		if option == color.."technologyPopup" then
-			broadcastToAll("Please use the 'Update UI' button on the Automation card.", "Red")
-		end
+	if (UI.getAttributes(option) == nil) then
 		return
 	end
 
-
-	vis = UI.getAttribute(option, "visibility")
-	act = UI.getAttribute(option, "active")
+	local vis = UI.getAttribute(option, "visibility")
+	local act = UI.getAttribute(option, "active")
 	if vis == "" or vis == nil then
 		vis = color
 		assert(act~="true", option .. " is active but not visible")
@@ -798,22 +784,10 @@ end
 function _closePopupUi(color, option)
 	assert(type(color) == "string")
 	assert(type(option) == "string")
-	if (not _testPopupOptions(option, color)) then
+	if (UI.getAttributes(option) == nil) then
 		return
 	end
 	_closeMenu(color, option)
-end
-
-function _closeAllPopups(color)
-	for _,option in pairs(_legalOptions) do
-		--not implemented yet !!!!!!!!!!!!!!!!
-		if (not option == "secondaryPopup") then
-			if option == "technologyPopup" then
-				_closePopupUi(option, color..option)
-			end
-			_closePopupUi(option, color)
-		end
-	end
 end
 
 -- closeMenu (just like in global), but closes all associated Popups
@@ -824,34 +798,13 @@ function _closeMenu(color, card)
 	local Popup = false
 	if i ~= nil and j ~= nil then
 		Popup = true
-		if (not _testPopupOptions(card, color)) then
+		if (UI.getAttributes(card) == nil) then
 			return
 		end
 	end
 
 	local vis = UI.getAttribute(card, "visibility")
 	local newVis = vis
-
-	-- try to close associated _Popups
-	if not Popup then
-		if card == "technology" then
-			_closeMenu(color, color..card.."Popup")
-		else
-			_closeMenu(color, card.."Popup")
-		end
-		-- reset visibility to true for all
-		if vis == nil or vis == "" then
-			local seatedPlayers = getSeatedPlayers()
-			for p, player in pairs(seatedPlayers) do
-				if vis == nil or vis == "" then
-					vis = player
-				else
-					vis = vis .. "|" .. player
-				end
-			end
-		end
-	end
-
 
 	local i, j = string.find(vis, color)
 	local l = string.len(vis)
@@ -977,7 +930,7 @@ function _addTechnologyPrimarySecondary(layout)
 				local horizontalKeep = {}
 				for ibutton,button in ipairs(o["children"]) do
 					local techName = button['attributes']['onClick']
-					source = _techSourceSet[string.sub(techName, 10, -2)]
+					local source = _techSourceSet[string.sub(techName, 10, -2)]
 					if not (source == "PoK") then
 						horizontalKeep[counter] = button
 						counter = counter + 1
@@ -1077,18 +1030,18 @@ function _addSecondaryPopup(layout, colorTable)
 		return secondaryPopup
 	end
 
-	local function insertAll(option)
+	local function insertAll(option, optionTable)
 		for _,color in ipairs(colorTable) do
-			optionsForColor[color][option] = true
+			optionTable[color][option] = true
 		end
 	end
-
-	optionsForColor = {}
+ 
+	local optionsForColor = {}
 	for _,color in ipairs(colorTable) do
 		optionsForColor[color] = {["Strategy Token"] = true}
 	end
 	if _setupHelper.getPoK() then
-		insertAll('Scepter of Emelpar')
+		insertAll('Scepter of Emelpar', optionsForColor)
 	end
 
 	local cardOptions = {["Jae Mir Kan"]= {}, ["Ssruu"]= {}}
@@ -1102,7 +1055,7 @@ function _addSecondaryPopup(layout, colorTable)
 		if (object.tag == 'Deck') and (string.match(name, "Notes")) then
 			for _,cardObject in ipairs(object.getObjects()) do
 				if promissories[cardObject.name] then
-					insertAll(cardObject.name)
+					insertAll(cardObject.name, optionsForColor)
 				end
 			end
 		end
@@ -1115,7 +1068,7 @@ function _addSecondaryPopup(layout, colorTable)
 				end
 			end
 			if promissories[object.getName()] then
-				insertAll(object.getName())
+				insertAll(object.getName(), optionsForColor)
 			end
 		end
 	end
@@ -1288,7 +1241,7 @@ function _updateColorSelector(layout, element, colorTable)
 
 	local function _getColorButton(element, color)
 		local yourbutton = _deepcopy(_customLayout["colorButton"])
-		attributes = _deepcopy(_customLayout[element.."Attributes"])
+		local attributes = _deepcopy(_customLayout[element.."Attributes"])
 		for key,value in pairs(attributes) do
 			yourbutton["attributes"][key] = value
 		end
@@ -1555,7 +1508,7 @@ end
 function _returnPromissoryNote(color, promissoryName)
 	assert(type(color) == "string")
 	assert(type(promissoryName) == "string")
-	object = _getByName(promissoryName, 'Card')
+	local object = _getByName(promissoryName, 'Card')
 	if object then
 		object.setPosition(object.getPosition() + vector(0, 20, 0))
 		local discardParams = {
@@ -1578,7 +1531,7 @@ function _moveSpeakerToken(color)
 		return
 	end
 
-	zone = _zoneHelper.zoneAttributes(color)
+	local zone = _zoneHelper.zoneAttributes(color)
 	if not zone then
 		broadcastToAll('Assign speaker token: missing ' .. color .. ' player area', 'Red')
 		return
@@ -1772,11 +1725,16 @@ function _refreshCommodities(color)
 	-- gets the number of commodities from the faction.commodities value
 	-- cache commodities bag. and while we're at it, maybe cache command token bags. and while we're at it, maybe cache everything else aswell.
 
-	local commoditiesBag = _getByName("x1 Commodities/Tradegoods Bag", "Infinite")
+	local commoditiesBags = {
+		["x1 Commodities/Tradegoods"] = _getByName("x1 Commodities/Tradegoods Bag", "Infinite"),
+		["x3 Commodities/Tradegoods"] = _getByName("x3 Commodities/Tradegoods Bag", "Infinite")
+	}
 
-	if not commoditiesBag then
-		broadcastToAll('Refresh commodities: missing x1 Commodities/Tradegoods Bag TEST', 'Red')
-		return
+	for key,v in pairs(commoditiesBags) do
+		if not v then
+			broadcastToAll('Refresh commodities: missing ' .. key .. ' Bag.', 'Red')
+			return
+		end
 	end
 
 	local faction = _factionHelper.fromColor(color)
@@ -1809,7 +1767,7 @@ function _refreshCommodities(color)
 	for _, v in pairs(hitlist) do
 		local name = v.hit_object.getName()
 		if name == string.match(name, ".*Commodities/Tradegoods$") then
-			commoditiesBag.putObject(v.hit_object)
+			commoditiesBags[name].putObject(v.hit_object)
 		end
 	end
 
@@ -1863,7 +1821,7 @@ function _refreshCommodities(color)
 
 	-- positions are relative to faction sheet
 	for i = 1,faction.commodities do
-		commoditiesBag.takeObject({
+		commoditiesBags["x1 Commodities/Tradegoods"].takeObject({
 			position = factionSheet.positionToWorld({
 				x = -0.8-(0.15*math.ceil(i/2)),
 				y = 2 + (i*0.01),
@@ -1996,7 +1954,7 @@ function researchTech(color, cardName, chainCallback)
 	end
 
 	for _,object in ipairs(getAllObjects()) do
-		name = object.getName()
+		local name = object.getName()
 		if techNameSet[string.gsub(name, " Ω$","")]then
 			guidToPosTechOnTable[object.getGUID()] = object.getPosition()
 		end
@@ -2076,7 +2034,7 @@ function researchTech(color, cardName, chainCallback)
 		-- copy unitUpgrade technology card and send it to respective position on faction sheet.
 		local positionTable = {}
 		positionTable.position = _getPosToFactionSheet(cardName, factionSheet, techDeck).position
-		clone = cardObject.clone(positionTable)
+		local clone = cardObject.clone(positionTable)
 		clone.setRotation(factionSheet.getRotation())
 		clone.highlightOn(color, 1)
 	end
@@ -2271,3 +2229,13 @@ function _getByName(name, tag)
 		end
 	end
 end
+
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+	error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+	error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

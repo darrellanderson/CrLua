@@ -1250,9 +1250,6 @@ function onPlayerTurnStart(player_color_start, player_color_previous)
 
     local url = GAME_DATA_HOST .. '/setup'
     local function callback(result)
-        if result.is_error then
-            print('Upload failed: ' .. result.error)
-        end
     end
     WebRequest.post(url, JSON.encode(data), callback)
 end
@@ -1318,7 +1315,7 @@ function _uploadGameDataCallback(data)
     local url = GAME_DATA_HOST .. '/data?key=' .. _gameDataKey
     local function callback(result)
         if result.is_error then
-            print('Upload failed: ' .. result.error)
+            print('!gamedata upload failed: ' .. result.error)
         end
     end
     WebRequest.post(url, JSON.encode(data), callback)

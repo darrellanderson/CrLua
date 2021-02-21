@@ -236,14 +236,6 @@ function getExploreTokenNames()
     return result
 end
 
-function getAttachmentCardNames()
-    local result = {}
-    for cardName, _ in pairs(exploreCardToTokenMap) do
-        table.insert(result, cardName)
-    end
-    return result
-end
-
 -------------------------------------------------------------------------------
 
 function onLoad(saveState)

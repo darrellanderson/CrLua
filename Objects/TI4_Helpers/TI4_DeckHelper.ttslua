@@ -22,11 +22,16 @@ function getHelperClient(helperObjectName)
     end
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
-local _exploreHelper = getHelperClient('TI4_EXPLORE_HELPER')
 local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
+-- DECK_NAME to SOURCE_NAME to CARDS
+-- CARDS were originally a simple string list, however they may also be
+-- a CARD_NAME string key to a CARD_ATTRIBUTES table.
+-- CARD_ATTRIBUTES include:
+-- - purge (boolean) : add a purge menu option.
+-- - score (boolean) : add a score menu option.
 local DECKS = {
     ['Public Objectives I'] = {
         transform = {
@@ -41,6 +46,7 @@ local DECKS = {
                 count = 5
             }
         },
+        score = true,
         cardNames = {
             ['Base'] = {
                 'Corner the Market',
@@ -81,6 +87,7 @@ local DECKS = {
                 count = 5
             }
         },
+        score = true,
         cardNames = {
             ['Base'] = {
                 'Centralize Galactic Trade',
@@ -116,6 +123,7 @@ local DECKS = {
                 rotation = { x = 0, y = 0, z = 180 },
             }
         },
+        score = true,
         shuffleOnDiscard = true,
         cardNames = {
             base = {
@@ -192,7 +200,7 @@ local DECKS = {
                 'Enforced Travel Ban',
                 'Executive Sanctions',
                 'Fleet Regulations',
-                'Holy Planet of Ixth',
+                ['Holy Planet of Ixth'] = { score = true },
                 'Homeland Defense Act',
                 'Imperial Arbiter',
                 'Incentive Program',
@@ -206,9 +214,9 @@ local DECKS = {
                 'Minister of Sciences',
                 'Minister of War',
                 'Miscount Disclosed',
-                'Mutiny',
-                'Mutiny (For)',  -- right click rename
-                'Mutiny (Against)',  -- right click rename
+                ['Mutiny'] = { score = true },
+                ['Mutiny (For)'] = { score = true },  -- right click rename
+                ['Mutiny (Against)'] = { score = true },  -- right click rename
                 'New Constitution',
                 'Prophecy of Ixth',
                 'Public Execution',
@@ -219,13 +227,13 @@ local DECKS = {
                 'Research Team: Cybernetic',
                 'Research Team: Propulsion',
                 'Research Team: Warfare',
-                'Seed of an Empire',
+                ['Seed of an Empire'] = { score = true },
                 'Senate Sanctuary',
-                'Shard of the Throne',
+                ['Shard of the Throne'] = { score = true },
                 'Shared Research',
                 'Swords to Plowshares',
                 'Terraforming Initiative',
-                'The Crown of Emphidia',
+                ['The Crown of Emphidia'] = { score = true },
                 'The Crown of Thalnos',
                 'Unconventional Measures',
                 'Wormhole Reconstruction',
@@ -289,7 +297,7 @@ local DECKS = {
                 'Focused Research',
                 'Frontline Deployment',
                 'Ghost Ship',
-                'Imperial Rider',
+                ['Imperial Rider'] = { score = true },
                 'In the Silence of Space',
                 'Industrial Initiative',
                 'Infiltrate',
@@ -414,11 +422,11 @@ local DECKS = {
         reportRemaining = true,
         cardNames = {
             ['PoK'] = {
-                'Industrial Relic Fragment (1)',
-                'Industrial Relic Fragment (2)',
-                'Industrial Relic Fragment (3)',
-                'Industrial Relic Fragment (4)',
-                'Industrial Relic Fragment (5)',
+                ['Industrial Relic Fragment (1)'] = { purge = true },
+                ['Industrial Relic Fragment (2)'] = { purge = true },
+                ['Industrial Relic Fragment (3)'] = { purge = true },
+                ['Industrial Relic Fragment (4)'] = { purge = true },
+                ['Industrial Relic Fragment (5)'] = { purge = true },
                 'Abandoned Warehouses (1)',
                 'Abandoned Warehouses (2)',
                 'Abandoned Warehouses (3)',
@@ -431,9 +439,9 @@ local DECKS = {
                 'Functioning Base (2)',
                 'Functioning Base (3)',
                 'Functioning Base (4)',
-                'Biotic Research Facility',
-                'Propulsion Research Facility',
-                'Cybernetic Research Facility',
+                ['Biotic Research Facility'] = { purge = true },
+                ['Propulsion Research Facility'] = { purge = true },
+                ['Cybernetic Research Facility'] = { purge = true },
             },
         },
     },
@@ -452,13 +460,13 @@ local DECKS = {
         reportRemaining = true,
         cardNames = {
             ['PoK'] = {
-                'Hazardous Relic Fragment (1)',
-                'Hazardous Relic Fragment (2)',
-                'Hazardous Relic Fragment (3)',
-                'Hazardous Relic Fragment (4)',
-                'Hazardous Relic Fragment (5)',
-                'Hazardous Relic Fragment (6)',
-                'Hazardous Relic Fragment (7)',
+                ['Hazardous Relic Fragment (1)'] = { purge = true },
+                ['Hazardous Relic Fragment (2)'] = { purge = true },
+                ['Hazardous Relic Fragment (3)'] = { purge = true },
+                ['Hazardous Relic Fragment (4)'] = { purge = true },
+                ['Hazardous Relic Fragment (5)'] = { purge = true },
+                ['Hazardous Relic Fragment (6)'] = { purge = true },
+                ['Hazardous Relic Fragment (7)'] = { purge = true },
                 'Expedition (1)',
                 'Expedition (2)',
                 'Expedition (3)',
@@ -468,10 +476,10 @@ local DECKS = {
                 'Volatile Fuel Source (1)',
                 'Volatile Fuel Source (2)',
                 'Volatile Fuel Source (3)',
-                'Mining World',
-                'Lazax Survivors',
-                'Warfare Research Facility',
-                'Rich World',
+                ['Mining World'] = { purge = true },
+                ['Lazax Survivors'] = { purge = true },
+                ['Warfare Research Facility'] = { purge = true },
+                ['Rich World'] = { purge = true },
             },
         },
     },
@@ -490,26 +498,26 @@ local DECKS = {
         reportRemaining = true,
         cardNames = {
             ['PoK'] = {
-                'Cultural Relic Fragment (1)',
-                'Cultural Relic Fragment (2)',
-                'Cultural Relic Fragment (3)',
-                'Cultural Relic Fragment (4)',
-                'Cultural Relic Fragment (5)',
-                'Cultural Relic Fragment (6)',
-                'Cultural Relic Fragment (7)',
-                'Cultural Relic Fragment (8)',
-                'Cultural Relic Fragment (9)',
+                ['Cultural Relic Fragment (1)'] = { purge = true },
+                ['Cultural Relic Fragment (2)'] = { purge = true },
+                ['Cultural Relic Fragment (3)'] = { purge = true },
+                ['Cultural Relic Fragment (4)'] = { purge = true },
+                ['Cultural Relic Fragment (5)'] = { purge = true },
+                ['Cultural Relic Fragment (6)'] = { purge = true },
+                ['Cultural Relic Fragment (7)'] = { purge = true },
+                ['Cultural Relic Fragment (8)'] = { purge = true },
+                ['Cultural Relic Fragment (9)'] = { purge = true },
                 'Mercenary Outfit (1)',
                 'Mercenary Outfit (2)',
                 'Mercenary Outfit (3)',
                 'Freelancers (1)',
                 'Freelancers (2)',
                 'Freelancers (3)',
-                'Demilitarized Zone (PoK)',
-                'Dyson Sphere',
-                'Paradise World',
-                'Tomb of Emphidia',
-                'Gamma Wormhole',
+                ['Demilitarized Zone (PoK)'] = { purge = true },
+                ['Dyson Sphere'] = { purge = true },
+                ['Paradise World'] = { purge = true },
+                ['Tomb of Emphidia'] = { purge = true },
+                ['Gamma Wormhole'] = { purge = true },
             },
         },
     },
@@ -528,20 +536,20 @@ local DECKS = {
         reportRemaining = true,
         cardNames = {
             ['PoK'] = {
-                'Unknown Relic Fragment (1)',
-                'Unknown Relic Fragment (2)',
-                'Unknown Relic Fragment (3)',
-                'Enigmatic Device (1)',
-                'Enigmatic Device (2)',
-                'Ion Storm',
-                'Gamma Relay',
+                ['Unknown Relic Fragment (1)'] = { purge = true },
+                ['Unknown Relic Fragment (2)'] = { purge = true },
+                ['Unknown Relic Fragment (3)'] = { purge = true },
+                ['Enigmatic Device (1)'] = { purge = true },
+                ['Enigmatic Device (2)'] = { purge = true },
+                ['Ion Storm'] = { purge = true },
+                ['Gamma Relay'] = { purge = true },
                 'Lost Crew (1)',
                 'Lost Crew (2)',
                 'Merchant Station (1)',
                 'Merchant Station (2)',
                 'Derelict Vessel (1)',
                 'Derelict Vessel (2)',
-                'Mirage (Exploration)',
+                ['Mirage (Exploration)'] = { purge = true },
             },
         },
     },
@@ -556,13 +564,13 @@ local DECKS = {
         reportRemaining = true,
         cardNames = {
             ['PoK'] = {
-                'Dominus Orb',
-                'Maw of Worlds',
+                ['Dominus Orb'] = { purge = true },
+                ['Maw of Worlds'] = { purge = true },
                 'Scepter of Emelpar',
-                'Shard of the Throne (PoK)',
-                'Stellar Converter',
-                'The Codex',
-                'The Crown of Emphidia (PoK)',
+                ['Shard of the Throne (PoK)'] = { score = true },
+                ['Stellar Converter'] = { purge = true },
+                ['The Codex'] = { purge = true },
+                ['The Crown of Emphidia (PoK)'] = { score = true },
                 'The Crown of Thalnos (PoK)',
                 'The Obsidian',
                 "The Prophet's Tears",
@@ -590,7 +598,8 @@ local DECKS = {
 }
 
 local _parentNameToGuid = {}
-local _lowerCardNameToDeckAttributes = false
+local _cardNameToDeckAttributes = false
+local _cardNameToCardAttributes = false
 local _discardCardQueue = {}
 local _discardDeckQueue = {}
 local _waitForDestroy = {}
@@ -615,12 +624,13 @@ end
 
 local function _getDeckAttributes(cardName)
     assert(type(cardName) == 'string')
-    if not _lowerCardNameToDeckAttributes then
-        _lowerCardNameToDeckAttributes = {}
-        for _, attributes in pairs(DECKS) do
-            for _, cardNames in pairs(attributes.cardNames) do
-                for _, cardName in ipairs(cardNames) do
-                    _lowerCardNameToDeckAttributes[string.lower(cardName)] = attributes
+    if not _cardNameToDeckAttributes then
+        _cardNameToDeckAttributes = {}
+        for deckName, deckAttributes in pairs(DECKS) do
+            for cardSource, cardNames in pairs(deckAttributes.cardNames) do
+                for k, v in pairs(cardNames) do
+                    local cardName = type(k) == 'string' and k or v
+                    _cardNameToDeckAttributes[cardName] = deckAttributes
                 end
             end
         end
@@ -633,27 +643,59 @@ local function _getDeckAttributes(cardName)
             'Trade Agreement ($COLOR)',
         }
         for _, color in ipairs(Player.getColors()) do
-            local attributes = {
+            local deckAttributes = {
                 transform = {}, -- compute on demand
                 color = color
             }
             for _, cardName in ipairs(genericPromissoryNotes) do
                 cardName = string.gsub(cardName, '$COLOR', color)
-                _lowerCardNameToDeckAttributes[string.lower(cardName)] = attributes
+                _cardNameToDeckAttributes[cardName] = deckAttributes
             end
         end
         -- Add faction promissory notes, attributes point to faction name.
         for _, faction in pairs(_factionHelper.allFactions(true)) do
-            local attributes = {
+            local deckAttributes = {
                 transform = {}, -- compute on demand
                 factionName = faction.name
             }
             for _, cardName in ipairs(faction.promissoryNotes or {}) do
-                _lowerCardNameToDeckAttributes[string.lower(cardName)] = attributes
+                _cardNameToDeckAttributes[cardName] = deckAttributes
             end
         end
     end
-    return _lowerCardNameToDeckAttributes[string.lower(cardName)]
+    return _cardNameToDeckAttributes[cardName]
+end
+
+local function _getCardAttributes(cardName)
+    assert(type(cardName) == 'string')
+    if not _cardNameToCardAttributes then
+        _cardNameToCardAttributes = {}
+        for _, deckAttributes in pairs(DECKS) do
+            for _, cardNames in pairs(deckAttributes.cardNames) do
+                for cardName, cardAttributes in pairs(cardNames) do
+                    if type(cardName) == 'string' and type(cardAttributes) == 'table' then
+                        _cardNameToCardAttributes[cardName] = cardAttributes
+                    end
+                end
+            end
+        end
+        -- Add other cards.
+        local function addCardAttributes(cardName, addAttrs)
+            local cardAttrs = _cardNameToCardAttributes[cardName]
+            if not cardAttrs then
+                cardAttrs = {}
+                _cardNameToCardAttributes[cardName] = cardAttrs
+            end
+            for k, v in pairs(addAttrs) do
+                cardAttrs[k] = v
+            end
+        end
+        for _, color in ipairs(Player.getColors()) do
+            local cardName = 'Support for the Throne (' .. color .. ')'
+            addCardAttributes(cardName, { score = true })
+        end
+    end
+    return _cardNameToCardAttributes[cardName]
 end
 
 local function _getDeckAttributesByType(deckType)
@@ -754,6 +796,24 @@ local function _getDeck(deckTransform)
     end
 end
 
+--- Expose scorable card names.
+function getScoreCardNameSet()
+    _getDeckAttributes('bogus')  -- make sure table exists
+    _getCardAttributes('bogus')  -- make sure table exists
+    local result = {}
+    for cardName, deckAttrs in pairs(_cardNameToDeckAttributes) do
+        if deckAttrs.score then
+            result[cardName] = true
+        end
+    end
+    for cardName, cardAttrs in pairs(_cardNameToCardAttributes) do
+        if cardAttrs.score then
+            result[cardName] = true
+        end
+    end
+    return result
+end
+
 --- Expose get deck method.
 function getDeck(name)
     assert(type(name) == 'string')
@@ -829,7 +889,8 @@ function getCardsWithSource(params)
     local result = {}
     for cardSource, cardNames in pairs(deckAttributes.cardNames) do
         if (not source) or (cardSource == source) then
-            for _, cardName in ipairs(cardNames) do
+            for k, v in pairs(cardNames) do
+                local cardName = type(k) == 'string' and k or v
                 table.insert(result, cardName)
             end
         end
@@ -846,10 +907,10 @@ function injectCard(params)
     assert((not params.deckName) or type(params.deckName == 'string'), 'deckName')
     assert((not params.factionName) or type(params.factionName == 'string'), 'deckName')
 
-    -- Make sure _lowerCardNameToDeckAttributes exists.
+    -- Make sure _cardNameToDeckAttributes exists.
     _getDeckAttributes('bogus')
 
-    _lowerCardNameToDeckAttributes[string.lower(params.cardName)] = {
+    _cardNameToDeckAttributes[params.cardName] = {
         transform = {},
         deckName = params.deckName,
         factionName = params.factionName,
@@ -1510,34 +1571,42 @@ local function _reportRemainingCards(playerColor, object)
     printToColor(message, playerColor, 'Yellow')
 end
 
-local _scoreDeckSet = false
-local _scoreCardSet = false
+local function _reportDiscards(playerColor, deckName)
+    assert(type(playerColor) == 'string' and type(deckName) == 'string')
+    local deckAttributes = DECKS[deckName]
+    local deckTransform = deckAttributes and _getTransform(deckAttributes, 'discard')
+    local deck = deckTransform and _getDeck(deckTransform)
+    local discards = {}
+    if deck then
+        if deck.tag == 'Deck' then
+            for _, entry in ipairs(deck.getObjects()) do
+                table.insert(discards, entry.name)
+            end
+        elseif deck.tag == 'Card' then
+            table.insert(discards, deck.getName())
+        end
+    else
+        table.insert(discards, '<empty>')
+    end
+    local message = 'Actions discards: ' .. table.concat(discards, ', ')
+    printToColor(message, playerColor, 'Yellow')
+end
+
 local function _isScoreObjective(card)
-    -- Non-card object.
     if card.tag == 'Tile' and card.getName() == 'Custodians' then
         return true
     end
-
-    -- Cards.
-    if not _scoreDeckSet then
-        _scoreDeckSet = {
-            ['Public Objectives I'] = true,
-            ['Public Objectives II'] = true,
-            ['Secret Objectives'] = true,
-        }
-        _scoreCardSet = {
-            ['Shard of the Throne'] = true,
-            ['Holy Planet of Ixth'] = true,
-            ['Shard of the Throne (PoK)'] = true,
-            ['The Crown of Emphidia (PoK)'] = true,
-        }
-        for _, color in ipairs(Player.getColors()) do
-            _scoreCardSet['Support for the Throne (' .. color .. ')'] = true
+    if card.tag == 'Card' then
+        local cardName = card.getName()
+        local deckAttrs = _getDeckAttributes(cardName)
+        if deckAttrs and deckAttrs.score then
+            return true
+        end
+        local cardAttrs = _getCardAttributes(cardName)
+        if cardAttrs and cardAttrs.score then
+            return true
         end
     end
-    local cardName = card.tag == 'Card' and card.getName()
-    local deckName = cardName and getDeckName(cardName)
-    return _scoreDeckSet[deckName] or _scoreCardSet[cardName]
 end
 
 function _hasContextMenuItems(object)
@@ -1551,37 +1620,13 @@ function _hasContextMenuItems(object)
     end
 end
 
-local _purgeCardNameSet = false
 function _isPurgableCard(cardName)
-    if not _purgeCardNameSet then
-        -- Initialize with Relics.
-        _purgeCardNameSet = {
-            ['Dominus Orb'] = true,
-            ['Enigmatic Device (1)'] = true,
-            ['Enigmatic Device (2)'] = true,
-            ['Maw of Worlds'] = true,
-            ['The Codex'] = true,
-        }
-
-        -- Add attachment cards.
-        for _, cardName in ipairs(_exploreHelper.getAttachmentCardNames()) do
-            _purgeCardNameSet[cardName] = true
-        end
-
-        -- Add Relic Fragments.
-        for deckName, attributes in pairs(DECKS) do
-            if string.match(deckName, ' Exploration$') then
-                for _, cardNames in pairs(attributes.cardNames) do
-                    for _, cardName in ipairs(cardNames) do
-                        if string.match(cardName, '^.* Relic Fragment %(.*%)$') then
-                            _purgeCardNameSet[cardName] = true
-                        end
-                    end
-                end
-            end
-        end
+    assert(type(cardName) == 'string')
+    local cardAttributes = _getCardAttributes(cardName)
+    if cardAttributes and cardAttributes.purge then
+        return true
     end
-    return _purgeCardNameSet[cardName]
+    -- other special cases here
 end
 
 function _applyContextMenuItems(object)
@@ -1602,6 +1647,9 @@ function _applyContextMenuItems(object)
 
     if object.tag == 'Card' and _isPurgableCard(object.getName()) then
         object.addContextMenuItem('Purge Card', function(playerColor) _purgeCard(object) end)
+    end
+    if object.tag == 'Card' and object.getName() == 'The Codex' then
+        object.addContextMenuItem('Report discards', function(playerColor) _reportDiscards(playerColor, 'Actions') end)
     end
 
     if object.tag == 'Deck' then
@@ -1642,7 +1690,8 @@ local function _splitDecks()
     for deckName, deckAttributes in pairs(DECKS) do
         deckNameToSources[deckName] = {}
         for source, cardNames in pairs(deckAttributes.cardNames) do
-            for _, cardName in ipairs(cardNames) do
+            for k, v in pairs(cardNames) do
+                local cardName = type(k) == 'string' and k or v
                 cardNameToInfo[cardName] = {
                     cardName = cardName,
                     deckName = deckName,

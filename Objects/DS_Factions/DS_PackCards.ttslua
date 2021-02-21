@@ -310,7 +310,7 @@ function _packFactionBox(factionBoxName, bagNameToCardNames)
     -- Pack faction sheets.
     local sheetName1 = 'The ' .. string.gsub(factionBoxName, 'Box', 'Sheet')
     local sheetName2 = string.gsub(factionBoxName, 'Box', 'Sheet')
-    local sheet = _getObject(sheetName, 'Tile') or _getObject(sheetName2, 'Tile')
+    local sheet = _getObject(sheetName1, 'Tile') or _getObject(sheetName2, 'Tile')
     coroutine.yield(0)
     if not sheet then
         error('missign sheet "' .. sheetName .. '"')

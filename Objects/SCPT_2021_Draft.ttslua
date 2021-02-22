@@ -1,0 +1,428 @@
+--- SCPT 2021 Tournament Draft
+-- https://cdn.discordapp.com/attachments/535582218077339659/812945113884917770/unknown.png
+--
+-- ╔═══════════════╗
+-- ║ SLICES (6)    ║
+-- ╠═══════════════╣
+-- ║ POOL (12)     ║
+-- ╠═══════════════╣
+-- ║ NOMINATED (6) ║
+-- ╠═══════════════╣
+-- ║ LIMBO (12)    ║
+-- ╠═══════════════╣
+-- ║ BAN (6)       ║
+-- ╚═══════════════╝
+--
+-- 1. Randomize draft order, set turns.
+-- 2. Deal 4 factions to each player.
+-- 3. Players simultaneously place 1 faction into POOL.
+-- 4. Players simultaneously place 1 faction into BAN.
+-- 5. Move remaining 12 factions into LIMBO.
+-- 6. In draft order (once around), players either:
+--    - Move 1 faction from LIMBO to NOMINATED.
+--    - Move 1 faction from NOMINATED to POOL.
+-- 7. In snake draft order, players select either:
+--    - Faction from POOL.
+--    - Slice from SLICES.
+
+--- Snap secret objectives to grid.
+-- @author Darrell
+
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
+        return function(parameters) return helperObject.call(functionName, parameters) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
+
+local SNAP_POINTS = {
+    PADDING = {  -- around edge of grid
+        x = 0.5,
+        z = 0.5
+    },
+    CARD_SIZE = {
+        x = 4.04,
+        z = 2.70
+    },
+    ROTATION = {
+        x = 0,
+        y = 180,
+        z = 180
+    },
+    BOX_SIZE = {
+        x = 4.04 + 0.5,
+        z = 2.7 + 0.5
+    }
+}
+
+local ROW_COLOR = {
+    'White',
+    'Green',
+    'Green',
+    'Yellow',
+    'White',
+    'White',
+    'Red'
+}
+
+-- Snap points are layed out in a grid, [col][row] indexing.
+local _snapPointsGrid = false
+
+local _draftOrder = false
+
+-------------------------------------------------------------------------------
+
+function onLoad(save_state)
+    math.randomseed(tonumber(self.getGUID(), 16))
+    self.addContextMenuItem('Redraw boxes', drawSnapPoints, false)
+    resetSnapPoints()
+    drawSnapPoints()
+
+    local buttons = {
+        {
+            label = '1. Place slices,\nrandomize order,\nset turns,\ndeal 4 factions to all',
+            onClick = 'randomizeDraftSetTurnsDealFourFactions',
+            tooltip = false,
+            col2 = 'Slice'
+        },
+        {
+            label = '2. Players\nsimultaneously\nplace 1 faction\ninto POOL',
+            onClick = false,
+            tooltip = false,
+            col2 = 'Pool'
+        },
+        {
+            label = '3. Players\nsimultaneously\nplace 1 faction\ninto BAN',
+            onClick = false,
+            tooltip = false,
+            col2 = false
+        },
+        {
+            label = '4. Move remaining\n12 factions\ninto LIMBO',
+            onClick = 'moveRemainingFactionsToLimbo',
+            tooltip = false,
+            col2 = 'Nmntd'
+        },
+        {
+            label = '5. Turn order move:\nLIMBO to NOMINATED\nor\nNOMINATED to POOL.',
+            onClick = 'assignTurnOrderDraft',
+            tooltip = false,
+            col2 = 'Limbo'
+        },
+        {
+            label = '6. Snake select:\nfaction from POOL\nor\nslice from SLICES',
+            onClick = 'assignTurnOrderSnake',
+            tooltip = false,
+            col2 = false
+        },
+        {
+            label = '7. Move players\ninto slices',
+            onClick = 'movePlayersIntoSlices',
+            tooltip = false,
+            col2 = 'Ban'
+        }
+    }
+    for i, button in ipairs(buttons) do
+        local row = assert(_snapPointsGrid[i])
+        local p = row[#row].position
+        self.createButton({
+            click_function = button.onClick or 'doNothing',
+            function_owner = self,
+            label          = assert(button.label),
+            position       = { x = p.x, y = 0.41, z = p.z },
+            width          = button.onClick and 2000 or 0,
+            height         = button.onClick and 1200 or 0,
+            font_size      = 200,
+            font_color     = button.onClick and 'Black' or 'White',
+            tooltip        = button.tooltip or nil
+        })
+        if button.col2 then
+            local p = row[(#row) - 1].position
+            self.createButton({
+                click_function = 'doNothing',
+                function_owner = self,
+                label          = assert(button.col2),
+                position       = { x = p.x, y = 0.41, z = p.z },
+                width          = 0,
+                height         = 0,
+                font_size      = 600,
+                font_color     = ROW_COLOR[i],
+                tooltip        = button.tooltip or nil
+            })
+        end
+    end
+
+    if false then
+        Player['White'].lookAt({
+            position = self.getPosition(),
+            pitch    = 75,
+            yaw      = self.getRotation().y + 180,
+            distance = 30
+        })
+    end
+end
+
+function resetSnapPoints()
+    local bounds = self.getBoundsNormalized()
+
+    -- Create as many snap points as fit inside bounds.
+    local numCols = math.floor(bounds.size.x / (SNAP_POINTS.CARD_SIZE.x + SNAP_POINTS.PADDING.x))
+    local numRows = math.floor(bounds.size.z / (SNAP_POINTS.CARD_SIZE.z + SNAP_POINTS.PADDING.z))
+
+    -- Compute spacing in local space.
+    local size = bounds.size
+    local cardSize = SNAP_POINTS.CARD_SIZE
+    local padding = SNAP_POINTS.PADDING
+
+    local x0 = -(size.x / 2) + padding.x + (cardSize.x / 2)
+    local z0 = -(size.z / 2) + padding.z + (cardSize.z / 2)
+    local dx = cardSize.x + padding.x
+    local dz = cardSize.z + padding.x
+
+    _snapPointsGrid = {}
+    local allSnapPoints = {}
+    for row = 0, numRows - 1 do
+        local rowEntries = {}
+        for col = 0, numCols - 1 do
+            local snapPoint = {
+                position = {
+                    x = -(x0 + col * dx),
+                    y = bounds.size.y,
+                    z = z0 + row * dz,
+                },
+                rotation = SNAP_POINTS.ROTATION,
+                rotation_snap = true
+            }
+            table.insert(rowEntries, snapPoint)
+            -- Get all coordinates, but only create snap points for col 3+.
+            if col > 1 then
+                table.insert(allSnapPoints, snapPoint)
+            end
+        end
+        table.insert(_snapPointsGrid, rowEntries)
+    end
+    self.setSnapPoints(allSnapPoints)
+end
+
+function drawSnapPoints()
+    local y = self.getBoundsNormalized().size.y + 0.01
+
+    local defaultColor = { r = 0.15, g = 0.15, b = 0.15, a = 0.4 }
+    local rowColor = {}
+    for i, color in ipairs(ROW_COLOR) do
+        if color then
+            local rgba = Color.fromString(color)
+            rgba = {
+                r = (rgba.r + defaultColor.r) / 2,
+                g = (rgba.g + defaultColor.g) / 2,
+                b = (rgba.b + defaultColor.b) / 2,
+                a = defaultColor.a
+            }
+            rowColor[i] = rgba
+        else
+            rowColor[i] = defaultColor
+        end
+    end
+
+    local thickness = SNAP_POINTS.BOX_SIZE.z
+    local lines = {}
+    local dx = SNAP_POINTS.BOX_SIZE.x / 2
+    for i, color in ipairs(rowColor) do
+        local row = _snapPointsGrid[i]
+        local p0 = row[3].position
+        local p1 = row[#row].position
+        table.insert(lines, {
+            points = {
+                { x = p0.x + dx, y = y, z = p0.z },
+                { x = p1.x - dx, y = y, z = p1.z },
+            },
+            thickness = thickness,
+            color = color,
+            loop = false,
+            square = true
+        })
+    end
+    self.setVectorLines(lines)
+end
+
+function doNothing()
+end
+
+-------------------------------------------------------------------------------
+
+function randomizeDraftSetTurnsDealFourFactions()
+    self.setLock(true)
+
+    -- Place slice tokens.
+    local sliceBag = _findByName('Randomize Seats', 'Bag')
+    local row = _snapPointsGrid[1]
+    local colorToPos = {}
+    for i, color in ipairs(_zoneHelper.zones()) do
+        local p = assert(row[i + 2].position)
+        colorToPos[color] = p
+    end
+    for _, entry in ipairs(sliceBag and sliceBag.getObjects() or {}) do
+        local p = colorToPos[entry.name]
+        if p then
+            p = self.positionToWorld(p) + vector(0, 1, 0)
+            sliceBag.takeObject({
+                position          = p,
+                smooth            = true,
+                guid              = entry.guid
+            })
+        end
+    end
+
+    local colors = _zoneHelper.zones()
+    _draftOrder = {}
+    math.randomseed(os.time())
+    while #colors > 0 do
+        local color =  table.remove(colors, math.random(#colors))
+        table.insert(_draftOrder, color)
+    end
+    Turns.order = _draftOrder
+    Turns.turn_color = _draftOrder[1]
+    Turns.enable = true
+    printToAll('SCPT draft order: ' .. table.concat(_draftOrder, ', '), 'Yellow')
+
+    local factionBag = _findByName('Pick a Faction to Play', 'Bag')
+    if factionBag then
+        for _, color in ipairs(_zoneHelper.zones()) do
+            factionBag.deal(4, color)
+        end
+    end
+end
+
+function moveRemainingFactionsToLimbo()
+    local factionTokens = {}
+    for _, player in ipairs(Player.getPlayers()) do
+        for i = 1, player.getHandCount() do
+            for _, object in ipairs(player.getHandObjects(i)) do
+                if string.match(object.getName(), ' Faction Token$') then
+                    table.insert(factionTokens, object)
+                end
+            end
+        end
+    end
+    local slots = {}
+    for row = 5, 6 do
+        for col = 3, 8 do
+            local p = _snapPointsGrid[row][col].position
+            p = self.positionToWorld(p) + vector(0, 1, 0)
+            table.insert(slots, p)
+        end
+    end
+    for i, factionToken in ipairs(factionTokens) do
+        local p = slots[i]
+        if p then
+            factionToken.setPosition(p)
+            factionToken.setRotation(self.getRotation())
+        end
+    end
+end
+
+function assignTurnOrderDraft()
+    Turns.order = _draftOrder
+    Turns.turn_color = _draftOrder[1]
+    Turns.enable = true
+    printToAll('SCPT draft order: ' .. table.concat(_draftOrder, ', '), 'Yellow')
+end
+
+function assignTurnOrderSnake()
+    local snake = {}
+    for _, color in ipairs(_draftOrder) do
+        table.insert(snake, color)
+    end
+    for _, color in ipairs(_draftOrder) do
+        table.insert(snake, 7, color)
+    end
+    Turns.enable = true
+    Turns.order = snake
+    Turns.turn_color = snake[1]
+    printToAll('SCPT snake order: ' .. table.concat(snake, ', '), 'Yellow')
+end
+
+function movePlayersIntoSlices()
+    -- Get players.
+    local colorToPlayer = {}
+    for _, player in ipairs(Player.getPlayers()) do
+        colorToPlayer[player.color] = player
+    end
+
+    -- Identify needed color changes.
+    local moves = {}
+    local errors = false
+    for _, color in ipairs(_zoneHelper.zones()) do
+        local sliceToken = _findByName(color, 'GoPiece')
+        local zone = sliceToken and _zoneHelper.zoneFromPosition(sliceToken.getPosition())
+        if not zone then
+            errors = errors or {}
+            table.insert(errors, 'Slice token ' .. color .. ' not in a player area')
+        end
+        table.insert(moves, {
+            src = zone,
+            dst = color,
+            sliceToken = sliceToken
+        })
+    end
+    if errors then
+        error(table.concat(errors, ', '))
+    end
+
+    -- Move players to Grey to free up seats, then into seats.
+    for _, move in ipairs(moves) do
+        local player = move.dst and colorToPlayer[move.dst]
+        if player then
+            player.changeColor('Grey')
+        end
+    end
+    for _, move in ipairs(moves) do
+        local player = move.src and colorToPlayer[move.src]
+        if player and move.dst then
+            printToAll('SCPT moving ' .. move.src .. ' to ' .. move.dst, 'Yellow')
+            player.changeColor(move.dst)
+        end
+    end
+
+    -- Put away slice tokens.
+    local sliceBag = _findByName('Randomize Seats', 'Bag')
+    if sliceBag then
+        for _, move in ipairs(moves) do
+            if move.sliceToken then
+                sliceBag.putObject(move.sliceToken)
+            end
+        end
+    end
+
+    -- Unpack factions?  No, just in case moving needs to be fixed.
+end
+
+function _findByName(name, tag)
+    assert(type(name) == 'string' and type(tag) == 'string')
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == tag and object.getName() == name then
+            return object
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

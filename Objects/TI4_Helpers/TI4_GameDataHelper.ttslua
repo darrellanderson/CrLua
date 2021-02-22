@@ -17,6 +17,17 @@ function getHelperClient(helperObjectName)
     end
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
+local function copyTable(t)
+    if t and type(t) == 'table' then
+        local copy = {}
+        for k, v in pairs(t) do
+            copy[k] = type(v) == 'table' and copyTable(v) or v
+        end
+        t = copy
+    end
+    return t
+end
+
 local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 local _technologyHelper = getHelperClient('TI4_TECHNOLOGY_HELPER')
@@ -28,8 +39,9 @@ local GAME_DATA_HOST = 'http://ti4-game-data.appspot.com'
 --local GAME_DATA_HOST = 'http://localhost:8080'
 
 local _state = {}
+local _gamedataOptIn = false
 local _gameDataKey = false
-local _timerId = false
+local _timerId = false  -- for regular gamedata updates
 
 -------------------------------------------------------------------------------
 
@@ -50,9 +62,9 @@ function asyncGatherDataCoroutine()
     end
 
     local result = {
-        load = _state.loadTimestamp,
-        laws = getLaws(),
+        setupTimestamp = _state.setupTimestamp,
         timestamp = math.floor(os.time()),
+        laws = getLaws(),
         turn = Turns.turn_color or '',
         isPoK = _setupHelper.getPoK() and true or false,
         isFranken = _factionHelper.isFrankenEnabled() and true or false,
@@ -82,10 +94,17 @@ function asyncGatherDataCoroutine()
     coroutine.yield(0)
     coroutine.yield(0)
 
+    result.mapString = Map.getMapString() or ''
+    coroutine.yield(0)
+    coroutine.yield(0)
+
     -- Per-player items.
 
-    for color, steamName in pairs(colorToSteamName()) do
-        colorToPlayerResult[color].steamName = steamName
+    -- Only gather names when using game data (for the streamer overlay).
+    if params.includeSteamNames then
+        for color, steamName in pairs(colorToSteamName()) do
+            colorToPlayerResult[color].steamName = steamName
+        end
     end
     coroutine.yield(0)
     coroutine.yield(0)
@@ -175,6 +194,41 @@ function asyncGatherDataCoroutine()
     end
     coroutine.yield(0)
     coroutine.yield(0)
+
+    -- Get the round.  Reject if any players are missing a strategy card.
+    -- (Objective flipped but not yet started new round).
+    local round = result.round or 0
+    local requiredStrategyCardCount = (#result.players) < 5 and 2 or 1
+    for color, playerResult in pairs(colorToPlayerResult) do
+        local strategyCards = playerResult.strategyCards or {}
+        if (#strategyCards) < requiredStrategyCardCount then
+            round = false
+            break
+        end
+    end
+    local prevRound = 0
+    if _state.gameDataHistory and (#_state.gameDataHistory) > 0 then
+        prevRound = _state.gameDataHistory[#_state.gameDataHistory].round
+    end
+    if round and prevRound and (round > prevRound) then
+        _state.gameDataHistory = _state.gameDataHistory or {}
+        -- Add the "pure" start-of-round data, before attaching the history entry.
+        local historyEntry = copyTable(result)
+        -- Remove some fields from the history.
+        historyEntry.isFranken = nil
+        historyEntry.isPoK = nil
+        historyEntry.mapString = nil
+        historyEntry.setup = nil
+        historyEntry.scoreboard = nil
+        historyEntry.turn = nil
+        for _, playerResult in ipairs(historyEntry.players) do
+            playerResult.steamName = nil
+            playerResult.factionName = nil
+            playerResult.active = nil
+        end
+        table.insert(_state.gameDataHistory, historyEntry)
+    end
+    result.history = _state.gameDataHistory or {}
 
     local callbackObject = getObjectFromGUID(params.guid)
     if callbackObject then
@@ -837,6 +891,49 @@ end
 
 -------------------------------------------------------------------------------
 
+Map = {
+    _mapToolGuid = false
+}
+
+function Map.getMapString()
+    local mapTool = Map._getMapTool()
+    local mapString = mapTool and mapTool.call('getMapString')
+
+    -- This is the string in the tool, not a table scan to compute it.
+    -- Prevent non-map strings from getting recorded.
+    if string.len(mapString) > 1024 then
+        return false
+    end
+    local buildList = mapTool.call('parseMapString', mapString)
+    if #buildList > 0 and buildList[1].tile == 18 then
+        table.remove(buildList, 1)
+    end
+    local result = {}
+    for i, entry in ipairs(buildList) do
+        table.insert(result, entry.tile .. (entry.ab or '') .. (entry.rotation or ''))
+    end
+    mapString = table.concat(result, ' ')
+    mapString = string.upper(mapString)
+
+    return mapString
+end
+
+function Map._getMapTool()
+    local mapTool = Map._mapToolGuid and getObjectFromGUID(Map._mapToolGuid)
+    if mapTool then
+        return mapTool
+    end
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        if name == 'TI4 Map Tool' then
+            Map._mapToolGuid = object.getGUID()
+            return object
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
+
 StrategyCards = {
     OBJECT_NAME_TO_VALUE = {
         ['Leadership'] = 'Leadership',
@@ -1195,7 +1292,7 @@ function onLoad(saveState)
     self.setInvisibleTo(invisibleTo)
 
     _state = saveState and string.len(saveState) > 0 and JSON.decode(saveState) or _state
-    _state.loadTimestamp = math.floor(os.time())
+
 
     self.addContextMenuItem('Report', _doReport)
 end
@@ -1214,6 +1311,15 @@ local _setupParams = false
 -- - playerTools (nil or boolean).
 function onSetupHelperSetupFinished(params)
     _setupParams = params
+    _gamedataOptIn = params.gamedataOptIn
+
+    _state.setupTimestamp = math.floor(os.time() * 1000) / 1000
+
+    if _gamedataOptIn and not _timerId then
+        startPeriodicUpdates({
+            delay = 600
+        })
+    end
 end
 
 --- The first time a turn starts after setup send anonymized game setup data.
@@ -1258,13 +1364,13 @@ end
 
 function startPeriodicUpdates(params)
     assert(type(params) == 'table')
-    assert(type(params.key) == 'string')
+    assert((not params.key) or type(params.key) == 'string')
     assert((not params.delay) or (type(params.delay) == 'number'))
 
     _gameDataKey = params.key
     local delay = params.delay or 60
     delay = math.max(delay, 30)
-    delay = math.min(delay, 300)
+    delay = math.min(delay, 600)
 
     -- Stop any existing timer.
     if _timerId then
@@ -1273,7 +1379,7 @@ function startPeriodicUpdates(params)
     end
 
     -- Start a new timer.
-    _timerId = self.getGUID() .. '_periodicUploads'
+    _timerId = self.getGUID() .. '_periodicGameData'
     Timer.create({
         identifier = _timerId,
         function_name = '_uploadGameData',
@@ -1299,23 +1405,34 @@ end
 -------------------------------------------------------------------------------
 
 function _uploadGameData()
-    if not _gameDataKey then
+    local active = false
+    if _gameDataKey then
+        -- ALWAYS send when game data key is present
+        active = true
+    elseif _gamedataOptIn then
+        -- To help prevent curiosity and solo griefing corruption REQUIRE
+        -- multiple players before uploading vonulary anonymized game data.
+        local seated = getSeatedPlayers()
+        active = seated and #seated > 1
+    end
+    if not active then
         return
     end
     asyncGatherData({
         guid = self.getGUID(),
+        includeSteamNames = _gameDataKey and true or false,
         callbackFunctionName = '_uploadGameDataCallback'
     })
 end
 
 function _uploadGameDataCallback(data)
-    if not _gameDataKey then
-        return
+    local url = GAME_DATA_HOST .. '/data'
+    if _gameDataKey then
+        url = url .. '?key=' .. _gameDataKey
     end
-    local url = GAME_DATA_HOST .. '/data?key=' .. _gameDataKey
     local function callback(result)
         if result.is_error then
-            print('!gamedata upload failed: ' .. result.error)
+            print('!gamedata error: ' .. result.error)
         end
     end
     WebRequest.post(url, JSON.encode(data), callback)

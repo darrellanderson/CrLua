@@ -1348,7 +1348,8 @@ function onPlayerTurnStart(player_color_start, player_color_previous)
         scoreboard = Score._getScoreboard().is_face_down and 14 or 10,
         seatedCount = #seated,
         playerCount = _zoneHelper.getPlayerCount(),
-        factions = factions
+        factions = factions,
+        gamedata = _gamedataOptIn,
     }
 
     -- Suppress future calls.

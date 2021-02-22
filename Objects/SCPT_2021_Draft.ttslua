@@ -66,6 +66,7 @@ local SNAP_POINTS = {
 }
 
 local ROW_COLOR = {
+    false,
     'White',
     'Green',
     'Green',
@@ -92,47 +93,55 @@ function onLoad(save_state)
 
     local buttons = {
         {
-            label = '1. Randomize draft\norder, place slice\ntokens, deal 4\nfactions to all',
-            onClick = 'randomizeDraftDealFourFactions',
-            tooltip = 'Randomize draft\norder, place slice\ntokens, deal 4\nfactions to all',
-            col2 = 'Slice'
+            label = 'Randomize draft\norder, place slice\ntokens',
+            onClick = 'randomizeDraft',
+            tooltip = false,
         },
         {
-            label = '2. Players\nsimultaneously\nplace 1 faction\ninto POOL',
+            label = 'Deal 4 factions\nto each player',
+            onClick = 'deal4Factions',
+            tooltip = false,
+        },
+        {
+            label = 'Players\nsimultaneously\nplace 1 faction\ninto POOL',
             onClick = false,
             tooltip = false,
-            col2 = 'Pool'
         },
         {
-            label = '3. Players\nsimultaneously\nplace 1 faction\ninto BAN',
+            label = 'Players\nsimultaneously\nplace 1 faction\ninto BAN',
             onClick = false,
             tooltip = false,
-            col2 = false
         },
         {
-            label = '4. Move remaining\n12 factions\ninto LIMBO',
+            label = 'Move remaining\n12 factions\ninto LIMBO',
             onClick = 'moveRemainingFactionsToLimbo',
-            tooltip = 'Move remaining\n12 factions\ninto LIMBO',
-            col2 = 'Nominated',
+            tooltip = false,
         },
         {
-            label = '5. Turn order move:\nLIMBO to NOMINATED\nor\nNOMINATED to POOL.',
+            label = 'Turn order move:\nLIMBO to NOMINATED\nor\nNOMINATED to POOL.',
             onClick = 'assignTurnOrderDraft',
-            tooltip = 'Turn order move:\nLIMBO to NOMINATED\nor\nNOMINATED to POOL.',
-            col2 = 'Limbo'
+            tooltip = false,
         },
         {
-            label = '6. Snake select:\nfaction from POOL\nor\nslice from SLICES',
+            label = 'Snake select:\nfaction from POOL\nor\nslice from SLICES',
             onClick = 'assignTurnOrderSnake',
-            tooltip = 'Snake select:\nfaction from POOL\nor\nslice from SLICES',
-            col2 = false
+            tooltip = false,
         },
         {
-            label = '7. Move players\ninto slices',
+            label = 'Move players\ninto slices,\nrandomize speaker,\nstart timer',
             onClick = 'movePlayersIntoSlices',
-            tooltip = 'Move players\ninto slices',
-            col2 = 'Ban'
+            tooltip = false,
         }
+    }
+    local col2 = {
+        false,
+        'Slice',
+        'Pool',
+        false,
+        'Nominated',
+        'Limbo',
+        false,
+        'Ban'
     }
     for i, button in ipairs(buttons) do
         local row = assert(_snapPointsGrid[i])
@@ -140,26 +149,25 @@ function onLoad(save_state)
         self.createButton({
             click_function = button.onClick or 'doNothing',
             function_owner = self,
-            label          = assert(button.label),
+            label          = i .. '. ' .. assert(button.label),
             position       = { x = p.x, y = 0.41, z = p.z },
             width          = button.onClick and 2000 or 0,
             height         = button.onClick and 1200 or 0,
             font_size      = 200,
             font_color     = button.onClick and 'Black' or 'White',
-            tooltip        = button.tooltip or nil
+            tooltip        = button.tooltip or button.label
         })
-        if button.col2 then
+        if col2[i] then
             local p = row[(#row) - 1].position
             self.createButton({
                 click_function = 'doNothing',
                 function_owner = self,
-                label          = string.upper(assert(button.col2)),
+                label          = string.upper(col2[i]),
                 position       = { x = p.x, y = 0.41, z = p.z },
                 width          = 0,
                 height         = 0,
                 font_size      = 350,
                 font_color     = ROW_COLOR[i],
-                tooltip        = button.tooltip or nil
             })
         end
     end
@@ -205,7 +213,7 @@ function resetSnapPoints()
             }
             table.insert(rowEntries, snapPoint)
             -- Get all coordinates, but only create snap points for col 3+.
-            if col > 1 then
+            if row > 0 and col > 1 then
                 table.insert(allSnapPoints, snapPoint)
             end
         end
@@ -260,7 +268,7 @@ end
 
 -------------------------------------------------------------------------------
 
-function randomizeDraftDealFourFactions()
+function randomizeDraft()
     self.setLock(true)
 
     -- Generate random draft order.
@@ -283,25 +291,51 @@ function randomizeDraftDealFourFactions()
         broadcastToAll('Missing "Randomize Seats" bag, aborting', 'Red')
         return
     end
-    local row = _snapPointsGrid[1]
+    local row = _snapPointsGrid[2]
     local colorToPos = {}
     for i, color in ipairs(_draftOrder) do
         local p = assert(row[i + 2].position)
+        p = self.positionToWorld(p) + vector(0, 3, 0)
         colorToPos[color] = p
     end
     for _, entry in ipairs(sliceBag.getObjects()) do
         local p = colorToPos[entry.name]
+        p = false
         if p then
-            p = self.positionToWorld(p) + vector(0, 1, 0)
             sliceBag.takeObject({
                 position          = p,
                 smooth            = true,
                 guid              = entry.guid
             })
+            colorToPos[entry.name] = nil  -- consume
         end
     end
 
-    -- Deal 4 factions.
+    -- If any colorToPos remain the token was not found.
+    for color, pos in pairs(colorToPos) do
+        -- Is the token on the table?
+        local sliceToken = _findByName(color, 'GoPiece')
+        if sliceToken then
+            local collide = false
+            local fast = false
+            sliceToken.setPositionSmooth(pos, collide, fast)
+        else
+            sliceToken = spawnObject({
+                type              = 'go_game_piece_white',
+                position          = pos,
+                scale             = { x = 2.5, y = 2.5, z = 2.5 },
+                sound             = false,
+                snap_to_grid      = false
+            })
+            sliceToken.setName(color)
+            sliceToken.setColorTint(color)
+            sliceToken.use_hands = true
+            sliceToken.use_snap_points = true
+        end
+    end
+end
+
+function deal4Factions()
     local factionBag = _findByName('Pick a Faction to Play', 'Bag')
     if not factionBag then
         broadcastToAll('Missing "Pick a Faction to Play" bag, aborting', 'Red')
@@ -324,7 +358,7 @@ function moveRemainingFactionsToLimbo()
         end
     end
     local slots = {}
-    for row = 5, 6 do
+    for row = 6, 7 do
         for col = 3, 8 do
             local p = _snapPointsGrid[row][col].position
             p = self.positionToWorld(p) + vector(0, 1, 0)
@@ -515,6 +549,7 @@ function movePlayersIntoSlices()
 
     -- Start clock!
     if clock then
+        clock.setLock(true)
         clock.Clock.setValue(CLOCK_SECONDS)
         clock.Clock.pauseStart()
         broadcastToAll('SCPT 2021 Tournament draft complete, starting clock', 'Yellow')

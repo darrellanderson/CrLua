@@ -1,16 +1,19 @@
 -- @author Darrell for UI generation scripting
 -- @author Milty for game setup
--- #include <~/CrLua/Objects/TI4_GameSetupOptions>
+-- #include <~/CrLua/Objects/TI4_GameSetupOptions2>
 
 local _config = false
+
 local DEFAULT_CONFIG = {
     playerCount = 6,
     extraRings = 0,
     usePoK = false,
     useCodex1ACs = false,
+    useCodex2ACs = false,
     is14ptGame = false,
     isRightClick = false,
     playerTools = false,
+    gamedataOptIn = false,
 }
 
 local CONTRIBUTORS = {
@@ -215,7 +218,7 @@ function _createUI()
                 tag = 'Text',
                 attributes = {
                     class = 'title',
-                    fontSize = 24,
+                    fontSize = 20,
                     fontStyle = 'Bold',
                     color = 'White',
                     alignment = 'MiddleCenter',
@@ -225,7 +228,7 @@ function _createUI()
                 tag = 'Text',
                 attributes = {
                     class = 'heading',
-                    fontSize = 16,
+                    fontSize = 14,
                     color = 'White',
                     alignment = 'MiddleCenter'
                 }
@@ -245,7 +248,7 @@ function _createUI()
             {
                 tag = 'VerticalLayout',
                 attributes = {
-                    padding = '10 10 10 90',
+                    padding = '10 10 5 70',
                 },
                 children = {
                     text('title', 'TI4 Game Setup Options'),
@@ -258,8 +261,10 @@ function _createUI()
 
                     toggle('usePoK', 'Prophecy of Kings expansion'),
                     toggle('useCodex1ACs', 'Codex 1 action cards'),
+                    --toggle('useCodex2ACs', 'Codex 2 action cards'),
                     toggle('14ptGame', '14 point game'),
                     toggle('playerTools', 'Player tools (boards, build area)'),
+                    toggle('gamedataOptIn', 'Share anonymized game stats'),
                 }
             },
             {
@@ -312,8 +317,10 @@ end
 function updateUiFromConfig()
     self.UI.setAttribute('usePoK', 'isOn', _config.usePoK)
     self.UI.setAttribute('useCodex1ACs', 'isOn', _config.useCodex1ACs)
+    self.UI.setAttribute('useCodex2ACs', 'isOn', _config.useCodex2ACs)
     self.UI.setAttribute('14ptGame', 'isOn', _config.is14ptGame)
     self.UI.setAttribute('playerTools', 'isOn', _config.playerTools)
+    self.UI.setAttribute('gamedataOptIn', 'isOn', _config.gamedataOptIn)
     for i = 3, 8 do
         self.UI.setAttribute('playerCount' .. i, 'isOn', _config.playerCount == i)
     end
@@ -354,10 +361,14 @@ function onToggleValueChanged(player, value, id)
         _config.usePoK = valueAsBool
     elseif id == 'useCodex1ACs' then
         _config.useCodex1ACs = valueAsBool
+    elseif id == 'useCodex2ACs' then
+        _config.useCodex2ACs = valueAsBool
     elseif id == '14ptGame' then
         _config.is14ptGame = valueAsBool
     elseif id == 'playerTools' then
         _config.playerTools = valueAsBool
+    elseif id == 'gamedataOptIn' then
+        _config.gamedataOptIn = valueAsBool
     else
         error('onToggleValueChanged: unknown toggle "' .. id .. '"')
     end
@@ -391,9 +402,11 @@ function setupGameCoroutine()
     assert(type(_config.extraRings) == 'number')
     assert(type(_config.usePoK) == 'boolean')
     assert(type(_config.useCodex1ACs) == 'boolean')
+    assert(type(_config.useCodex2ACs) == 'boolean')
     assert(type(_config.is14ptGame) == 'boolean')
     assert(type(_config.isRightClick) == 'boolean')
     assert(type(_config.playerTools) == 'boolean')
+    assert(type(_config.gamedataOptIn) == 'boolean')
 
     print('Setting up for ' .. _config.playerCount .. ' players with ' .. _config.extraRings .. ' extra map rings')
 
@@ -401,6 +414,9 @@ function setupGameCoroutine()
     coroutine.yield(0)
 
     setupCodex1ACs(_config.useCodex1ACs)
+    coroutine.yield(0)
+
+    setupCodex2ACs(_config.useCodex2ACs)
     coroutine.yield(0)
 
     setup14ptGame(_config.is14ptGame)
@@ -412,6 +428,7 @@ function setupGameCoroutine()
         isRightClick = _config.isRightClick,
         includePoK = _config.usePoK,
         playerTools = _config.playerTools and not _config.isRightClick,
+        gamedataOptIn = _config.gamedataOptIn,
     })
     coroutine.yield(0)
 
@@ -423,6 +440,14 @@ function setupCodex1ACs(useCodex1ACs)
         _addCards('Variant Pieces (Searching Recommended)', 'Actions', 'Codex 1')
     else
         _removeCards('Variant Pieces (Searching Recommended)', 'Actions', 'Codex 1')
+    end
+end
+
+function setupCodex2ACs(useCodex2ACs)
+    if useCodex2ACs then
+        _addCards('Variant Pieces (Searching Recommended)', 'Actions', 'Codex 2')
+    else
+        _removeCards('Variant Pieces (Searching Recommended)', 'Actions', 'Codex 2')
     end
 end
 

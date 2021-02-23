@@ -36,7 +36,7 @@ local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 local GAME_DATA_HOST = 'http://ti4-game-data.appspot.com'
---local GAME_DATA_HOST = 'http://localhost:8080'
+local GAME_DATA_HOST = 'http://localhost:8080'
 
 local _state = {}
 local _gamedataOptIn = false
@@ -218,6 +218,7 @@ function asyncGatherDataCoroutine()
         historyEntry.isFranken = nil
         historyEntry.isPoK = nil
         historyEntry.mapString = nil
+        historyEntry.objectives = nil
         historyEntry.setup = nil
         historyEntry.scoreboard = nil
         historyEntry.turn = nil
@@ -225,6 +226,7 @@ function asyncGatherDataCoroutine()
             playerResult.steamName = nil
             playerResult.factionName = nil
             playerResult.active = nil
+            playerResult.technologies = #playerResult.technologies  -- same order as main list
         end
         table.insert(_state.gameDataHistory, historyEntry)
     end

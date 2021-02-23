@@ -172,12 +172,12 @@ function onLoad(save_state)
         end
     end
 
-    Player['White'].lookAt({
-        position = self.getPosition(),
-        pitch    = 75,
-        yaw      = self.getRotation().y + 180,
-        distance = 30
-    })
+    -- Player['White'].lookAt({
+    --     position = self.getPosition(),
+    --     pitch    = 75,
+    --     yaw      = self.getRotation().y + 180,
+    --     distance = 30
+    -- })
 end
 
 function resetSnapPoints()

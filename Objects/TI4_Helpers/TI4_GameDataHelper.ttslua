@@ -45,6 +45,25 @@ local _timerId = false  -- for regular gamedata updates
 
 -------------------------------------------------------------------------------
 
+function addExtraData(params)
+    assert(type(params.name) == 'string')
+    assert((not params.callbackGuid) or type(params.callbackGuid) == 'string')
+    assert((not params.callbackFunction) or type(params.callbackFunction) == 'string')
+
+    if params.value then
+        assert((not params.callbackGuid) and (not params.callbackFunction))
+    else
+        assert(params.callbackGuid and params.callbackFunction)
+        local object = getObjectFromGUID(params.callbackGuid)
+        assert(object.getVar(params.callbackFunction))
+    end
+
+    _state.extraData = _state.extraData or {}
+    _state.extraData[params.name] = params
+end
+
+-------------------------------------------------------------------------------
+
 local _asyncGatherDataQueue = {}
 
 function asyncGatherData(params)
@@ -104,6 +123,7 @@ function asyncGatherDataCoroutine()
     if params.includeSteamNames then
         for color, steamName in pairs(colorToSteamName()) do
             colorToPlayerResult[color].steamName = steamName
+            colorToPlayerResult[color].crc = CRC32.hash(steamName)
         end
     end
     coroutine.yield(0)
@@ -227,10 +247,31 @@ function asyncGatherDataCoroutine()
             playerResult.factionName = nil
             playerResult.active = nil
             playerResult.technologies = #playerResult.technologies  -- same order as main list
+            playerResult.crc = nil
         end
         table.insert(_state.gameDataHistory, historyEntry)
     end
     result.history = _state.gameDataHistory or {}
+    coroutine.yield(0)
+    coroutine.yield(0)
+
+    -- Let objects add additional top-level (not in history) data.
+    for name, params in pairs(_state.extraData or {}) do
+        local value = params.value
+        if not value then
+            local object = getObjectFromGUID(params.callbackGuid)
+            if object and object.getVar(params.callbackFunction) then
+                value = object.call(params.callbackFunction)
+                coroutine.yield(0)
+            end
+        end
+        if value then
+            result.extra = result.extra or {}
+            result.extra[name] = value
+        end
+    end
+    coroutine.yield(0)
+    coroutine.yield(0)
 
     local callbackObject = getObjectFromGUID(params.guid)
     if callbackObject then
@@ -1295,8 +1336,11 @@ function onLoad(saveState)
 
     _state = saveState and string.len(saveState) > 0 and JSON.decode(saveState) or _state
 
-
     self.addContextMenuItem('Report', _doReport)
+
+    if string.find(GAME_DATA_HOST, 'localhost') then
+        broadcastToAll('Game data using localhost', 'Red')
+    end
 end
 
 function onSave()
@@ -1479,6 +1523,44 @@ function _logTable(message, table, depth)
         print(indentedPrefix .. '...')
     end
     print(prefix .. '}')
+end
+
+-------------------------------------------------------------------------------
+
+CRC32 = {
+    _tableData = false
+}
+
+function CRC32._table()
+    if not CRC32._tableData then
+        CRC32._tableData = {}
+        for i = 0, 0xff do
+            local rem = i
+            for _ = 1, 8 do
+                if bit32.band(rem, 1) == 1 then
+                    rem = bit32.rshift(rem, 1)
+                    rem = bit32.bxor(rem, 0xedb88320)
+                else
+                    rem = bit32.rshift(rem, 1)
+                end
+            end
+            CRC32._tableData[i] = rem
+        end
+    end
+    return CRC32._tableData
+end
+
+function CRC32.hash(str)
+    local crc = 0xffffffff
+    local crcTable = CRC32._table()
+    assert(type(crcTable) == 'table')
+    for i = 1, string.len(str) do
+        local c = string.byte(str, i)
+        local crc123 = bit32.rshift(crc, 8)
+        local crc4 = bit32.band(crc, 0xff)
+        crc = bit32.bxor(crc123, crcTable[bit32.bxor(crc4, c)])
+    end
+    return bit32.bxor(crc, 0xffffffff)
 end
 
 -------------------------------------------------------------------------------

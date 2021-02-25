@@ -43,6 +43,10 @@ local _gamedataOptIn = false
 local _gameDataKey = false
 local _timerId = false  -- for regular gamedata updates
 
+-- Time based throttle for external pokes, internal based throttle for no change.
+local _lastTriggerUploadGameDataTimestamp = false
+local _lastCrc = false
+
 -------------------------------------------------------------------------------
 
 function addExtraData(params)
@@ -60,6 +64,19 @@ function addExtraData(params)
 
     _state.extraData = _state.extraData or {}
     _state.extraData[params.name] = params
+end
+
+--- Expose method so outsiders can trigger an update.
+function triggerUploadGameData()
+    local now = Time.time
+    if _lastTriggerUploadGameDataTimestamp then
+        local delta = now - _lastTriggerUploadGameDataTimestamp
+        if delta < 10 then
+            return
+        end
+    end
+    _lastTriggerUploadGameDataTimestamp = now
+    _uploadGameData()
 end
 
 -------------------------------------------------------------------------------
@@ -272,6 +289,12 @@ function asyncGatherDataCoroutine()
     end
     coroutine.yield(0)
     coroutine.yield(0)
+
+    -- Finally add a root CRC for everything EXCEPT TIMESTAMP!
+    local saveTimestamp = result.timestamp
+    result.timestamp = nil
+    result.crc = CRC32.hash(JSON.encode(result))
+    result.timestamp = saveTimestamp
 
     local callbackObject = getObjectFromGUID(params.guid)
     if callbackObject then
@@ -1375,9 +1398,9 @@ function onPlayerTurnStart(player_color_start, player_color_previous)
         return
     end
 
-    -- Ignore if only one player, developer testing?
-    local seated = getSeatedPlayers()
-    if (not seated) or #seated < 2 then
+    -- Ignore if only one player, unless pointing to localhsot (dev testing?).
+    local seated = getSeatedPlayers() or {}
+    if (#seated < 2) and (not string.find(GAME_DATA_HOST, 'localhost')) then
         return
     end
 
@@ -1473,6 +1496,14 @@ function _uploadGameData()
 end
 
 function _uploadGameDataCallback(data)
+    -- Suppress updates if nothing (other than timestamp) changed.
+    if data.crc then
+        if data.crc == _lastCrc then
+            return
+        end
+        _lastCrc = data.crc
+    end
+
     local url = GAME_DATA_HOST .. '/data'
     if _gameDataKey then
         url = url .. '?key=' .. _gameDataKey

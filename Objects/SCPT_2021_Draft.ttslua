@@ -27,6 +27,7 @@
 
 --- Snap secret objectives to grid.
 -- @author Darrell
+-- #include <~/CrLua/Objects/SCPT_2021_Draft>
 
 -- TODO: LOAD ART FROM EXTERNAL SOURCE FOR EASY UPDATE?
 -- TTS will do a get-if-modified-since for images with "{verifycache}" url prefix.
@@ -82,7 +83,10 @@ local SNAP_POINTS = {
 -- }
 
 local DRAFT_SELECTION_MAT_NAME = 'SCPT 2021 Tournament Draft Selection'
+
 local CLOCK_SECONDS = 8 * 3600
+
+local MAP_STRING = '26 61 64 59 31 63 76 45 69 41 65 68 72 79 66 80 36 67 0 73 47 0 74 46 0 37 49 0 30 50 0 29 40 0 70 48'
 
 -- Snap points are layed out in a grid, [col][row] indexing.
 local _snapPointsGrid = false
@@ -92,6 +96,11 @@ local _draftOrder = false
 -------------------------------------------------------------------------------
 
 function onLoad(save_state)
+    -- Wait a moment in case the model hasn't fully loaded (need bounds).
+    Wait.time(delayedOnLoad, 1)
+end
+
+function delayedOnLoad()
     resetSnapPoints()
     self.setVectorLines({})
 
@@ -104,6 +113,14 @@ function onLoad(save_state)
         })
     end
     self.addContextMenuItem('Look at me', lookAtMe)
+
+    local function setMapString()
+        local mapTool = _findByName('TI4 Map Tool', 'Tile')
+        if mapTool then
+            mapTool.call('setMapString', MAP_STRING)
+        end
+    end
+    self.addContextMenuItem('Set map string', setMapString)
 
     local buttons = {
         {
@@ -193,6 +210,7 @@ function doNothing()
 end
 
 function resetSnapPoints()
+    self.setScale({ x = 1, y = 1, z = 1 })
     local bounds = self.getBoundsNormalized()
 
     -- Create as many snap points as fit inside bounds.
@@ -208,6 +226,15 @@ function resetSnapPoints()
     local z0 = -(size.z / 2) + padding.z + (cardSize.z / 2)
     local dx = cardSize.x + padding.x
     local dz = cardSize.z + padding.x
+
+    -- print(table.concat({
+    --     'numCols = ' .. numCols,
+    --     'numRows = ' .. numRows,
+    --     'x0 = ' .. x0,
+    --     'z0 = ' .. z0,
+    --     'dx = ' .. dx,
+    --     'dz = ' .. dz,
+    -- }, '\n'))
 
     _snapPointsGrid = {}
     local allSnapPoints = {}

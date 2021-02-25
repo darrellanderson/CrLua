@@ -28,6 +28,9 @@
 --- Snap secret objectives to grid.
 -- @author Darrell
 
+-- TODO: LOAD ART FROM EXTERNAL SOURCE FOR EASY UPDATE?
+-- TTS will do a get-if-modified-since for images with "{verifycache}" url prefix.
+
 function getHelperClient(helperObjectName)
     local function getHelperObject()
         for _, object in ipairs(getAllObjects()) do
@@ -43,6 +46,8 @@ function getHelperClient(helperObjectName)
     end
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
+local _gameDataHelper = getHelperClient('TI4_GAME_DATA_HELPER')
+local _setupHelper = getHelperClient('TI4_SETUP_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 local SNAP_POINTS = {
@@ -56,7 +61,7 @@ local SNAP_POINTS = {
     },
     ROTATION = {
         x = 0,
-        y = 180,
+        y = 0,
         z = 180
     },
     BOX_SIZE = {
@@ -65,16 +70,16 @@ local SNAP_POINTS = {
     }
 }
 
-local ROW_COLOR = {
-    false,
-    'White',
-    'Green',
-    'Green',
-    'Yellow',
-    'White',
-    'White',
-    'Red'
-}
+-- local ROW_COLOR = {
+--     false,
+--     'White',
+--     'Green',
+--     'Green',
+--     'Yellow',
+--     'White',
+--     'White',
+--     'Red'
+-- }
 
 local DRAFT_SELECTION_MAT_NAME = 'SCPT 2021 Tournament Draft Selection'
 local CLOCK_SECONDS = 8 * 3600
@@ -87,9 +92,18 @@ local _draftOrder = false
 -------------------------------------------------------------------------------
 
 function onLoad(save_state)
-    self.addContextMenuItem('Redraw boxes', drawSnapPoints, false)
     resetSnapPoints()
-    drawSnapPoints()
+    self.setVectorLines({})
+
+    local function lookAtMe(playerColor)
+        Player[playerColor].lookAt({
+            position = self.getPosition(),
+            pitch    = 90,
+            yaw      = self.getRotation().y + 180,
+            distance = 30
+        })
+    end
+    self.addContextMenuItem('Look at me', lookAtMe)
 
     local buttons = {
         {
@@ -133,16 +147,18 @@ function onLoad(save_state)
             tooltip = false,
         }
     }
-    local col2 = {
-        false,
-        'Slice',
-        'Pool',
-        false,
-        'Nominated',
-        'Limbo',
-        false,
-        'Ban'
-    }
+    -- local col2 = {
+    --     false,
+    --     'Slice',
+    --     'Pool',
+    --     false,
+    --     'Nominated',
+    --     'Limbo',
+    --     false,
+    --     'Ban'
+    -- }
+    local bounds = self.getBoundsNormalized().size
+    local buttonY = bounds.y + 0.01
     for i, button in ipairs(buttons) do
         local row = assert(_snapPointsGrid[i])
         local p = row[#row].position
@@ -150,34 +166,30 @@ function onLoad(save_state)
             click_function = button.onClick or 'doNothing',
             function_owner = self,
             label          = i .. '. ' .. assert(button.label),
-            position       = { x = p.x, y = 0.41, z = p.z },
+            position       = { x = p.x, y = buttonY, z = p.z },
             width          = button.onClick and 2000 or 0,
             height         = button.onClick and 1200 or 0,
             font_size      = 200,
             font_color     = button.onClick and 'Black' or 'White',
             tooltip        = button.tooltip or button.label
         })
-        if col2[i] then
-            local p = row[(#row) - 1].position
-            self.createButton({
-                click_function = 'doNothing',
-                function_owner = self,
-                label          = string.upper(col2[i]),
-                position       = { x = p.x, y = 0.41, z = p.z },
-                width          = 0,
-                height         = 0,
-                font_size      = 350,
-                font_color     = ROW_COLOR[i],
-            })
-        end
+        -- if col2[i] then
+        --     local p = row[(#row) - 1].position
+        --     self.createButton({
+        --         click_function = 'doNothing',
+        --         function_owner = self,
+        --         label          = string.upper(col2[i]),
+        --         position       = { x = p.x, y = 0.41, z = p.z },
+        --         width          = 0,
+        --         height         = 0,
+        --         font_size      = 350,
+        --         font_color     = ROW_COLOR[i],
+        --     })
+        -- end
     end
+end
 
-    -- Player['White'].lookAt({
-    --     position = self.getPosition(),
-    --     pitch    = 75,
-    --     yaw      = self.getRotation().y + 180,
-    --     distance = 30
-    -- })
+function doNothing()
 end
 
 function resetSnapPoints()
@@ -222,53 +234,55 @@ function resetSnapPoints()
     self.setSnapPoints(allSnapPoints)
 end
 
-function drawSnapPoints()
-    local y = self.getBoundsNormalized().size.y + 0.01
-
-    local defaultColor = { r = 0.15, g = 0.15, b = 0.15, a = 0.4 }
-    local rowColor = {}
-    for i, color in ipairs(ROW_COLOR) do
-        if color then
-            local rgba = Color.fromString(color)
-            rgba = {
-                r = (rgba.r + defaultColor.r) / 2,
-                g = (rgba.g + defaultColor.g) / 2,
-                b = (rgba.b + defaultColor.b) / 2,
-                a = defaultColor.a
-            }
-            rowColor[i] = rgba
-        else
-            rowColor[i] = defaultColor
-        end
-    end
-
-    local thickness = SNAP_POINTS.BOX_SIZE.z
-    local lines = {}
-    local dx = SNAP_POINTS.BOX_SIZE.x / 2
-    for i, color in ipairs(rowColor) do
-        local row = _snapPointsGrid[i]
-        local p0 = row[3].position
-        local p1 = row[#row].position
-        table.insert(lines, {
-            points = {
-                { x = p0.x + dx, y = y, z = p0.z },
-                { x = p1.x - dx, y = y, z = p1.z },
-            },
-            thickness = thickness,
-            color = color,
-            loop = false,
-            square = true
-        })
-    end
-    self.setVectorLines(lines)
-end
-
-function doNothing()
-end
+-- function drawSnapPoints()
+--     local y = self.getBoundsNormalized().size.y + 0.01
+--
+--     local defaultColor = { r = 0.15, g = 0.15, b = 0.15, a = 0.4 }
+--     local rowColor = {}
+--     for i, color in ipairs(ROW_COLOR) do
+--         if color then
+--             local rgba = Color.fromString(color)
+--             rgba = {
+--                 r = (rgba.r + defaultColor.r) / 2,
+--                 g = (rgba.g + defaultColor.g) / 2,
+--                 b = (rgba.b + defaultColor.b) / 2,
+--                 a = defaultColor.a
+--             }
+--             rowColor[i] = rgba
+--         else
+--             rowColor[i] = defaultColor
+--         end
+--     end
+--
+--     local thickness = SNAP_POINTS.BOX_SIZE.z
+--     local lines = {}
+--     local dx = SNAP_POINTS.BOX_SIZE.x / 2
+--     for i, color in ipairs(rowColor) do
+--         local row = _snapPointsGrid[i]
+--         local p0 = row[3].position
+--         local p1 = row[#row].position
+--         table.insert(lines, {
+--             points = {
+--                 { x = p0.x + dx, y = y, z = p0.z },
+--                 { x = p1.x - dx, y = y, z = p1.z },
+--             },
+--             thickness = thickness,
+--             color = color,
+--             loop = false,
+--             square = true
+--         })
+--     end
+--     self.setVectorLines(lines)
+-- end
 
 -------------------------------------------------------------------------------
 
 function randomizeDraft()
+    if not _setupHelper.getPoK() then
+        broadcastToAll('SCPT draft: please do setup with PoK enabled first', 'Red')
+        return
+    end
+
     self.setLock(true)
 
     -- Generate random draft order.
@@ -300,7 +314,6 @@ function randomizeDraft()
     end
     for _, entry in ipairs(sliceBag.getObjects()) do
         local p = colorToPos[entry.name]
-        p = false
         if p then
             sliceBag.takeObject({
                 position          = p,
@@ -331,11 +344,17 @@ function randomizeDraft()
             sliceToken.setColorTint(color)
             sliceToken.use_hands = true
             sliceToken.use_snap_points = true
+            sliceToken.use_grid = false
         end
     end
 end
 
 function deal4Factions()
+    if not _setupHelper.getPoK() then
+        broadcastToAll('SCPT draft: please do setup with PoK enabled first', 'Red')
+        return
+    end
+
     local factionBag = _findByName('Pick a Faction to Play', 'Bag')
     if not factionBag then
         broadcastToAll('Missing "Pick a Faction to Play" bag, aborting', 'Red')
@@ -347,6 +366,11 @@ function deal4Factions()
 end
 
 function moveRemainingFactionsToLimbo()
+    if not _setupHelper.getPoK() then
+        broadcastToAll('SCPT draft: please do setup with PoK enabled first', 'Red')
+        return
+    end
+
     local factionTokens = {}
     for _, player in ipairs(Player.getPlayers()) do
         for i = 1, player.getHandCount() do
@@ -362,7 +386,7 @@ function moveRemainingFactionsToLimbo()
         for col = 3, 8 do
             local p = _snapPointsGrid[row][col].position
             p = self.positionToWorld(p) + vector(0, 1, 0)
-            if _positionIsClear(p) then
+            if not _factionTokenAtPosition(p) then
                 table.insert(slots, p)
             end
         end
@@ -377,6 +401,15 @@ function moveRemainingFactionsToLimbo()
 end
 
 function assignTurnOrderDraft()
+    if not _setupHelper.getPoK() then
+        broadcastToAll('SCPT draft: please do setup with PoK enabled first', 'Red')
+        return
+    end
+    if not _draftOrder then
+        broadcastToAll('SCPT draft: please click "Randomize draft" first', 'Red')
+        return
+    end
+
     Turns.enable = false
     Turns.order = _draftOrder
     Turns.turn_color = _draftOrder[1]
@@ -385,6 +418,15 @@ function assignTurnOrderDraft()
 end
 
 function assignTurnOrderSnake()
+    if not _setupHelper.getPoK() then
+        broadcastToAll('SCPT draft: please do setup with PoK enabled first', 'Red')
+        return
+    end
+    if not _draftOrder then
+        broadcastToAll('SCPT draft: please click "Randomize draft" first', 'Red')
+        return
+    end
+
     local snake = {}
     for _, color in ipairs(_draftOrder) do
         table.insert(snake, color)
@@ -400,6 +442,11 @@ function assignTurnOrderSnake()
 end
 
 function movePlayersIntoSlices()
+    if not _setupHelper.getPoK() then
+        broadcastToAll('SCPT draft: please do setup with PoK enabled first', 'Red')
+        return
+    end
+
     local errors = false
 
     -- Find slice and faction tokens.
@@ -536,7 +583,7 @@ function movePlayersIntoSlices()
     math.randomseed(os.time())
     local colors = _zoneHelper.zones()
     local speaker = colors[math.random(1, #colors)]
-    broadcastToAll('Assigning speaker to ' .. speaker, speaker)
+    broadcastToAll('SCPT 2021 Tournament draft: assigning speaker to ' .. speaker, 'Yellow')
     local zoneAttrs = _zoneHelper.zoneAttributes(speaker)
     local pos = zoneAttrs.center
     local rot = zoneAttrs.rotation
@@ -552,8 +599,10 @@ function movePlayersIntoSlices()
         clock.setLock(true)
         clock.Clock.setValue(CLOCK_SECONDS)
         clock.Clock.pauseStart()
-        broadcastToAll('SCPT 2021 Tournament draft complete, starting clock', 'Yellow')
+        broadcastToAll('SCPT 2021 Tournament draft: complete, starting clock', 'Yellow')
     end
+
+    startLuaCoroutine(self, '_addExtraGameDataCoroutine')
 end
 
 function _findByName(name, tag)
@@ -565,7 +614,7 @@ function _findByName(name, tag)
     end
 end
 
-function _positionIsClear(position)
+function _factionTokenAtPosition(position)
     local hits = Physics.cast({
         origin       = position,
         direction    = { x = 0, y = -1, z = 0 },
@@ -573,11 +622,10 @@ function _positionIsClear(position)
         size         = { x = 0.1, y = 4, z = 0.1 },
     })
     for _, hit in ipairs(hits or {}) do
-        if hit.hit_object.tag == 'Card' then
-            return false
+        if hit.hit_object.tag == 'Card' and string.match(hit.hit_object.getName(), ' Faction Token$') then
+            return hit.hit_object
         end
     end
-    return true
 end
 
 function _selectFaction(color, factionTokenName)
@@ -636,6 +684,58 @@ function _selectFaction(color, factionTokenName)
 
     local clickFunction = 'selectFaction_' .. id
     factionSelector.call(clickFunction)
+end
+-------------------------------------------------------------------------------
+
+function _addExtraGameDataCoroutine()
+    local function getFactionTokenPositions(rows)
+        local result = {}
+        for _, row in ipairs(rows) do
+            for col = 3, 8 do
+                local p = _snapPointsGrid[row][col].position
+                p = self.positionToWorld(p)
+                table.insert(result, p)
+            end
+        end
+        return result
+    end
+    local function getFactionNameFromPosition(position)
+        local card = _factionTokenAtPosition(position)
+        local name = card and card.getName()
+        return name and string.match(name, '^(.*) Faction Token$')
+    end
+    local function getFactionNamesWithYields(rows)
+        local result = {}
+        for _, position in ipairs(getFactionTokenPositions(rows)) do
+            local factionName = getFactionNameFromPosition(position)
+            if factionName then
+                table.insert(result, factionName)
+            end
+            coroutine.yield(0)
+        end
+        return result
+    end
+
+    local extraDataValue = {
+        pool = getFactionNamesWithYields({ 3, 4 }),
+        nominated = getFactionNamesWithYields({ 5 }),
+        limbo = getFactionNamesWithYields({ 6, 7 }),
+        banned = getFactionNamesWithYields({ 8 }),
+    }
+    -- for k, v in pairs(extraDataValue) do
+    --     print('xxx ' .. k .. ' ' .. table.concat(v, ', '))
+    -- end
+
+    -- "addExtraData" is a newer method, silently fail if not there.
+    local gdh = _findByName('TI4_GAME_DATA_HELPER', 'Block')
+    if gdh and gdh.getVar('addExtraData') then
+        _gameDataHelper.addExtraData({
+            name = 'SCPT_2021_Tournament_Draft',
+            value = extraDataValue
+        })
+    end
+
+    return 1
 end
 
 -------------------------------------------------------------------------------

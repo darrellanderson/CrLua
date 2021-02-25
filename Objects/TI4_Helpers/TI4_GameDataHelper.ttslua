@@ -1584,7 +1584,6 @@ end
 function CRC32.hash(str)
     local crc = 0xffffffff
     local crcTable = CRC32._table()
-    assert(type(crcTable) == 'table')
     for i = 1, string.len(str) do
         local c = string.byte(str, i)
         local crc123 = bit32.rshift(crc, 8)

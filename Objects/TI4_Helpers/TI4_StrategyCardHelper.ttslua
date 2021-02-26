@@ -77,6 +77,13 @@ local _strategyCardSheetGuid = false
 local _allocatedTokenGuidToColor = {}  -- unassigned command tokens
 local _putTokenGuidSet = {}
 
+local _doNotReadySet = {}
+
+function injectDoNotReady(cardName)
+    assert(type(cardName) == 'string')
+    _doNotReadySet[cardName] = true
+end
+
 function _uniqueList(order)
     local result = {}
     local seenSet = {}
@@ -685,6 +692,9 @@ end
 
 function _readyCards()
     local excludeNameSet = {}
+    for cardName, _ in pairs(_doNotReadySet) do
+        excludeNameSet[cardName] = true
+    end
     local function exclude(itemOrItems)
         if itemOrItems then
             if type(itemOrItems) == 'string' then

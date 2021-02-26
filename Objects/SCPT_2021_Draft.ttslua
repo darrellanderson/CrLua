@@ -575,14 +575,14 @@ function movePlayersIntoSlices()
 
         local playerName = player and player.steam_name or '<none>'
         local factionName = string.match(factionToken.getName(), '^(.*) Faction Token')
-        local sliceName = sliceToken.getName()
+        local sliceColor = sliceToken.getName()
         local message = {
             '(' .. i .. ')',
             playerName,
             'drafted',
             factionName,
             'in slice',
-            sliceName
+            sliceColor
         }
         message = table.concat(message, ' ')
         local messageColor = sliceToken.getName()
@@ -591,9 +591,9 @@ function movePlayersIntoSlices()
         -- Wait to act both to spread load and keep draft messages together.
         local function delayedApply()
             if player then
-                player.changeColor(sliceToken.getName())
+                player.changeColor(sliceColor)
             end
-            _selectFaction(color, factionToken.getName())
+            _selectFaction(sliceColor, factionToken.getName())
             factionTokensBag.putObject(factionToken)
             sliceTokensBag.putObject(sliceToken)
         end

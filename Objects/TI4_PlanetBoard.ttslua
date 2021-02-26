@@ -43,8 +43,8 @@ function fetchPlanet(clickerColor, planetName, isLegendaryCard)
         printToColor('Unable to find "' .. planetName .. '" card', clickerColor, 'Red')
         return
     end
-    local srcPlayer = _zoneHelper.zoneFromPosition(card.getPosition())
-    local dstPlayer = _zoneHelper.zoneFromPosition(self.getPosition())
+    local srcPlayer = _zoneHelper.zoneFromPosition(card.getPosition()) or '-'
+    local dstPlayer = _zoneHelper.zoneFromPosition(self.getPosition()) or '-'
     if srcPlayer == dstPlayer then
         printToColor(dstPlayer .. ' already has "' .. planetName .. '" card', clickerColor, 'Red')
         return

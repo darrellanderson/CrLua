@@ -13,17 +13,17 @@
 -- ║ BAN (6)       ║
 -- ╚═══════════════╝
 --
--- 1. Randomize draft order, set turns.
+-- 1. Randomize draft order.
 -- 2. Deal 4 factions to each player.
--- 3. Players simultaneously place 1 faction into POOL.
--- 4. Players simultaneously place 1 faction into BAN.
--- 5. Move remaining 12 factions into LIMBO.
--- 6. In draft order (once around), players either:
---    - Move 1 faction from LIMBO to NOMINATED.
---    - Move 1 faction from NOMINATED to POOL.
--- 7. In snake draft order, players select either:
---    - Faction from POOL.
---    - Slice from SLICES.
+-- 3. Simultaneously place 1 into POOL.
+-- 4. Simultaneously place 1 into BAN.
+-- 5. Move remaining 12 into LIMBO.
+-- 6. In draft order, players either:
+-- - Move 1 from LIMBO to NOMINATED.
+-- - Move 1 from NOMINATED to POOL.
+-- 7. In snake order, players select either:
+-- - Faction from POOL.
+-- - Slice from SLICES.
 
 --- Snap secret objectives to grid.
 -- @author Darrell
@@ -31,6 +31,7 @@
 
 -- TODO: LOAD ART FROM EXTERNAL SOURCE FOR EASY UPDATE?
 -- TTS will do a get-if-modified-since for images with "{verifycache}" url prefix.
+-- Placeholder: http://cloud-3.steamusercontent.com/ugc/1769323221564430064/9474926ACF7888F36D28F80FD273A338AE07AD65/
 
 function getHelperClient(helperObjectName)
     local function getHelperObject()

@@ -36,7 +36,7 @@ local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 local GAME_DATA_HOST = 'http://ti4-game-data.appspot.com'
---local GAME_DATA_HOST = 'http://localhost:8080'
+local GAME_DATA_HOST = 'http://localhost:8080'
 
 local _state = {}
 local _gamedataOptIn = false
@@ -104,7 +104,7 @@ function asyncGatherDataCoroutine()
         turn = Turns.turn_color or '',
         isPoK = _setupHelper.getPoK() and true or false,
         isFranken = _factionHelper.isFrankenEnabled() and true or false,
-        scoreboard = Score._getScoreboard().is_face_down and 14 or 10,
+        scoreboard = Score.getScoreboardPoints(),
         players = {},
     }
     local colorToPlayerResult = {}
@@ -456,6 +456,48 @@ function colorToObjectives()
         table.sort(entry)
         result[color] = entry
     end
+
+    -- Also add objectives in color's "Secrets Mat" column.
+    local secretsMat = Objects.getByName('Secrets Mat')
+    if secretsMat then
+        local bounds = secretsMat.getBounds()
+        local bb = {
+            min = {
+                x = bounds.center.x - bounds.size.x / 2,
+                z = bounds.center.z - bounds.size.z / 2,
+            },
+            max = {
+                x = bounds.center.x + bounds.size.x / 2,
+                z = bounds.center.z + bounds.size.z / 2,
+            },
+        }
+        local colors = _zoneHelper.zones()
+        for _, objective in ipairs(objectives) do
+            local p = objective.getPosition()
+            if p.x > bb.min.x and p.x < bb.max.x and p.z > bb.min.z and p.z < bb.max.z then
+                p = secretsMat.positionToLocal(p)
+                -- Row centers: -8.75, -6.25, ..., 8.75.  Col width: 2.5
+                local col = math.floor((p.x + 8.75 + 0.5) / 2.5) + 1
+                local color = colors[col]
+                if color then
+                    local entry = result[color] or {}
+                    local name = objective.getName()
+                    name = string.match(name, '^(.*) %(PoK%)$') or name
+                    local found = false
+                    for _, candidate in ipairs(entry) do
+                        if candidate == name then
+                            found = true
+                            break
+                        end
+                    end
+                    if not found then
+                        table.insert(entry, name)
+                    end
+                end
+            end
+        end
+    end
+
     return result
 end
 
@@ -603,7 +645,23 @@ end
 
 -------------------------------------------------------------------------------
 
-Objects = {}
+Objects = {
+    _nameToGuid = {}
+}
+
+function Objects.getByName(name, tag)
+    local guid = Objects._nameToGuid[name]
+    local object = guid and getObjectFromGUID(guid)
+    if object then
+        return object
+    end
+    for _, object in ipairs(getAllObjects()) do
+        if object.getName() == name and ((not tag) or (object.tag == tag)) then
+            Objects._nameToGuid[name] = object.getGUID()
+            return object
+        end
+    end
+end
 
 --- Group objects by player zone they are in, if any.
 -- @param objects : list of objects.
@@ -905,37 +963,33 @@ end
 
 -------------------------------------------------------------------------------
 
-Score = {
-    _scoreboardGuid = false
-}
+Score = {}
 
 --- Given a list of owner tokens, get the score from the best overlapping scoreboard.
 -- @params ownerTokens table : list of owner token objects.
 -- @return number : score, if found.
 function Score.getScore(ownerTokens)
     assert(type(ownerTokens) == 'table')
-    local scoreboard = Score._getScoreboard()
+    local scoreboard = Score.getScoreboard()
     local score = 0
-    for _, ownerToken in ipairs(ownerTokens) do
-        local candidate = Score._getScoreFromToken(scoreboard, ownerToken)
-        score = math.max(score, candidate or 0)
+    if scoreboard then
+        for _, ownerToken in ipairs(ownerTokens) do
+            local candidate = Score._getScoreFromToken(scoreboard, ownerToken)
+            score = math.max(score, candidate or 0)
+        end
     end
     return score
 end
 
-function Score._getScoreboard()
-    local scoreboard = Score._scoreboardGuid and getObjectFromGUID(Score._scoreboardGuid)
+function Score.getScoreboard()
+    return Objects.getByName('Scoreboard')
+end
+
+function Score.getScoreboardPoints()
+    local scoreboard = Score.getScoreboard()
     if scoreboard then
-        return scoreboard
+        return scoreboard.is_face_down and 14 or 10
     end
-    for _, object in ipairs(getAllObjects()) do
-        local name = object.getName()
-        if name == 'Scoreboard' then
-            Score._scoreboardGuid = object.getGUID()
-            return object
-        end
-    end
-    error('Score.getScoreboard: missing scoreboard')
 end
 
 function Score._getScoreFromToken(scoreboard, ownerToken)
@@ -957,12 +1011,10 @@ end
 
 -------------------------------------------------------------------------------
 
-Map = {
-    _mapToolGuid = false
-}
+Map = {}
 
 function Map.getMapString()
-    local mapTool = Map._getMapTool()
+    local mapTool = Objects.getByName('TI4 Map Tool')
     local mapString = mapTool and mapTool.call('getMapString')
 
     -- This is the string in the tool, not a table scan to compute it.
@@ -982,20 +1034,6 @@ function Map.getMapString()
     mapString = string.upper(mapString)
 
     return mapString
-end
-
-function Map._getMapTool()
-    local mapTool = Map._mapToolGuid and getObjectFromGUID(Map._mapToolGuid)
-    if mapTool then
-        return mapTool
-    end
-    for _, object in ipairs(getAllObjects()) do
-        local name = object.getName()
-        if name == 'TI4 Map Tool' then
-            Map._mapToolGuid = object.getGUID()
-            return object
-        end
-    end
 end
 
 -------------------------------------------------------------------------------
@@ -1232,11 +1270,7 @@ function Players.getActivePassedTokens()
 end
 
 function Players.getSpeakerToken()
-    for _, object in ipairs(getAllObjects()) do
-        if object.getName() == 'Speaker Token' then
-            return object
-        end
-    end
+    return Objects.getByName('Speaker Token')
 end
 
 -------------------------------------------------------------------------------

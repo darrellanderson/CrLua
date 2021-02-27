@@ -1173,7 +1173,7 @@ function parseMapString(input)
     assert(type(input) == 'string')
     local buildList = {}
 
-    local centerSystem, ab, rotation = string.match(input, '^{([-]?%d+)([A-H]?)(%d*)}$')
+    local centerSystem, ab, rotation = string.match(input, '^{([-]?%d+)([A-H]?)(%d*)}')
     if centerSystem then
         table.insert(buildList, {
             tile = assert(tonumber(centerSystem)),

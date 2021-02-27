@@ -1216,8 +1216,10 @@ function Laws.getLawCards()
         if object.tag == 'Card' and (not inHandGuidSet[object.getGUID()]) and (not object.is_face_down) then
             local name = object.getName()
             if Laws._lawNameSet[name] and not nameToCard[name] then
-                table.insert(cardNames, name)
-                nameToCard[name] = object
+                if not _deckHelper.isDiscard(object.getGUID()) then
+                    table.insert(cardNames, name)
+                    nameToCard[name] = object
+                end
             end
         end
     end

@@ -336,6 +336,7 @@ local RIGHT_CLICK = '-2'
 function onButtonClick(player, inputType, id)
     local isRightClick = inputType == RIGHT_CLICK and true or false
     if id == 'setup' then
+        self.setLock(false)
         setupGame(isRightClick)
     else
         error('onButtonClick: unknown button "' .. id .. '"')

@@ -1434,6 +1434,9 @@ function onPlayerTurnStart(player_color_start, player_color_previous)
         return
     end
 
+    -- Suppress future calls.
+    _setupParams = false
+
     -- Ignore if only one player, unless pointing to localhsot (dev testing?).
     local seated = getSeatedPlayers() or {}
     if (#seated < 2) and (not string.find(GAME_DATA_HOST, 'localhost')) then
@@ -1450,15 +1453,12 @@ function onPlayerTurnStart(player_color_start, player_color_previous)
         timestamp = math.floor(os.time()),
         isPoK = _setupHelper.getPoK() and true or false,
         isFranken = _factionHelper.isFrankenEnabled() and true or false,
-        scoreboard = Score._getScoreboard().is_face_down and 14 or 10,
+        scoreboard = Score.getScoreboardPoints(),
         seatedCount = #seated,
         playerCount = _zoneHelper.getPlayerCount(),
         factions = factions,
         gamedata = _gamedataOptIn,
     }
-
-    -- Suppress future calls.
-    _setupParams = false
 
     local url = GAME_DATA_HOST .. '/setup'
     local function callback(result)

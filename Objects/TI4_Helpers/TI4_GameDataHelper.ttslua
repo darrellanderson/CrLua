@@ -38,13 +38,20 @@ local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 local GAME_DATA_HOST = 'http://ti4-game-data.appspot.com'
 --local GAME_DATA_HOST = 'http://localhost:8080'
 
+local MIN_PERIODIC_SECONDS = 20
+local MAX_PERIODIC_SECONDS = 3600
+local DEFAULT_KEY_PERIODIC_SECONDS = 60
+local DEFAULT_ANON_PERIODIC_SECONDS
+
 local _state = {}
 local _gamedataOptIn = false
 local _gameDataKey = false
 local _timerId = false  -- for regular gamedata updates
 
--- Time based throttle for external pokes, internal based throttle for no change.
-local _lastTriggerUploadGameDataTimestamp = false
+-- Time based throttle for external pokes.
+local _triggerUploadGameDataWaitId = false
+
+-- Disable update when nothing changes.
 local _lastCrc = false
 
 -------------------------------------------------------------------------------
@@ -68,15 +75,14 @@ end
 
 --- Expose method so outsiders can trigger an update.
 function triggerUploadGameData()
-    local now = Time.time
-    if _lastTriggerUploadGameDataTimestamp then
-        local delta = now - _lastTriggerUploadGameDataTimestamp
-        if delta < 10 then
-            return
-        end
+    if _triggerUploadGameDataWaitId then
+        Wait.stop(_triggerUploadGameDataWaitId)
     end
-    _lastTriggerUploadGameDataTimestamp = now
-    _uploadGameData()
+    local function wrappedUploadGameData()
+        _triggerUploadGameDataWaitId = false
+        _uploadGameData()
+    end
+    _triggerUploadGameDataWaitId = Wait.time(wrappedUploadGameData, 10)
 end
 
 -------------------------------------------------------------------------------
@@ -140,7 +146,6 @@ function asyncGatherDataCoroutine()
     if params.includeSteamNames then
         for color, steamName in pairs(colorToSteamName()) do
             colorToPlayerResult[color].steamName = steamName
-            colorToPlayerResult[color].crc = CRC32.hash(steamName)
         end
     end
     coroutine.yield(0)
@@ -409,7 +414,9 @@ function colorToStrategyCards()
     for color, strategyCards in pairs(colorToStrategyCards) do
         local names = {}
         for _, strategyCard in ipairs(strategyCards) do
-            table.insert(names, StrategyCards.value(strategyCard))
+            if not strategyCard.held_by_color then
+                table.insert(names, StrategyCards.value(strategyCard))
+            end
         end
         table.sort(names)
         result[color] = names
@@ -1395,18 +1402,30 @@ function onLoad(saveState)
 
     _state = saveState and string.len(saveState) > 0 and JSON.decode(saveState) or _state
 
-    self.addContextMenuItem('Report', _doReport)
 
     if string.find(GAME_DATA_HOST, 'localhost') then
         broadcastToAll('Game data using localhost', 'Red')
     end
+
+    self.addContextMenuItem('Report Data', _doReport)
+    self.addContextMenuItem('Report State', function() _logTable('_state', _state) end)
+    self.addContextMenuItem('Reset State', function() _state = {} end)
 end
 
 function onSave()
     return JSON.encode(_state)
 end
 
-local _setupParams = false
+--- Trigger a delayed update when scoring the final point.
+function onObjectDrop(playerColor, droppedObject)
+    local tokenName = string.match(droppedObject.getName(), '^(.*) Owner Token')
+    if tokenName then
+        local score = Score.getScore({ droppedObject })
+        if score and (score > 0) and (score == Score.getScoreboardPoints()) then
+            triggerUploadGameData()
+        end
+    end
+end
 
 --- Called by TI4_SETUP_HELPER when setup finishes.
 -- Params:
@@ -1415,55 +1434,16 @@ local _setupParams = false
 -- - includePoK (nil or boolean).
 -- - playerTools (nil or boolean).
 function onSetupHelperSetupFinished(params)
-    _setupParams = params
     _gamedataOptIn = params.gamedataOptIn
 
     _state.setupTimestamp = math.floor(os.time() * 1000) / 1000
 
+    -- If opt-in and haven't already started (streamer) game data, start now.
     if _gamedataOptIn and not _timerId then
         startPeriodicUpdates({
-            delay = 600
+            delay = DEFAULT_ANON_PERIODIC_SECONDS
         })
     end
-end
-
---- The first time a turn starts after setup send anonymized game setup data.
-function onPlayerTurnStart(player_color_start, player_color_previous)
-    -- Only record the first time after setup.
-    if not _setupParams then
-        return
-    end
-
-    -- Suppress future calls.
-    _setupParams = false
-
-    -- Ignore if only one player, unless pointing to localhsot (dev testing?).
-    local seated = getSeatedPlayers() or {}
-    if (#seated < 2) and (not string.find(GAME_DATA_HOST, 'localhost')) then
-        return
-    end
-
-    -- Build anonymized data.
-    local factions = {}
-    for _, color in ipairs(_zoneHelper.zones()) do
-        local faction = _factionHelper.fromColor(color)
-        table.insert(factions, faction and faction.name or '-')
-    end
-    local data = {
-        timestamp = math.floor(os.time()),
-        isPoK = _setupHelper.getPoK() and true or false,
-        isFranken = _factionHelper.isFrankenEnabled() and true or false,
-        scoreboard = Score.getScoreboardPoints(),
-        seatedCount = #seated,
-        playerCount = _zoneHelper.getPlayerCount(),
-        factions = factions,
-        gamedata = _gamedataOptIn,
-    }
-
-    local url = GAME_DATA_HOST .. '/setup'
-    local function callback(result)
-    end
-    WebRequest.post(url, JSON.encode(data), callback)
 end
 
 -------------------------------------------------------------------------------
@@ -1474,9 +1454,9 @@ function startPeriodicUpdates(params)
     assert((not params.delay) or (type(params.delay) == 'number'))
 
     _gameDataKey = params.key
-    local delay = params.delay or 60
-    delay = math.max(delay, 30)
-    delay = math.min(delay, 600)
+    local delay = params.delay or DEFAULT_KEY_PERIODIC_SECONDS
+    delay = math.max(delay, MIN_PERIODIC_SECONDS)
+    delay = math.min(delay, MAX_PERIODIC_SECONDS)
 
     -- Stop any existing timer.
     if _timerId then

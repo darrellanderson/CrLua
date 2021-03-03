@@ -36,17 +36,19 @@ local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 local GAME_DATA_HOST = 'http://ti4-game-data.appspot.com'
---local GAME_DATA_HOST = 'http://localhost:8080'
+local GAME_DATA_LOCALHOST = 'http://localhost:8080'
+local GAME_DATA_LOCALHOST_KEY = 'localhost'
 
 local MIN_PERIODIC_SECONDS = 20
 local MAX_PERIODIC_SECONDS = 3600
 local DEFAULT_KEY_PERIODIC_SECONDS = 60
-local DEFAULT_ANON_PERIODIC_SECONDS
+local DEFAULT_ANON_PERIODIC_SECONDS = 600
 
 local _state = {}
 local _gamedataOptIn = false
 local _gameDataKey = false
 local _timerId = false  -- for regular gamedata updates
+local _timerPeriodicSeconds = false
 
 -- Time based throttle for external pokes.
 local _triggerUploadGameDataWaitId = false
@@ -112,6 +114,7 @@ function asyncGatherDataCoroutine()
         isFranken = _factionHelper.isFrankenEnabled() and true or false,
         scoreboard = Score.getScoreboardPoints(),
         players = {},
+        periodicSeconds = _timerPeriodicSeconds,
     }
     local colorToPlayerResult = {}
     for _, color in ipairs(_zoneHelper.zones()) do
@@ -1457,6 +1460,7 @@ function startPeriodicUpdates(params)
     local delay = params.delay or DEFAULT_KEY_PERIODIC_SECONDS
     delay = math.max(delay, MIN_PERIODIC_SECONDS)
     delay = math.min(delay, MAX_PERIODIC_SECONDS)
+    assert(type(delay) == 'number')
 
     -- Stop any existing timer.
     if _timerId then
@@ -1466,6 +1470,7 @@ function startPeriodicUpdates(params)
 
     -- Start a new timer.
     _timerId = self.getGUID() .. '_periodicGameData'
+    _timerPeriodicSeconds = delay
     Timer.create({
         identifier = _timerId,
         function_name = '_uploadGameData',
@@ -1520,7 +1525,12 @@ function _uploadGameDataCallback(data)
         _lastCrc = data.crc
     end
 
-    local url = GAME_DATA_HOST .. '/data'
+    local host = GAME_DATA_HOST
+    if _gameDataKey == GAME_DATA_LOCALHOST_KEY then
+        host = GAME_DATA_LOCALHOST
+    end
+
+    local url = host .. '/data'
     if _gameDataKey then
         url = url .. '?key=' .. _gameDataKey
     end

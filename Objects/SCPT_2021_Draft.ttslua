@@ -57,7 +57,6 @@ local _draftOrder = false
 -------------------------------------------------------------------------------
 
 function onLoad(save_state)
-    Wait.time(function() _spawnDraftSelectionMat('White') end, 1)
     local function lookAtMe(playerColor)
         Player[playerColor].lookAt({
             position = self.getPosition(),

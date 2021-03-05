@@ -405,7 +405,14 @@ function generateRollerXmlTable(unit_data)
         }
     }
 
-    local colors = Player.getAvailableColors()
+    local colors = {}
+    local colorSet = {}
+    for _, color in ipairs(Player.getAvailableColors()) do
+        if not colorSet[color] then
+            colorSet[color] = true
+            table.insert(colors, color)
+        end
+    end
     table.sort(colors)
     local buttonsVsColor = {}
     for _, color in ipairs(colors) do

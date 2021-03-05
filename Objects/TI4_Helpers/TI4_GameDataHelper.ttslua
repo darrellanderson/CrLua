@@ -143,6 +143,12 @@ function asyncGatherDataCoroutine()
     coroutine.yield(0)
     coroutine.yield(0)
 
+    local naaluToken = Objects.getByName('Zero Strategy Token')
+    local tokenZone = naaluToken and _zoneHelper.zoneFromPosition(naaluToken.getPosition())
+    result.naaluToken = tokenZone or nil
+    coroutine.yield(0)
+    coroutine.yield(0)
+
     -- Per-player items.
 
     -- Only gather names when using game data (for the streamer overlay).

@@ -47,7 +47,9 @@ local _setupHelper = getHelperClient('TI4_SETUP_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 local DRAFT_SELECTION_MAT_NAME = 'SCPT 2021 Tournament Draft Selection'
-local DRAFT_SELECTION_MAT_DESC = "Leave this in the player area.\n\nPlace this player's selected faction and slice selection here"
+local DRAFT_SELECTION_MAT_DESC = "Leave this in the player area.\n\nPlace this player's selected faction and slice selection here.\n\nWhen finished click the final button on the main draft mat to move players."
+local DRAFT_SELECTION_MAT_IMG = 'http://cloud-3.steamusercontent.com/ugc/1765946078498473751/3DF7E8F0188A2F9BFC767480B9AFE3172BAE6B84/'
+
 local CLOCK_SECONDS = 8 * 3600
 local MAP_STRING = '26 61 64 59 31 63 76 45 69 41 65 68 72 79 66 80 36 67 0 73 47 0 74 46 0 37 49 0 30 50 0 29 40 0 70 48'
 
@@ -527,7 +529,7 @@ function _spawnDraftSelectionMat(color)
     }
 
     local params = {
-        image = 'file:////Users/darrell/Desktop/white16x16.png',
+        image = DRAFT_SELECTION_MAT_IMG,
         type = 3,  -- rounded
         thickness = 0.4
     }
@@ -570,33 +572,33 @@ function _spawnDraftSelectionMat(color)
     tile.createButton({
         click_function = 'doNothing',
         function_owner = self,
-        label          = playerName .. '\nDraft Selections',
-        position       = { x = 0, y = params.thickness + 0.01, z = -0.5 },
+        label          = playerName,
+        position       = { x = 0, y = params.thickness + 0.01, z = -0.65 },
         width          = 0,
         height         = 0,
         font_size      = 120,
-        font_color     = 'Black',
+        font_color     = 'Yellow',
     })
-    tile.createButton({
-        click_function = 'doNothing',
-        function_owner = self,
-        label          = 'FACTION',
-        position       = { x = -0.5, y = params.thickness + 0.01, z = 0.5 },
-        width          = 300*1.3,
-        height         = 200*1.3,
-        font_size      = 100,
-        font_color     = 'Black',
-    })
-    tile.createButton({
-        click_function = 'doNothing',
-        function_owner = self,
-        label          = 'SLICE',
-        position       = { x = 0.5, y = params.thickness + 0.01, z = 0.5 },
-        width          = 300*1.3,
-        height         = 200*1.3,
-        font_size      = 100,
-        font_color     = 'Black',
-    })
+    -- tile.createButton({
+    --     click_function = 'doNothing',
+    --     function_owner = self,
+    --     label          = 'FACTION',
+    --     position       = { x = -0.5, y = params.thickness + 0.01, z = 0.5 },
+    --     width          = 300*1.3,
+    --     height         = 200*1.3,
+    --     font_size      = 100,
+    --     font_color     = 'Black',
+    -- })
+    -- tile.createButton({
+    --     click_function = 'doNothing',
+    --     function_owner = self,
+    --     label          = 'SLICE',
+    --     position       = { x = 0.5, y = params.thickness + 0.01, z = 0.5 },
+    --     width          = 300*1.3,
+    --     height         = 200*1.3,
+    --     font_size      = 100,
+    --     font_color     = 'Black',
+    -- })
 end
 
 function _factionTokenAtPosition(position)

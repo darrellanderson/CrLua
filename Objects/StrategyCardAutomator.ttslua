@@ -1505,7 +1505,8 @@ function _useStrategytokenAlternative(color, strategyCard, option)
 		if (object ~= nil) and(not object.is_face_down) then
 			object.highlightOn("Yellow" , 3)
 			_safeBroadcastToColor(strategyCard .. ": " .. color .. " used " .. option .. " instead of a strategy Token.", color, color)
-			return object.flip()
+			object.flip()
+			return true
 		else
 			_safeBroadcastToColor(strategyCard .. ": " .. option .. " is not available to you.", color, "Red")
 			return false

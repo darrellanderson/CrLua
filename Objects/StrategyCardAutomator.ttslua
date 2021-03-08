@@ -578,9 +578,11 @@ function onStrategyCardButtonClicked(params)
 		end
 	end
 
+	local constructionCommandToken = true
+	local localoption = option
+	
 	if action == "secondaryPopup" then
 		action = string.gsub(action, "Popup", "")
-		local localoption = option
 
 		local i,j
 		i,j = string.find(option," %[.*%]")
@@ -661,16 +663,24 @@ function onStrategyCardButtonClicked(params)
 
 	if card == "construction" then
 		local constructionSuccessful = false
+		local tokenSet = {}
 
 		if action == "primary" then
 			if option == "a Space Dock and a PDS" then
-				constructionSuccessful = _allocateConstructionUnits(color, {"PDS", "Space Dock"})
+				tokenSet = {"PDS","Space Dock"}
 			else
-				constructionSuccessful = _allocateConstructionUnits(color, {"PDS", "PDS"})
+				tokenSet = {"PDS","PDS"}
 			end
+			constructionSuccessful = _allocateConstructionUnits(color, tokenSet)
 		end
 		if (action == "secondary") and secondarySuccessful then
-			constructionSuccessful = _allocateConstructionUnits(color, {"Command Token", string.sub(option, 3, -1)})
+			tokenSet = {string.sub(option, 3, -1)}
+
+			-- if player is using "Jae Mir Kan" or "Ssruu" no longer draw the command token from reinforcements
+			if not ((localoption == "Jae Mir Kan") or (localoption == "Ssruu")) then
+				table.insert(tokenSet, 1, "Command Token")
+			end
+			constructionSuccessful = _allocateConstructionUnits(color, tokenSet)
 		end
 		if constructionSuccessful then
 			_closeMenu(color,card)

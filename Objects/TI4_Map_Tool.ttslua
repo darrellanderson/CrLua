@@ -692,7 +692,7 @@ function saveTilesCoroutine()
     local result = {}
     local maxIndex = 0
     for guid, hex in pairs(guidToHex) do
-        local index = assert(hexToMapStringIndex[hex], 'missing hex ' .. hex)
+        local index = hexToMapStringIndex[hex]  -- can be missing if past TILE_LIMIT
         local tile = assert(guidToTile[guid], 'missing tile ' .. guid)
         if index and tile then
             result[index] = tile

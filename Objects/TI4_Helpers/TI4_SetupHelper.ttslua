@@ -760,7 +760,7 @@ function SetupColor.unpack(color, colorBox, zone, agendaZoneCenter)
     local object = colorBox.takeObject({
         guid              = guid,
         position          = zone.homeSystemPosition,
-        rotation          = { x = 0, y = 0, z = 0 },
+        rotation          = { x = 0, y = 180, z = 0 },
         smooth            = false,
     })
     nameToObject[object.getName()] = object

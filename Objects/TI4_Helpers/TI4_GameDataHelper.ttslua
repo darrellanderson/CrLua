@@ -41,7 +41,7 @@ local GAME_DATA_LOCALHOST_KEY = 'localhost'
 
 local MIN_PERIODIC_SECONDS = 20
 local MAX_PERIODIC_SECONDS = 3600
-local DEFAULT_KEY_PERIODIC_SECONDS = 60
+local DEFAULT_KEY_PERIODIC_SECONDS = 30
 local DEFAULT_ANON_PERIODIC_SECONDS = 600
 
 local _state = {}
@@ -163,6 +163,9 @@ function asyncGatherDataCoroutine()
     for color, factionName in pairs(colorToFactionName()) do
         colorToPlayerResult[color].factionName = factionName
     end
+    for color, factionShort in pairs(colorToFactionAbbrv()) do
+        colorToPlayerResult[color].factionShort = factionShort
+    end
     coroutine.yield(0)
     coroutine.yield(0)
 
@@ -198,8 +201,12 @@ function asyncGatherDataCoroutine()
     coroutine.yield(0)
     coroutine.yield(0)
 
-    for color, strategyCards in pairs(colorToStrategyCards()) do
+    local all, faceDown = colorToStrategyCards()
+    for color, strategyCards in pairs(all) do
         colorToPlayerResult[color].strategyCards = strategyCards
+    end
+    for color, strategyCards in pairs(faceDown) do
+        colorToPlayerResult[color].strategyCardsFaceDown = strategyCards
     end
     coroutine.yield(0)
     coroutine.yield(0)
@@ -276,7 +283,9 @@ function asyncGatherDataCoroutine()
         for _, playerResult in ipairs(historyEntry.players) do
             playerResult.steamName = nil
             playerResult.factionName = nil
+            playerResult.factionShort = nil
             playerResult.active = nil
+            playerResult.strategyCardsFaceDown = nil
             playerResult.technologies = #playerResult.technologies  -- same order as main list
             playerResult.crc = nil
         end
@@ -338,6 +347,15 @@ function colorToFactionName()
     for _, color in ipairs(_zoneHelper.zones()) do
         local faction = _factionHelper.fromColor(color)
         result[color] = faction and faction.tokenName
+    end
+    return result
+end
+
+function colorToFactionAbbrv()
+    local result = {}
+    for _, color in ipairs(_zoneHelper.zones()) do
+        local faction = _factionHelper.fromColor(color)
+        result[color] = faction and faction.frankenName
     end
     return result
 end
@@ -419,18 +437,25 @@ end
 function colorToStrategyCards()
     local strategyCards = StrategyCards.getStrategyCards()
     local colorToStrategyCards = Objects.groupByZone(strategyCards)
-    local result = {}
+    local result, resultFaceDown = {}, {}
     for color, strategyCards in pairs(colorToStrategyCards) do
         local names = {}
+        local faceDown = {}
         for _, strategyCard in ipairs(strategyCards) do
             if not strategyCard.held_by_color then
-                table.insert(names, StrategyCards.value(strategyCard))
+                local name = StrategyCards.value(strategyCard)
+                table.insert(names, name)
+                if strategyCard.is_face_down then
+                    table.insert(faceDown, name)
+                end
             end
         end
         table.sort(names)
         result[color] = names
+        table.sort(faceDown)
+        resultFaceDown[color] = faceDown
     end
-    return result
+    return result, resultFaceDown
 end
 
 function getRound()
@@ -1046,10 +1071,18 @@ function Map.getMapString()
     for i, entry in ipairs(buildList) do
         table.insert(result, entry.tile .. (entry.ab or '') .. (entry.rotation or ''))
     end
+    while #result > 90 do
+        table.remove(result)
+    end
     mapString = table.concat(result, ' ')
     mapString = string.upper(mapString)
 
     return mapString
+end
+
+function Map.saveMapString()
+    local mapTool = Objects.getByName('TI4 Map Tool')
+    local mapString = mapTool and mapTool.call('onButtonSave')
 end
 
 -------------------------------------------------------------------------------
@@ -1452,6 +1485,14 @@ function onSetupHelperSetupFinished(params)
         startPeriodicUpdates({
             delay = DEFAULT_ANON_PERIODIC_SECONDS
         })
+    end
+end
+
+function onPlayerTurnStart(player_color_start, player_color_previous)
+    -- If map builder is empty, trigger a save for stats recording
+    local mapString = Map.getMapString()
+    if (not mapString) or string.len(mapString) == 0 then
+        Map.saveMapString()
     end
 end
 

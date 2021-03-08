@@ -52,14 +52,22 @@ local DRAFT_SELECTION_MAT_IMG = 'http://cloud-3.steamusercontent.com/ugc/1765946
 
 local CLOCK_SECONDS = 8 * 3600
 
-local MAP_STRING = '26 61 64 59 31 63 76 45 69 41 65 68 72 79 66 80 36 67 0 73 47 0 74 46 0 37 49 0 30 50 0 29 40 0 70 48'
-local MAP_SLICE_NAMES = {
-    White = 'Girls’\nNight\nOut',
-    Blue = 'Miller\nHigh\nSlice',
-    Purple = 'Mobile\nSlice\nGundam',
-    Yellow = 'Down\nWith The\nSliceness',
-    Red = 'Rigely\nField',
-    Green = 'Las\nVegas',
+local MAPS = {
+    ['2021 Prelim'] = {
+        mapString = '26 61 64 59 31 63 76 45 69 41 65 68 72 79 66 80 36 67 0 73 47 0 74 46 0 37 49 0 30 50 0 29 40 0 70 48',
+        sliceNames = {
+            White = 'Girls’\nNight\nOut',
+            Blue = 'Miller\nHigh\nSlice',
+            Purple = 'Mobile\nSlice\nGundam',
+            Yellow = 'Down\nWith The\nSliceness',
+            Red = 'Rigely\nField',
+            Green = 'Las\nVegas',
+        }
+    },
+    ['2021 Semifinals'] = {
+    },
+    ['2021 Finals'] = {
+    }
 }
 
 local _snapPointsGrid = false
@@ -78,13 +86,19 @@ function onLoad(save_state)
     end
     self.addContextMenuItem('Look at me', lookAtMe)
 
-    local function setMapString()
-        local mapTool = _findByName('TI4 Map Tool', 'Tile')
-        if mapTool then
-            mapTool.call('setMapString', MAP_STRING)
+    for name, map in pairs(MAPS) do
+        local function setMapString(playerColor)
+            if map.mapString then
+                local mapTool = _findByName('TI4 Map Tool', 'Tile')
+                if mapTool then
+                    mapTool.call('setMapString', map.mapString)
+                end
+            else
+                printToColor('The "' .. name .. '" map is not available', playerColor, 'Yellow')
+            end
         end
+        self.addContextMenuItem('Map: ' .. name, function(playerColor) setMapString(playerColor) end)
     end
-    self.addContextMenuItem('Set map string', setMapString)
 
     local buttons = {
         {
@@ -287,20 +301,26 @@ function randomizeDraft()
         sliceToken.setScale({ x = scale.x, y = 0.5, z = scale.z })
     end
 
-    -- If map string is empty add it.
+    -- If map string is empty add prelim.
     local mapString = false
     local mapTool = _findByName('TI4 Map Tool', 'Tile')
     if mapTool then
         mapString = mapTool.call('getMapString')
         if string.len(mapString) == 0 then
-            mapTool.call('setMapString', MAP_STRING)
-            mapString = MAP_STRING
+            mapString = MAPS['2021 Prelim'].mapString
+            mapTool.call('setMapString', mapString)
         end
     end
 
-    if string.upper(mapString) == string.upper(MAP_STRING) then
+    local mapSliceNames = false
+    for _, map in pairs(MAPS) do
+        if mapString and map.mapString == string.upper(mapString) then
+            mapSliceNames = map.sliceNames
+        end
+    end
+    if mapSliceNames then
         -- Assign slice names to slice tokens (if given).
-        for color, sliceName in pairs(MAP_SLICE_NAMES or {}) do
+        for color, sliceName in pairs(mapSliceNames or {}) do
             local sliceToken = colorToSliceToken[color]
             if sliceToken then
                 sliceToken.clearButtons()

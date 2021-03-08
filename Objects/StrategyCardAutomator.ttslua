@@ -580,7 +580,7 @@ function onStrategyCardButtonClicked(params)
 
 	local constructionCommandToken = true
 	local localoption = option
-	
+
 	if action == "secondaryPopup" then
 		action = string.gsub(action, "Popup", "")
 
@@ -1045,7 +1045,7 @@ function _addSecondaryPopup(layout, colorTable)
 			optionTable[color][option] = true
 		end
 	end
- 
+
 	local optionsForColor = {}
 	for _,color in ipairs(colorTable) do
 		optionsForColor[color] = {["Strategy Token"] = true}
@@ -1505,7 +1505,8 @@ function _useStrategytokenAlternative(color, strategyCard, option)
 		if (object ~= nil) and(not object.is_face_down) then
 			object.highlightOn("Yellow" , 3)
 			_safeBroadcastToColor(strategyCard .. ": " .. color .. " used " .. option .. " instead of a strategy Token.", color, color)
-			return object.flip()
+			object.flip()
+			return true
 		else
 			_safeBroadcastToColor(strategyCard .. ": " .. option .. " is not available to you.", color, "Red")
 			return false

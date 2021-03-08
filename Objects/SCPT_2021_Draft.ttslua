@@ -51,7 +51,16 @@ local DRAFT_SELECTION_MAT_DESC = "Leave this in the player area.\n\nPlace this p
 local DRAFT_SELECTION_MAT_IMG = 'http://cloud-3.steamusercontent.com/ugc/1765946078498473751/3DF7E8F0188A2F9BFC767480B9AFE3172BAE6B84/'
 
 local CLOCK_SECONDS = 8 * 3600
+
 local MAP_STRING = '26 61 64 59 31 63 76 45 69 41 65 68 72 79 66 80 36 67 0 73 47 0 74 46 0 37 49 0 30 50 0 29 40 0 70 48'
+local MAP_SLICE_NAMES = {
+    White = nil,
+    Blue = nil,
+    Purple = nil,
+    Yellow = nil,
+    Red = nil,
+    Green = nil,
+}
 
 local _snapPointsGrid = false
 local _draftOrder = false
@@ -104,14 +113,14 @@ function onLoad(save_state)
             tooltip = 'Moves faction tokens from player hands to the LIMBO area',
         },
         {
-            label = 'Turn order move:\nLIMBO to NOMINATED\nor\nNOMINATED to POOL.',
-            onClick = 'assignTurnOrderDraft',
-            tooltip = 'Assign turn order to draft order',
+            label = 'Draft order move:\nLIMBO to NOMINATED\nor\nNOMINATED to POOL.',
+            onClick = false,
+            tooltip = false,
         },
         {
             label = 'Snake select:\nfaction from POOL\nor\nslice from SLICES',
-            onClick = 'assignTurnOrderReverse',
-            tooltip = 'Reverse turn order; do this after the first snake segment',
+            onClick = false,
+            tooltip = false,
         },
         {
             label = 'Move players\ninto slices,\nrandomize speaker,\nstart timer',
@@ -121,7 +130,7 @@ function onLoad(save_state)
     }
 
     local x0 = -15.89
-    local y = 0.41
+    local y = 0.42
     local z0 = -11.2
     local dx = 4.54
     local dz = 3.2
@@ -152,13 +161,34 @@ function onLoad(save_state)
                 y = y,
                 z = z0 + dz * (i - 1),
             },
-            width          = button.onClick and 2000 or 0,
+            width          = button.onClick and 1900 or 0,
             height         = button.onClick and 1200 or 0,
             font_size      = 200,
             font_color     = button.onClick and 'Black' or 'White',
             tooltip        = button.tooltip or button.label
         })
     end
+
+    self.setVectorLines({
+        {
+            points         = {
+                {
+                    x = -x0,
+                    y = y - 0.01,
+                    z = z0 - dz / 2,
+                },
+                {
+                    x = -x0,
+                    y = y - 0.01,
+                    z = z0 + dz * 7.5,
+                },
+            },
+            color          = { r = 0.1, g = 0.1, b = 0.1, a = 0.98 },
+            thickness      = dx,
+            loop           = false,
+            square         = true,
+        },
+    })
 end
 
 function doNothing()
@@ -183,6 +213,8 @@ function randomizeDraft()
         table.insert(_draftOrder, color)
     end
     Turns.enable = false
+    Turns.type = 2
+    Turns.reverse_order = false
     Turns.order = _draftOrder
     Turns.turn_color = _draftOrder[1]
     Turns.enable = true
@@ -201,15 +233,18 @@ function randomizeDraft()
         p = self.positionToWorld(p) + vector(0, 3, 0)
         colorToPos[color] = p
     end
+    local colorToSliceToken = {}
     for _, entry in ipairs(sliceBag.getObjects()) do
         local p = colorToPos[entry.name]
         if p then
-            sliceBag.takeObject({
+            local sliceToken = sliceBag.takeObject({
                 position          = p,
+                rotation          = self.getRotation(),
                 smooth            = true,
                 guid              = entry.guid
             })
             colorToPos[entry.name] = nil  -- consume
+            colorToSliceToken[entry.name] = sliceToken
         end
     end
 
@@ -221,10 +256,12 @@ function randomizeDraft()
             local collide = false
             local fast = false
             sliceToken.setPositionSmooth(pos, collide, fast)
+            sliceToken.setRotationSmooth(self.getRotation(), collide, fast)
         else
             sliceToken = spawnObject({
                 type              = 'go_game_piece_white',
                 position          = pos,
+                rotation          = self.getRotation(),
                 scale             = { x = 2.5, y = 2.5, z = 2.5 },
                 sound             = false,
                 snap_to_grid      = false
@@ -234,6 +271,7 @@ function randomizeDraft()
             sliceToken.use_hands = true
             sliceToken.use_snap_points = true
             sliceToken.use_grid = false
+            colorToSliceToken[color] = sliceToken
         end
     end
 
@@ -241,6 +279,32 @@ function randomizeDraft()
     _deleteDraftSelectionMats()
     for _, color in ipairs(_draftOrder) do
         _spawnDraftSelectionMat(color)
+    end
+
+    -- Flatten slice tokens.
+    for _, sliceToken in pairs(colorToSliceToken) do
+        local scale = sliceToken.getScale()
+        sliceToken.setScale({ x = scale.x, y = 0.5, z = scale.z })
+    end
+
+    -- Assign slice names to slice tokens (if given).
+    for color, sliceName in pairs(MAP_SLICE_NAMES) do
+        local sliceToken = colorToSliceToken[color]
+        if sliceToken then
+            sliceToken.clearButtons()
+            sliceToken.createButton({
+                click_function = 'doNothing',
+                function_owner = self,
+                label          = sliceName,
+                position       = { x = 0, y = 0.185, z = 0 },
+                rotation       = { x = 0, y = 0, z = 0 },
+                scale          = { x = 1, y = 1, z = 1 },
+                width          = 0,
+                height         = 0,
+                font_size      = 100,
+                font_color     = 'Black'
+            })
+        end
     end
 end
 
@@ -293,38 +357,6 @@ function moveRemainingFactionsToLimbo()
             factionToken.setRotation(self.getRotation())
         end
     end
-end
-
-function assignTurnOrderDraft()
-    if not _setupHelper.getPoK() then
-        broadcastToAll('SCPT draft: please do setup with PoK enabled first', 'Red')
-        return
-    end
-    if not _draftOrder then
-        broadcastToAll('SCPT draft: please click "Randomize draft" first', 'Red')
-        return
-    end
-
-    Turns.enable = false
-    Turns.order = _draftOrder
-    Turns.turn_color = _draftOrder[1]
-    Turns.enable = true
-    printToAll('SCPT draft order: ' .. table.concat(_draftOrder, ', '), 'Yellow')
-end
-
-function assignTurnOrderReverse()
-    if not _setupHelper.getPoK() then
-        broadcastToAll('SCPT draft: please do setup with PoK enabled first', 'Red')
-        return
-    end
-    if not _draftOrder then
-        broadcastToAll('SCPT draft: please click "Randomize draft" first', 'Red')
-        return
-    end
-
-    Turns.reverse_order = not Turns.reverse_order
-    local message = Turns.reverse_order and 'reverse' or 'forward'
-    printToAll('SCPT snake order: ' .. message, 'Yellow')
 end
 
 function movePlayersIntoSlices()
@@ -459,14 +491,19 @@ function movePlayersIntoSlices()
     local speaker = colors[math.random(1, #colors)]
     broadcastToAll('SCPT 2021 Tournament draft: assigning speaker to ' .. speaker, 'Yellow')
     local zoneAttrs = _zoneHelper.zoneAttributes(speaker)
-    local pos = zoneAttrs.center
+    local pos = {
+        x = zoneAttrs.center,
+        y = zoneAttrs.center + 5,
+        z = zoneAttrs.center.z + 6 * (zoneAttrs.center.z < 0 and 1 or -1)
+    }
     local rot = zoneAttrs.rotation
-    pos.y = pos.y + 5
-    pos.z = pos.z + 6 * (pos.z < 0 and 1 or -1)
     local collide = false
     local fast = false
     speakerToken.setPositionSmooth(pos, collide, fast)
     speakerToken.setRotationSmooth(rot, collide, fast)
+
+    Turns.enable = false
+    Turns.reverse_order = false
 
     -- Start clock!
     if clock then

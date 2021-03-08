@@ -1489,10 +1489,12 @@ function onSetupHelperSetupFinished(params)
 end
 
 function onPlayerTurnStart(player_color_start, player_color_previous)
-    -- If map builder is empty, trigger a save for stats recording
-    local mapString = Map.getMapString()
-    if (not mapString) or string.len(mapString) == 0 then
-        Map.saveMapString()
+    if _gamedataOptIn or _gameDataKey then
+        -- If map builder is empty, trigger a save for stats recording
+        local mapString = Map.getMapString()
+        if (not mapString) or string.len(mapString) == 0 then
+            Map.saveMapString()
+        end
     end
 end
 

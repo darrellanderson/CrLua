@@ -243,10 +243,12 @@ function placeTradeGoodsAndSetTurns(obj, playerClickerColor, altClick)
 
     printToAll('Turn order: ' .. table.concat(turnOrder, ', '), playerClickerColor)
 
-    Turns.enable = true
+    Turns.enable = false
     Turns.type = 2
+    Turns.reverse_order = false
     Turns.order = turnOrder
     Turns.turn_color = turnOrder[1]
+    Turns.enable = true
 end
 
 function dealActionCards(obj, playerClickerColor, altClick)

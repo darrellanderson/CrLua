@@ -466,9 +466,12 @@ function updateBoundingBox()
 end
 
 function updateInsideBuildArea()
+    local inHandGuidSet = _zoneHelper.inHand()
     _data.inside = {}
     for _, object in ipairs(getAllObjects()) do
-        if isInsideBuildArea(object.getPosition()) then
+        local inHand = inHandGuidSet[object.getGUID()]
+        local inBuildArea = isInsideBuildArea(object.getPosition())
+        if (not inHand) and inBuildArea then
             _data.inside[object] = true
         end
     end
@@ -1132,8 +1135,12 @@ end
 
 function commit()
     CrLua.Log.d(TAG, 'commit')
+    local inHandGuidSet = _zoneHelper.inHand()
     for object, _ in pairs(_data.inside) do
-        if (object.tag == 'Card' or object.tag == 'Deck') and not object.is_face_down then
+        local tag = object.tag
+        local faceUp = not object.is_face_down
+        local inHand = inHandGuidSet[object.getGUID()]
+        if (tag == 'Card' or tag == 'Deck') and faceUp and (not inHand) then
             object.flip()
         end
     end

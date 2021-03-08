@@ -17,6 +17,17 @@ function getHelperClient(helperObjectName)
     end
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
+local function copyTable(t)
+    if t and type(t) == 'table' then
+        local copy = {}
+        for k, v in pairs(t) do
+            copy[k] = type(v) == 'table' and copyTable(v) or v
+        end
+        t = copy
+    end
+    return t
+end
+
 local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 local _technologyHelper = getHelperClient('TI4_TECHNOLOGY_HELPER')
@@ -25,11 +36,56 @@ local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 local GAME_DATA_HOST = 'http://ti4-game-data.appspot.com'
---local GAME_DATA_HOST = 'http://localhost:8080'
+local GAME_DATA_LOCALHOST = 'http://localhost:8080'
+local GAME_DATA_LOCALHOST_KEY = 'localhost'
+
+local MIN_PERIODIC_SECONDS = 20
+local MAX_PERIODIC_SECONDS = 3600
+local DEFAULT_KEY_PERIODIC_SECONDS = 30
+local DEFAULT_ANON_PERIODIC_SECONDS = 600
 
 local _state = {}
+local _gamedataOptIn = false
 local _gameDataKey = false
-local _timerId = false
+local _timerId = false  -- for regular gamedata updates
+local _timerPeriodicSeconds = false
+
+-- Time based throttle for external pokes.
+local _triggerUploadGameDataWaitId = false
+
+-- Disable update when nothing changes.
+local _lastCrc = false
+
+-------------------------------------------------------------------------------
+
+function addExtraData(params)
+    assert(type(params.name) == 'string')
+    assert((not params.callbackGuid) or type(params.callbackGuid) == 'string')
+    assert((not params.callbackFunction) or type(params.callbackFunction) == 'string')
+
+    if params.value then
+        assert((not params.callbackGuid) and (not params.callbackFunction))
+    else
+        assert(params.callbackGuid and params.callbackFunction)
+        local object = getObjectFromGUID(params.callbackGuid)
+        assert(object.getVar(params.callbackFunction))
+    end
+
+    _state.extraData = _state.extraData or {}
+    _state.extraData[params.name] = params
+end
+
+--- Expose method so outsiders can trigger an update.
+function triggerUploadGameData()
+    if _triggerUploadGameDataWaitId then
+        Wait.stop(_triggerUploadGameDataWaitId)
+    end
+    local function wrappedUploadGameData()
+        _triggerUploadGameDataWaitId = false
+        _uploadGameData()
+    end
+    _triggerUploadGameDataWaitId = Wait.time(wrappedUploadGameData, 10)
+end
 
 -------------------------------------------------------------------------------
 
@@ -50,14 +106,15 @@ function asyncGatherDataCoroutine()
     end
 
     local result = {
-        load = _state.loadTimestamp,
-        laws = getLaws(),
+        setupTimestamp = _state.setupTimestamp,
         timestamp = math.floor(os.time()),
+        laws = getLaws(),
         turn = Turns.turn_color or '',
         isPoK = _setupHelper.getPoK() and true or false,
         isFranken = _factionHelper.isFrankenEnabled() and true or false,
-        scoreboard = Score._getScoreboard().is_face_down and 14 or 10,
+        scoreboard = Score.getScoreboardPoints(),
         players = {},
+        periodicSeconds = _timerPeriodicSeconds,
     }
     local colorToPlayerResult = {}
     for _, color in ipairs(_zoneHelper.zones()) do
@@ -82,16 +139,32 @@ function asyncGatherDataCoroutine()
     coroutine.yield(0)
     coroutine.yield(0)
 
+    result.mapString = Map.getMapString() or ''
+    coroutine.yield(0)
+    coroutine.yield(0)
+
+    local naaluToken = Objects.getByName('Zero Strategy Token')
+    local tokenZone = naaluToken and _zoneHelper.zoneFromPosition(naaluToken.getPosition())
+    result.naaluToken = tokenZone or nil
+    coroutine.yield(0)
+    coroutine.yield(0)
+
     -- Per-player items.
 
-    for color, steamName in pairs(colorToSteamName()) do
-        colorToPlayerResult[color].steamName = steamName
+    -- Only gather names when using game data (for the streamer overlay).
+    if params.includeSteamNames then
+        for color, steamName in pairs(colorToSteamName()) do
+            colorToPlayerResult[color].steamName = steamName
+        end
     end
     coroutine.yield(0)
     coroutine.yield(0)
 
     for color, factionName in pairs(colorToFactionName()) do
         colorToPlayerResult[color].factionName = factionName
+    end
+    for color, factionShort in pairs(colorToFactionAbbrv()) do
+        colorToPlayerResult[color].factionShort = factionShort
     end
     coroutine.yield(0)
     coroutine.yield(0)
@@ -128,8 +201,12 @@ function asyncGatherDataCoroutine()
     coroutine.yield(0)
     coroutine.yield(0)
 
-    for color, strategyCards in pairs(colorToStrategyCards()) do
+    local all, faceDown = colorToStrategyCards()
+    for color, strategyCards in pairs(all) do
         colorToPlayerResult[color].strategyCards = strategyCards
+    end
+    for color, strategyCards in pairs(faceDown) do
+        colorToPlayerResult[color].strategyCardsFaceDown = strategyCards
     end
     coroutine.yield(0)
     coroutine.yield(0)
@@ -176,6 +253,72 @@ function asyncGatherDataCoroutine()
     coroutine.yield(0)
     coroutine.yield(0)
 
+    -- Get the round.  Reject if any players are missing a strategy card.
+    -- (Objective flipped but not yet started new round).
+    local round = result.round or 0
+    local requiredStrategyCardCount = (#result.players) < 5 and 2 or 1
+    for color, playerResult in pairs(colorToPlayerResult) do
+        local strategyCards = playerResult.strategyCards or {}
+        if (#strategyCards) < requiredStrategyCardCount then
+            round = false
+            break
+        end
+    end
+    local prevRound = 0
+    if _state.gameDataHistory and (#_state.gameDataHistory) > 0 then
+        prevRound = _state.gameDataHistory[#_state.gameDataHistory].round
+    end
+    if round and prevRound and (round > prevRound) then
+        _state.gameDataHistory = _state.gameDataHistory or {}
+        -- Add the "pure" start-of-round data, before attaching the history entry.
+        local historyEntry = copyTable(result)
+        -- Remove some fields from the history.
+        historyEntry.isFranken = nil
+        historyEntry.isPoK = nil
+        historyEntry.mapString = nil
+        historyEntry.objectives = nil
+        historyEntry.setup = nil
+        historyEntry.scoreboard = nil
+        historyEntry.turn = nil
+        for _, playerResult in ipairs(historyEntry.players) do
+            playerResult.steamName = nil
+            playerResult.factionName = nil
+            playerResult.factionShort = nil
+            playerResult.active = nil
+            playerResult.strategyCardsFaceDown = nil
+            playerResult.technologies = #playerResult.technologies  -- same order as main list
+            playerResult.crc = nil
+        end
+        table.insert(_state.gameDataHistory, historyEntry)
+    end
+    result.history = _state.gameDataHistory or {}
+    coroutine.yield(0)
+    coroutine.yield(0)
+
+    -- Let objects add additional top-level (not in history) data.
+    for name, params in pairs(_state.extraData or {}) do
+        local value = params.value
+        if not value then
+            local object = getObjectFromGUID(params.callbackGuid)
+            if object and object.getVar(params.callbackFunction) then
+                value = object.call(params.callbackFunction)
+                coroutine.yield(0)
+            end
+        end
+        if value then
+            result.extra = result.extra or {}
+            result.extra[name] = value
+        end
+    end
+    coroutine.yield(0)
+    coroutine.yield(0)
+
+    -- Finally add a root CRC for everything EXCEPT TIMESTAMP!
+    local saveTimestamp = result.timestamp
+    result.timestamp = nil
+    result.crc = CRC32.hash(JSON.encode(result))
+    result.timestamp = saveTimestamp
+
     local callbackObject = getObjectFromGUID(params.guid)
     if callbackObject then
         callbackObject.call(params.callbackFunctionName, result)
@@ -204,6 +347,15 @@ function colorToFactionName()
     for _, color in ipairs(_zoneHelper.zones()) do
         local faction = _factionHelper.fromColor(color)
         result[color] = faction and faction.tokenName
+    end
+    return result
+end
+
+function colorToFactionAbbrv()
+    local result = {}
+    for _, color in ipairs(_zoneHelper.zones()) do
+        local faction = _factionHelper.fromColor(color)
+        result[color] = faction and faction.frankenName
     end
     return result
 end
@@ -285,16 +437,25 @@ end
 function colorToStrategyCards()
     local strategyCards = StrategyCards.getStrategyCards()
     local colorToStrategyCards = Objects.groupByZone(strategyCards)
-    local result = {}
+    local result, resultFaceDown = {}, {}
     for color, strategyCards in pairs(colorToStrategyCards) do
         local names = {}
+        local faceDown = {}
         for _, strategyCard in ipairs(strategyCards) do
-            table.insert(names, StrategyCards.value(strategyCard))
+            if not strategyCard.held_by_color then
+                local name = StrategyCards.value(strategyCard)
+                table.insert(names, name)
+                if strategyCard.is_face_down then
+                    table.insert(faceDown, name)
+                end
+            end
         end
         table.sort(names)
         result[color] = names
+        table.sort(faceDown)
+        resultFaceDown[color] = faceDown
     end
-    return result
+    return result, resultFaceDown
 end
 
 function getRound()
@@ -336,6 +497,48 @@ function colorToObjectives()
         table.sort(entry)
         result[color] = entry
     end
+
+    -- Also add objectives in color's "Secrets Mat" column.
+    local secretsMat = Objects.getByName('Secrets Mat')
+    if secretsMat then
+        local bounds = secretsMat.getBounds()
+        local bb = {
+            min = {
+                x = bounds.center.x - bounds.size.x / 2,
+                z = bounds.center.z - bounds.size.z / 2,
+            },
+            max = {
+                x = bounds.center.x + bounds.size.x / 2,
+                z = bounds.center.z + bounds.size.z / 2,
+            },
+        }
+        local colors = _zoneHelper.zones()
+        for _, objective in ipairs(objectives) do
+            local p = objective.getPosition()
+            if p.x > bb.min.x and p.x < bb.max.x and p.z > bb.min.z and p.z < bb.max.z then
+                p = secretsMat.positionToLocal(p)
+                -- Row centers: -8.75, -6.25, ..., 8.75.  Col width: 2.5
+                local col = math.floor((p.x + 8.75 + 0.5) / 2.5) + 1
+                local color = colors[col]
+                if color then
+                    local entry = result[color] or {}
+                    local name = objective.getName()
+                    name = string.match(name, '^(.*) %(PoK%)$') or name
+                    local found = false
+                    for _, candidate in ipairs(entry) do
+                        if candidate == name then
+                            found = true
+                            break
+                        end
+                    end
+                    if not found then
+                        table.insert(entry, name)
+                    end
+                end
+            end
+        end
+    end
+
     return result
 end
 
@@ -483,7 +686,23 @@ end
 
 -------------------------------------------------------------------------------
 
-Objects = {}
+Objects = {
+    _nameToGuid = {}
+}
+
+function Objects.getByName(name, tag)
+    local guid = Objects._nameToGuid[name]
+    local object = guid and getObjectFromGUID(guid)
+    if object then
+        return object
+    end
+    for _, object in ipairs(getAllObjects()) do
+        if object.getName() == name and ((not tag) or (object.tag == tag)) then
+            Objects._nameToGuid[name] = object.getGUID()
+            return object
+        end
+    end
+end
 
 --- Group objects by player zone they are in, if any.
 -- @param objects : list of objects.
@@ -785,37 +1004,33 @@ end
 
 -------------------------------------------------------------------------------
 
-Score = {
-    _scoreboardGuid = false
-}
+Score = {}
 
 --- Given a list of owner tokens, get the score from the best overlapping scoreboard.
 -- @params ownerTokens table : list of owner token objects.
 -- @return number : score, if found.
 function Score.getScore(ownerTokens)
     assert(type(ownerTokens) == 'table')
-    local scoreboard = Score._getScoreboard()
+    local scoreboard = Score.getScoreboard()
     local score = 0
-    for _, ownerToken in ipairs(ownerTokens) do
-        local candidate = Score._getScoreFromToken(scoreboard, ownerToken)
-        score = math.max(score, candidate or 0)
+    if scoreboard then
+        for _, ownerToken in ipairs(ownerTokens) do
+            local candidate = Score._getScoreFromToken(scoreboard, ownerToken)
+            score = math.max(score, candidate or 0)
+        end
     end
     return score
 end
 
-function Score._getScoreboard()
-    local scoreboard = Score._scoreboardGuid and getObjectFromGUID(Score._scoreboardGuid)
+function Score.getScoreboard()
+    return Objects.getByName('Scoreboard')
+end
+
+function Score.getScoreboardPoints()
+    local scoreboard = Score.getScoreboard()
     if scoreboard then
-        return scoreboard
+        return scoreboard.is_face_down and 14 or 10
     end
-    for _, object in ipairs(getAllObjects()) do
-        local name = object.getName()
-        if name == 'Scoreboard' then
-            Score._scoreboardGuid = object.getGUID()
-            return object
-        end
-    end
-    error('Score.getScoreboard: missing scoreboard')
 end
 
 function Score._getScoreFromToken(scoreboard, ownerToken)
@@ -833,6 +1048,41 @@ function Score._getScoreFromToken(scoreboard, ownerToken)
         limit = 15
     end
     return math.floor(u * limit)
+end
+
+-------------------------------------------------------------------------------
+
+Map = {}
+
+function Map.getMapString()
+    local mapTool = Objects.getByName('TI4 Map Tool')
+    local mapString = mapTool and mapTool.call('getMapString')
+
+    -- This is the string in the tool, not a table scan to compute it.
+    -- Prevent non-map strings from getting recorded.
+    if string.len(mapString) > 1024 then
+        return false
+    end
+    local buildList = mapTool.call('parseMapString', mapString)
+    if #buildList > 0 and buildList[1].tile == 18 then
+        table.remove(buildList, 1)
+    end
+    local result = {}
+    for i, entry in ipairs(buildList) do
+        table.insert(result, entry.tile .. (entry.ab or '') .. (entry.rotation or ''))
+    end
+    while #result > 90 do
+        table.remove(result)
+    end
+    mapString = table.concat(result, ' ')
+    mapString = string.upper(mapString)
+
+    return mapString
+end
+
+function Map.saveMapString()
+    local mapTool = Objects.getByName('TI4 Map Tool')
+    local mapString = mapTool and mapTool.call('onButtonSave')
 end
 
 -------------------------------------------------------------------------------
@@ -1015,8 +1265,10 @@ function Laws.getLawCards()
         if object.tag == 'Card' and (not inHandGuidSet[object.getGUID()]) and (not object.is_face_down) then
             local name = object.getName()
             if Laws._lawNameSet[name] and not nameToCard[name] then
-                table.insert(cardNames, name)
-                nameToCard[name] = object
+                if not _deckHelper.isDiscard(object.getGUID()) then
+                    table.insert(cardNames, name)
+                    nameToCard[name] = object
+                end
             end
         end
     end
@@ -1069,11 +1321,7 @@ function Players.getActivePassedTokens()
 end
 
 function Players.getSpeakerToken()
-    for _, object in ipairs(getAllObjects()) do
-        if object.getName() == 'Speaker Token' then
-            return object
-        end
-    end
+    return Objects.getByName('Speaker Token')
 end
 
 -------------------------------------------------------------------------------
@@ -1195,16 +1443,31 @@ function onLoad(saveState)
     self.setInvisibleTo(invisibleTo)
 
     _state = saveState and string.len(saveState) > 0 and JSON.decode(saveState) or _state
-    _state.loadTimestamp = math.floor(os.time())
 
-    self.addContextMenuItem('Report', _doReport)
+
+    if string.find(GAME_DATA_HOST, 'localhost') then
+        broadcastToAll('Game data using localhost', 'Red')
+    end
+
+    self.addContextMenuItem('Report Data', _doReport)
+    self.addContextMenuItem('Report State', function() _logTable('_state', _state) end)
+    self.addContextMenuItem('Reset State', function() _state = {} end)
 end
 
 function onSave()
     return JSON.encode(_state)
 end
 
-local _setupParams = false
+--- Trigger a delayed update when scoring the final point.
+function onObjectDrop(playerColor, droppedObject)
+    local tokenName = string.match(droppedObject.getName(), '^(.*) Owner Token')
+    if tokenName then
+        local score = Score.getScore({ droppedObject })
+        if score and (score > 0) and (score == Score.getScoreboardPoints()) then
+            triggerUploadGameData()
+        end
+    end
+end
 
 --- Called by TI4_SETUP_HELPER when setup finishes.
 -- Params:
@@ -1213,58 +1476,38 @@ local _setupParams = false
 -- - includePoK (nil or boolean).
 -- - playerTools (nil or boolean).
 function onSetupHelperSetupFinished(params)
-    _setupParams = params
+    _gamedataOptIn = params.gamedataOptIn
+
+    _state.setupTimestamp = math.floor(os.time() * 1000) / 1000
+
+    -- If opt-in and haven't already started (streamer) game data, start now.
+    if _gamedataOptIn and not _timerId then
+        startPeriodicUpdates({
+            delay = DEFAULT_ANON_PERIODIC_SECONDS
+        })
+    end
 end
 
---- The first time a turn starts after setup send anonymized game setup data.
 function onPlayerTurnStart(player_color_start, player_color_previous)
-    -- Only record the first time after setup.
-    if not _setupParams then
-        return
+    -- If map builder is empty, trigger a save for stats recording
+    local mapString = Map.getMapString()
+    if (not mapString) or string.len(mapString) == 0 then
+        Map.saveMapString()
     end
-
-    -- Ignore if only one player, developer testing?
-    local seated = getSeatedPlayers()
-    if (not seated) or #seated < 2 then
-        return
-    end
-
-    -- Build anonymized data.
-    local factions = {}
-    for _, color in ipairs(_zoneHelper.zones()) do
-        local faction = _factionHelper.fromColor(color)
-        table.insert(factions, faction and faction.name or '-')
-    end
-    local data = {
-        timestamp = math.floor(os.time()),
-        isPoK = _setupHelper.getPoK() and true or false,
-        isFranken = _factionHelper.isFrankenEnabled() and true or false,
-        scoreboard = Score._getScoreboard().is_face_down and 14 or 10,
-        seatedCount = #seated,
-        playerCount = _zoneHelper.getPlayerCount(),
-        factions = factions
-    }
-
-    -- Suppress future calls.
-    _setupParams = false
-
-    local url = GAME_DATA_HOST .. '/setup'
-    local function callback(result)
-    end
-    WebRequest.post(url, JSON.encode(data), callback)
 end
 
 -------------------------------------------------------------------------------
 
 function startPeriodicUpdates(params)
     assert(type(params) == 'table')
-    assert(type(params.key) == 'string')
+    assert((not params.key) or type(params.key) == 'string')
     assert((not params.delay) or (type(params.delay) == 'number'))
 
     _gameDataKey = params.key
-    local delay = params.delay or 60
-    delay = math.max(delay, 30)
-    delay = math.min(delay, 300)
+    local delay = params.delay or DEFAULT_KEY_PERIODIC_SECONDS
+    delay = math.max(delay, MIN_PERIODIC_SECONDS)
+    delay = math.min(delay, MAX_PERIODIC_SECONDS)
+    assert(type(delay) == 'number')
 
     -- Stop any existing timer.
     if _timerId then
@@ -1273,7 +1516,8 @@ function startPeriodicUpdates(params)
     end
 
     -- Start a new timer.
-    _timerId = self.getGUID() .. '_periodicUploads'
+    _timerId = self.getGUID() .. '_periodicGameData'
+    _timerPeriodicSeconds = delay
     Timer.create({
         identifier = _timerId,
         function_name = '_uploadGameData',
@@ -1299,23 +1543,47 @@ end
 -------------------------------------------------------------------------------
 
 function _uploadGameData()
-    if not _gameDataKey then
+    local active = false
+    if _gameDataKey then
+        -- ALWAYS send when game data key is present
+        active = true
+    elseif _gamedataOptIn then
+        -- To help prevent curiosity and solo griefing corruption REQUIRE
+        -- multiple players before uploading vonulary anonymized game data.
+        local seated = getSeatedPlayers()
+        active = seated and #seated > 1
+    end
+    if not active then
         return
     end
     asyncGatherData({
         guid = self.getGUID(),
+        includeSteamNames = _gameDataKey and true or false,
         callbackFunctionName = '_uploadGameDataCallback'
     })
 end
 
 function _uploadGameDataCallback(data)
-    if not _gameDataKey then
-        return
+    -- Suppress updates if nothing (other than timestamp) changed.
+    if data.crc then
+        if data.crc == _lastCrc then
+            return
+        end
+        _lastCrc = data.crc
     end
-    local url = GAME_DATA_HOST .. '/data?key=' .. _gameDataKey
+
+    local host = GAME_DATA_HOST
+    if _gameDataKey == GAME_DATA_LOCALHOST_KEY then
+        host = GAME_DATA_LOCALHOST
+    end
+
+    local url = host .. '/data'
+    if _gameDataKey then
+        url = url .. '?key=' .. _gameDataKey
+    end
     local function callback(result)
         if result.is_error then
-            print('!gamedata upload failed: ' .. result.error)
+            print('!gamedata error: ' .. result.error)
         end
     end
     WebRequest.post(url, JSON.encode(data), callback)
@@ -1359,6 +1627,43 @@ function _logTable(message, table, depth)
         print(indentedPrefix .. '...')
     end
     print(prefix .. '}')
+end
+
+-------------------------------------------------------------------------------
+
+CRC32 = {
+    _tableData = false
+}
+
+function CRC32._table()
+    if not CRC32._tableData then
+        CRC32._tableData = {}
+        for i = 0, 0xff do
+            local rem = i
+            for _ = 1, 8 do
+                if bit32.band(rem, 1) == 1 then
+                    rem = bit32.rshift(rem, 1)
+                    rem = bit32.bxor(rem, 0xedb88320)
+                else
+                    rem = bit32.rshift(rem, 1)
+                end
+            end
+            CRC32._tableData[i] = rem
+        end
+    end
+    return CRC32._tableData
+end
+
+function CRC32.hash(str)
+    local crc = 0xffffffff
+    local crcTable = CRC32._table()
+    for i = 1, string.len(str) do
+        local c = string.byte(str, i)
+        local crc123 = bit32.rshift(crc, 8)
+        local crc4 = bit32.band(crc, 0xff)
+        crc = bit32.bxor(crc123, crcTable[bit32.bxor(crc4, c)])
+    end
+    return bit32.bxor(crc, 0xffffffff)
 end
 
 -------------------------------------------------------------------------------

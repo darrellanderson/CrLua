@@ -1805,7 +1805,6 @@ function _carrionHeroAbilityCoroutine()
         end
     end
 
-
     -- Start rolling dice.
     -- Separate coroutine, so 'self' can animate hexes while the dice are being rolled.
     startLuaCoroutine(self, 'dimensionalanchor_rollDiceCoroutine')
@@ -1813,29 +1812,24 @@ function _carrionHeroAbilityCoroutine()
     -- Function checks if dice are all still, and if they are maps their values to the ship they rolled for.
     -- If dice are NOT still, just return an object with "waitingOnResults = true"
     local function _processRollResults(diceToShip)
-        --wait for all dice to be settled
-        local allRest = true
+        -- Wait for all dice to be settled
+        local waitingOnResults = false
         for die, _ in pairs(diceToShip) do
             local dieObject = getObjectFromGUID(die)
-            if dieObject ~= nil and dieObject.resting == false then
-                allRest = false
+            if dieObject and not dieObject.resting then
+                waitingOnResults = true
+                break
             end
         end
 
-        if not allRest then
-            return { waitingOnResults = true }
-        end
-
+        -- ALWAYS report a value even if dice aren't resting, in case of timeout.
         local shipToResult = {}
-
         for die, ship in pairs(diceToShip) do
             local dieObject = getObjectFromGUID(die)
-            if dieObject then
-                shipToResult[ship] = dieObject.getValue()
-            end
+            shipToResult[ship] = dieObject and dieObject.getValue() or 0
         end
 
-        return { waitingOnResults = false, shipToResult = shipToResult }
+        return { waitingOnResults = waitingOnResults, shipToResult = shipToResult }
     end
 
     -- For blinking hexes.

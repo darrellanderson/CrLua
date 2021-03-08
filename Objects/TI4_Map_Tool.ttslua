@@ -692,7 +692,7 @@ function saveTilesCoroutine()
     local result = {}
     local maxIndex = 0
     for guid, hex in pairs(guidToHex) do
-        local index = assert(hexToMapStringIndex[hex], 'missing hex ' .. hex)
+        local index = hexToMapStringIndex[hex]  -- can be missing if past TILE_LIMIT
         local tile = assert(guidToTile[guid], 'missing tile ' .. guid)
         if index and tile then
             result[index] = tile
@@ -1173,7 +1173,9 @@ function parseMapString(input)
     assert(type(input) == 'string')
     local buildList = {}
 
-    local centerSystem, ab, rotation = string.match(input, '^{([-]?%d+)([A-H]?)(%d*)}$')
+    input = string.upper(input)
+
+    local centerSystem, ab, rotation = string.match(input, '^{([-]?%d+)([A-H]?)(%d*)}')
     if centerSystem then
         table.insert(buildList, {
             tile = assert(tonumber(centerSystem)),
@@ -1182,7 +1184,7 @@ function parseMapString(input)
         })
         local a,b = string.find(input, '}')
         input = string.sub(input, b + 1)
-    else
+    elseif not string.match(input, '18 ') then
         table.insert(buildList, { tile = MECATOL_TILE })
     end
 

@@ -176,7 +176,7 @@ local _customLayout = {
 			{
 				tag = 'Button',
 				attributes = {
-					id = "politics_Popup",
+					id = "politicsPopup_Popup",
 					color = "black",
 					textcolor="white",
 					text = "Close",
@@ -203,12 +203,11 @@ local _customLayout = {
 					textcolor = "white",
 					text = "Select Faction Technology"
 				}
-
 			},
 			{
 				tag = 'Button',
 				attributes = {
-					id = "technology_Popup",
+					id = "COLORPLACEHOLDERtechnologyPopup_Popup",
 					color = "black",
 					textcolor="white",
 					text = "Close Menu",
@@ -250,7 +249,7 @@ local _customLayout = {
 			{
 				tag = 'Button',
 				attributes = {
-					id = "CARDPLACEHOLDER_secondaryPopup",
+					id = "COLORPLACEHOLDERCARDPLACEHOLDERSecondaryPopup_Popup",
 					color = "black",
 					textcolor="white",
 					text = "Close Menu",
@@ -546,16 +545,12 @@ function onStrategyCardButtonClicked(params)
 	--log("Card:"..card.." Action:"..action .. " Option:"..option.. " Color:".. color)
 
 	--take care of ALL pass and close
-	if (action == "close") or (action == "pass") then
-		if card=="technology" then
-			_closePopupUi(color, color..card.."Popup")
+	if (action == "close") or (action == "pass") or (option == "close") then
+		if action == "Popup" then
+			_closePopupUi(color, card)
+		else
+			_closeMenu(color, card)
 		end
-		_closePopupUi(color, card.."Popup")
-
-		if action == "pass" then
-			_closeMenu(color,card)
-		end
-
 		return
 	end
 
@@ -564,7 +559,6 @@ function onStrategyCardButtonClicked(params)
 	-- or has Yssaril agent available with mahact agent in game.
 	-- would be nice to have alt key to choose to use alternative, but not possible in xml buttons.
 	local capitalizedCardName = string.gsub(card, "^%l", string.upper)
-
 
 	if action == "secondary" and card ~= "leadership" then
 		local altPayment = _getStrategytokenAlternative(color)
@@ -575,6 +569,7 @@ function onStrategyCardButtonClicked(params)
 			end
 		else
 			_openPopupUi(color, color..card.."SecondaryPopup")
+			return
 		end
 	end
 
@@ -591,16 +586,11 @@ function onStrategyCardButtonClicked(params)
 			option = "A "..string.sub(option,i+2,j-1)
 		end
 
-		if localoption == "close" then
-			_closePopupUi(color, color..card.."SecondaryPopup")
-			return
-		end
 		secondarySuccessful = _useStrategytokenAlternative(color, capitalizedCardName, localoption)
 		if secondarySuccessful then
 			_closePopupUi(color, color..card.."SecondaryPopup")
 		end
 	end
-
 
 	-------------------------- Diplomacy ---------------------------------------
 	-------------------------- warfare -----------------------------------------
@@ -657,6 +647,7 @@ function onStrategyCardButtonClicked(params)
 			_dealPoliticsActionCards(color)
 			_closeMenu(color, card)
 		end
+		return
 	end
 
 	-------------------------- Construction ------------------------------------
@@ -814,6 +805,10 @@ function _closeMenu(color, card)
 	end
 
 	local vis = UI.getAttribute(card, "visibility")
+	if vis == nil or vis == "" then
+		return
+	end
+
 	local newVis = vis
 
 	local i, j = string.find(vis, color)
@@ -951,6 +946,7 @@ function _addTechnologyPrimarySecondary(layout)
 		end
 	end
 
+
 	-- move the researchTechnology menu to technologyPopup
 	local techMenu = _deepcopy(layout[technologyIndex])
 	techMenu['attributes']['id'] = 'technologyPopup'
@@ -958,11 +954,17 @@ function _addTechnologyPrimarySecondary(layout)
 	local counter = 1
 	local keepButtons = {}
 	-- remove the "Pass" option, as players may already have spent a strategy token to open this menu
+	-- also prevent "technologyPopup(close) from closing base window"
 	for _,child in ipairs(techMenu["children"]) do
 		if not (child["attributes"]["id"] == "technology_pass") then
+			if (child["attributes"]["id"] == "technology_close") then
+				child["attributes"]["id"] = "technologyPopup_close"
+				child["attributes"]["onClick"] = "genericSilent(close)"
+			end
 			keepButtons[counter] = child
 			counter = counter + 1
 		end
+
 	end
 	techMenu["children"] = keepButtons
 	-- default technology menu is replaced by simple "Primary, Secondary, Pass, Close" menu
@@ -1126,7 +1128,11 @@ function _addAutomationTechPopup(layout, colorTable)
 		local factionPopup = {}
 		factionPopup = _deepcopy(_customLayout["technologyPopupTable"])
 		factionPopup["attributes"].id = string.gsub(factionPopup["attributes"].id, "COLORPLACEHOLDER", color)
-
+		for i,entry in ipairs(factionPopup["children"]) do
+			if entry["attributes"].text == "Close Menu" then
+				entry["attributes"].id = string.gsub(entry["attributes"].id, "COLORPLACEHOLDER", color)
+			end
+		end
 		local faction = _factionHelper.fromColor(color)
 		if not faction then
 			broadcastToAll("_addAutomationTechPopup: no faction found for " .. color, "Red")

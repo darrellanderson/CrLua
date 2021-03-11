@@ -249,7 +249,7 @@ local _customLayout = {
 			{
 				tag = 'Button',
 				attributes = {
-					id = "COLORPLACEHOLDERCARDPLACEHOLDERSecondaryPopup_secondaryPopup",
+					id = "COLORPLACEHOLDERCARDPLACEHOLDERSecondaryPopup_Popup",
 					color = "black",
 					textcolor="white",
 					text = "Close Menu",
@@ -546,7 +546,11 @@ function onStrategyCardButtonClicked(params)
 
 	--take care of ALL pass and close
 	if (action == "close") or (action == "pass") or (option == "close") then
-		_closeMenu(color,card)
+		if action == "Popup" then
+			_closePopupUi(color, card)
+		else
+			_closeMenu(color, card)
+		end
 		return
 	end
 
@@ -571,7 +575,7 @@ function onStrategyCardButtonClicked(params)
 
 	local constructionCommandToken = true
 	local localoption = option
-	
+
 	if action == "secondaryPopup" then
 		action = string.gsub(action, "Popup", "")
 
@@ -582,16 +586,11 @@ function onStrategyCardButtonClicked(params)
 			option = "A "..string.sub(option,i+2,j-1)
 		end
 
-		if localoption == "close" then
-			_closePopupUi(color, color..card.."SecondaryPopup")
-			return
-		end
 		secondarySuccessful = _useStrategytokenAlternative(color, capitalizedCardName, localoption)
 		if secondarySuccessful then
 			_closePopupUi(color, color..card.."SecondaryPopup")
 		end
 	end
-
 
 	-------------------------- Diplomacy ---------------------------------------
 	-------------------------- warfare -----------------------------------------

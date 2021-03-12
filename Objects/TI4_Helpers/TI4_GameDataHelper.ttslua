@@ -463,9 +463,10 @@ function getRound()
 end
 
 function getObjectives()
-    local objectives = Objectives.getCards()
+    local objectives = Objectives.getCards()  -- discovery order
     local deckNameToObjectives = Objectives.groupByDeckName(objectives)
     local result = {}
+
     for deckName, objectives in pairs(deckNameToObjectives) do
         local entry = {}
         for _, objective in ipairs(objectives) do
@@ -476,6 +477,22 @@ function getObjectives()
         -- Do NOT sort, objectives are in discovery order (newly flipped at end).
         result[deckName] = entry
     end
+
+    -- Track public objects off board.
+    result.offBoardPublicObjectives = {}
+    for deckName, objectives in pairs(deckNameToObjectives) do
+        local isPublic = string.match(deckName, '^Public') and true or false
+        if isPublic then
+            for _, objective in ipairs(objectives) do
+                if not Objectives.isOnPublicObjectivesMat(objective) then
+                    local name = objective.getName()
+                    name = string.match(name, '^(.*) %(PoK%)$') or name
+                    table.insert(result.offBoardPublicObjectives, name)
+                end
+            end
+        end
+    end
+
     return result
 end
 
@@ -502,20 +519,11 @@ function colorToObjectives()
     local secretsMat = Objects.getByName('Secrets Mat')
     if secretsMat then
         local bounds = secretsMat.getBounds()
-        local bb = {
-            min = {
-                x = bounds.center.x - bounds.size.x / 2,
-                z = bounds.center.z - bounds.size.z / 2,
-            },
-            max = {
-                x = bounds.center.x + bounds.size.x / 2,
-                z = bounds.center.z + bounds.size.z / 2,
-            },
-        }
+        local bb = _getBoundingBox(secretsMat)
         local colors = _zoneHelper.zones()
         for _, objective in ipairs(objectives) do
             local p = objective.getPosition()
-            if p.x > bb.min.x and p.x < bb.max.x and p.z > bb.min.z and p.z < bb.max.z then
+            if _insideBox(objective, bb) then
                 p = secretsMat.positionToLocal(p)
                 -- Row centers: -8.75, -6.25, ..., 8.75.  Col width: 2.5
                 local col = math.floor((p.x + 8.75 + 0.5) / 2.5) + 1
@@ -901,8 +909,17 @@ Cards = {
 function Cards.getCards()
     local cards = {}
     local inHandGuidSet = _zoneHelper.inHand()
+    local function isCandidate(object)
+        if object.tag ~= 'Card' then
+            return false
+        end
+        if inHandGuidSet[object.getGUID()] or object.held_by_color then
+            return false
+        end
+        return true
+    end
     for _, object in ipairs(getAllObjects()) do
-        if object.tag == 'Card' and not inHandGuidSet[object.getGUID()] then
+        if isCandidate(object) then
             table.insert(cards, object)
         end
     end
@@ -1152,9 +1169,21 @@ function Objectives.getCards()
     local cardNames = {}
     local nameToCard = {}
     local inHandGuidSet = _zoneHelper.inHand()
+    local function isCandidate(object)
+        if object.tag ~= 'Card' then
+            return false
+        end
+        if inHandGuidSet[object.getGUID()] or object.held_by_color then
+            return false
+        end
+        if object.is_face_down then
+            return false
+        end
+        return true
+    end
     local objectiveToDeckName = Objectives._getObjectiveToDeckName()
     for _, object in ipairs(getAllObjects()) do
-        if object.tag == 'Card' and (not inHandGuidSet[object.getGUID()]) and (not object.is_face_down) then
+        if isCandidate(object) then
             local name = object.getName()
             if objectiveToDeckName[name] and not nameToCard[name] then
                 table.insert(cardNames, name)
@@ -1221,26 +1250,50 @@ function Objectives.getRound()
         end
     end
     local inHandGuidSet = _zoneHelper.inHand()
+    local function isCandidate(object)
+        if object.tag ~= 'Card' then
+            return false
+        end
+        if inHandGuidSet[object.getGUID()] or object.held_by_color then
+            return false
+        end
+        if object.is_face_down then
+            return false
+        end
+        local name = object.getName()
+        return publicObjectiveNameSet[name]
+    end
+
     local numObjectives = 0
-    local incentiveProgram = false
     local seen = {}
     for _, object in ipairs(getAllObjects()) do
-        if object.tag == 'Card' and (not object.is_face_down) and (not inHandGuidSet[object.getGUID()]) then
+        if isCandidate(object) and Objectives.isOnPublicObjectivesMat(object) then
             local name = object.getName()
             if publicObjectiveNameSet[name] and not seen[name] then
                 seen[name] = true
                 numObjectives = numObjectives + 1
             end
-            if name == 'Incentive Program' then
-                incentiveProgram = true
-            end
         end
     end
     local round = numObjectives - 1
-    if incentiveProgram then
-        round = round - 1
-    end
     return math.max(round, 1)
+end
+
+function Objectives.isOnPublicObjectivesMat(object)
+    local boxes = {}
+    local function addBoundingBox(name)
+        local object = Objects.getByName(name)
+        if object then
+            table.insert(boxes, _getBoundingBox(object))
+        end
+    end
+    addBoundingBox('Public Objectives I Mat')
+    addBoundingBox('Public Objectives II Mat')
+    for _, box in ipairs(boxes) do
+        if _insideBox(object, box) then
+            return true
+        end
+    end
 end
 
 -------------------------------------------------------------------------------
@@ -1261,8 +1314,25 @@ function Laws.getLawCards()
     local nameToCard = {}
     local inHandGuidSet = _zoneHelper.inHand()
     local objectiveToDeckName = Objectives._getObjectiveToDeckName()
+    local agendaPhaseMat = Objects.getByName('Agenda Phase Mat')
+    local bb = agendaPhaseMat and _getBoundingBox(agendaPhaseMat)
+    local function isCandidate(object)
+        if object.tag ~= 'Card' then
+            return false
+        end
+        if inHandGuidSet[object.getGUID()] or object.held_by_color then
+            return false
+        end
+        if object.is_face_down then
+            return false
+        end
+        if bb and _insideBox(object, bb) then
+            return false
+        end
+        return true
+    end
     for _, object in ipairs(getAllObjects()) do
-        if object.tag == 'Card' and (not inHandGuidSet[object.getGUID()]) and (not object.is_face_down) then
+        if isCandidate(object) then
             local name = object.getName()
             if Laws._lawNameSet[name] and not nameToCard[name] then
                 if not _deckHelper.isDiscard(object.getGUID()) then
@@ -1340,8 +1410,17 @@ function Factions.getLeaderCards()
     end
     local inHandGuidSet = _zoneHelper.inHand()
     local cards = {}
+    local function isCandidate(object)
+        if object.tag ~= 'Card' then
+            return false
+        end
+        if inHandGuidSet[object.getGUID()] then
+            return false
+        end
+        return leaderNameSet[object.getName()]
+    end
     for _, object in ipairs(getAllObjects()) do
-        if object.tag == 'Card' and (not inHandGuidSet[object.getGUID()]) and leaderNameSet[object.getName()] then
+        if isCandidate(object) then
             table.insert(cards, object)
         end
     end
@@ -1350,9 +1429,21 @@ end
 
 function Factions.getAllianceCards()
     local inHandGuidSet = _zoneHelper.inHand()
+    local function isCandidate(object)
+        if object.tag ~= 'Card' then
+            return false
+        end
+        if inHandGuidSet[object.getGUID()] or object.held_by_color then
+            return false
+        end
+        if object.is_face_down then
+            return false
+        end
+        return string.match(object.getName(), '^Alliance')
+    end
     local cards = {}
     for _, object in ipairs(getAllObjects()) do
-        if object.tag == 'Card' and (not inHandGuidSet[object.getGUID()]) then
+        if isCandidate(object) then
             local color = string.match(object.getName(), '^Alliance %((.*)%)$')
             if color then
                 table.insert(cards, object)
@@ -1369,15 +1460,27 @@ Technologies = {}
 --- Get face-up objective card objects (ignoring held cards).
 -- @return table : list of objective card objects.
 function Technologies.getCards()
-    local cards = {}
-    local inHandGuidSet = _zoneHelper.inHand()
     local techNameSet = {}
     for name, _ in pairs(_technologyHelper.getTechNameSet()) do
         techNameSet[name] = true
         techNameSet[name .. ' Ω'] = true
     end
+    local inHandGuidSet = _zoneHelper.inHand()
+    local function isCandidate(object)
+        if object.tag ~= 'Card' then
+            return false
+        end
+        if inHandGuidSet[object.getGUID()] or object.held_by_color then
+            return false
+        end
+        if object.is_face_down then
+            return false
+        end
+        return techNameSet[object.getName()]
+    end
+    local cards = {}
     for _, object in ipairs(getAllObjects()) do
-        if object.tag == 'Card' and (not inHandGuidSet[object.getGUID()]) and (not object.is_face_down) and techNameSet[object.getName()] then
+        if isCandidate(object) then
             table.insert(cards, object)
         end
     end
@@ -1427,6 +1530,27 @@ end
 
 -------------------------------------------------------------------------------
 
+function _getBoundingBox(object)
+    local bounds = object.getBounds()
+    return {
+        min = {
+            x = bounds.center.x - bounds.size.x / 2,
+            z = bounds.center.z - bounds.size.z / 2,
+        },
+        max = {
+            x = bounds.center.x + bounds.size.x / 2,
+            z = bounds.center.z + bounds.size.z / 2,
+        },
+    }
+end
+
+function _insideBox(object, bb)
+    local p = object.getPosition()
+    return p.x > bb.min.x and p.x < bb.max.x and p.z > bb.min.z and p.z < bb.max.z
+end
+
+-------------------------------------------------------------------------------
+
 function onLoad(saveState)
     self.setColorTint({ r = 0.25, g = 0.25, b = 0.25 })
     self.setScale({ x = 2, y = 0.01, z = 2 })
@@ -1443,7 +1567,6 @@ function onLoad(saveState)
     self.setInvisibleTo(invisibleTo)
 
     _state = saveState and string.len(saveState) > 0 and JSON.decode(saveState) or _state
-
 
     if string.find(GAME_DATA_HOST, 'localhost') then
         broadcastToAll('Game data using localhost', 'Red')

@@ -251,7 +251,7 @@ local DECKS = {
                 'Covert Legislation',
                 'Minister of Antiquities',
                 'Search Warrant',
-                'Political Censure',
+                ['Political Censure'] = { score = true },
                 'Representative Government (PoK)',
             },
         },

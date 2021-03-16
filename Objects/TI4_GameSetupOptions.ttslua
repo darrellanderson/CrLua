@@ -1,6 +1,6 @@
 -- @author Darrell for UI generation scripting
 -- @author Milty for game setup
--- #include <~/CrLua/Objects/TI4_GameSetupOptions2>
+-- #include <~/CrLua/Objects/TI4_GameSetupOptions>
 
 local _config = false
 
@@ -257,7 +257,7 @@ function _createUI()
                     toggleGroup('playerCount', { 2, 3, 4, 5, 6, 7, 8 }),
 
                     text('heading', 'Extra map rings'),
-                    toggleGroup('extraRings', { 0, 1, 2 }),
+                    toggleGroup('extraRings', { 0, 1, 2, 3 }),
 
                     toggle('usePoK', 'Prophecy of Kings expansion'),
                     toggle('useCodex1ACs', 'Codex 1 action cards'),

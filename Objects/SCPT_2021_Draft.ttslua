@@ -576,11 +576,15 @@ function movePlayersIntoSlices()
     broadcastToAll('SCPT 2021 Tournament draft: assigning speaker to ' .. speaker, 'Yellow')
     local zoneAttrs = _zoneHelper.zoneAttributes(speaker)
     local pos = {
-        x = zoneAttrs.center,
-        y = zoneAttrs.center + 5,
+        x = zoneAttrs.center.x,
+        y = zoneAttrs.center.y + 5,
         z = zoneAttrs.center.z + 6 * (zoneAttrs.center.z < 0 and 1 or -1)
     }
-    local rot = zoneAttrs.rotation
+    local rot = {
+        x = 0,
+        y = zoneAttrs.rotation.y,
+        z = 0
+    }
     local collide = false
     local fast = false
     speakerToken.setPositionSmooth(pos, collide, fast)

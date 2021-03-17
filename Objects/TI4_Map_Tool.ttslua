@@ -486,6 +486,8 @@ function placeTilesCoroutine()
                     local bag = systemGuidToBag[system.guid]
                     placeTile(system, bag, position, rotation)
                 end
+            elseif system.home then
+                broadcastToAll('cannot place home system tile ' .. tile, 'Red')
             else
                 broadcastToAll('unknown system tile ' .. tile, 'Red')
             end

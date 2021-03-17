@@ -493,26 +493,49 @@ function getObjectives()
         end
     end
 
+    -- Make sure each is unique.
+    for k, v in pairs(result) do
+        local seen = {}
+        local unique = {}
+        for _, name in ipairs(v) do
+            if not seen[name] then
+                seen[name] = true
+                table.insert(unique, name)
+            end
+        end
+        result[k] = unique
+    end
+
     return result
 end
 
 function colorToObjectives()
+    local result = {}
+    local function addResult(color, name)
+        name = string.match(name, '^(.*) %(PoK%)$') or name
+        local entry = result[color]
+        if not entry then
+            entry = {}
+            result[color] = entry
+        end
+        for _, entryValue in ipairs(entry) do
+            if entryValue == name then
+                return
+            end
+        end
+        table.insert(entry, name)
+    end
+
     local objectives = Objectives.getCards()
     local tokens = Tokens.getTokens('Owner')
-    local result = {}
     for _, color in ipairs(_zoneHelper.zones()) do
         local colorTokens = Tokens.filterTokens(tokens, color)
         local objectiveToOverlappingTokens = Objects.overlap(colorTokens, objectives)
-        local entry = {}
         for objective, overlappingTokens in pairs(objectiveToOverlappingTokens) do
             if #overlappingTokens > 0 then
-                local name = objective.getName()
-                name = string.match(name, '^(.*) %(PoK%)$') or name
-                table.insert(entry, name)
+                addResult(color, objective.getName())
             end
         end
-        table.sort(entry)
-        result[color] = entry
     end
 
     -- Also add objectives in color's "Secrets Mat" column.
@@ -529,19 +552,7 @@ function colorToObjectives()
                 local col = math.floor((p.x + 8.75 + 0.5) / 2.5) + 1
                 local color = colors[col]
                 if color then
-                    local entry = result[color] or {}
-                    local name = objective.getName()
-                    name = string.match(name, '^(.*) %(PoK%)$') or name
-                    local found = false
-                    for _, candidate in ipairs(entry) do
-                        if candidate == name then
-                            found = true
-                            break
-                        end
-                    end
-                    if not found then
-                        table.insert(entry, name)
-                    end
+                    addResult(color, objective.getName())
                 end
             end
         end
@@ -1166,8 +1177,6 @@ end
 -- Preserves discovery order.
 -- @return table : list of objective card objects.
 function Objectives.getCards()
-    local cardNames = {}
-    local nameToCard = {}
     local inHandGuidSet = _zoneHelper.inHand()
     local function isCandidate(object)
         if object.tag ~= 'Card' then
@@ -1182,12 +1191,17 @@ function Objectives.getCards()
         return true
     end
     local objectiveToDeckName = Objectives._getObjectiveToDeckName()
+    local cardNames = {}
+    local nameToCards = {}
     for _, object in ipairs(getAllObjects()) do
         if isCandidate(object) then
             local name = object.getName()
-            if objectiveToDeckName[name] and not nameToCard[name] then
-                table.insert(cardNames, name)
-                nameToCard[name] = object
+            if objectiveToDeckName[name] then
+                if not nameToCards[name] then
+                    table.insert(cardNames, name)
+                    nameToCards[name] = {}
+                end
+                table.insert(nameToCards[name], object)
             end
         end
     end
@@ -1198,8 +1212,9 @@ function Objectives.getCards()
     -- Generate object list.
     local cards = {}
     for _, cardName in ipairs(cardNames) do
-        local card = nameToCard[cardName]
-        table.insert(cards, card)
+        for _, card in ipairs(nameToCards[cardName]) do
+            table.insert(cards, card)
+        end
     end
     return cards
 end

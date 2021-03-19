@@ -1322,6 +1322,31 @@ end
 
 -------------------------------------------------------------------------------
 
+--- Make sure system tile is grid aligned and laying flat.
+function lockSystemTile(tileGuid)
+    assert(type(tileGuid) == 'string')
+    local object = getObjectFromGUID(tileGuid)
+    if object then
+        -- Get grid position.
+        local hex = hexFromPosition(object.getPosition())
+        local pos = hexToPosition(hex)
+
+        -- Place so laying flat on table surface.
+        local h = object.getBoundsNormalized().size.y
+        pos.y = _zoneHelper.getTableY() + (h / 2) - 0.01
+
+        -- Rotation (expect y = 0 or 180).
+        local rot = object.getRotation()
+        rot = { x = 0, y = math.floor(rot.y + 0.5), z = 0 }
+
+        object.setPosition(pos)
+        object.setRotation(rot)
+        object.setLock(true)
+    end
+end
+
+-------------------------------------------------------------------------------
+
 -- Heavily distilled hex math based on RedBlobGames excellent hex math.
 local _M = {
     -- F matrix translates hex to position.

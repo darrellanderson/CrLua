@@ -42,7 +42,6 @@ function getHelperClient(helperObjectName)
 end
 local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 local _exploreHelper = getHelperClient('TI4_EXPLORE_HELPER')
-
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
@@ -185,7 +184,7 @@ function rotateMap180()
     end
     local function delayedLock()
         for system, object in pairs(getPlacedSystemToObject(false)) do
-            object.setLock(true)
+            _systemHelper.lockSystemTile(object.getGUID())
         end
     end
     Wait.time(delayedLock, 5)
@@ -209,7 +208,7 @@ function rotateHyperlanes()
     end
     local function delayedLock()
         for system, object in pairs(getPlacedSystemToObject(false)) do
-            object.setLock(true)
+            _systemHelper.lockSystemTile(object.getGUID())
         end
     end
     Wait.time(delayedLock, 5)
@@ -498,11 +497,9 @@ function placeTilesCoroutine()
 end
 
 local function delayedLock(object)
-    local function doLock(object)
-        object.setLock(true)
-        object.use_hands = false
-    end
-    Wait.time(function() doLock(object) end, 3)
+    object.use_hands = false
+    local guid = object.getGUID()
+    Wait.time(function() _systemHelper.lockSystemTile(guid) end, 3)
 end
 
 function placeTile(system, bag, position, rotation)
@@ -785,7 +782,7 @@ function placeCardsCoroutine()
     -- Make sure system tiles are locked, and no longer drawable into hands.
     for system, object in pairs(getPlacedSystemToObject(false)) do
         object.use_hands = false
-        object.setLock(true)
+        _systemHelper.lockSystemTile(object.getGUID())
     end
 
     -- Build a map from planet name to positionS plural, in case repeated.

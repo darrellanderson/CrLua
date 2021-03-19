@@ -1472,7 +1472,8 @@ end
 
 Technologies = {}
 
---- Get face-up objective card objects (ignoring held cards).
+--- Get face-up AND face-down card objects (ignoring held cards).
+-- Face down because might be researched but exhuasted.
 -- @return table : list of objective card objects.
 function Technologies.getCards()
     local techNameSet = {}
@@ -1488,9 +1489,7 @@ function Technologies.getCards()
         if inHandGuidSet[object.getGUID()] or object.held_by_color then
             return false
         end
-        if object.is_face_down then
-            return false
-        end
+        -- allow face down
         return techNameSet[object.getName()]
     end
     local cards = {}

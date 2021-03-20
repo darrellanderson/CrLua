@@ -16,7 +16,7 @@
 -- Setup:
 -- 1. Create (7) roughly balanced slices with the left-equidistant present.
 -- 2. Create 6 numbered and colored slice location / seat tokens.
--- 3. Deal (12) random factions to the pool.
+-- 3. Deal (9) random factions to the pool.
 -- 4. Assign random turn order.
 --
 -- Players snake draft one of [1, 2, 3] above.
@@ -58,24 +58,86 @@ local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 -------------------------------------------------------------------------------
 
 _config = {
-    NUM_SLICES = 8,
-    NUM_FACTIONS = 12,
+    NUM_SLICES = 7,
+    NUM_FACTIONS = 9,
 }
 
 _state = {}
 _deletedItemsBag = false
+_lastScale = false
 
 function onLoad(saveState)
     if saveState and string.len(saveState) > 0 then
         _state = JSON.decode(saveState) or _state
     end
     _deletedItemsBag = _getByName('Bag', 'TI4 Deleted Items')
-    self.addContextMenuItem('setup', function() startLuaCoroutine(self, 'setupCoroutine') end)
-    self.addContextMenuItem('finish', function() startLuaCoroutine(self, 'finishCoroutine') end)
+    --self.addContextMenuItem('setup', doSetup)
+    --self.addContextMenuItem('finish', doFinish)
+    self.addContextMenuItem('reset', doReset)
+
+    self.clearButtons()
+    self.createButton({
+        click_function = 'doSetup',
+        function_owner = self,
+        label          = 'Setup',
+        position       = { x = 0, y = 0.21, z = -0.6 },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1, y = 1, z = 1 },
+        width          = 600,
+        height         = 270,
+        font_size      = 90,
+        tooltip        = 'Place draft slices, factions, and seat tokens',
+    })
+    self.createButton({
+        click_function = 'doReverseTurns',
+        function_owner = self,
+        label          = 'Reverse Turns',
+        position       = { x = 0, y = 0.21, z = 0 },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1, y = 1, z = 1 },
+        width          = 600,
+        height         = 270,
+        font_size      = 90,
+        tooltip        = 'Change next player direction (forward / reverse)',
+    })
+    self.createButton({
+        click_function = 'doFinish',
+        function_owner = self,
+        label          = 'Finish',
+        position       = { x = 0, y = 0.21, z = 0.6 },
+        rotation       = { x = 0, y = 0, z = 0 },
+        scale          = { x = 1, y = 1, z = 1 },
+        width          = 600,
+        height         = 270,
+        font_size      = 90,
+        tooltip        = 'Move players to their drafted seats, factions, and slices (found in the drafting player\'s area)',
+    })
+
+    _maybeDrawBox()
 end
 
 function onSave()
     return JSON.encode(_state)
+end
+
+function onHover(player_color)
+    _maybeDrawBox()
+end
+
+function onPickUp(player_color)
+    _maybeDrawBox()
+end
+
+function onDrop(player_color)
+    _maybeDrawBox()
+end
+
+function _maybeDrawBox()
+    local scale = self.getScale()
+    if not _lastScale or _lastScale.x ~= scale.x or _lastScale.z ~= scale.z then
+        _lastScale = scale
+        Position.drawBox()
+    end
 end
 
 function _getByName(tag, name)
@@ -89,17 +151,41 @@ end
 
 -------------------------------------------------------------------------------
 
+function doReverseTurns()
+    Turns.reverse_order = not Turns.reverse_order
+    local message = Turns.reverse_order and 'reverse' or 'forward'
+    printToAll('Snake order: ' .. message, 'Yellow')
+end
+
+function doSetup()
+    startLuaCoroutine(self, 'setupCoroutine')
+end
+function doFinish()
+    startLuaCoroutine(self, 'finishCoroutine')
+end
+function doReset()
+    startLuaCoroutine(self, 'resetCoroutine')
+end
+
 function setupCoroutine()
     if not _setupHelper.getPoK() then
         broadcastToAll('Please do setup with PoK enabled first', 'Red')
-        return
+        return 1
     end
+
+    -- Put away any existing draft parts (start from scratch).
+    SeatTokens.stow()
+    coroutine.yield(0)
+
+    FactionTokens.stow()
+    coroutine.yield(0)
+
+    SliceTokens.stow()
+    coroutine.yield(0)
 
     -- Get 3 "balanced" blue tiles and 2 red ones.
     _state.tileLists = assert(VolverMilty.makeHands(_config.NUM_SLICES))
-    for _, tileList in ipairs(_state.tileLists) do
-        VolverMilty.addRedTiles(tileList, 2)
-    end
+    VolverMilty.addRedTiles(_state.tileLists, 2)
     coroutine.yield(0)
 
     -- Randomize, separate any adajent anomalies.
@@ -110,15 +196,15 @@ function setupCoroutine()
 
     -- Place slices.
     for i, tileList in ipairs(_state.tileLists) do
-        print('Slice ' .. i .. ': ' .. table.concat(tileList, ', '))
-        local name = 'Draft Slice ' .. i
+        printToAll('Slice ' .. i .. ': ' .. table.concat(tileList, ', '), 'Yellow')
+        local name = 'Slice ' .. i
         local position = Position.draftSlice(i)
         local label = 'Slice ' .. i .. '\n' .. Slice.getLabel(tileList)
-
-        local slice = SliceTokens.spawn(tileList, name, position, label)
+        local slice = SliceTokens.spawn(tileList, name, label, position, self.getRotation())
         local scale = slice.getScale()
         local s = 0.25
         slice.setScale({ x = scale.x * s, y = scale.y, z = scale.z * s })
+        coroutine.yield(0)
         coroutine.yield(0)
     end
     coroutine.yield(0)
@@ -127,7 +213,7 @@ function setupCoroutine()
     for i, color in ipairs(_zoneHelper.zones()) do
         local position = Position.draftSeat(i)
         local label = (i == 1) and 'SPEAKER' or tostring(i)
-        SeatTokens.moveToken(color, position, label)
+        SeatTokens.moveToken(color, label, position, self.getRotation())
         coroutine.yield(0)
     end
     coroutine.yield(0)
@@ -136,8 +222,7 @@ function setupCoroutine()
     FactionTokens.shuffle()
     for i = 1, _config.NUM_FACTIONS do
         local position = Position.draftFaction(i)
-        local rotation = { x = 0, y = 180, z = 0 }
-        FactionTokens.placeRandomToken(position, rotation)
+        FactionTokens.placeRandomToken(position, self.getRotation())
         coroutine.yield(0)
     end
     coroutine.yield(0)
@@ -154,36 +239,207 @@ function setupCoroutine()
     Turns.order = order
     Turns.turn_color = order[1]
     Turns.enable = true
+    printToAll('Draft order: ' .. table.concat(order, ', '), 'Yellow')
 
     return 1
 end
 
 function finishCoroutine()
+    if not _setupHelper.getPoK() then
+        broadcastToAll('SCPT draft: please do setup with PoK enabled first', 'Red')
+        return 1
+    end
 
-    local zoneColorToPlayer = {}
-    local zoneColorToSlice = {}
-    local zoneColorToFaction = {}
+    -- Gather per-player choices.
+    local errors = false
+    local colorToChoices = {}
+    for _, color in ipairs(_zoneHelper.zones()) do
+        colorToChoices[color] = {
+            player = false,
+            sliceTiles = false,
+            factionTokenName = false,
+            seatColor = false
+        }
+    end
 
-    -- XXX TODO
-
-    -- Move players to their chosen seat.
-    -- TODO ONLY FOR ZONES() COLORS
-    local currentColorToPlayer = {}
     for _, player in ipairs(Player.getPlayers()) do
-        currentColorToPlayer[player.color] = player
-        player.changeColor('Grey')
+        local color = player.color
+        local choices = color and colorToChoices[color]
+        if choices then
+            choices.player = player
+        end
     end
     coroutine.yield(0)
 
+    for _, object in ipairs(SliceTokens.getAll()) do
+        local zone = _zoneHelper.zoneFromPosition(object.getPosition())
+        local choices = zone and colorToChoices[zone]
+        if choices then
+            if choices.sliceTiles then
+                errors = errors or {}
+                table.insert(errors, zone .. ' has multiple slice tokens')
+            else
+                local sliceIndex = SliceTokens.getSliceIndex(object)
+                local sliceTiles = _state.tileLists[sliceIndex]
+                choices.sliceTiles = assert(sliceTiles)
+            end
+        end
+    end
+    for zone, choices in pairs(colorToChoices) do
+        if not choices.sliceTiles then
+            errors = errors or {}
+            table.insert(errors, zone .. ' does not have a slice token')
+        end
+    end
+    coroutine.yield(0)
 
-    -- Move slices.
-    -- Select factions on the unpack tool.
-    -- Assign speaker to slice token #1.
+    for _, object in ipairs(FactionTokens.getAll()) do
+        local zone = _zoneHelper.zoneFromPosition(object.getPosition())
+        local choices = zone and colorToChoices[zone]
+        if choices then
+            if choices.factionTokenName then
+                errors = errors or {}
+                table.insert(errors, zone .. ' has multiple faction tokens')
+            else
+                local name = object.getName()
+                local factionTokenName = string.match(name, '^(.*) Faction Token$')
+                choices.factionTokenName = assert(factionTokenName)
+            end
+        end
+    end
+    for zone, choices in pairs(colorToChoices) do
+        if not choices.factionTokenName then
+            errors = errors or {}
+            table.insert(errors, zone .. ' does not have a faction token')
+        end
+    end
+    coroutine.yield(0)
 
+    for _, object in ipairs(SeatTokens.getAll()) do
+        local zone = _zoneHelper.zoneFromPosition(object.getPosition())
+        local choices = zone and colorToChoices[zone]
+        if choices then
+            if choices.seatColor then
+                errors = errors or {}
+                table.insert(errors, zone .. ' has multiple seat/color tokens')
+            else
+                local color = object.getName()
+                if colorToChoices[color] then
+                    choices.seatColor = color
+                end
+            end
+        end
+    end
+    for zone, choices in pairs(colorToChoices) do
+        if not choices.seatColor then
+            errors = errors or {}
+            table.insert(errors, zone .. ' does not have a valid seat token')
+        end
+    end
+    coroutine.yield(0)
+
+    -- Abort if anything is amiss.
+    if errors then
+        local message = 'Error: ' .. table.concat(errors, ', ')
+        broadcastToAll(message, 'Red')
+        return 1
+    end
+
+    for i, color in ipairs(_zoneHelper.zones()) do
+        local choices = assert(colorToChoices[color])
+        local message = {
+            '(' .. i .. ')',
+            choices.player and choices.player.steam_name or color,
+            'drafted',
+            choices.factionTokenName,
+            'in',
+            choices.seatColor,
+            'with slice {',
+            table.concat(choices.sliceTiles, ', '),
+            '}'
+        }
+        message = table.concat(message, ' ')
+        printToAll(message, color)
+    end
+    coroutine.yield(0)
+
+    -- Put away draft items.
     SeatTokens.stow()
     coroutine.yield(0)
 
     FactionTokens.stow()
+    coroutine.yield(0)
+
+    SliceTokens.stow()
+    coroutine.yield(0)
+
+    -- Move players to their chosen seat.
+    for _, choices in pairs(colorToChoices) do
+        if choices.player then
+            choices.player.changeColor('Grey')
+            coroutine.yield(0)
+            coroutine.yield(0)
+        end
+    end
+    for _, choices in pairs(colorToChoices) do
+        if choices.player then
+            choices.player.changeColor(choices.seatColor)
+            coroutine.yield(0)
+            coroutine.yield(0)
+        end
+    end
+
+    -- Move slices.
+    for _, choices in pairs(colorToChoices) do
+        local seatColor = assert(choices.seatColor)
+        local zoneAttrs = assert(_zoneHelper.zoneAttributes(seatColor))
+        local tiles = assert(choices.sliceTiles)
+        local p0 = assert(zoneAttrs.homeSystemPosition)
+        local applyRotation = true
+        Slice.placeTiles(tiles, p0, applyRotation)
+        coroutine.yield(0)
+        coroutine.yield(0)
+    end
+
+    -- Setup faction on selector.
+    for _, choices in pairs(colorToChoices) do
+        local seatColor = assert(choices.seatColor)
+        local factionTokenName = assert(choices.factionTokenName)
+        _selectFaction(seatColor, factionTokenName)
+        coroutine.yield(0)
+    end
+
+    -- Assign speaker to slice token #1.
+    local speakerToken = _getByName('Generic', 'Speaker Token')
+    if speakerToken then
+        local zoneAttrs = _zoneHelper.zonesAttributes()[1]
+        local pos = {
+            x = zoneAttrs.center.x,
+            y = zoneAttrs.center.y + 5,
+            z = zoneAttrs.center.z + 6 * (zoneAttrs.center.z < 0 and 1 or -1)
+        }
+        local rot = {
+            x = 0,
+            y = zoneAttrs.rotation.y,
+            z = 0
+        }
+        local collide = false
+        local fast = false
+        speakerToken.setPositionSmooth(pos, collide, fast)
+        speakerToken.setRotationSmooth(rot, collide, fast)
+    end
+
+    return 1
+end
+
+function resetCoroutine()
+    SeatTokens.stow()
+    coroutine.yield(0)
+
+    FactionTokens.stow()
+    coroutine.yield(0)
+
+    SliceTokens.stow()
     coroutine.yield(0)
 
     return 1
@@ -191,45 +447,102 @@ end
 
 -------------------------------------------------------------------------------
 
-Position = {}
+Position = {
+    -- p0 is relative to self top-right corner.
+    p0 = { x = -3, y = 3, z = 3 },
+    dx = -5,
+    dz = 5,
+
+    SLICE_COLS = 3,
+    FACTION_COLS = 3,
+    SEAT_COLS = 2,
+}
+
+function Position._pos(col, row)
+    -- Apply scale to p0, but not to offset.
+    local bounds = self.getBoundsNormalized().size
+    local scale = self.getScale()
+    local p0 = {
+        x = ((-bounds.x / 2) + Position.p0.x) / scale.x,
+        y = Position.p0.y / scale.y,
+        z = ((-bounds.z / 2) + Position.p0.z) / scale.z,
+    }
+    local offset = {
+        x = col * Position.dx / scale.x,
+        y = 0,
+        z = row * Position.dz / scale.z,
+    }
+    local localPos = {
+        x = p0.x + offset.x,
+        y = p0.y + offset.y,
+        z = p0.z + offset.z,
+    }
+    return self.positionToWorld(localPos)
+end
 
 --- Where to place draftable slices during setup.
 -- @param i (number) : slice index.
 -- @return table : {xyz} position.
 function Position.draftSlice(i)
-    local y = _zoneHelper.getTableY() + 5
-    local p0 = { x = 105.00, y = y, z = 6.06}
-    local dx = 21 / 4
-    local dz = -24.25 / 4
-    local col = (i - 1) % 2
-    local row = math.floor((i - 1) / 2)
-    return {
-        x = p0.x + col * dx,
-        y = p0.y,
-        z = p0.z + row * dz
-    }
+    local col = (i - 1) % Position.SLICE_COLS
+    local row = math.floor((i - 1) / Position.SLICE_COLS)
+    return Position._pos(col, row)
 end
 
 --- Where to place draftable factions during setup.
 -- @param i (number) : faction index.
 -- @return table : {xyz} position.
 function Position.draftFaction(i)
-    return {
-        x = i * 3,
-        y = 5,
-        z = 2
-    }
+    local col = (i - 1) % Position.FACTION_COLS
+    local row = math.floor((i - 1) / Position.FACTION_COLS)
+    col = col + Position.SLICE_COLS
+    return Position._pos(col, row)
 end
 
 --- Where to place draftable seats during setup.
 -- @param i (number) : seat index.
 -- @return table : {xyz} position.
 function Position.draftSeat(i)
-    return {
-        x = i * 3,
-        y = 5,
-        z = -2
-    }
+    local col = (i - 1) % Position.SEAT_COLS
+    local row = math.floor((i - 1) / Position.SEAT_COLS)
+    col = col + Position.SLICE_COLS + Position.FACTION_COLS
+    return Position._pos(col, row)
+end
+
+function Position.drawBox()
+    local cols = Position.SLICE_COLS + Position.FACTION_COLS + Position.SEAT_COLS
+    local rows = 0
+    rows = math.max(rows, math.ceil(_config.NUM_SLICES / Position.SLICE_COLS))
+    rows = math.max(rows, math.ceil(_config.NUM_FACTIONS / Position.FACTION_COLS))
+    rows = math.max(rows, math.ceil(#_zoneHelper.zones() / Position.SEAT_COLS))
+
+    local bounds = self.getBoundsNormalized().size
+    local scale = self.getScale()
+
+    local left = (bounds.x / 2) / scale.x
+    local top = (-bounds.z / 2) / scale.z
+    local right = (-(bounds.x / 2) + Position.p0.x + Position.dx * (cols - 0.5)) / scale.x
+    local bottom = (-(bounds.z / 2) + Position.p0.z + Position.dz * (rows - 0.5)) / scale.z
+
+    local thickness = 0.1
+    right = right + thickness
+    bottom = bottom + thickness
+
+    self.setVectorLines({
+        {
+            points         = {
+                { x = left, y = 0.1, z = top },
+                { x = right, y = 0.1, z = top },
+                { x = right, y = 0.1, z = bottom },
+                { x = left, y = 0.1, z = bottom },
+            },
+            color          = 'White',
+            thickness      = thickness,
+            rotation       = { x = 0, y = 0, z = 0 },
+            loop           = true,
+            square         = true
+        },
+    })
 end
 
 -------------------------------------------------------------------------------
@@ -246,8 +559,6 @@ VolverMilty = {
     minI = false,
     minTotal = 9,
     maxTotal = 13,
-
-    _redTiles = false,
 }
 
 function VolverMilty.permute(list)
@@ -343,13 +654,14 @@ function VolverMilty._verifyHand(tileTable)
     return optR >= minR and optI >= minI and optR + optI >= minTotal and optR + optI <= maxTotal
 end
 
-function VolverMilty.addRedTiles(tileTable, count)
-    if not VolverMilty._redTiles then
-        VolverMilty._redTiles = SystemTiles.getRedTiles()
-        VolverMilty.permute(VolverMilty._redTiles)
-    end
-    for _ = 1, count do
-        table.insert(tileTable, table.remove(VolverMilty._redTiles))
+function VolverMilty.addRedTiles(hands, count)
+    local redTiles = SystemTiles.getRedTiles()
+    VolverMilty.permute(redTiles)
+    for _, hand in ipairs(hands) do
+        for _ = 1, count do
+            local tile = assert(table.remove(redTiles))
+            table.insert(hand, tile)
+        end
     end
 end
 
@@ -359,26 +671,40 @@ SliceTokens = {}
 
 --- Create a single object with the home system (grey) and slice tiles,
 -- merging tiles into it as child objects.  The overall slice has a safe guid.
-function SliceTokens.spawn(tiles, name, position, label)
-    local rotation = { x = 0, y = 180, z = 0 }
+function SliceTokens.spawn(tiles, name, label, position, rotation)
+    assert(type(tiles) == 'table')
+    assert(type(name) == 'string')
+    assert(type(label) == 'string')
+    assert(type(position) == 'table')
+    assert(type(rotation) == 'table')
+
+    local spawnRotation = { x = 0, y = 180, z = 0 }
     local scale = { x = 1.4, y = 1, z = 1.4 }  -- removes gutter
+
+    -- Use a grid aligned position, move to requested position later
+    -- (getTilePosition forces grid alignment).
+    local positionGrid = Slice._getTilePosition(0, position, false)
 
     -- Place a anchor at center so rotation feels natural.
     -- Bury anchor inside other objects.  Do not use the center tile, because
     -- want to make sure have a unique GUID (not shared with a system tile).
-    local anchor = SliceTokens._spawnHex(position, rotation, false)
+    local anchor = SliceTokens._spawnHex(positionGrid, spawnRotation, false)
     anchor.setScale({ x = 1, y = 0.5, z = 1 })
     anchor.use_grid = false
     anchor.use_snap_points = true
+    if name then
+        anchor.setName(name)
+    end
 
-    -- Home system is shifted.
+    -- Home system is "south" of center by one grid unit.
     local homePos = {
-        x = position.x,
-        y = position.y,
-        z = position.z - 6.06
+        x = positionGrid.x,
+        y = positionGrid.y,
+        z = positionGrid.z - 6.06
     }
 
-    local home = SliceTokens._spawnHex(homePos, rotation, label)
+    -- Label gets dropped when attaching, place label on anchor later.
+    local home = SliceTokens._spawnHex(homePos, spawnRotation, false)
     home.setScale(scale)
     if _deletedItemsBag then
         _deletedItemsBag.call('ignoreGuid', home.getGUID())
@@ -387,7 +713,7 @@ function SliceTokens.spawn(tiles, name, position, label)
 
     for i, tile in ipairs(tiles) do
         local tilePos = Slice._getTilePosition(i, homePos, false)
-        local tileObject = SliceTokens._cloneSystemTile(tile, tilePos, rotation)
+        local tileObject = SliceTokens._cloneSystemTile(tile, tilePos, spawnRotation)
         tileObject.setScale(scale)
         if _deletedItemsBag then
             _deletedItemsBag.call('ignoreGuid', tileObject.getGUID())
@@ -395,10 +721,32 @@ function SliceTokens.spawn(tiles, name, position, label)
         anchor.addAttachment(tileObject)
     end
 
+    if label then
+        anchor.createButton({
+            click_function = 'doNothing',
+            function_owner = self,
+            label          = label,
+            position       = { x = 0, y = 0.31, z = 6.06 },
+            rotation       = { x = 0, y = 0, z = 0 },
+            scale          = { x = 1, y = 1, z = 1 },
+            width          = 0,
+            height         = 0,
+            font_size      = 400,
+            font_color     = { r = 0, g = 0, b = 0 }
+        })
+
+    end
+
+    anchor.setPosition(position)
+    anchor.setRotation(rotation)
     return anchor
 end
 
 function SliceTokens._spawnHex(position, rotation, label)
+    assert(type(position) == 'table')
+    assert(type(rotation) == 'table')
+    assert((not label) or type(label) == 'string')
+
     local params = {
         mesh = 'http://cloud-3.steamusercontent.com/ugc/1495712136739988324/528952D008E642AAC461C7B53CFD1CBE16C62F15/',
         collider = 'http://cloud-3.steamusercontent.com/ugc/1495712136739988406/0EF61A7C53392D9A4F95900FE7274EF978D24B84/',
@@ -416,12 +764,14 @@ function SliceTokens._spawnHex(position, rotation, label)
     })
     hex.setCustomObject(params)
     hex.setColorTint('Grey')
+    hex.use_grid = false
+    hex.use_snap_points = false
     if label then
         hex.createButton({
             click_function = 'doNothing',
             function_owner = self,
             label          = label,
-            position       = { x = 0, y = 0.21, z = 0 },
+            position       = { x = 0, y = 1.35, z = 0 },
             rotation       = { x = 0, y = 0, z = 0 },
             scale          = { x = 1, y = 1, z = 1 },
             width          = 0,
@@ -442,7 +792,6 @@ function SliceTokens._cloneSystemTile(tile, position, rotation)
     if not tileData then
         error('Spawn.tileClone: missing tile ' .. tile)
     end
-    tileData.GUID = self.getGUID()  -- allocate a new GUID
     local tileObject = spawnObjectData({
         data              = tileData,
         position          = position,
@@ -451,7 +800,32 @@ function SliceTokens._cloneSystemTile(tile, position, rotation)
         sound             = false,
         snap_to_grid      = false,
     })
+    tileObject.use_grid = false
+    tileObject.use_snap_points = false
     return tileObject
+end
+
+function SliceTokens.getSliceIndex(sliceToken)
+    return tonumber(string.match(sliceToken.getName(), '^Slice (%d+)$'))
+end
+
+function SliceTokens.getAll()
+    local result = {}
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Generic' and SliceTokens.getSliceIndex(object) then
+            table.insert(result, object)
+        end
+    end
+    return result
+end
+
+function SliceTokens.stow()
+    for _, object in ipairs(SliceTokens.getAll()) do
+        if _deletedItemsBag then
+            _deletedItemsBag.call('ignoreGuid', object.getGUID())
+        end
+        destroyObject(object)
+    end
 end
 
 -------------------------------------------------------------------------------
@@ -475,19 +849,25 @@ function SeatTokens._getBag()
     error('SeatTokens._getBag: missing "' .. SeatTokens.BAG_NAME .. '"')
 end
 
-function SeatTokens.moveToken(color, position, label)
+function SeatTokens.moveToken(color, label, position, rotation)
+    assert(type(color) == 'string')
+    assert(type(label) == 'string')
+    assert(type(position) == 'table')
+    assert(type(rotation) == 'table')
+
     local token = _getByName('GoPiece', color)
     if token then
         local collide = false
         local fast = true
         token.setPositionSmooth(position, collide, fast)
+        token.setRotationSmooth(rotation, collide, fast)
     else
         local bag = SeatTokens._getBag()
         for _, entry in ipairs(bag.getObjects()) do
             if entry.name == color then
                 token = bag.takeObject({
                     position          = position,
-                    rotation          = { x = 0, y = 180, z = 0 },
+                    rotation          = rotation,
                     smooth            = true,
                     guid              = entry.guid
                 })
@@ -791,9 +1171,9 @@ end
 --- Get position given the home system position and tile index.
 -- Optionally apply slice rotation to account for map orientation.
 function Slice._getTilePosition(i, p0, applyRotation)
-    assert(type(i) == 'number')
-    assert(type(p0) == 'table')
-    assert(type(applyRotation) == 'boolean')
+    assert(type(i) == 'number', 'bad i')
+    assert(type(p0) == 'table', 'bad p0')
+    assert(type(applyRotation) == 'boolean', 'bad applyRotation')
 
     local offset = { x = 0, z = 0 }
     if i > 0 then
@@ -845,7 +1225,7 @@ end
 
 --- Place system tiles, find tiles in bags or on table.
 function Slice.placeTiles(tiles, homeSystemPosition, applyRotation)
-    assert(type(offsetToTile) == 'table')
+    assert(type(tiles) == 'table')
     assert(type(homeSystemPosition) == 'table')
     assert(type(applyRotation) == 'boolean')
 
@@ -854,6 +1234,71 @@ function Slice.placeTiles(tiles, homeSystemPosition, applyRotation)
         local rot = { x = 0, y = 180, z = 0 }
         SystemTiles.placeTile(tile, pos, rot)
     end
+end
+
+-------------------------------------------------------------------------------
+
+function _selectFaction(color, factionTokenName)
+    assert(type(color) == 'string' and type(factionTokenName) == 'string')
+
+    local factionSelector = false
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        if name == 'Faction Selector' then
+            local zone = _zoneHelper.zoneFromPosition(object.getPosition())
+            if zone == color then
+                factionSelector = object
+                break
+            end
+        end
+    end
+    assert(factionSelector, 'missing faction selector for ' .. color)
+
+    -- Requires a mod update for this to be available, fall through to the hack way.
+    if factionSelector.getVar('selectFaction') then
+        factionSelect.call('selectFaction', factionTokenName)
+        return
+    end
+
+    -- From here to the end will be removed once the faction selector has the new method.
+    -- The faction selector has its own faction ids, sigh.
+    local FACTION_ID_AND_TOKEN_NAMES = {
+        { id = 'Arborec', tokenName = 'Arborec' },
+        { id = 'Letnev', tokenName = 'Barony of Letnev' },
+        { id = 'Saar', tokenName = 'Clan of Saar' },
+        { id = 'Muaat', tokenName = 'Embers of Muaat' },
+        { id = 'Hacan', tokenName = 'Emirates of Hacan' },
+        { id = 'Sol', tokenName = 'Federation of Sol' },
+        { id = 'Creuss', tokenName = 'Ghosts of Creuss' },
+        { id = 'L1Z1X', tokenName = 'L1Z1X Mindnet' },
+        { id = 'Mentak', tokenName = 'Mentak Coalition' },
+        { id = 'Naalu', tokenName = 'Naalu Collective' },
+        { id = 'Nekro', tokenName = 'Nekro Virus' },
+        { id = 'Sardakk', tokenName = "Sardakk N'orr", },
+        { id = 'JolNar', tokenName = 'Universities of Jol-Nar' },
+        { id = 'Winnu', tokenName = 'Winnu' },
+        { id = 'Xxcha', tokenName = 'Xxcha Kingdom' },
+        { id = 'Yin', tokenName = 'Yin Brotherhood' },
+        { id = 'Yssaril', tokenName = 'Yssaril Tribes' },
+        { id = 'Argent', tokenName = 'Argent Flight', pok = true },
+        { id = 'Cabal', tokenName = "Vuil'raith Cabal", pok = true },
+        { id = 'Empyrean', tokenName = 'Empyrean', pok = true },
+        { id = 'Mahact', tokenName = 'Mahact Gene-Sorcerers', pok = true },
+        { id = 'Nomad', tokenName = 'Nomad', pok = true },
+        { id = 'NRA', tokenName = 'Naaz-Rokha Alliance', pok = true },
+        { id = 'Titans', tokenName = 'Titans of Ul', pok = true },
+    }
+    local id = false
+    for _, entry in ipairs(FACTION_ID_AND_TOKEN_NAMES) do
+        if entry.tokenName == factionTokenName then
+            id = entry.id
+            break
+        end
+    end
+    assert(id, 'missing id for "' .. factionTokenName .. '"')
+
+    local clickFunction = 'selectFaction_' .. id
+    factionSelector.call(clickFunction)
 end
 
 -------------------------------------------------------------------------------

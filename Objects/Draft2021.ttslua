@@ -73,7 +73,7 @@ function onLoad(saveState)
     _deletedItemsBag = _getByName('Bag', 'TI4 Deleted Items')
     --self.addContextMenuItem('setup', doSetup)
     --self.addContextMenuItem('finish', doFinish)
-    self.addContextMenuItem('reset', doReset)
+    self.addContextMenuItem('Reset', doReset)
 
     self.clearButtons()
     self.createButton({
@@ -117,7 +117,7 @@ function onLoad(saveState)
 end
 
 function onSave()
-    return JSON.encode(_state)
+    return _state and JSON.encode(_state)
 end
 
 function onHover(player_color)
@@ -197,9 +197,9 @@ function setupCoroutine()
     -- Place slices.
     for i, tileList in ipairs(_state.tileLists) do
         printToAll('Slice ' .. i .. ': ' .. table.concat(tileList, ', '), 'Yellow')
-        local name = 'Slice ' .. i
+        local name = SliceTokens.getSliceName(i)
         local position = Position.draftSlice(i)
-        local label = 'Slice ' .. i .. '\n' .. Slice.getLabel(tileList)
+        local label = name .. '\n' .. Slice.getLabel(tileList)
         local slice = SliceTokens.spawn(tileList, name, label, position, self.getRotation())
         local scale = slice.getScale()
         local s = 0.25
@@ -656,7 +656,7 @@ end
 
 function VolverMilty.addRedTiles(hands, count)
     local redTiles = SystemTiles.getRedTiles()
-    VolverMilty.permute(redTiles)
+    redTiles = VolverMilty.permute(redTiles)
     for _, hand in ipairs(hands) do
         for _ = 1, count do
             local tile = assert(table.remove(redTiles))
@@ -806,7 +806,17 @@ function SliceTokens._cloneSystemTile(tile, position, rotation)
 end
 
 function SliceTokens.getSliceIndex(sliceToken)
-    return tonumber(string.match(sliceToken.getName(), '^Slice (%d+)$'))
+    local letter = string.match(sliceToken.getName(), '^Slice (.)$')
+    if letter then
+        local startPos, endPos = string.find('ABCDEFGHIJKLMNOPQRSTUVWXYZ', letter)
+        return startPos
+    end
+end
+
+function SliceTokens.getSliceName(index)
+    assert(type(index) == 'number')
+    local letter = string.sub('ABCDEFGHIJKLMNOPQRSTUVWXYZ', index, index)
+    return 'Slice ' .. assert(letter)
 end
 
 function SliceTokens.getAll()
@@ -1140,30 +1150,77 @@ function Slice.randomizeAndFixAdjacentAnomalies(tiles)
             anomalySet[tile] = true
         end
     end
-
     local nameToIndex = {}
     for i, offset in ipairs(Slice.OFFSETS) do
         nameToIndex[offset.name] = i
     end
 
-    local function moveAnomalyNeighbor(moveTile, neighborTile, moveDestination)
-        local moveIdx = assert(nameToIndex[moveTile])
-        local neighborIdx = assert(nameToIndex[neighborTile])
-        local moveDstIdx = assert(nameToIndex[moveDestination])
-        local a = assert(tiles[moveIdx])
-        local b = assert(tiles[neighborIdx])
-        local c = assert(tiles[moveDstIdx])
-        if anomalySet[a] and anomalySet[b] then
-            tiles[moveIdx] = c
-            tiles[moveDstIdx] = a
+    local swapRules = {
+        {
+            check1 = 'leftOfHome',
+            check2 = 'leftEquidistant',
+            swaps = {
+                { 'leftOfHome', 'rightOfHome' },
+                { 'leftEquidistant', 'rightOfHome' },
+                { 'leftEquidistant', 'frontFurther' },
+            },
+        },
+        {
+            check1 = 'leftOfHome',
+            check2 = 'frontOfHome',
+            swaps = {
+                { 'frontOfHome', 'frontFurther' },
+                { 'frontOfHome', 'rightOfHome' },
+            },
+        },
+        {
+            check1 = 'frontOfHome',
+            check2 = 'frontFurther',
+            swaps = {
+                { 'frontOfHome', 'leftOfHome' },
+                { 'frontOfHome', 'rightOfHome' },
+            },
+        },
+        {
+            check1 = 'frontOfHome',
+            check2 = 'leftEquidistant',
+            swaps = {
+                { 'frontOfHome', 'rightOfHome' },
+            },
+        },
+        {
+            check1 = 'frontOfHome',
+            check2 = 'rightOfHome',
+            swaps = {
+                { 'frontOfHome', 'leftOfHome' },
+                { 'frontOfHome', 'leftEquidistant' },
+                { 'frontOfHome', 'frontFurther' },
+            },
+        },
+        {
+            check1 = 'leftEquidistant',
+            check2 = 'frontFurther',
+            swaps = {
+                { 'leftEquidistant', 'leftOfHome' },
+                { 'leftEquidistant', 'rightOfHome' },
+                { 'frontFurther', 'rightOfHome' },
+            },
+        },
+    }
+    for _, swapRule in ipairs(swapRules) do
+        local check1 = assert(tiles[nameToIndex[swapRule.check1]])
+        local check2 = assert(tiles[nameToIndex[swapRule.check2]])
+        if anomalySet[check1] and anomalySet[check2] then
+            math.randomseed(os.time())
+            local swap = assert(swapRule.swaps[math.random(1, #swapRule.swaps)])
+            local index1 = assert(nameToIndex[swap[1]])
+            local index2 = assert(nameToIndex[swap[2]])
+            local tile1 = tiles[index1]
+            local tile2 = tiles[index2]
+            tiles[index1] = tile2
+            tiles[index2] = tile1
         end
     end
-    moveAnomalyNeighbor('frontOfHome', 'leftOfHome', 'frontFurther')
-    moveAnomalyNeighbor('frontOfHome', 'rightOfHome', 'frontFurther')
-    moveAnomalyNeighbor('frontOfHome', 'leftEquidistant', 'rightOfHome')
-    moveAnomalyNeighbor('frontOfHome', 'frontFurther', 'leftOfHome')
-    moveAnomalyNeighbor('leftEquidistant', 'leftOfHome', 'frontFurther')
-    moveAnomalyNeighbor('leftEquidistant', 'frontFurther', 'leftOfHome')
 
     return tiles
 end

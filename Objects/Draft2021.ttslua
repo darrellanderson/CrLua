@@ -549,6 +549,10 @@ end
 
 -------------------------------------------------------------------------------
 
+-- Tile allocation system that ensures players get balanced tile hand.
+-- Allocates tiles from three tiers, with minimum and maximum spends for resources/influence.
+-- @author Volverbot for design
+-- @author Milty for scripting and design
 VolverMilty = {
     tier1 = { 27, 28, 35, 37, 38, 69, 72, 75 },
     tier2 = { 26, 29, 30, 33, 34, 62, 64, 65, 66, 70, 71, 74, 76 },

@@ -67,6 +67,8 @@ _deletedItemsBag = false
 _lastScale = false
 
 function onLoad(saveState)
+    math.randomseed(os.time())
+
     if saveState and string.len(saveState) > 0 then
         _state = JSON.decode(saveState) or _state
     end
@@ -563,7 +565,6 @@ VolverMilty = {
 
 function VolverMilty.permute(list)
     assert(type(list) == 'table')
-    math.randomseed(os.time())
     local shuffled = {}
     for i, v in ipairs(list) do
         local j = math.random(1, #shuffled + 1)
@@ -1211,7 +1212,6 @@ function Slice.randomizeAndFixAdjacentAnomalies(tiles)
         local check1 = assert(tiles[nameToIndex[swapRule.check1]])
         local check2 = assert(tiles[nameToIndex[swapRule.check2]])
         if anomalySet[check1] and anomalySet[check2] then
-            math.randomseed(os.time())
             local swap = assert(swapRule.swaps[math.random(1, #swapRule.swaps)])
             local index1 = assert(nameToIndex[swap[1]])
             local index2 = assert(nameToIndex[swap[2]])

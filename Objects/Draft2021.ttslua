@@ -66,6 +66,33 @@ _state = {}
 _deletedItemsBag = false
 _lastScale = false
 
+local BUTTONS = {
+    {
+        stateful = true,
+        id = 'setup',
+        label1 = 'Setup',
+        function1 = 'confirmSetup',
+        label2 = 'CLICK AGAIN\nTO CONFIRM',
+        function2 = 'doSetup'
+    },
+    {
+        stateful = false,
+        id = 'reverseTurns',
+        label1 = 'Deal Action Cards',
+        function1 = 'doReverseTurns',
+    },
+    {
+        stateful = true,
+        id = 'finish',
+        label1 = 'Finish',
+        function1 = 'confirmFinish',
+        label2 = 'CLICK AGAIN\nTO CONFIRM',
+        function2 = 'doFinish'
+    }
+}
+
+local _buttonIsState2 = {}
+
 function onLoad(saveState)
     math.randomseed(os.time())
 
@@ -115,6 +142,7 @@ function onLoad(saveState)
         tooltip        = 'Move players to their drafted seats, factions, and slices (found in the drafting player\'s area)',
     })
 
+    resetButtons()
     _maybeDrawBox()
 end
 
@@ -153,6 +181,48 @@ end
 
 -------------------------------------------------------------------------------
 
+function doNothing()
+end
+
+function resetButtons()
+    for i, values in ipairs(BUTTONS) do
+        if values.stateful then
+            local color = _buttonIsState2[values.id] and { r = 1, g = 0, b = 0 } or { r = 1, g = 1, b = 1 }
+            self.editButton({
+                index          = i - 1,
+                click_function = _buttonIsState2[values.id] and values.function2 or values.function1,
+                label          = _buttonIsState2[values.id] and values.label2 or values.label1,
+                color          = color,
+            })
+        end
+    end
+end
+
+function confirmSetup()
+    _confirm('setup')
+end
+
+function confirmFinish()
+    _confirm('finish')
+end
+
+function _confirm(buttonId)
+    _buttonIsState2[buttonId] = true
+    resetButtons()
+
+    local function delayedReset()
+        _reset(buttonId)
+    end
+    Wait.time(delayedReset, 5)
+end
+
+function _reset(buttonId)
+    _buttonIsState2[buttonId] = false
+    resetButtons()
+end
+
+-------------------------------------------------------------------------------
+
 function doReverseTurns()
     Turns.reverse_order = not Turns.reverse_order
     local message = Turns.reverse_order and 'reverse' or 'forward'
@@ -160,9 +230,11 @@ function doReverseTurns()
 end
 
 function doSetup()
+    _reset('setup')
     startLuaCoroutine(self, 'setupCoroutine')
 end
 function doFinish()
+    _reset('finish')
     startLuaCoroutine(self, 'finishCoroutine')
 end
 function doReset()
@@ -212,9 +284,15 @@ function setupCoroutine()
     coroutine.yield(0)
 
     -- Add seat / speaker order tokens.
+    local zones = _zoneHelper.zones()
+    local numSeats = #zones
+    local speakerIndex = math.random(1, numSeats)
+    _state.speakerColor = assert(zones[speakerIndex])
+    printToAll('Speaker: ' .. _state.speakerColor, 'Yellow')
     for i, color in ipairs(_zoneHelper.zones()) do
         local position = Position.draftSeat(i)
-        local label = (i == 1) and 'SPEAKER' or tostring(i)
+        local speakerOrder = (((i + numSeats) - speakerIndex) % numSeats) + 1
+        local label = (speakerOrder == 1) and 'SPEAKER' or tostring(speakerOrder)
         SeatTokens.moveToken(color, label, position, self.getRotation())
         coroutine.yield(0)
     end
@@ -222,12 +300,16 @@ function setupCoroutine()
 
     -- Add draft factions.
     FactionTokens.shuffle()
+    local factionNames = {}
     for i = 1, _config.NUM_FACTIONS do
         local position = Position.draftFaction(i)
-        FactionTokens.placeRandomToken(position, self.getRotation())
+        local token = FactionTokens.placeRandomToken(position, self.getRotation())
+        local factionName = assert(string.match(token.getName(), '^(.*) Faction Token$'))
+        table.insert(factionNames, factionName)
         coroutine.yield(0)
     end
     coroutine.yield(0)
+    printToAll('Factions: ' .. table.concat(factionNames, ', '), 'Yellow')
 
     -- Randomize turns.
     local order = {}
@@ -411,10 +493,10 @@ function finishCoroutine()
         coroutine.yield(0)
     end
 
-    -- Assign speaker to slice token #1.
+    -- Assign speaker.
     local speakerToken = _getByName('Generic', 'Speaker Token')
     if speakerToken then
-        local zoneAttrs = _zoneHelper.zonesAttributes()[1]
+        local zoneAttrs = _zoneHelper.zoneAttributes(_state.speakerColor)
         local pos = {
             x = zoneAttrs.center.x,
             y = zoneAttrs.center.y + 5,

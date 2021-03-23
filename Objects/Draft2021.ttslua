@@ -58,28 +58,60 @@ local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 -------------------------------------------------------------------------------
 
 _config = {
-    NUM_SLICES = 7,
-    NUM_FACTIONS = 9,
+    DEFAULT_SLICES = 7,
+    DEFAULT_FACTIONS = 9,
+
+    MIN_SLICES = 6,
+    MAX_SLICES = 8,
+
+    MIN_FACTIONS = 6,
+    MAX_FACTIONS = 12,
 }
 
-_state = {}
+_state = {
+    numSlices = _config.DEFAULT_SLICES,
+    numFactions = _config.DEFAULT_FACTIONS
+}
 _deletedItemsBag = false
 _lastScale = false
 
 local BUTTONS = {
+    {
+        stateful = false,
+        label1 = 'Reset\nMilty\nDraft',
+        function1 = 'doReset',
+        tooltip = 'Remove draft components, reset default slice and faction counts'
+    },
+    {
+        stateful = false,
+        id = 'numSlices',
+        label1 = '<>',
+        function1 = 'changeSliceCount',
+        LABEL_TEMPLATE = '#Slices: $VALUE\nLeft +/Right -',
+        tooltip = 'Left click to increase, right click to decrease',
+    },
+    {
+        stateful = false,
+        id = 'numFactions',
+        label1 = '<>',
+        function1 = 'changeFactionCount',
+        LABEL_TEMPLATE = '#Factions: $VALUE\nLeft +/Right -',
+        tooltip = 'Left click to increase, right click to decrease',
+    },
     {
         stateful = true,
         id = 'setup',
         label1 = 'Setup',
         function1 = 'confirmSetup',
         label2 = 'CLICK AGAIN\nTO CONFIRM',
-        function2 = 'doSetup'
+        function2 = 'doSetup',
+        tooltip = 'Place draft slices, factions, and seat tokens',
     },
     {
         stateful = false,
-        id = 'reverseTurns',
-        label1 = 'Deal Action Cards',
+        label1 = 'Reverse\nTurn\nOrder',
         function1 = 'doReverseTurns',
+        tooltip = 'Change next player direction (forward / reverse)',
     },
     {
         stateful = true,
@@ -87,7 +119,8 @@ local BUTTONS = {
         label1 = 'Finish',
         function1 = 'confirmFinish',
         label2 = 'CLICK AGAIN\nTO CONFIRM',
-        function2 = 'doFinish'
+        function2 = 'doFinish',
+        tooltip = 'Move players to their drafted seats, factions, and slices (found in the drafting player\'s area)',
     }
 }
 
@@ -99,75 +132,66 @@ function onLoad(saveState)
     if saveState and string.len(saveState) > 0 then
         _state = JSON.decode(saveState) or _state
     end
+    _state.numSlices = _state.numSlices or _config.DEFAULT_SLICES
+    _state.numFactions = _state.numFactions or _config.DEFAULT_FACTIONS
+
     _deletedItemsBag = _getByName('Bag', 'TI4 Deleted Items')
     --self.addContextMenuItem('setup', doSetup)
     --self.addContextMenuItem('finish', doFinish)
     self.addContextMenuItem('Reset', doReset)
 
     self.clearButtons()
-    self.createButton({
-        click_function = 'doSetup',
-        function_owner = self,
-        label          = 'Setup',
-        position       = { x = 0, y = 0.21, z = -0.6 },
-        rotation       = { x = 0, y = 0, z = 0 },
-        scale          = { x = 1, y = 1, z = 1 },
-        width          = 600,
-        height         = 270,
-        font_size      = 90,
-        tooltip        = 'Place draft slices, factions, and seat tokens',
-    })
-    self.createButton({
-        click_function = 'doReverseTurns',
-        function_owner = self,
-        label          = 'Reverse Turns',
-        position       = { x = 0, y = 0.21, z = 0 },
-        rotation       = { x = 0, y = 0, z = 0 },
-        scale          = { x = 1, y = 1, z = 1 },
-        width          = 600,
-        height         = 270,
-        font_size      = 90,
-        tooltip        = 'Change next player direction (forward / reverse)',
-    })
-    self.createButton({
-        click_function = 'doFinish',
-        function_owner = self,
-        label          = 'Finish',
-        position       = { x = 0, y = 0.21, z = 0.6 },
-        rotation       = { x = 0, y = 0, z = 0 },
-        scale          = { x = 1, y = 1, z = 1 },
-        width          = 600,
-        height         = 270,
-        font_size      = 90,
-        tooltip        = 'Move players to their drafted seats, factions, and slices (found in the drafting player\'s area)',
-    })
-
+    for i, button in ipairs(BUTTONS) do
+        self.createButton({
+            click_function = button.function1 or 'doNothing',
+            function_owner = self,
+            label          = button.label1,
+            position       = Slots.getPosition(0, i - 1, Slots.DRAFT_MAT),
+            rotation       = { x = 0, y = 0, z = 0 },
+            scale          = { x = 1, y = 1, z = 1 },
+            width          = button.function1 and 1900 or 0,
+            height         = button.function1 and 1200 or 0,
+            font_size      = 300,
+            font_color     = button.function1 and 'Black' or 'White',
+            tooltip        = button.tooltip,
+        })
+    end
     resetButtons()
-    _maybeDrawBox()
+
+    local snapPoints = {}
+    local lines = {}
+    local color = { r = 1, g = 1, b = 1, a = 0.1 }
+    for col = 0, 0 do
+        for row = 0, 5 do
+            table.insert(lines, Slots.getVectorLine(col, row, Slots.DRAFT_MAT, color))
+        end
+    end
+    for col = 1, 3 do
+        for row = 0, 5, 2 do
+            table.insert(snapPoints, {
+                position = Slots.getPosition(6 - col, row + 0.5, Slots.DRAFT_MAT),
+                rotation = { x = 0, y = 0, z = 0 },
+                rotation_snap = true,
+            })
+            table.insert(lines, Slots.getVectorLine(col, row, Slots.DRAFT_MAT, color, 2))
+        end
+    end
+    for col = 4, 6 do
+        for row = 0, 5 do
+            table.insert(snapPoints, {
+                position = Slots.getPosition(6 - col, row, Slots.DRAFT_MAT),
+                rotation = { x = 0, y = 0, z = 0 },
+                rotation_snap = true,
+            })
+            table.insert(lines, Slots.getVectorLine(col, row, Slots.DRAFT_MAT, color))
+        end
+    end
+    self.setSnapPoints(snapPoints)
+    self.setVectorLines(lines)
 end
 
 function onSave()
     return _state and JSON.encode(_state)
-end
-
-function onHover(player_color)
-    _maybeDrawBox()
-end
-
-function onPickUp(player_color)
-    _maybeDrawBox()
-end
-
-function onDrop(player_color)
-    _maybeDrawBox()
-end
-
-function _maybeDrawBox()
-    local scale = self.getScale()
-    if not _lastScale or _lastScale.x ~= scale.x or _lastScale.z ~= scale.z then
-        _lastScale = scale
-        Position.drawBox()
-    end
 end
 
 function _getByName(tag, name)
@@ -193,6 +217,21 @@ function resetButtons()
                 click_function = _buttonIsState2[values.id] and values.function2 or values.function1,
                 label          = _buttonIsState2[values.id] and values.label2 or values.label1,
                 color          = color,
+            })
+        end
+        if values.id == 'numSlices' then
+            local value = tostring(_state.numSlices)
+            local label = string.gsub(values.LABEL_TEMPLATE, '$VALUE', value)
+            self.editButton({
+                index          = i - 1,
+                label          = label
+            })
+        elseif values.id == 'numFactions' then
+            local value = tostring(_state.numFactions)
+            local label = string.gsub(values.LABEL_TEMPLATE, '$VALUE', value)
+            self.editButton({
+                index          = i - 1,
+                label          = label
             })
         end
     end
@@ -223,23 +262,49 @@ end
 
 -------------------------------------------------------------------------------
 
-function doReverseTurns()
-    Turns.reverse_order = not Turns.reverse_order
-    local message = Turns.reverse_order and 'reverse' or 'forward'
-    printToAll('Snake order: ' .. message, 'Yellow')
+function changeSliceCount(clickObject, clickerColor, altClick)
+    local delta = altClick and -1 or 1
+    local value = _state.numSlices + delta
+    if (value >= _config.MIN_SLICES) and (value <= _config.MAX_SLICES) then
+        _state.numSlices = value
+        resetButtons()
+    else
+        printToColor('Already at limit', clickerColor, 'Red')
+    end
+end
+
+function changeFactionCount(clickObject, clickerColor, altClick)
+    local delta = altClick and -1 or 1
+    local value = _state.numFactions + delta
+    if (value >= _config.MIN_FACTIONS) and (value <= _config.MAX_FACTIONS) then
+        _state.numFactions = value
+        resetButtons()
+    else
+        printToColor('Already at limit', clickerColor, 'Red')
+    end
 end
 
 function doSetup()
     _reset('setup')
     startLuaCoroutine(self, 'setupCoroutine')
 end
+
+function doReverseTurns()
+    Turns.reverse_order = not Turns.reverse_order
+    local message = Turns.reverse_order and 'reverse' or 'forward'
+    printToAll('Snake order: ' .. message, 'Yellow')
+end
+
 function doFinish()
     _reset('finish')
     startLuaCoroutine(self, 'finishCoroutine')
 end
+
 function doReset()
     startLuaCoroutine(self, 'resetCoroutine')
 end
+
+-------------------------------------------------------------------------------
 
 function setupCoroutine()
     if not _setupHelper.getPoK() then
@@ -258,7 +323,7 @@ function setupCoroutine()
     coroutine.yield(0)
 
     -- Get 3 "balanced" blue tiles and 2 red ones.
-    _state.tileLists = assert(VolverMilty.makeHands(_config.NUM_SLICES))
+    _state.tileLists = assert(VolverMilty.makeHands(_state.numSlices))
     VolverMilty.addRedTiles(_state.tileLists, 2)
     coroutine.yield(0)
 
@@ -290,9 +355,9 @@ function setupCoroutine()
     _state.speakerColor = assert(zones[speakerIndex])
     printToAll('Speaker: ' .. _state.speakerColor, 'Yellow')
     for i, color in ipairs(_zoneHelper.zones()) do
-        local position = Position.draftSeat(i)
         local speakerOrder = (((i + numSeats) - speakerIndex) % numSeats) + 1
         local label = (speakerOrder == 1) and 'SPEAKER' or tostring(speakerOrder)
+        local position = Position.draftSeat(speakerOrder)
         SeatTokens.moveToken(color, label, position, self.getRotation())
         coroutine.yield(0)
     end
@@ -301,7 +366,7 @@ function setupCoroutine()
     -- Add draft factions.
     FactionTokens.shuffle()
     local factionNames = {}
-    for i = 1, _config.NUM_FACTIONS do
+    for i = 1, _state.numFactions do
         local position = Position.draftFaction(i)
         local token = FactionTokens.placeRandomToken(position, self.getRotation())
         local factionName = assert(string.match(token.getName(), '^(.*) Faction Token$'))
@@ -517,6 +582,11 @@ function finishCoroutine()
 end
 
 function resetCoroutine()
+    _state.numSlices = _config.DEFAULT_SLICES
+    _state.numFactions = _config.DEFAULT_FACTIONS
+    resetButtons()
+    coroutine.yield(0)
+
     SeatTokens.stow()
     coroutine.yield(0)
 
@@ -531,102 +601,122 @@ end
 
 -------------------------------------------------------------------------------
 
-Position = {
-    -- p0 is relative to self top-right corner.
-    p0 = { x = -3, y = 3, z = 3 },
-    dx = -5,
-    dz = 5,
-
-    SLICE_COLS = 3,
-    FACTION_COLS = 3,
-    SEAT_COLS = 2,
+Slots = {
+    SIZE = {
+        x = 4.04,
+        z = 2.70,
+        gap = 0.5,
+    },
+    DRAFT_MAT = {
+        numCols = 7,
+        numRows = 6
+    }
 }
 
-function Position._pos(col, row)
-    -- Apply scale to p0, but not to offset.
-    local bounds = self.getBoundsNormalized().size
-    local scale = self.getScale()
+function Slots.getPosition(col, row, mat)
+    assert(type(col) == 'number' and type(row) == 'number' and type(mat) == 'table')
+    assert(type(mat.numCols) == 'number' and type(mat.numRows) == 'number')
+
+    -- Not safe to read bounds while spawning.
+    local bounds = {
+        x = (mat.numCols * Slots.SIZE.x) + ((mat.numCols + 1) * Slots.SIZE.gap),
+        y = 0.4,
+        z = (mat.numRows * Slots.SIZE.z) + ((mat.numRows + 1) * Slots.SIZE.gap),
+    }
+
     local p0 = {
-        x = ((-bounds.x / 2) + Position.p0.x) / scale.x,
-        y = Position.p0.y / scale.y,
-        z = ((-bounds.z / 2) + Position.p0.z) / scale.z,
+        x = -(bounds.x / 2) + Slots.SIZE.gap + (Slots.SIZE.x / 2),
+        y = bounds.y + 0.01,
+        z = -(bounds.z / 2) + Slots.SIZE.gap + (Slots.SIZE.z / 2),
     }
-    local offset = {
-        x = col * Position.dx / scale.x,
-        y = 0,
-        z = row * Position.dz / scale.z,
+
+    return {
+        x = p0.x + col * (Slots.SIZE.x + Slots.SIZE.gap),
+        y = p0.y,
+        z = p0.z + row * (Slots.SIZE.z + Slots.SIZE.gap),
     }
-    local localPos = {
-        x = p0.x + offset.x,
-        y = p0.y + offset.y,
-        z = p0.z + offset.z,
+end
+
+function Slots.getVectorLine(col, row, mat, color, rowSpan)
+    assert(type(col) == 'number' and type(row) == 'number' and type(mat) == 'table')
+    assert(type(mat.numCols) == 'number' and type(mat.numRows) == 'number')
+
+    -- Vector lines have reversed X space?
+    local p1 = Slots.getPosition(col, row, mat)
+    local p2 = Slots.getPosition(col, row + ((rowSpan or 1) - 1), mat)
+    return {
+        points = {
+            { x = -p1.x, y = p1.y, z = p1.z - Slots.SIZE.z / 2 },
+            { x = -p2.x, y = p2.y, z = p2.z + Slots.SIZE.z / 2 },
+        },
+        rotation = { x = 0, y = 0, z = 0 },
+        thickness = Slots.SIZE.x,
+        color = color,
+        square = true,
+        loop = false,
     }
-    return self.positionToWorld(localPos)
+end
+
+-------------------------------------------------------------------------------
+
+-- Mat is 7x6.  COL/ROW in 0-based values:
+-- Col 0: buttons.
+-- Cols 1-3: slices, offset Z by 0.5.
+-- Cols 4-6:
+--   Rows 1-4: factions
+--   Rows 5-6: seats
+Position = {
+    SLICE = {
+        col0 = 1,
+        row0 = 0.5,
+        numCols = 3
+    },
+    FACTION = {
+        col0 = 4,
+        row0 = 0,
+        numCols = 3
+    },
+    SEAT = {
+        col0 = 4,
+        row0 = 4,
+        numCols = 3
+    },
+}
+
+function Position._pos(col, row, mat)
+    local p = Slots.getPosition(col, row, mat)
+    p.x = -p.x  -- x backwards from local?
+    p = self.positionToWorld(p)
+    p.y = p.y + 3
+    return p
 end
 
 --- Where to place draftable slices during setup.
 -- @param i (number) : slice index.
 -- @return table : {xyz} position.
 function Position.draftSlice(i)
-    local col = (i - 1) % Position.SLICE_COLS
-    local row = math.floor((i - 1) / Position.SLICE_COLS)
-    return Position._pos(col, row)
+    -- Unlike others, scale row by 2x.
+    local col = Position.SLICE.col0 + ((i - 1) % Position.SLICE.numCols)
+    local row = Position.SLICE.row0 + math.floor((i - 1) /  Position.SLICE.numCols) * 2
+    return Position._pos(col, row, Slots.DRAFT_MAT)
 end
 
 --- Where to place draftable factions during setup.
 -- @param i (number) : faction index.
 -- @return table : {xyz} position.
 function Position.draftFaction(i)
-    local col = (i - 1) % Position.FACTION_COLS
-    local row = math.floor((i - 1) / Position.FACTION_COLS)
-    col = col + Position.SLICE_COLS
-    return Position._pos(col, row)
+    local col = Position.FACTION.col0 + ((i - 1) % Position.FACTION.numCols)
+    local row = Position.FACTION.row0 + math.floor((i - 1) /  Position.FACTION.numCols)
+    return Position._pos(col, row, Slots.DRAFT_MAT)
 end
 
 --- Where to place draftable seats during setup.
 -- @param i (number) : seat index.
 -- @return table : {xyz} position.
 function Position.draftSeat(i)
-    local col = (i - 1) % Position.SEAT_COLS
-    local row = math.floor((i - 1) / Position.SEAT_COLS)
-    col = col + Position.SLICE_COLS + Position.FACTION_COLS
-    return Position._pos(col, row)
-end
-
-function Position.drawBox()
-    local cols = Position.SLICE_COLS + Position.FACTION_COLS + Position.SEAT_COLS
-    local rows = 0
-    rows = math.max(rows, math.ceil(_config.NUM_SLICES / Position.SLICE_COLS))
-    rows = math.max(rows, math.ceil(_config.NUM_FACTIONS / Position.FACTION_COLS))
-    rows = math.max(rows, math.ceil(#_zoneHelper.zones() / Position.SEAT_COLS))
-
-    local bounds = self.getBoundsNormalized().size
-    local scale = self.getScale()
-
-    local left = (bounds.x / 2) / scale.x
-    local top = (-bounds.z / 2) / scale.z
-    local right = (-(bounds.x / 2) + Position.p0.x + Position.dx * (cols - 0.5)) / scale.x
-    local bottom = (-(bounds.z / 2) + Position.p0.z + Position.dz * (rows - 0.5)) / scale.z
-
-    local thickness = 0.1
-    right = right + thickness
-    bottom = bottom + thickness
-
-    self.setVectorLines({
-        {
-            points         = {
-                { x = left, y = 0.1, z = top },
-                { x = right, y = 0.1, z = top },
-                { x = right, y = 0.1, z = bottom },
-                { x = left, y = 0.1, z = bottom },
-            },
-            color          = 'White',
-            thickness      = thickness,
-            rotation       = { x = 0, y = 0, z = 0 },
-            loop           = true,
-            square         = true
-        },
-    })
+    local col = Position.SEAT.col0 + ((i - 1) % Position.SEAT.numCols)
+    local row = Position.SEAT.row0 + math.floor((i - 1) /  Position.SEAT.numCols)
+    return Position._pos(col, row, Slots.DRAFT_MAT)
 end
 
 -------------------------------------------------------------------------------

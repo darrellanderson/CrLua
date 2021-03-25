@@ -32,6 +32,8 @@
 -- 2. Reverse Turn Order.
 -- 3. Commit (do finish steps).
 
+-- 7x6 mat: http://cloud-3.steamusercontent.com/ugc/1734422701007725477/663ABBFFF278EA1CDFEEF84C1DBA12D309C745F0/
+
 -------------------------------------------------------------------------------
 
 function getHelperClient(helperObjectName)
@@ -105,7 +107,7 @@ local BUTTONS = {
         function1 = 'confirmSetup',
         label2 = 'CLICK AGAIN\nTO CONFIRM',
         function2 = 'doSetup',
-        tooltip = 'Place draft slices, factions, and seat tokens',
+        tooltip = 'Place (or replace) draft slices, factions, and seat tokens',
     },
     {
         stateful = false,
@@ -136,9 +138,6 @@ function onLoad(saveState)
     _state.numFactions = _state.numFactions or _config.DEFAULT_FACTIONS
 
     _deletedItemsBag = _getByName('Bag', 'TI4 Deleted Items')
-    --self.addContextMenuItem('setup', doSetup)
-    --self.addContextMenuItem('finish', doFinish)
-    self.addContextMenuItem('Reset', doReset)
 
     self.clearButtons()
     for i, button in ipairs(BUTTONS) do
@@ -188,6 +187,16 @@ function onLoad(saveState)
     end
     self.setSnapPoints(snapPoints)
     self.setVectorLines(lines)
+
+    local function lookAtMe(playerColor)
+        Player[playerColor].lookAt({
+            position = self.getPosition(),
+            pitch    = 90,
+            yaw      = self.getRotation().y + 180,
+            distance = 30
+        })
+    end
+    self.addContextMenuItem('Look at me', lookAtMe)
 end
 
 function onSave()
@@ -322,6 +331,9 @@ function setupCoroutine()
     SliceTokens.stow()
     coroutine.yield(0)
 
+    DraftSelectionMats.stow()
+    coroutine.yield(0)
+
     -- Get 3 "balanced" blue tiles and 2 red ones.
     _state.tileLists = assert(VolverMilty.makeHands(_state.numSlices))
     VolverMilty.addRedTiles(_state.tileLists, 2)
@@ -357,7 +369,7 @@ function setupCoroutine()
     for i, color in ipairs(_zoneHelper.zones()) do
         local speakerOrder = (((i + numSeats) - speakerIndex) % numSeats) + 1
         local label = (speakerOrder == 1) and 'SPEAKER' or tostring(speakerOrder)
-        local position = Position.draftSeat(speakerOrder)
+        local position = Position.draftSeat(i)
         SeatTokens.moveToken(color, label, position, self.getRotation())
         coroutine.yield(0)
     end
@@ -375,6 +387,12 @@ function setupCoroutine()
     end
     coroutine.yield(0)
     printToAll('Factions: ' .. table.concat(factionNames, ', '), 'Yellow')
+
+    -- Create draft selection mats.
+    for _, color in ipairs(_zoneHelper.zones()) do
+        DraftSelectionMats.spawn(color)
+        coroutine.yield(0)
+    end
 
     -- Randomize turns.
     local order = {}
@@ -420,7 +438,7 @@ function finishCoroutine()
     end
     coroutine.yield(0)
 
-    for _, object in ipairs(SliceTokens.getAll()) do
+    for _, object in ipairs(SliceTokens.getAll(false)) do
         local zone = _zoneHelper.zoneFromPosition(object.getPosition())
         local choices = zone and colorToChoices[zone]
         if choices then
@@ -442,7 +460,7 @@ function finishCoroutine()
     end
     coroutine.yield(0)
 
-    for _, object in ipairs(FactionTokens.getAll()) do
+    for _, object in ipairs(FactionTokens.getAll(false)) do
         local zone = _zoneHelper.zoneFromPosition(object.getPosition())
         local choices = zone and colorToChoices[zone]
         if choices then
@@ -464,7 +482,7 @@ function finishCoroutine()
     end
     coroutine.yield(0)
 
-    for _, object in ipairs(SeatTokens.getAll()) do
+    for _, object in ipairs(SeatTokens.getAll(false)) do
         local zone = _zoneHelper.zoneFromPosition(object.getPosition())
         local choices = zone and colorToChoices[zone]
         if choices then
@@ -522,6 +540,9 @@ function finishCoroutine()
     SliceTokens.stow()
     coroutine.yield(0)
 
+    DraftSelectionMats.stow()
+    coroutine.yield(0)
+
     -- Move players to their chosen seat.
     for _, choices in pairs(colorToChoices) do
         if choices.player then
@@ -577,6 +598,13 @@ function finishCoroutine()
         speakerToken.setPositionSmooth(pos, collide, fast)
         speakerToken.setRotationSmooth(rot, collide, fast)
     end
+    coroutine.yield(0)
+
+    -- Stow self.
+    local toolsBag = _getByName('Bag', 'Tools and Helpers')
+    if toolsBag then
+        toolsBag.putObject(self)
+    end
 
     return 1
 end
@@ -596,7 +624,40 @@ function resetCoroutine()
     SliceTokens.stow()
     coroutine.yield(0)
 
+    DraftSelectionMats.stow()
+    coroutine.yield(0)
+
     return 1
+end
+
+-------------------------------------------------------------------------------
+
+BoundingBox = {
+    _bb = false
+}
+
+function BoundingBox.get(object)
+    local bounds = object.getBounds()
+    return {
+        min = {
+            x = bounds.center.x - bounds.size.x / 2,
+            z = bounds.center.z - bounds.size.z / 2,
+        },
+        max = {
+            x = bounds.center.x + bounds.size.x / 2,
+            z = bounds.center.z + bounds.size.z / 2,
+        },
+    }
+end
+
+function BoundingBox.inside(object, bb)
+    local p = object.getPosition()
+    return p.x > bb.min.x and p.x < bb.max.x and p.z > bb.min.z and p.z < bb.max.z
+end
+
+function BoundingBox.insideSelf(object)
+    BoundingBox._bb = BoundingBox._bb or BoundingBox.get(self)
+    return BoundingBox.inside(object, BoundingBox._bb)
 end
 
 -------------------------------------------------------------------------------
@@ -610,6 +671,10 @@ Slots = {
     DRAFT_MAT = {
         numCols = 7,
         numRows = 6
+    },
+    SELECTION_MAT = {
+        numCols = 3,
+        numRows = 3
     }
 }
 
@@ -714,6 +779,21 @@ end
 -- @param i (number) : seat index.
 -- @return table : {xyz} position.
 function Position.draftSeat(i)
+    local numZones = #_zoneHelper.zones()
+
+    -- Match table positions (give up if more than fit).
+    if numZones == 2 then
+        i = ({ 4, 1 })[i]
+    elseif numZones == 3 then
+        i = ({ 4, 1, 2 })[i]
+    elseif numZones == 4 then
+        i = ({ 5, 4, 1, 2 })[i]
+    elseif numZones == 5 then
+        i = ({ 5, 4, 1, 2, 3 })[i]
+    elseif numZones == 6 then
+        i = ({ 6, 5, 4, 1, 2, 3 })[i]
+    end
+
     local col = Position.SEAT.col0 + ((i - 1) % Position.SEAT.numCols)
     local row = Position.SEAT.row0 + math.floor((i - 1) /  Position.SEAT.numCols)
     return Position._pos(col, row, Slots.DRAFT_MAT)
@@ -996,18 +1076,21 @@ function SliceTokens.getSliceName(index)
     return 'Slice ' .. assert(letter)
 end
 
-function SliceTokens.getAll()
+function SliceTokens.getAll(includeInsideSelf)
+    assert(type(includeInsideSelf) == 'boolean')
     local result = {}
     for _, object in ipairs(getAllObjects()) do
         if object.tag == 'Generic' and SliceTokens.getSliceIndex(object) then
-            table.insert(result, object)
+            if includeInsideSelf or (not BoundingBox.insideSelf(object)) then
+                table.insert(result, object)
+            end
         end
     end
     return result
 end
 
 function SliceTokens.stow()
-    for _, object in ipairs(SliceTokens.getAll()) do
+    for _, object in ipairs(SliceTokens.getAll(true)) do
         if _deletedItemsBag then
             _deletedItemsBag.call('ignoreGuid', object.getGUID())
         end
@@ -1083,7 +1166,8 @@ function SeatTokens.moveToken(color, label, position, rotation)
     return token
 end
 
-function SeatTokens.getAll()
+function SeatTokens.getAll(includeInsideSelf)
+    assert(type(includeInsideSelf) == 'boolean')
     local nameSet = {}
     for _, color in ipairs(_zoneHelper.zones()) do
         nameSet[color] = true
@@ -1091,7 +1175,9 @@ function SeatTokens.getAll()
     local result = {}
     for _, object in ipairs(getAllObjects()) do
         if object.tag == 'GoPiece' and nameSet[object.getName()] then
-            table.insert(result, object)
+            if includeInsideSelf or (not BoundingBox.insideSelf(object)) then
+                table.insert(result, object)
+            end
         end
     end
     return result
@@ -1099,7 +1185,7 @@ end
 
 function SeatTokens.stow()
     local bag = SeatTokens._getBag()
-    for _, object in ipairs(SeatTokens.getAll()) do
+    for _, object in ipairs(SeatTokens.getAll(true)) do
         object.clearButtons()
         bag.putObject(object)
     end
@@ -1141,7 +1227,8 @@ function FactionTokens.placeRandomToken(position, rotation)
     return token
 end
 
-function FactionTokens.getAll()
+function FactionTokens.getAll(includeInsideSelf)
+    assert(type(includeInsideSelf) == 'boolean')
     local nameSet = {}
     for _, faction in pairs(_factionHelper.allFactions(true)) do
         nameSet[faction.tokenName .. ' Faction Token'] = true
@@ -1149,7 +1236,9 @@ function FactionTokens.getAll()
     local result = {}
     for _, object in ipairs(getAllObjects()) do
         if object.tag == 'Card' and nameSet[object.getName()] then
-            table.insert(result, object)
+            if includeInsideSelf or (not BoundingBox.insideSelf(object)) then
+                table.insert(result, object)
+            end
         end
     end
     return result
@@ -1157,9 +1246,104 @@ end
 
 function FactionTokens.stow()
     local bag = FactionTokens._getBag()
-    for _, object in ipairs(FactionTokens.getAll()) do
+    for _, object in ipairs(FactionTokens.getAll(true)) do
         bag.putObject(object)
     end
+end
+
+-------------------------------------------------------------------------------
+
+DraftSelectionMats = {
+    NAME = 'Draft Selections Mat',
+    DESCRIPTION = 'Place your slice, faction, and seat draft selections here'
+}
+
+function DraftSelectionMats.stow()
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Generic' and object.getName() == DraftSelectionMats.NAME then
+            if _deletedItemsBag then
+                _deletedItemsBag.call('ignoreGuid', object.getGUID())
+            end
+            destroyObject(object)
+        end
+    end
+end
+
+function DraftSelectionMats.spawn(color)
+    assert(type(color) == 'string')
+
+    local zoneAttrs = assert(_zoneHelper.zoneAttributes(color))
+    local pos = {
+        x = zoneAttrs.center.x,
+        y = zoneAttrs.center.y + 2,
+        z = zoneAttrs.center.z + 4 * (zoneAttrs.center.z < 0 and 1 or -1)
+    }
+    local rot = {
+        x = 0,
+        y = zoneAttrs.rotation.y,
+        z = 0
+    }
+    local scale = {
+        x = 1,
+        y = 1,
+        z = 1
+    }
+
+    local params = {
+        mesh = 'http://cloud-3.steamusercontent.com/ugc/1734422701007716546/23FC1D77A4E2C9F34C0D5E269C3A0A7706EBB850/',
+        diffuse = 'http://cloud-3.steamusercontent.com/ugc/1499090241450210706/2DA6B757A764A6BC9F6051ABD64E6291135FBA0A/',
+        type = 0,  -- generic
+        material = 3,  -- cardboard
+    }
+    local tile = spawnObject({
+        type              = 'Custom_Model',
+        position          = pos,
+        rotation          = rot,
+        scale             = scale,
+        callback_function = function(object) object.setLock(true) end,
+        sound             = false,
+        snap_to_grid      = false,
+        params            = params,
+    })
+    tile.setCustomObject(params)
+    tile.setName(DraftSelectionMats.NAME)
+    tile.setDescription(DraftSelectionMats.DESCRIPTION)
+    tile.use_grid = false
+    tile.use_snap_points = false
+
+    local snapPoints = {}
+    local lines = {}
+    local lineColor = { r = 1, g = 1, b = 1, a = 0.1 }
+    for col = 0, 2 do
+        for row = 1, 1 do
+            table.insert(snapPoints, {
+                position = Slots.getPosition(2 - col, row, Slots.SELECTION_MAT),
+                rotation = { x = 0, y = 0, z = 0 },
+                rotation_snap = true,
+            })
+            table.insert(lines, Slots.getVectorLine(col, row, Slots.SELECTION_MAT, lineColor))
+        end
+    end
+    tile.setSnapPoints(snapPoints)
+    tile.setVectorLines(lines)
+
+    local playerName = color
+    for _, player in ipairs(Player.getPlayers()) do
+        if player.color == color then
+            playerName = player.steam_name
+            break
+        end
+    end
+    tile.createButton({
+        click_function = 'doNothing',
+        function_owner = self,
+        label          = playerName .. '\nDraft Choices',
+        position       = Slots.getPosition(1, 0, Slots.SELECTION_MAT),
+        width          = 0,
+        height         = 0,
+        font_size      = 400,
+        font_color     = 'Yellow',
+    })
 end
 
 -------------------------------------------------------------------------------
@@ -1320,16 +1504,17 @@ end
 function Slice.randomizeAndFixAdjacentAnomalies(tiles)
     local tiles = VolverMilty.permute(tiles)
 
-    local anomalySet = {}
+    -- Lookup by tile number is slightly expensive (linear).
+    -- Get the relevant systems in one pass.
+    local tileSet = {}
     for _, tile in ipairs(tiles) do
-        local system = _systemHelper.systemFromTile(tile)
-        if system.anomalies and #system.anomalies > 0 then
-            anomalySet[tile] = true
-        end
+        tileSet[tile] = true
     end
-    local nameToIndex = {}
-    for i, offset in ipairs(Slice.OFFSETS) do
-        nameToIndex[offset.name] = i
+    local tileToSystem = {}
+    for _, system in pairs(_systemHelper.systems()) do
+        if tileSet[system.tile] then
+            tileToSystem[system.tile] = system
+        end
     end
 
     local swapRules = {
@@ -1384,19 +1569,50 @@ function Slice.randomizeAndFixAdjacentAnomalies(tiles)
             },
         },
     }
-    for _, swapRule in ipairs(swapRules) do
-        local check1 = assert(tiles[nameToIndex[swapRule.check1]])
-        local check2 = assert(tiles[nameToIndex[swapRule.check2]])
-        if anomalySet[check1] and anomalySet[check2] then
-            local swap = assert(swapRule.swaps[math.random(1, #swapRule.swaps)])
-            local index1 = assert(nameToIndex[swap[1]])
-            local index2 = assert(nameToIndex[swap[2]])
-            local tile1 = tiles[index1]
-            local tile2 = tiles[index2]
-            tiles[index1] = tile2
-            tiles[index2] = tile1
+    local nameToIndex = {}
+    for i, offset in ipairs(Slice.OFFSETS) do
+        nameToIndex[offset.name] = i
+    end
+    local function doSwaps(checkFunction)
+        for _, swapRule in ipairs(swapRules) do
+            local check1 = assert(tiles[nameToIndex[swapRule.check1]])
+            local check2 = assert(tiles[nameToIndex[swapRule.check2]])
+            local system1 = assert(tileToSystem[check1])
+            local system2 = assert(tileToSystem[check2])
+            if checkFunction(system1, system2) then
+                local swap = assert(swapRule.swaps[math.random(1, #swapRule.swaps)])
+                local index1 = assert(nameToIndex[swap[1]])
+                local index2 = assert(nameToIndex[swap[2]])
+                local tile1 = tiles[index1]
+                local tile2 = tiles[index2]
+                tiles[index1] = tile2
+                tiles[index2] = tile1
+            end
         end
     end
+
+    -- Separate adjacent same wormholes.
+    local function checkWormholes(system1, system2)
+        assert(type(system1) == 'table' and type(system2) == 'table')
+        local wormholeSet1 = {}
+        for _, wormhole in ipairs(system1.wormholes or {}) do
+            wormholeSet1[wormhole] = true
+        end
+        for _, wormhole in ipairs(system2.wormholes or {}) do
+            if wormholeSet1[wormhole] then
+                return true
+            end
+        end
+    end
+    doSwaps(checkWormholes)
+
+    -- Separate adjacent anomalies (may clobber earlier adjustments).
+    local function checkAnomalies(system1, system2)
+        local anomalies1 = system1.anomalies and #system1.anomalies > 0
+        local anomalies2 = system2.anomalies and #system2.anomalies > 0
+        return anomalies1 and anomalies2
+    end
+    doSwaps(checkAnomalies)
 
     return tiles
 end

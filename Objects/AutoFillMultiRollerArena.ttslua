@@ -28,8 +28,13 @@ _lockedGuidSet = {}
 
 function onLoad(saveState)
     createButtons()
+
+    -- Load the active system when first pulled from a bag.  Take care to
+    -- avoid an infinite loop if this onLoad is via self.reload().
     local system = _systemHelper.getActivatedSystem()
-    _activeSystemGuid = system and system.guid
+    if system then
+        onSystemActivation(system)
+    end
 end
 
 function onPlayerTurnEnd(player_color_end, player_color_next)
@@ -69,14 +74,22 @@ function onSystemActivation(system)
     local systemObject = getObjectFromGUID(system.guid)
     local systemCustom = systemObject.getCustomObject()
     local custom = self.getCustomObject()
-    custom.diffuse = systemCustom.diffuse
 
-    _applyPlanetDecals(system, systemObject)
+    -- Only update the arena tile if image changed.  This *seems* redundant
+    -- with the _activeSystemGuid check at the top of this function, but reload
+    -- causes the script to reset.  After reset, the onLoad will attempt to
+    -- apply the current active system, and stop when it sees the image set here.
+    if custom.diffuse ~= systemCustom.diffuse then
 
-    -- Resetting custom object triggers delete.  Tell Deleted Items it is ok.
-    ignoreDeletedItem(self.getGUID())
-    self.setCustomObject(custom)
-    local newSelf = self.reload()
+        -- Update arena visuals.
+        _applyPlanetDecals(system, systemObject)
+        custom.diffuse = systemCustom.diffuse
+        self.setCustomObject(custom)
+
+        -- Resetting custom object triggers delete.  Tell Deleted Items it is ok.
+        ignoreDeletedItem(self.getGUID())
+        self.reload()  -- script gets reset, calls onLoad!
+    end
 end
 
 local _deletedItemsGuid = false

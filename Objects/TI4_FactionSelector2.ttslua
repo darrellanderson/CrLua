@@ -85,6 +85,20 @@ local _customNameToUrl = false
 local _chosenFactionId = false
 local _includePoK = true
 
+--- Expose method of outsiders to select a faction.
+function selectFaction(tokenName)
+    assert(type(tokenName) == 'string')
+    for _, entry in ipairs(FACTION_ID_AND_TOKEN_NAMES) do
+        if entry.tokenName == tokenName then
+            local clickFunction = 'selectFaction_' .. entry.id
+            self.call(clickFunction)
+            return
+        end
+    end
+    error('selectFaction: no such faction "' .. tokenName .. '"')
+end
+
+
 function doNothing() end
 
 function _addTitle()
@@ -352,11 +366,11 @@ function onLoad()
     -- Normal buttons are not as flexible, create a function for each.
     for _, idAndTokenName in ipairs(FACTION_ID_AND_TOKEN_NAMES) do
         local id = idAndTokenName.id
-        local function selectFaction()
+        local function selectFactionInternal()
             _chosenFactionId = id
             showBaseInfo(id)
         end
-        self.setVar('selectFaction_' .. id, selectFaction)
+        self.setVar('selectFaction_' .. id, selectFactionInternal)
     end
 
     Wait.frames(showFactionSelection, 2)

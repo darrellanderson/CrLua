@@ -1049,29 +1049,16 @@ function count_slices(count)
     for i = 1, #homeSystemPositions do
         hsValue[i] = {
             position = labelPosition(homeSystemPositions[i]),
-            resources = 0,
-            influence = 0,
-            tech = {}
+            tiles = {},
         }
         eqValue[i] = {
             position = labelPosition(equidistantPositions[i]),
-            resources = 0,
-            influence = 0,
-            tech = {}
+            tiles = {}
         }
     end
     local function updateValue(valueTable, system)
         assert(type(valueTable) == 'table' and type(system) == 'table')
-        for _, planet in ipairs(system.planets or {}) do
-            valueTable.resources = valueTable.resources + (planet.resources or 0)
-            valueTable.influence = valueTable.influence + (planet.influence or 0)
-            if planet.tech then
-                table.insert(valueTable.tech, string.sub(planet.tech, 1, 1):upper())
-            end
-            if planet.legendary then
-                valueTable.legendary = (valueTable.legendary or 0) + 1
-            end
-        end
+        table.insert(valueTable.tiles, system.tile)
     end
 
     local function getClosestIndex(positions, targetPosition)
@@ -1112,27 +1099,12 @@ function count_slices(count)
         text.TextTool.setFontSize(text.TextTool.getFontSize() * (fontSizeScale or 1))
     end
 
-    local function valueToString(value)
-        local items = {
-            value.resources .. '/' .. value.influence
-        }
-        if #value.tech > 0 then
-            table.sort(value.tech)
-            table.insert(items, table.concat(value.tech, ''))
-        end
-        if value.legendary then
-            local n = value.legendary
-            table.insert(items, ((n > 1) and n or '') .. 'L')
-        end
-        return table.concat(items, ' ')
-    end
-
     for _, value in ipairs(hsValue) do
-        local text = valueToString(value)
+        local text = _systemHelper.summarizeTiles(value.tiles)
         createLabel(value.position, {x=90,y=0,z=0}, text, 1.5)
     end
     for _, value in ipairs(eqValue) do
-        local text = '(' .. valueToString(value) .. ')'
+        local text = '(' .. _systemHelper.summarizeTiles(value.tiles) .. ')'
         createLabel(value.position, {x=90,y=0,z=0}, text, 1)
     end
 end

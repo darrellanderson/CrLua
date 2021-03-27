@@ -50,6 +50,7 @@ local systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 function onLoad()
+    math.randomseed(os.time())
     createButtons()
     minR = 2.5
     minI = 4
@@ -189,7 +190,6 @@ end
 
 function permute(tab)
   local shuffled = {}
-  math.randomseed(os.time())
   for i, v in ipairs(tab) do
     local j = math.random(1, #shuffled+1)
     table.insert(shuffled, j, v)

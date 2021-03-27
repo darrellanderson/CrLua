@@ -579,6 +579,17 @@ local _unitModifiers = {
     --     end
     -- },
 
+    ['Emissary Taivra'] = {
+        leader = LEADER.AGENT, -- Ghosts
+        description = 'Active with-wormhole system is adjacent to other wormholes',
+        owner = OWNER.ANY,
+        type = TYPE.CHOOSE,
+        isCombat = false,
+        toggleActive = true,
+        apply = function(unitAttrs)
+        end
+    },
+
     ['Experimental Battlestation'] = {
         description = 'One in or adjacent Space Dock gets SPACE CANNON 5x3',
         owner = OWNER.SELF,
@@ -1931,7 +1942,7 @@ function _applyToggleActiveCard(object)
     local pos = {
         x = 0,
         y = 1,
-        z = (bounds.size.z / scale.z) / 2
+        z = ((bounds.size.z / scale.z) / 2) + 0.15
     }
     object.clearButtons()
     object.createButton({

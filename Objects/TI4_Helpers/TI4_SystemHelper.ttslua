@@ -27,6 +27,7 @@ function getHelperClient(helperObjectName)
 end
 local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
+local _unitHelper = getHelperClient('TI4_UNIT_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 local function copyTable(t)
@@ -783,13 +784,36 @@ function wormholes(playerColor)
                 if object.is_face_down then
                     wormholeSide = 'beta'
                 end
-
                 addGuid(wormholeSide, guid)
             end
 
             if name == 'Wormhole Reconstruction' and (not object.is_face_down) and (not _deckHelper.isDiscard(guid)) then
                 addConnection('alpha', 'beta')
                 addConnection('beta', 'alpha')
+            end
+
+            if name == 'Lost Star Chart' and (not object.is_face_down) and (not _deckHelper.isDiscard(guid)) then
+                addConnection('alpha', 'beta')
+                addConnection('beta', 'alpha')
+            end
+
+            -- Ghosts agent.
+            if name == 'Emissary Taivra' and (not object.is_face_down) and _unitHelper._isToggleActiveCardActive(object) then
+                local activeSystem = getActivatedSystem()
+                if activeSystem then
+                    _fillMissingSystemData(activeSystem.guid, activeSystem)
+                    for _, wormhole in ipairs(activeSystem.wormholes or {}) do
+                        if wormhole ~= 'delta' then
+                            addConnection('alpha', 'beta')
+                            addConnection('alpha', 'gamma')
+                            addConnection('alpha', 'delta')
+                            addConnection('beta', 'gamma')
+                            addConnection('beta', 'delta')
+                            addConnection('gamma', 'delta')
+                            break
+                        end
+                    end
+                end
             end
         end
     end
@@ -1337,12 +1361,52 @@ function lockSystemTile(tileGuid)
 
         -- Rotation (expect y = 0 or 180).
         local rot = object.getRotation()
-        rot = { x = 0, y = math.floor(rot.y + 0.5), z = 0 }
+        rot = {
+            x = math.floor(rot.x + 0.5),
+            y = math.floor(rot.y + 0.5),
+            z = math.floor(rot.z + 0.5)
+        }
 
         object.setPosition(pos)
         object.setRotation(rot)
         object.setLock(true)
     end
+end
+
+function summarizeTiles(tiles)
+    assert(type(tiles) == 'table')
+    local r = 0
+    local i = 0
+    local tech = {}
+    local legendary = 0
+    for _, tile in ipairs(tiles) do
+        local system = systemFromTile(tile)
+        if not system then
+            error('summarizeTiles: bad tile ' .. tile)
+        end
+        for _, planet in ipairs(system.planets or {}) do
+            r = r + (planet.resources or 0)
+            i = i + (planet.influence or 0)
+            if planet.tech then
+                table.insert(tech, string.sub(planet.tech, 1, 1):upper())
+            end
+            if planet.legendary then
+                legendary = legendary + 1
+            end
+        end
+    end
+    local items = {
+        r .. '/' .. i
+    }
+    if #tech > 0 then
+        table.sort(tech)
+        table.insert(items, table.concat(tech, ''))
+    end
+    if legendary > 0 then
+        local n = legendary
+        table.insert(items, ((n > 1) and n or '') .. 'L')
+    end
+    return table.concat(items, ' ')
 end
 
 -------------------------------------------------------------------------------

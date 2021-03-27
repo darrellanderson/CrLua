@@ -758,6 +758,9 @@ function getColorToCommanders()
         end
         commandTokenNameToColor[faction.tokenName .. ' Command Token'] = color
         allianceCardNameToColor['Alliance (' .. color .. ')'] = color
+        if faction.frankenName then
+            allianceCardNameToColor[faction.frankenName .. ' Alliance'] = color
+        end
         for _, ability in ipairs(faction.abilities or {}) do
             if ability == 'Imperia' then
                 imperiaColorSet = imperiaColorSet or {}

@@ -158,11 +158,11 @@ function onLoad(saveState)
     resetButtons()
 
     local snapPoints = {}
-    local lines = {}
-    local color = { r = 1, g = 1, b = 1, a = 0.1 }
+    --local lines = {}
+    --local color = { r = 1, g = 1, b = 1, a = 0.1 }
     for col = 0, 0 do
         for row = 0, 5 do
-            table.insert(lines, Slots.getVectorLine(col, row, Slots.DRAFT_MAT, color))
+            --table.insert(lines, Slots.getVectorLine(col, row, Slots.DRAFT_MAT, color))
         end
     end
     for col = 1, 3 do
@@ -172,7 +172,7 @@ function onLoad(saveState)
                 rotation = { x = 0, y = 0, z = 0 },
                 rotation_snap = true,
             })
-            table.insert(lines, Slots.getVectorLine(col, row, Slots.DRAFT_MAT, color, 2))
+            --table.insert(lines, Slots.getVectorLine(col, row, Slots.DRAFT_MAT, color, 2))
         end
     end
     for col = 4, 6 do
@@ -182,11 +182,11 @@ function onLoad(saveState)
                 rotation = { x = 0, y = 0, z = 0 },
                 rotation_snap = true,
             })
-            table.insert(lines, Slots.getVectorLine(col, row, Slots.DRAFT_MAT, color))
+            --table.insert(lines, Slots.getVectorLine(col, row, Slots.DRAFT_MAT, color))
         end
     end
     self.setSnapPoints(snapPoints)
-    self.setVectorLines(lines)
+    self.setVectorLines({})
 
     local function lookAtMe(playerColor)
         Player[playerColor].lookAt({
@@ -1703,51 +1703,7 @@ function _selectFaction(color, factionTokenName)
     end
     assert(factionSelector, 'missing faction selector for ' .. color)
 
-    -- Requires a mod update for this to be available, fall through to the hack way.
-    if factionSelector.getVar('selectFaction') then
-        factionSelect.call('selectFaction', factionTokenName)
-        return
-    end
-
-    -- From here to the end will be removed once the faction selector has the new method.
-    -- The faction selector has its own faction ids, sigh.
-    local FACTION_ID_AND_TOKEN_NAMES = {
-        { id = 'Arborec', tokenName = 'Arborec' },
-        { id = 'Letnev', tokenName = 'Barony of Letnev' },
-        { id = 'Saar', tokenName = 'Clan of Saar' },
-        { id = 'Muaat', tokenName = 'Embers of Muaat' },
-        { id = 'Hacan', tokenName = 'Emirates of Hacan' },
-        { id = 'Sol', tokenName = 'Federation of Sol' },
-        { id = 'Creuss', tokenName = 'Ghosts of Creuss' },
-        { id = 'L1Z1X', tokenName = 'L1Z1X Mindnet' },
-        { id = 'Mentak', tokenName = 'Mentak Coalition' },
-        { id = 'Naalu', tokenName = 'Naalu Collective' },
-        { id = 'Nekro', tokenName = 'Nekro Virus' },
-        { id = 'Sardakk', tokenName = "Sardakk N'orr", },
-        { id = 'JolNar', tokenName = 'Universities of Jol-Nar' },
-        { id = 'Winnu', tokenName = 'Winnu' },
-        { id = 'Xxcha', tokenName = 'Xxcha Kingdom' },
-        { id = 'Yin', tokenName = 'Yin Brotherhood' },
-        { id = 'Yssaril', tokenName = 'Yssaril Tribes' },
-        { id = 'Argent', tokenName = 'Argent Flight', pok = true },
-        { id = 'Cabal', tokenName = "Vuil'raith Cabal", pok = true },
-        { id = 'Empyrean', tokenName = 'Empyrean', pok = true },
-        { id = 'Mahact', tokenName = 'Mahact Gene-Sorcerers', pok = true },
-        { id = 'Nomad', tokenName = 'Nomad', pok = true },
-        { id = 'NRA', tokenName = 'Naaz-Rokha Alliance', pok = true },
-        { id = 'Titans', tokenName = 'Titans of Ul', pok = true },
-    }
-    local id = false
-    for _, entry in ipairs(FACTION_ID_AND_TOKEN_NAMES) do
-        if entry.tokenName == factionTokenName then
-            id = entry.id
-            break
-        end
-    end
-    assert(id, 'missing id for "' .. factionTokenName .. '"')
-
-    local clickFunction = 'selectFaction_' .. id
-    factionSelector.call(clickFunction)
+    factionSelector.call('selectFaction', factionTokenName)
 end
 
 -------------------------------------------------------------------------------

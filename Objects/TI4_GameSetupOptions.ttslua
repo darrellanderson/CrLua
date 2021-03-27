@@ -8,8 +8,8 @@ local DEFAULT_CONFIG = {
     playerCount = 6,
     extraRings = 0,
     usePoK = false,
-    useCodex1ACs = false,
-    useCodex2ACs = false,
+    useCodex1 = false,
+    useCodex2 = false,
     is14ptGame = false,
     isRightClick = false,
     playerTools = false,
@@ -260,8 +260,8 @@ function _createUI()
                     toggleGroup('extraRings', { 0, 1, 2, 3 }),
 
                     toggle('usePoK', 'Prophecy of Kings expansion'),
-                    toggle('useCodex1ACs', 'Codex 1 action cards'),
-                    --toggle('useCodex2ACs', 'Codex 2 action cards'),
+                    toggle('useCodex1', 'Codex 1 action cards'),
+                    toggle('useCodex2', 'Codex 2 relic cards'),
                     toggle('14ptGame', '14 point game'),
                     toggle('playerTools', 'Player tools (boards, build area)'),
                     toggle('gamedataOptIn', 'Share anonymized game stats'),
@@ -316,8 +316,8 @@ end
 
 function updateUiFromConfig()
     self.UI.setAttribute('usePoK', 'isOn', _config.usePoK)
-    self.UI.setAttribute('useCodex1ACs', 'isOn', _config.useCodex1ACs)
-    self.UI.setAttribute('useCodex2ACs', 'isOn', _config.useCodex2ACs)
+    self.UI.setAttribute('useCodex1', 'isOn', _config.useCodex1)
+    self.UI.setAttribute('useCodex2', 'isOn', _config.useCodex2)
     self.UI.setAttribute('14ptGame', 'isOn', _config.is14ptGame)
     self.UI.setAttribute('playerTools', 'isOn', _config.playerTools)
     self.UI.setAttribute('gamedataOptIn', 'isOn', _config.gamedataOptIn)
@@ -360,10 +360,10 @@ function onToggleValueChanged(player, value, id)
         end
     elseif id == 'usePoK' then
         _config.usePoK = valueAsBool
-    elseif id == 'useCodex1ACs' then
-        _config.useCodex1ACs = valueAsBool
-    elseif id == 'useCodex2ACs' then
-        _config.useCodex2ACs = valueAsBool
+    elseif id == 'useCodex1' then
+        _config.useCodex1 = valueAsBool
+    elseif id == 'useCodex2' then
+        _config.useCodex2 = valueAsBool
     elseif id == '14ptGame' then
         _config.is14ptGame = valueAsBool
     elseif id == 'playerTools' then
@@ -402,8 +402,8 @@ function setupGameCoroutine()
     assert(type(_config.playerCount) == 'number')
     assert(type(_config.extraRings) == 'number')
     assert(type(_config.usePoK) == 'boolean')
-    assert(type(_config.useCodex1ACs) == 'boolean')
-    assert(type(_config.useCodex2ACs) == 'boolean')
+    assert(type(_config.useCodex1) == 'boolean')
+    assert(type(_config.useCodex2) == 'boolean')
     assert(type(_config.is14ptGame) == 'boolean')
     assert(type(_config.isRightClick) == 'boolean')
     assert(type(_config.playerTools) == 'boolean')
@@ -414,10 +414,10 @@ function setupGameCoroutine()
     setupPoK(_config.usePoK)
     coroutine.yield(0)
 
-    setupCodex1ACs(_config.useCodex1ACs)
+    setupCodex1(_config.useCodex1)
     coroutine.yield(0)
 
-    setupCodex2ACs(_config.useCodex2ACs)
+    setupCodex2(_config.useCodex2)
     coroutine.yield(0)
 
     setup14ptGame(_config.is14ptGame)
@@ -436,19 +436,19 @@ function setupGameCoroutine()
     return 1
 end
 
-function setupCodex1ACs(useCodex1ACs)
-    if useCodex1ACs then
+function setupCodex1(useCodex1)
+    if useCodex1 then
         _addCards('Variant Pieces (Searching Recommended)', 'Actions', 'Codex 1')
     else
         _removeCards('Variant Pieces (Searching Recommended)', 'Actions', 'Codex 1')
     end
 end
 
-function setupCodex2ACs(useCodex2ACs)
-    if useCodex2ACs then
-        _addCards('Variant Pieces (Searching Recommended)', 'Actions', 'Codex 2')
+function setupCodex2(useCodex2)
+    if useCodex2 then
+        _addCards('Variant Pieces (Searching Recommended)', 'Relics', 'Codex 2')
     else
-        _removeCards('Variant Pieces (Searching Recommended)', 'Actions', 'Codex 2')
+        _removeCards('Variant Pieces (Searching Recommended)', 'Relics', 'Codex 2')
     end
 end
 
@@ -878,7 +878,7 @@ function _addCards(containerName, deckName, sourceName)
         end
     end
     if not guid then
-        --error('_addCards: missing "' .. containerName .. '/' .. name .. '"')
+        printToAll('_addCards: missing "' .. containerName .. '/' .. name .. '"', 'Yellow')
         return -- this happens if the deck is already on the table
     end
 

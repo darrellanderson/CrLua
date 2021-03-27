@@ -867,13 +867,13 @@ function Tokens.sumTacticFleetStrategy(tokens, playerColor)
             local p = commandSheet.positionToLocal(token.getPosition())
             local dSq = p.x * p.x + p.z * p.z
             local degrees = (math.deg(math.atan2(p.z, p.x)) + 360) % 360
-            if dSq < 15 then
-                if 300 > degrees and degrees > 240 then
-                    numTactics = numTactics + 1
+            if dSq < 16 then  -- exact + gutter is 15
+                if 330 > degrees and degrees > 240 then
+                    numTactics = numTactics + 1  -- exact is 240-300
                 elseif 240 > degrees and degrees > 180 then
-                    numFleet = numFleet + 1
-                elseif 180 > degrees and degrees > 120 then
-                    numStrategy = numStrategy + 1
+                    numFleet = numFleet + 1  -- exact is 180-240
+                elseif 180 > degrees and degrees > 90 then
+                    numStrategy = numStrategy + 1  -- exact is 120-180
                 end
             end
         end
@@ -1625,7 +1625,15 @@ function onSetupHelperSetupFinished(params)
     end
 end
 
+local _didOnPlayerTurnStartCheck = false
 function onPlayerTurnStart(player_color_start, player_color_previous)
+    -- A bug report says the map tool keeps re-saving the string every turn.
+    -- Unable to reproduce, hammer to make sure it only tries once.
+    if _didOnPlayerTurnStartCheck then
+        return
+    end
+    _didOnPlayerTurnStartCheck = true
+
     if _gamedataOptIn or _gameDataKey then
         -- If map builder is empty, trigger a save for stats recording
         local mapString = Map.getMapString()

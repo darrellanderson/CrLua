@@ -32,23 +32,62 @@ local function copyTable(t)
     return t
 end
 
-local exploreCardToTokenMap = {
-    ["Propulsion Research Facility"] = {"Propulsion Research Facility Token"}, -- 1r1i or blue
-    ["Cybernetic Research Facility"] = {"Cybernetic Research Facility Token"}, -- 1r1i or yellow
-    ["Biotic Research Facility"] = {"Biotic Research Facility Token"}, -- 1r1i or green
-    ["Warfare Research Facility"] = {"Warfare Research Facility Token"}, -- 1r1i or red
-    ["Lazax Survivors"] = {"Lazax Survivors Token"}, -- 1r2i
-    ["Rich World"] = {"Rich World Token"}, -- 1r
-    ["Mining World"] = {"Mining World Token"}, -- 2r
-    ["Dyson Sphere"] = {"Dyson Sphere Token"}, -- 2r1i
-    ["Paradise World"] = {"Paradise World Token"}, -- 2i
-    ["Tomb of Emphidia"] = {"Tomb of Emphidia Token"}, -- 1i
-    ["Demilitarized Zone (PoK)"] = {"DMZ Token"},
-    ["Gamma Wormhole"] = {"Gamma Wormhole Token"},
-    ["Gamma Relay"] = {"Gamma Wormhole Token"},
-    ["Mirage (Exploration)"] = {"Mirage Token", "Mirage", "Mirage Flight Academy"},
-    ["Ion Storm"] = {"Ion Storm Token"},
-    ["Stellar Converter"] = {"Stellar Converter Token"},
+local exploreCards = {
+    ['Propulsion Research Facility'] = {
+        pull = { 'Propulsion Research Facility Token' }, -- 1r1i or blue
+    },
+    ['Cybernetic Research Facility'] = {
+        pull = { 'Cybernetic Research Facility Token' }, -- 1r1i or yellow
+    },
+    ['Biotic Research Facility'] = {
+        pull = { 'Biotic Research Facility Token' }, -- 1r1i or green
+    },
+    ['Warfare Research Facility'] = {
+        pull = { 'Warfare Research Facility Token' }, -- 1r1i or red
+    },
+    ['Lazax Survivors'] = {
+        pull = { 'Lazax Survivors Token' }, -- 1r2i
+    },
+    ['Rich World'] = {
+        pull = { 'Rich World Token' }, -- 1r
+    },
+    ['Mining World'] = {
+        pull = { 'Mining World Token' }, -- 2r
+    },
+    ['Dyson Sphere'] = {
+        pull = { 'Dyson Sphere Token' }, -- 2r1i
+    },
+    ['Paradise World'] = {
+        pull = { 'Paradise World Token' }, -- 2i
+    },
+    ['Tomb of Emphidia'] = {
+        pull = { 'Tomb of Emphidia Token' }, -- 1i
+    },
+    ['Demilitarized Zone (PoK)'] = {
+        pull = { 'DMZ Token' },
+    },
+    ['Gamma Wormhole'] = {
+        pull = { 'Gamma Wormhole Token' },
+    },
+    ['Gamma Relay'] = {
+        pull = { 'Gamma Wormhole Token' },
+    },
+    ['Mirage (Exploration)'] = {
+        pull = { 'Mirage Token', 'Mirage', 'Mirage Flight Academy' },
+    },
+    ['Ion Storm'] = {
+        pull = { 'Ion Storm Token' },
+    },
+    ['Stellar Converter'] = {
+        drawTokenOnSpawn = true,
+        pull = { 'Stellar Converter Token' },
+    },
+
+    -- Codex 2
+    ['Nano-Forge'] = {
+        drawTokenOnSpawn = true,
+        pull = { 'Nano-Forge Token' },
+    },
 }
 
 local attachTokens = {
@@ -106,6 +145,10 @@ local attachTokens = {
             assert(attachTokenObject.getName() == 'Mirage Token')
             return _mirageTokenEjectFunction(system, planetName, attachTokenObject)
         end
+    },
+    ['Nano-Forge Token'] = {
+        decal = true,
+        faceUpOrDown = { resources = 2, influence = 2, legendary = true },
     },
     ['Paradise World Token'] = {
         decal = true,
@@ -213,12 +256,15 @@ function injectAttachToken(params)
     end
 
     -- Add to tokens associated with that card.
-    local attach = exploreCardToTokenMap[params.cardName]
+    local attach = exploreCards[params.cardName]
     if not attach then
-        attach = {}
-        exploreCardToTokenMap[params.cardName] = attach
+        attach = {
+            pull = {},
+        }
+        exploreCards[params.cardName] = attach
     end
-    table.insert(attach, params.tokenName)
+    table.insert(attach.pull, params.tokenName)
+
     attachTokens[params.tokenName] = copyTable(params)
     return true
 end
@@ -228,8 +274,8 @@ end
 --- Return explore token names, to be able to put them back in the bag on graveyard.
 function getExploreTokenNames()
     local result = {}
-    for _, tokenNames in pairs(exploreCardToTokenMap) do
-        for _, tokenName in ipairs(tokenNames) do
+    for _, attrs in pairs(exploreCards) do
+        for _, tokenName in ipairs(attrs.pull or {}) do
             table.insert(result, tokenName)
         end
     end
@@ -298,25 +344,30 @@ function onLoad(saveState)
 end
 
 function onObjectSpawn(object)
+    local name = object.getName()
+
     if isExplorable(object) then
         applyExplorationGoodness(object)
     elseif isFrontierToken(object) then
         applyFrontierGoodness(object)
-    elseif object.tag == 'Card' and AttachLib._planetNameToDecals[object.getName()] then
-        local decals = AttachLib._planetNameToDecals[object.getName()]
+    elseif object.tag == 'Card' and AttachLib._planetNameToDecals[name] then
+        local decals = AttachLib._planetNameToDecals[name]
         object.setDecals(decals)
     end
 
     -- Give token when card is drawn.
-    if object.tag == 'Card' and object.getName() == 'Stellar Converter' then
-        local guid = object.guid
-        local function delayedCheck()
-            local object = getObjectFromGUID(guid)
-            if object then
-                checkCardForToken(object, false)
+    if object.tag == 'Card' then
+        local attrs = exploreCards[name]
+        if attrs and attrs.drawTokenOnSpawn then
+            local guid = object.guid
+            local function delayedCheck()
+                local object = getObjectFromGUID(guid)
+                if object then
+                    checkCardForToken(object, false)
+                end
             end
+            Wait.time(delayedCheck, 5)
         end
-        Wait.time(delayedCheck, 5)
     end
 end
 
@@ -506,7 +557,8 @@ end
 function checkCardForToken(object_spawned, planetName)
     local cardName = object_spawned.getName()
     local tokensToRetrieveSet = {}
-    for _, item in ipairs(exploreCardToTokenMap[cardName] or {}) do
+    local attrs = exploreCards[cardName]
+    for _, item in ipairs(attrs and attrs.pull or {}) do
         tokensToRetrieveSet[item] = true
     end
 
@@ -1280,9 +1332,9 @@ function _mirageTokenEjectFunction(system, planetName, attachTokenObject)
     return false
 end
 
-local _stellarConveterTokenDestroyPlanetQueue = {}
-function _stellarConveterTokenDestroyPlanet_coroutine()
-    local params = assert(table.remove(_stellarConveterTokenDestroyPlanetQueue))
+local _stellarConverterTokenDestroyPlanetQueue = {}
+function _stellarConverterTokenDestroyPlanet_coroutine()
+    local params = assert(table.remove(_stellarConverterTokenDestroyPlanetQueue))
     local system = assert(params.system)
     local planetName = assert(params.planetName)
     local attachToken = assert(params.attachToken)
@@ -1311,8 +1363,8 @@ function _stellarConveterTokenDestroyPlanet_coroutine()
 
     -- Get set of attachment tokens to search for
     local attachmentCardByToken = {}
-    for card, tokens in pairs(exploreCardToTokenMap) do
-        for _, tokenName in ipairs(tokens or {}) do
+    for card, attrs in pairs(exploreCards) do
+        for _, tokenName in ipairs(attrs and attrs.pull or {}) do
             if tokenName ~= 'Mirage Token' and tokenName ~= 'Stellar Converter Token' then -- Stellar Converter doesn't remove Mirage Token, or itself.
                 attachmentCardByToken[tokenName] = card
             end
@@ -1354,7 +1406,7 @@ function _stellarConveterTokenDestroyPlanet_coroutine()
             if pfp and pfp.name == planetName then
                 table.insert(attachmentTokensOnPlanet, object.getGUID())
             end
-        elseif exploreCardToTokenMap[object.getName()] then -- Checks if it's an attachment card
+        elseif exploreCards[object.getName()] then -- Checks if it's an attachment card
             attachmentCardGuidByName[object.getName()] = object.getGUID()
         elseif string.match(object.getName(), ' Owner Token$') then
             -- If it's on planet, keep track of owner token.
@@ -1488,17 +1540,17 @@ function _stellarConveterTokenDestroyPlanet_coroutine()
     return 1
 end
 
-function _stellarConveterTokenDestroyPlanet(system, planetName, attachToken)
+function _stellarConverterTokenDestroyPlanet(system, planetName, attachToken)
     assert(system)
     assert(planetName)
     assert(attachToken)
 
-    table.insert(_stellarConveterTokenDestroyPlanetQueue, {
+    table.insert(_stellarConverterTokenDestroyPlanetQueue, {
         system = system,
         planetName = planetName,
         attachToken = attachToken
     })
-    startLuaCoroutine(self, '_stellarConveterTokenDestroyPlanet_coroutine')
+    startLuaCoroutine(self, '_stellarConverterTokenDestroyPlanet_coroutine')
 end
 
 function _stellarConverterTokenInjectFunction(system, planetName, attachTokenObject)
@@ -1586,7 +1638,7 @@ function _stellarConverterTokenInjectFunction(system, planetName, attachTokenObj
         local planetName = planet.name
         local function wrapped()
             printToAll('Stellar Converter destroying ' .. planetName, 'Yellow')
-            _stellarConveterTokenDestroyPlanet(system, planetName, tokenGuid)
+            _stellarConverterTokenDestroyPlanet(system, planetName, tokenGuid)
         end
         attachTokenObject.addContextMenuItem('Destroy ' .. planetName, wrapped, false)
     end
@@ -1644,8 +1696,8 @@ function _stellarConverterTokenEjectFunction(system, planetName, attachTokenObje
         -- Get map of attach token name to card name
         local attachmentCardByToken = {}
         if restorePlanet._attachments then
-            for card, tokens in pairs(exploreCardToTokenMap) do
-                for _, tokenName in ipairs(tokens or {}) do
+            for card, attrs in pairs(exploreCards) do
+                for _, tokenName in ipairs(attrs and attrs.pull or {}) do
                     -- Check if the token was on the planet when it was destroyed.
                     -- NOTE: This won't catch attachments after save/load. Consider reading planet card decals instead.
                     if restorePlanet._attachments[tokenName] then
@@ -1666,9 +1718,10 @@ function _stellarConverterTokenEjectFunction(system, planetName, attachTokenObje
                 unpurge = true
             elseif attachmentCardByToken[purgeObject.name] then -- Check if attachment token which was on planet
                 unpurge = true
-            elseif exploreCardToTokenMap[purgeObject.name] then -- Check if attachment card
+            elseif exploreCards[purgeObject.name] then -- Check if attachment card
                 -- Check if associated token was on the card
-                for _, cardToken in ipairs(exploreCardToTokenMap[purgeObject.name] or {}) do
+                local attrs = exploreCards[purgeObject.name]
+                for _, cardToken in ipairs(attrs and attrs.pull or {}) do
                     if attachmentCardByToken[cardToken] then
                         unpurge = true
                         break

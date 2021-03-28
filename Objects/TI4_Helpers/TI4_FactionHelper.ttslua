@@ -224,7 +224,7 @@ local _factionAttributes = {
         flagship = 'The Alastor',
         flagshipDescription = 'At the start of space combat, choose any number of your ground forces in this system to participate in that combat as is they were ships.  These ground forces do not count against fleet supply.',
         abilities = { 'Galactic Threat', 'Technological Singularity', 'Propagation' },
-        startMessage = 'If the Vuil\'Raith Cabal isn\'t in your game, Purge your Dimensional Tear tokens.',
+        startMessage = 'If the Vuil\'raith Cabal isn\'t in your game, purge your Dimensional Tear tokens.',
         units = { 'Mordred' },
         commander = 'Nekro Acidos',
         hero = 'Unit.dsgn.FLAYESH',
@@ -252,12 +252,13 @@ local _factionAttributes = {
     ['The Universities of Jol-Nar'] = {
         tokenName = 'Universities of Jol-Nar',
         frankenName = 'Jol Nar',
+        shortName = 'Jol-Nar',  -- should fix Franken objects and remove this
         home = 12,
         startingUnits = { Infantry = 2, Fighter = 1, Carrier = 2, Dreadnought = 1, Space_Dock = 1, PDS = 2 },
         startingTech = { 'Antimass Deflectors', 'Neural Motivator', 'Sarween Tools', 'Plasma Scoring' },
         factionTech = { "Spacial Conduit Cylinder", "E-res Siphons" },
         flagship = 'J.N.S. Hylarim',
-        flagshipDescription = 'When making a combat roll for this ship, each result of 9 or 10, before applying modifiers, produces 2 extra hits.',
+        flagshipDescription = 'When making a combat roll for this ship, each result of 9 or 10 (before applying modifiers) produces 2 extra hits.',
         abilities = { 'Fragile', 'Brilliant', 'Analytical' },
         units = { 'Shield Paling' },
         commander = 'Ta Zern',
@@ -761,6 +762,9 @@ function getColorToCommanders()
         if faction.frankenName then
             allianceCardNameToColor[faction.frankenName .. ' Alliance'] = color
         end
+        if faction.shortName then
+            allianceCardNameToColor[faction.shortName .. ' Alliance'] = color
+        end
         for _, ability in ipairs(faction.abilities or {}) do
             if ability == 'Imperia' then
                 imperiaColorSet = imperiaColorSet or {}
@@ -776,6 +780,7 @@ function getColorToCommanders()
 
     -- Find alliance cards and command tokens (for imperia).
     local availableCommanderNameSet = {}
+    local activeCommanderNameSet = {}  -- also track toggleActive state, when present
     local guidToAllianceColor = {}
     local guidToCommandTokenColor = {}
     local guidToPosition = {}
@@ -786,6 +791,12 @@ function getColorToCommanders()
             local name = object.getName()
             if commanderNameSet[name] and (not object.is_face_down) then
                 availableCommanderNameSet[name] = true
+                -- Also track if idle/active
+                local isActive = true
+                if _unitHelper._isToggleActiveCard(object) then
+                    isActive = _unitHelper._isToggleActiveCardActive(object)
+                end
+                activeCommanderNameSet[name] = isActive
             end
             local color = (object.tag == 'Card') and (not object.is_face_down) and allianceCardNameToColor[name]
             if color then
@@ -802,10 +813,13 @@ function getColorToCommanders()
     local guidToZoneColor = _zoneHelper.zonesFromPositions(guidToPosition)
 
     local colorToCommanders = {}
-    local function addCommanderIfUnlocked(color, commander)
+    local function addCommanderIfUnlocked(color, commander, requireActive)
         assert(type(color) == 'string' and type(commander) == 'string')
         if not availableCommanderNameSet[commander] then
             return  -- locked
+        end
+        if requireActive and (not activeCommanderNameSet[commander]) then
+            return  -- idle
         end
         local commanders = colorToCommanders[color]
         if not commanders then
@@ -814,7 +828,7 @@ function getColorToCommanders()
         end
         for _, entry in ipairs(commanders) do
             if entry == commander then
-                return  -- already have this one
+                return -- already have this one
             end
         end
         table.insert(commanders, commander)
@@ -822,16 +836,27 @@ function getColorToCommanders()
 
     -- Add native.
     for color, commander in pairs(colorToFactionCommander) do
-        addCommanderIfUnlocked(color, commander)
+        addCommanderIfUnlocked(color, commander, true)
     end
 
     -- Add alliances.
     for guid, allianceColor in pairs(guidToAllianceColor) do
+        -- If the alliance card has toggle active, only add it if active.
+        local considerCard = true
+        local requireActive = true
+        local card = getObjectFromGUID(guid)
+        if _unitHelper._isToggleActiveCard(card) then
+            if _unitHelper._isToggleActiveCardActive(card) then
+                requireActive = false  -- alliance marked active
+            else
+                considerCard = false  -- alliace marked idle, disregard completely
+            end
+        end
         local zoneColor = guidToZoneColor[guid]
-        if zoneColor and (zoneColor ~= allianceColor) then
+        if considerCard and zoneColor and (zoneColor ~= allianceColor) then
             local commander = colorToFactionCommander[allianceColor]
             if commander then
-                addCommanderIfUnlocked(zoneColor, commander)
+                addCommanderIfUnlocked(zoneColor, commander, requireActive)
             end
         end
     end
@@ -842,7 +867,7 @@ function getColorToCommanders()
         if zoneColor and (zoneColor ~= commandTokenColor) and imperiaColorSet[zoneColor] then
             local commander = colorToFactionCommander[commandTokenColor]
             if commander then
-                addCommanderIfUnlocked(zoneColor, commander)
+                addCommanderIfUnlocked(zoneColor, commander, true)
             end
         end
     end
@@ -903,6 +928,9 @@ function injectFaction(faction)
     if faction.frankenName then
         _lowerTokenNameToFaction[string.lower(faction.frankenName)] = faction
     end
+    if faction.shortName then
+        _lowerTokenNameToFaction[string.lower(faction.shortName)] = faction
+    end
 
     -- Tell deck helper about promissory notes (for discard back to player).
     for _, cardName in ipairs(faction.promissoryNotes or {}) do
@@ -927,6 +955,11 @@ function _factionIsValid(faction)
     local frankenName = faction.frankenName
     if not frankenName or type(frankenName) ~= 'string' or string.len(frankenName) == 0 then
         return false, 'faction.frankenName must be a non-empty string'
+    end
+
+    local shortName = faction.shortName
+    if not shortName or type(shortName) ~= 'string' or string.len(shortName) == 0 then
+        return false, 'faction.shortName must be a non-empty string'
     end
 
     local home = faction.home
@@ -1145,6 +1178,9 @@ function updateFactions()
         if attributes.frankenName then
             _lowerTokenNameToFaction[string.lower(attributes.frankenName)] = attributes
         end
+        if attributes.shortName then
+            _lowerTokenNameToFaction[string.lower(attributes.shortName)] = attributes
+        end
     end
 
     -- Add any missing factions to token name map.
@@ -1156,6 +1192,9 @@ function updateFactions()
             end
             if attributes.frankenName then
                 _lowerTokenNameToFaction[string.lower(attributes.frankenName)] = attributes
+            end
+            if attributes.shortName then
+                _lowerTokenNameToFaction[string.lower(attributes.shortName)] = attributes
             end
         end
     end
@@ -2033,7 +2072,7 @@ function dimensionalanchor_rollDiceCoroutine()
 end
 
 -- Hero
--- Faction: The Vuil'Raith Cabal
+-- Faction: The Vuil'raith Cabal
 -- Card Name: It Feeds on Carrion
 -- Ability Name: Dimensional Anchor
 -- Ability Text:
@@ -2041,7 +2080,7 @@ end
 -- that are in or adjacent to a system that contains a dimensional tear; on
 -- a 1-3, capture that unit. If this causes a player's ground forces or fighters
 -- to be removed, also capture those units. Then, purge this card.
-local function _carrionHeroAbility(owningObject, clickingColor) --Vuil'Raith Hero
+local function _carrionHeroAbility(owningObject, clickingColor) --Vuil'raith Hero
     if not _heroCardCanBeUsed(owningObject, clickingColor) then
         -- Function will print why card cannot be used
         return

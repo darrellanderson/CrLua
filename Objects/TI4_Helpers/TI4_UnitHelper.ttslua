@@ -448,7 +448,7 @@ local _flagshipModifiers = {
 -- - allowFaceDown: optional boolean, if true detect even if face down
 -- - toggleActive: optional boolean, if true add "idle/active" button
 local _unitModifiers = {
-    ['2Ram'] = {
+    ['2RAM'] = {
         leader = LEADER.COMMANDER, -- L1Z1X
         description = 'PLANETARY SHIELD does not prevent BOMBARDMENT',
         owner = OWNER.SELF,
@@ -1037,7 +1037,7 @@ local _unitModifiers = {
 
     ['That Which Molds Flesh'] = {
         description = 'When producing Infantry and/or Fighters, up to 2 do not count against the production limit.',
-        leader = LEADER.COMMANDER, -- Vuil'Raith
+        leader = LEADER.COMMANDER, -- Vuil'raith
         owner = OWNER.SELF,
         type = TYPE.CHOOSE,
         isCombat = false,
@@ -1491,18 +1491,13 @@ function getColorToUnitModifiers()
     end
 
     -- Add commanders (including Alliance and Imperia sharing).
+    -- Faction helper looks at alliance cards when they have toggle active,
+    -- as well as if the linked commander is active when unable to (imperia).
+    -- It is safe to trust faction helper returns only valid commanders.
     local colorToCommanders = _factionHelper.getColorToCommanders()
-    local toggleActiveCommanderToColor = {}
     for color, commanders in pairs(colorToCommanders) do
         for _, commander in ipairs(commanders) do
-            local unitModifier = _unitModifiers[commander]
-            if (not unitModifier) or (not unitModifier.toggleActive) then
-                addModifier(color, commander)
-            else
-                -- Toggle Active commanders require additional checks
-                toggleActiveCommanderToColor[commander] = toggleActiveCommanderToColor[commander] or {}
-                table.insert(toggleActiveCommanderToColor[commander], color)
-            end
+            addModifier(color, commander)
         end
     end
 
@@ -1578,15 +1573,6 @@ function getColorToUnitModifiers()
                 local color = _zoneHelper.zoneFromPosition(object.getPosition())
                 if sardakk and sardakk.color and sardakk.color ~= color then
                     addModifier(sardakk.color, name)
-                end
-            end
-
-            local commanderColors = toggleActiveCommanderToColor[name]
-            if commanderColors then
-                -- This object has passed any 'toggle active' checks. Add commander to specified colors.
-                -- These come from faction.commander, Alliance promissory notes, and Imperia
-                for _, color in ipairs(commanderColors) do
-                    addModifier(color, name)
                 end
             end
 
@@ -1900,11 +1886,43 @@ local TOGGLE_ACTIVE_STATE = {
 
 function _isToggleActiveCard(object)
     if object.tag == 'Card' then
-        local modifier = _unitModifiers[object.getName()]
+        local name = object.getName()
+        local modifier = _unitModifiers[name]
         if modifier and modifier.alias then
             modifier = _unitModifiers[modifier.alias]
         end
-        return modifier and modifier.toggleActive
+        if modifier then
+            return modifier.toggleActive
+        end
+
+        -- Add toggle active for alliance cards where the peer is toggle active.
+        -- Do not use an alias should only actually get used when linked
+        -- commander is active, let faction helper look at the toggle active
+        -- status and decide when an alliance is in play.
+        local shortName = string.match(name, '^(.*) Alliance$')
+        local faction = shortName and _factionHelper.fromTokenName(shortName)
+        local commander = faction and faction.commander
+        local modifier = commander and _unitModifiers[commander]
+        if modifier and modifier.alias then
+            modifier = _unitModifiers[modifier.alias]
+        end
+        if modifier then
+            return modifier.toggleActive
+        end
+
+        -- Also support the old style.
+        local factionColor = string.match(name, '^Alliance %((.*)%)$')
+        local faction = factionColor and _factionHelper.fromColor(factionColor)
+        local commander = faction and faction.commander
+        local modifier = commander and _unitModifiers[commander]
+        if modifier and modifier.alias then
+            modifier = _unitModifiers[modifier.alias]
+        end
+        if modifier then
+            return modifier.toggleActive
+        end
+
+        return false
     end
 end
 

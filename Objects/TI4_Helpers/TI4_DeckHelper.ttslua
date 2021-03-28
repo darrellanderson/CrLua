@@ -664,6 +664,7 @@ local function _getDeckAttributes(cardName)
             for _, cardName in ipairs(faction.promissoryNotes or {}) do
                 _cardNameToDeckAttributes[cardName] = deckAttributes
             end
+            _cardNameToDeckAttributes[(faction.shortName or faction.frankenName or '-') .. ' Alliance'] = deckAttributes
         end
     end
     return _cardNameToDeckAttributes[cardName]

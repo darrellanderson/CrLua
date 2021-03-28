@@ -620,7 +620,12 @@ function colorToAlliances()
         local seen = {}
         for _, card in ipairs(cards) do
             local alliance = string.match(card.getName(), '^Alliance %((.*)%)$')
-            if alliance and not seen[alliance] then
+            local shortName = string.match(card.getName(), '^(.*) Alliance$')
+            if shortName then
+                local faction = _factionHelper.fromTokenName(shortName)
+                alliance = faction and faction.color
+            end
+            if alliance and (alliance ~= color) and (not seen[alliance]) then
                 seen[alliance] = true
                 table.insert(result[color], alliance)
             end
@@ -1007,6 +1012,7 @@ function Cards.summarize(cards)
             for _, name in ipairs(faction.promissoryNotes or {}) do
                 Cards._promissoryNoteSet[name] = true
             end
+            Cards._promissoryNoteSet[(faction.shortName or faction.frankenName or '-') .. ' Alliance'] = true
         end
         for _, color in ipairs(Player.getColors()) do
             Cards._promissoryNoteSet['Alliance (' .. color .. ')'] = true
@@ -1454,15 +1460,20 @@ function Factions.getAllianceCards()
         if object.is_face_down then
             return false
         end
-        return string.match(object.getName(), '^Alliance')
+        local color = string.match(object.getName(), '^Alliance %((.*)%)$')
+        if color then
+            return true
+        end
+        local shortName = string.match(object.getName(), '^(.*) Alliance$')
+        local faction = shortName and _factionHelper.fromTokenName(shortName)
+        if faction then
+            return true
+        end
     end
     local cards = {}
     for _, object in ipairs(getAllObjects()) do
         if isCandidate(object) then
-            local color = string.match(object.getName(), '^Alliance %((.*)%)$')
-            if color then
-                table.insert(cards, object)
-            end
+            table.insert(cards, object)
         end
     end
     return cards

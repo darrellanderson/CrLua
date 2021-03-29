@@ -261,7 +261,9 @@ function _createUI()
 
                     toggle('usePoK', 'Prophecy of Kings expansion'),
                     toggle('useCodex1', 'Codex 1 action cards'),
-                    toggle('useCodex2', 'Codex 2 relic cards'),
+                    -- TODO: uncomment the following line to add Codex 2.
+                    -- Expects to find "Codex 2 Relics" in the variants bag.
+                    --toggle('useCodex2', 'Codex 2 relic cards'),
                     toggle('14ptGame', '14 point game'),
                     toggle('playerTools', 'Player tools (boards, build area)'),
                     toggle('gamedataOptIn', 'Share anonymized game stats'),

@@ -7,6 +7,7 @@
 -- v3.1: safer transition when two cards forming a deck, and vice versa.
 -- v3.2: wait for TTS before moving to final destination in order to preserve guid.
 -- v3.3 [August 2020]: migrate to deck helper.
+-- v3.4 [March 2021]: deck helper now synchronous, do heavy lifting internally
 
 function getHelperClient(helperObjectName)
     local function getHelperObject()
@@ -30,26 +31,78 @@ local _exploreHelper = getHelperClient('TI4_EXPLORE_HELPER')
 local PICK_FACTION_BAG = 'Pick a Faction to Play'
 local EXPLORE_TOKEN_BAG = 'Exploration Bag'
 
+local REPORT_CARDS_LIMIT = 20
+
 -------------------------------------------------------------------------------
+
+local _reportTrashed = {}
 
 local _exploreTokenNameSet = false
 local _objectNameToBagGuid = {}
 
-local _guidToPending = {}  -- waiting for put into self to finish
-local _guidToLimbo = {}  -- put into self is done
-local _guidToFinal = {}  -- waiting for put into final to finish
+local _deckNameToDiscardIndex = {}
 
-local _reportTrashed = false
+local _guidAwaitingDestroySet = {}
+local _guidPendingMoveSet = {}
+
+local _coroutineStartTime = false
+
+-------------------------------------------------------------------------------
+
+local function reportTrashed(objectName)
+    assert(type(objectName) == 'string')
+
+    local deckName = _deckHelper.getDeckName(objectName)
+    if deckName == 'Secret Objectives' then
+        objectName = 'Secret Objective' -- ALWAYS hide secrets
+        deckName = false
+    end
+    if deckName then
+        local cards = _reportTrashed[deckName]
+        if not cards then
+            cards = {}
+            _reportTrashed[deckName] = cards
+        end
+        if type(cards) == 'table' then
+            if #cards < REPORT_CARDS_LIMIT then
+                table.insert(cards, objectName)
+            elseif #cards == REPORT_CARDS_LIMIT then
+                table.insert(cards, '...')
+            end
+        elseif type(cards) == 'number' then
+            _reportTrashed[deckName] = (_reportTrashed[deckName] or 0) + 1
+        end
+    else
+        _reportTrashed[objectName] = (_reportTrashed[objectName] or 0) + 1
+    end
+end
+
+local function printAndResetReportTrashed()
+    local message = {}
+    for name, countOrCards in pairs(_reportTrashed or {}) do
+        local count = type(countOrCards) == 'table' and #countOrCards or countOrCards
+        local cards = type(countOrCards) == 'table' and countOrCards
+        local plural = count > 1 and (not string.match(name, '[ys]$') and 's') or ''
+        if cards then
+            cards = table.concat(cards, ', ')
+            table.insert(message, count .. ' ' .. name .. plural .. ' (' .. cards .. ')')
+        else
+            table.insert(message, count .. ' ' .. name .. plural)
+        end
+    end
+    if #message > 0 then
+        message = 'Graveyard moving ' .. table.concat(message, ', ')
+        printToAll(message, 'Yellow')
+    end
+    _reportTrashed = {}
+end
 
 -------------------------------------------------------------------------------
 
 --- Get bag for object.
-local function getNonCardDestination(objectTag, objectName)
-    assert(type(objectName) == 'string')
-
-    if string.len(objectName) == 0 then
-        return false
-    end
+local function getBag(object)
+    assert(type(object) == 'userdata')
+    local objectName = object.getName()
 
     -- Do we already know where to put it?
     local bagGuid = _objectNameToBagGuid[objectName]
@@ -58,7 +111,7 @@ local function getNonCardDestination(objectTag, objectName)
         return bag
     end
 
-    -- Look forand remember bag if found.  If more than one choose closest
+    -- Look for and remember bag if found.  If more than one choose closest
     -- (reduces objects from flying over the table).
     -- Remember via guid to prevent trying to access a deleted bag later.
     -- Do not store "nacks" for objects with no bag, it could be unpacked!
@@ -73,8 +126,8 @@ local function getNonCardDestination(objectTag, objectName)
 
     if not _exploreTokenNameSet then
         _exploreTokenNameSet = {}
-        for _, name in ipairs(_exploreHelper.getExploreTokenNames()) do
-            _exploreTokenNameSet[name] = true
+        for _, tokenName in ipairs(_exploreHelper.getExploreTokenNames()) do
+            _exploreTokenNameSet[tokenName] = true
         end
     end
     if _exploreTokenNameSet[objectName] then
@@ -99,147 +152,207 @@ local function getNonCardDestination(objectTag, objectName)
     return bag
 end
 
--------------------------------------------------------------------------------
+local function resetDiscardIndex()
+    _deckNameToDiscardIndex = {}
+end
 
-local function reportTrashed(object)
-    local function _report()
-        local message = {}
-        for name, countOrCards in pairs(_reportTrashed or {}) do
-            local count = type(countOrCards) == 'table' and #countOrCards or countOrCards
-            local cards = type(countOrCards) == 'table' and countOrCards
-            local plural = count > 1 and (not string.match(name, '[ys]$') and 's') or ''
-            if cards then
-                cards = table.concat(cards, ', ')
-                table.insert(message, count .. ' ' .. name .. plural .. ' (' .. cards .. ')')
-            else
-                table.insert(message, count .. ' ' .. name .. plural)
-            end
-        end
-        message = 'Graveyard moving ' .. table.concat(message, ', ')
-        printToAll(message)
-
-        _reportTrashed = false
-    end
-
-    if not _reportTrashed then
-        _reportTrashed = {}
-        Wait.frames(_report, 2)
-    end
-
-    local name = object.getName()
-    local deckName = object.tag == 'Card' and _deckHelper.getDeckName(object.getName())
-    if deckName == 'Secret Objectives' then
-        name = 'Secret Objective' -- ALWAYS hide secrets
-        deckName = false
-    end
-    if deckName then
-        local cards = _reportTrashed[deckName]
-        if not cards then
-            cards = {}
-            _reportTrashed[deckName] = cards
-        end
-        if type(cards) == 'table' then
-            table.insert(cards, name)
-        elseif type(cards) == 'number' then
-            _reportTrashed[deckName] = (_reportTrashed[deckName] or 0) + 1
-        end
-    else
-        _reportTrashed[name] = (_reportTrashed[name] or 0) + 1
-    end
+local function getAndIncrementDiscardIndex(deckName)
+    assert(type(deckName) == 'string')
+    local index = _deckNameToDiscardIndex[deckName] or 1
+    _deckNameToDiscardIndex[deckName] = index + 1
+    return index
 end
 
 -------------------------------------------------------------------------------
 
-function _processLimbo()
-    local function getFirst(tbl)
-        for k, v in pairs(tbl) do
-            return k, v
+local function canMove(object)
+    assert(type(object) == 'userdata')
+
+    -- Singleton card.
+    if object.tag == 'Card' then
+        local cardName = object.getName()
+        if _deckHelper.canDiscard(cardName) then
+            return true
         end
     end
 
-    -- Wait for puts into self or puts into final bags to finish.
-    if getFirst(_guidToPending) or getFirst(_guidToFinal) then
-        return
-    end
-
-    -- Otherwise nothing is in progress, get an item from limbo.
-    local guid, bag = getFirst(_guidToLimbo)
-    if not guid then
-        return
-    end
-    assert(bag.tag == 'Bag' or bag.tag == 'Infinite')
-    _guidToLimbo[guid] = nil
-
-    -- Make sure it is still valid.
-    local function haveGuid(guid)
-        for _, entry in ipairs(self.getObjects()) do
-            if entry.guid == guid then
+    -- Deck.  Can at least one card be discarded?
+    if object.tag == 'Deck' then
+        for _, entry in ipairs(object.getObjects()) do
+            if _deckHelper.canDiscard(entry.name) then
                 return true
             end
         end
     end
-    if not haveGuid(guid) then
-        Wait.frames(_processLimbo, 1)
-        return  -- got removed somehow
+
+    -- Arbitrary object.  Is there a bag for it?
+    local bag = getBag(object)
+    if bag then
+        return true
     end
-
-    -- Mark it as in-progress, put into final bag when take finishes.
-    -- That put will trigger a future onObjectDestroy, furthers the cycle.
-    _guidToFinal[guid] = bag
-
-    local p = self.getPosition()
-    local object = self.takeObject({
-        guid              = guid,
-        position          = { x = p.x, y = p.y + 5, z = p.z },
-        smooth            = false,
-        callback_function = function(object) bag.putObject(object) end
-    })
 end
 
-function onObjectEnterContainer(container, enterObject)
-    if container == self then
+-- Returns:
+-- - true : move complete
+-- - false : cannot move, stow given object in self
+-- - object : call again next frame with that object
+local function moveAtLeastPartially(object)
+    assert(type(object) == 'userdata')
 
-        local discardParams = {
-            guid = enterObject.getGUID(),
-            name = enterObject.getName(),
-            containerGuid = self.getGUID(),
-            waitForDestroy = true,
-        }
+    -- Singleton card.  Check if deckHelper can discard it.
+    if object.tag == 'Card' then
+        local cardName = object.getName()
+        if _deckHelper.canDiscard(cardName) then
+            local deckName = _deckHelper.getDeckName(cardName) or '-'
+            local index = getAndIncrementDiscardIndex(deckName)
+            local success = _deckHelper.discardCard({
+                guid = object.getGUID(),
+                name = cardName,
+                index = index
+            })
+            if success then
+                reportTrashed(cardName)
+            end
+            return success
+        end
+    end
 
-        if enterObject.tag == 'Card' and _deckHelper.discardCard(discardParams) then
-            -- deck helper is handling it.
-            reportTrashed(enterObject)
-        elseif enterObject.tag == 'Deck' and _deckHelper.discardDeck(discardParams) then
-            -- deck helper is handling it.
-            reportTrashed(enterObject)
-        else
-            local bag = getNonCardDestination(enterObject.tag, enterObject.getName())
-            if bag then
-                _guidToPending[enterObject.getGUID()] = bag
-                reportTrashed(enterObject)
+    -- Deck.  Can at least one card be discarded?
+    if object.tag == 'Deck' then
+        for _, entry in ipairs(object.getObjects()) do
+            local cardName = entry.name
+            if _deckHelper.canDiscard(cardName) then
+                local deckName = _deckHelper.getDeckName(entry.name) or '-'
+                local index = getAndIncrementDiscardIndex(deckName)
+                local success = _deckHelper.discardCard({
+                    guid = entry.guid,
+                    name = cardName,
+                    containerGuid = object.getGUID(),
+                    index = index
+                })
+                assert(type(success) == 'boolean')
+                if success then
+                    reportTrashed(cardName)
+                    return object.remainder or object
+                end
+                return false
             end
         end
+    end
+
+    -- Arbitrary object.  Is there a bag for it?
+    local bag = getBag(object)
+    if bag then
+        local objectName = object.getName()
+        bag.putObject(object)
+        reportTrashed(objectName)
+        return true
+    end
+
+    return false
+end
+
+-------------------------------------------------------------------------------
+
+function _getFirst(set)
+    for k, v in pairs(set) do
+        return k, v
+    end
+end
+
+function _waitForEnteringObjects()
+    while _getFirst(_guidAwaitingDestroySet) do
+        coroutine.yield(0)
+    end
+end
+
+function _getObjectToMove()
+    local guid = _getFirst(_guidPendingMoveSet)
+    if guid then
+        _guidPendingMoveSet[guid] = nil
+        local pos = self.getPosition() + vector(0, 5, 0)
+        local object = self.takeObject({
+            position          = pos,
+            rotation          = { x = 0, y = 0, z = 180 },
+            smooth            = false,
+            guid              = guid,
+        })
+        assert(object)
+        return object
+    end
+end
+
+function processMoveObjectsCoroutine()
+    resetDiscardIndex()
+
+    while true do
+        _waitForEnteringObjects()
+        coroutine.yield(0)
+
+        local object = _getObjectToMove()
+        if not object then
+            break
+        end
+        object.setLock(true)
+        coroutine.yield(0)
+        object.setLock(false)
+
+        -- Keep moving until done or fail.
+        while true do
+            local success = moveAtLeastPartially(object)
+            if success == true then
+                break
+            elseif success == false then
+                self.putObject(object)
+                break
+            elseif type(success) == 'userdata' then
+                object = success
+            else
+                error('bad type')
+            end
+            object.setLock(true)
+            coroutine.yield(0)
+            object.setLock(false)
+        end
+        coroutine.yield(0)
+    end
+
+    printAndResetReportTrashed()
+    _coroutineStartTime = false
+    return 1
+end
+
+function maybeStartProcessMoveObjectsCouroutine()
+    local now = Time.time
+    if (not _coroutineStartTime) or (now - _coroutineStartTime > 10) then
+        _coroutineStartTime = now
+        startLuaCoroutine(self, 'processMoveObjectsCoroutine')
+    end
+end
+
+-------------------------------------------------------------------------------
+
+function onObjectEnterContainer(container, enterObject)
+    if container == self and canMove(enterObject) then
+        _guidAwaitingDestroySet[enterObject.getGUID()] = true
+        maybeStartProcessMoveObjectsCouroutine()
     end
 end
 
 function onObjectLeaveContainer(container, leaveObject)
     if container == self then
         -- Not normally needed, but just in case an object moves by non-self means.
-        _guidToPending[leaveObject.getGUID()] = nil
-        _guidToLimbo[leaveObject.getGUID()] = nil
+        local guid = leaveObject.getGUID()
+        _guidAwaitingDestroySet[guid] = nil
+        _guidPendingMoveSet[guid] = nil
     end
 end
 
 function onObjectDestroy(dyingObject)
     local guid = dyingObject.getGUID()
-
-    if _guidToPending[guid] then
-        _guidToLimbo[guid] = _guidToPending[guid]
-        _guidToPending[guid] = nil
-        Wait.frames(_processLimbo, 2)
-    elseif _guidToFinal[guid] then
-        _guidToFinal[guid] = nil
-        Wait.frames(_processLimbo, 2)
+    if _guidAwaitingDestroySet[guid] then
+        _guidAwaitingDestroySet[guid] = nil
+        _guidPendingMoveSet[guid] = true
     end
 end
 

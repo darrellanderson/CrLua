@@ -923,6 +923,11 @@ end
 
 -------------------------------------------------------------------------------
 
+function canDiscard(cardName)
+    assert(type(cardName) == 'string')
+    return _getDeckAttributes(cardName) and true
+end
+
 --- Discard this card, optionally removing it from a contiainer.
 function discardCard(params)
     assert(type(params) == 'table')
@@ -988,7 +993,7 @@ function discardCard(params)
             guid              = params.guid,
             position          = transform.position,
             rotation          = transform.rotation,
-            smooth            = false,
+            smooth            = true,
         })
         container.setLock(isLocked)
         assert(cardObject, 'take card from deck failed')

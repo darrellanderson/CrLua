@@ -1052,6 +1052,7 @@ function updateFactions()
     local commanderGuidToPosition = {}
     local heroGuidToPosition = {}
     local commodityTileGuidToFactionTokenName = {}
+    local colorToCommodityBonus = {}
     for _, object in ipairs(getAllObjects()) do
         local name = object.getName()
         local guid = object.getGUID()
@@ -1075,6 +1076,14 @@ function updateFactions()
         if factionName then
             factionSheetGuidToFactionSheet[guid] = object
             factionSheetGuidToFactionName[guid] = factionName
+        end
+
+        -- Pick up bonus commodities (via relic).
+        if name == 'Dynamis Core' then
+            local color = _zoneHelper.zoneFromPosition(object.getPosition())
+            if color then
+                colorToCommodityBonus[color] = (colorToCommodityBonus[color] or 0) + 2
+            end
         end
 
         -- Pick up any Franken abilities.
@@ -1170,6 +1179,11 @@ function updateFactions()
         for k, v in pairs(_factionAttributes[factionName]) do
             attributes[k] = v
         end
+        local bonus = colorToCommodityBonus[color]
+        if attributes.commodities and bonus then
+            attributes.commodities = attributes.commodities + bonus
+        end
+
         _colorToFaction[color] = attributes
         _lowerTokenNameToFaction[string.lower(attributes.name)] = attributes
         if attributes.tokenName then

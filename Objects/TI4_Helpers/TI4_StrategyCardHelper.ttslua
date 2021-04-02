@@ -171,6 +171,30 @@ function register(parameters)
         font_size = BUTTON_FONT_SIZE,
         tooltip = 'Show UI'
     })
+
+    -- Strategy cards shift slightly between save and load, which gets worse
+    -- after each save/load cycle.  Force "close" cards to snap points.
+    -- This is a TTS bug, this code can be removed when that bug is fixed.
+    local index = assert(STRATEGY_CARD_INITIATIVE[strategyCard.getName()])
+    local sheet = _getStrategyCardSheet()
+    local snapPoint = sheet.call('getSnapPoint', index)
+    local position = sheet.positionToWorld(snapPoint.position)
+    local rotation = {
+        x = 0,
+        y = sheet.getRotation().y + snapPoint.rotation.y,
+        z = 0
+    }
+    local dx = strategyCard.getPosition().x - position.x
+    local dz = strategyCard.getPosition().z - position.z
+    local d = math.sqrt(dx ^ 2 + dz ^ 2)
+    if d < 1 then
+        local collide = false
+        local fast = true
+        local abovePos = { x = position.x, y = position.y + 1, z = position.z }
+        strategyCard.setLock(false)  -- paranoia
+        strategyCard.setPositionSmooth(abovePos, collide, fast)
+        strategyCard.setRotationSmooth(rotation, collide, fast)
+    end
 end
 
 -------------------------------------------------------------------------------

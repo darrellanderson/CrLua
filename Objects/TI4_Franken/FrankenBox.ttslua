@@ -1,0 +1,1185 @@
+--- Setup a Franken game mixing box contents and faction objects.
+-- Must first do normal game setup so all Franken factions are in the factions
+-- box (if any are not those factions and abilities, etc, are not included in
+-- the Franken setup (e.g. base game only Franken)).
+-- @author Darrell
+-- #include <~/CrLua/Objects/TI4_Franken/FrankenBox>
+
+function getHelperClient(helperObjectName)
+    local function getHelperObject()
+        for _, object in ipairs(getAllObjects()) do
+            if object.getName() == helperObjectName then return object end
+        end
+        error('missing object "' .. helperObjectName .. '"')
+    end
+    local helperObject = false
+    local function getCallWrapper(functionName)
+        helperObject = helperObject or getHelperObject()
+        if not helperObject.getVar(functionName) then error('missing ' .. helperObjectName .. '.' .. functionName) end
+        return function(parameters) return helperObject.call(functionName, parameters) end
+    end
+    return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
+end
+local _deckHelper = getHelperClient('TI4_DECK_HELPER')
+local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
+local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
+local _unitHelper = getHelperClient('TI4_UNIT_HELPER')
+local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
+
+-- Undraftable components are associated with a prerequisite item.  Along with
+-- the name store the type to avoid any unexpected name collisions.
+local TYPE = {
+    ABILITY = 'ability',
+    FLAGSHIP = 'flagship',
+    HOME_SYSTEM = 'homeSystem',
+}
+
+-- 35 "Non Draft Parts"
+local UNDRAFTABLE = {
+    ['Alpha Wormhole Token'] = {}, -- TODO
+    ['Beta Wormhole Token'] = {}, -- TODO
+    ['Gamma Wormhole Token'] = {}, -- TODO
+    ['Titan Note Token'] = {}, -- TODO
+    ['Titan Sleeper Tokens Bag'] = {}, -- TODO
+    ['Titan Ultimate Token'] = {}, -- TODO
+    ['Tear Token (Cabal)'] = {}, -- TODO
+    ['Tear Token (Nekro)'] = {}, -- TODO
+    ['Valefar Assimilator X Token'] = {}, -- TODO
+    ['Valefar Assimilator Y Token'] = {}, -- TODO
+    ['Zero Strategy Token'] = {}, -- TODO
+    ['Muaat Supernova Bag'] = {}, -- TODO
+    ['Creuss Gate Tile'] = {}, -- TODO
+
+    ['Antivirus'] = {
+        prereq = { name = 'Technological Singularity', type = TYPE.ABILITY },
+        faction = 'Nekro',
+    },
+    ['Artuno the Betrayer'] = {
+        prereq = { name = 'The Company', type = TYPE.ABILITY },
+        faction = 'Nomad',
+    },
+    ['Blackshade Infiltrator'] = {
+        prereq = { name = 'Stall Tactics', type = TYPE.ABILITY },
+        faction = 'Yssaril',
+    },
+    ['Brother Omar'] = {
+        prereq = { name = 'Indoctrination', type = TYPE.ABILITY },
+        faction = 'Yin',
+    },
+    ['Creuss Gate'] = {  -- XXX MISSING
+        prereq = { name = 'Creuss', type = TYPE.HOME_SYSTEM },
+        faction = 'Creuss',
+    },
+    ['Dark Pact'] = {
+        prereq = { name = 'Dark Whispers', type = TYPE.ABILITY },
+        faction = 'Empyrean',
+    },
+    ['Ember Colossus'] = {
+        prereq = { name = 'Star Forge', type = TYPE.ABILITY },
+        faction = 'Muaat',
+    },
+    ['Gift of Prescience'] = {
+        prereq = { name = 'Telepathic', type = TYPE.ABILITY },
+        faction = 'Naalu',
+    },
+    ['Hil Colish'] = {
+        prereq = { name = 'Creuss', type = TYPE.HOME_SYSTEM },
+        faction = 'Creuss',
+    },
+    ['It Feeds on Carrion'] = {
+        prereq = { name = 'Dimensional Tear', type = TYPE.ABILITY },
+        faction = 'Cabal',
+    },
+    ['Memoria II'] = {
+        prereq = { name = 'Memoria I', type = TYPE.FLAGSHIP },
+        faction = 'Nomad',
+    },
+    ["Moyin's Ashes"] = {
+        prereq = { name = 'Indoctrination', type = TYPE.ABILITY },
+        faction = 'Yin',
+    },
+    ['Promise of Protection'] = {
+        prereq = { name = 'Pillage', type = TYPE.ABILITY },
+        faction = 'Mentak',
+    },
+    ['Suffi An'] = {
+        prereq = { name = 'Pillage', type = TYPE.ABILITY },
+        faction = 'Mentak',
+    },
+    ['That Which Molds Flesh'] = {
+        prereq = { name = 'Dimensional Tear', type = TYPE.ABILITY },
+        faction = 'Cabal',
+    },
+    ['The Thundarian'] = {
+        prereq = { name = 'The Company', type = TYPE.ABILITY },
+        faction = 'Nomad',
+    },
+    ['Valefar Assimilator X'] = {
+        prereq = { name = 'Technological Singularity', type = TYPE.ABILITY },
+        faction = 'Nekro',
+    },
+    ['Valefar Assimilator Y'] = {
+        prereq = { name = 'Technological Singularity', type = TYPE.ABILITY },
+        faction = 'Nekro',
+    },
+    ['ZS Thunderbolt M2'] = {
+        prereq = { name = 'Orbital Drop', type = TYPE.ABILITY },
+        faction = 'Sol',
+    },
+}
+
+-- Unpack items directly to these positions.
+local UNPACK_TRANSFORMS = {
+    ['Base Unit Tiles'] = {
+        position = {70, 2, 15},
+    },
+    ['Non Draft Parts'] = {
+        position = {70, 2, 12},
+    },
+    ['A. Draft'] = {
+        position = {79, 2, -17},
+        rotation = {0, 90, 0},
+    },
+    ['B. Build Galaxy'] = {
+        position = {76, 3, -17},
+        rotation = {0, 90, 0},
+    },
+    ['C. Reveal'] = {
+        position = {73, 4, -17},
+        rotation = {0, 90, 0},
+    },
+    ['D. Build Factions'] = {
+        position = {70, 5, -17},
+        rotation = {0, 90, 0},
+    },
+}
+
+local CLONE_TO_HIDDEN = {
+    'Frankenstein Checklist',
+}
+
+local function printHelpMessage()
+    printToAll('HELLO WORLD', 'Yellow')
+end
+
+-------------------------------------------------------------------------------
+
+function onLoad(save_state)
+    self.addContextMenuItem('0. HELP', printHelpMessage)
+    self.addContextMenuItem('1. Gather draft items', function() startLuaCoroutine(self, 'gatherDraftItemsCoroutine') end)
+    self.addContextMenuItem('2. Build draft bags', function() startLuaCoroutine(self, 'buildDraftBagsCoroutine') end)
+    self.addContextMenuItem('3. Cleanup', function() startLuaCoroutine(self, 'packFrankenCoroutine') end)
+
+    self.addContextMenuItem('_init_', function() startLuaCoroutine(self, '_initializeSelfFromOldStyleFrankenBags') end)
+end
+
+local _1_gatherDone = false
+function gatherDraftItemsCoroutine()
+    local log = _getLog('Gather draft items')
+    if _1_gatherDone then
+        log.e('already done, aborting')
+        return 1
+    end
+    log.i('starting')
+
+    log.i('creating draft source bags')
+    FrankenBags.createDraftSourceBags()
+    coroutine.yield(0)
+
+    log.i('moving Franken tiles')
+    FrankenBags.fillSourceBagsFromSelf()
+    coroutine.yield(0)
+
+    log.i('moving faction parts')
+    FrankenBags.fillSourceBagsFromFactionBoxes()
+    coroutine.yield(0)
+
+    _1_gatherDone = true
+    log.i('finished')
+    return 1
+end
+
+local _2_buildDone = false
+function buildDraftBagsCoroutine()
+    local log = _getLog('Build draft bags')
+    if not _1_gatherDone then
+        log.e('must do gather first, aborting')
+        return 1
+    elseif _2_buildDone then
+        log.e('already done, aborting')
+        return 1
+    end
+    log.i('starting')
+
+    HiddenZones.spawnCenter()
+    coroutine.yield(0)
+
+    FrankenBags.createDraftBags()
+    coroutine.yield(0)
+
+    -- TODO populate draft bags
+
+    --FrankenBags.stowDraftSourceBags()
+    coroutine.yield(0)
+
+    HiddenZones.removeCenter()
+    coroutine.yield(0)
+
+    HiddenZones.spawnPlayers()
+    coroutine.yield(0)
+
+    _2_buildDone = true
+    log.i('finished')
+    return 1
+end
+
+function packFrankenCoroutine()
+    local log = _getLog('Pack Franken')
+    log.i('starting')
+
+
+    HiddenZones.removePlayers()
+    coroutine.yield(0)
+
+    log.i('finished')
+    return 1
+end
+
+-------------------------------------------------------------------------------
+
+--- Tell other scripts this is Franken.
+-- @param value : boolean, is Franken enabled?
+function _sendOnFrankenEnabled(value)
+    assert(type(value) == 'boolean')
+    local listenerFunctionName = 'onFrankenEnabled'
+    local listenerGuids = {}
+    for _, object in ipairs(getAllObjects()) do
+        if object.getVar(listenerFunctionName) then
+            table.insert(listenerGuids, object.getGUID())
+        end
+    end
+    for i, listenerGuid in ipairs(listenerGuids) do
+        local function callListener()
+            local listener = getObjectFromGUID(listenerGuid)
+            if listener then
+                listener.call(listenerFunctionName, value)
+            end
+        end
+        Wait.frames(callListener, i)
+    end
+end
+
+function _getLog(tag)
+    assert(type(tag) == 'string')
+    local function doLog(level, color)
+        return function(message)
+            printToAll(tag .. '/' .. level .. ': ' .. message, color)
+        end
+    end
+    return {
+        d = doLog('d', 'Grey'),
+        i = doLog('i', 'Grey'),
+        w = doLog('w', 'Grey'),
+        e = doLog('e', 'Grey'),
+    }
+end
+
+function _safeDelete(object)
+    assert(type(object) == 'userdata')
+    local deletedItems = _findItemOnTable('TI4 Deleted Items', 'Bag')
+    if deletedItems then
+        deletedItems.call('ignoreGuid', object.getGUID())
+    end
+    destroyObject(object)
+end
+
+local _findItemOnTableCache = {}
+function _findItemOnTable(name, tag)
+    assert(type(name) == 'string' and type(tag) == 'string')
+    local key = name .. '|' .. tag
+    local guid = _findItemOnTableCache[key]
+    local object = getObjectFromGUID(guid)
+    if object then
+        return object
+    end
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == tag and object.getName() == name then
+            _findItemOnTableCache[key] = object.getGUID()
+            return object
+        end
+    end
+    error('_findItem: missing "' .. name .. '" with tag "' .. tag .. '"')
+end
+
+-------------------------------------------------------------------------------
+
+--- Temporary function.  Move "normal" Franken bag contents to new style.
+function _initializeSelfFromOldStyleFrankenBags()
+    local log = _getLog('Initialize')
+
+    -- Unpack any Franken bags from variants.
+    local variants = assert(_findItemOnTable('Variant Pieces (Searching Recommended)', 'Bag'))
+    local p = self.getPosition() + vector(6, 3, 0)
+    local nameToFrankenBag = {}
+    for _, entry in ipairs(variants.getObjects()) do
+        if string.match(entry.name, 'Frankenstein Bags$') then
+            local frankenBag = variants.takeObject({
+                position          = p,
+                smooth            = false,
+                guid              = entry.guid
+            })
+            p = p + vector(3, 0, 0)
+            nameToFrankenBag[entry.name] = frankenBag
+        end
+    end
+    coroutine.yield(0)
+
+    local p = self.getPosition
+    local p = self.getPosition() + vector(6, 5, 6)
+    local sourceAndNameToBag = {}
+    local function getBag(source, name)
+        local color = nil
+        if source == 'Base' or (not source) then
+            source = 'Base'
+            color = 'Brown'
+        elseif source == 'PoK' then
+            source = 'PoK'
+            color = 'Red'
+        elseif source == 'Blue Space' then
+            source = 'Blu'
+            color = 'Blue'
+        end
+        local key = name .. ' (' .. source .. ')'
+        local bag = sourceAndNameToBag[key]
+        if not bag then
+            bag = spawnObject({
+                type              = 'Bag',
+                position          = p,
+                sound             = false,
+                snap_to_grid      = false,
+            })
+            p = p + vector(3, 0, 0)
+            bag.use_grid = false
+            bag.use_snap_points = false
+            bag.setName(key)
+            bag.setColorTint(Color.fromString(color))
+            sourceAndNameToBag[key] = bag
+            coroutine.yield(0)
+            bag.setLock(true)
+        end
+        return bag
+    end
+
+    local movedNameSet = {}
+    local function processFrankenBag(bag, restrictToSource)
+        local unitNameToFactionName = {}
+        local abilityToFactionName = {}
+        for _, faction in pairs(_factionHelper.allFactions(true)) do
+            for _, unitName in ipairs(faction.units or {}) do
+                assert(not unitNameToFactionName[unitName])
+                unitNameToFactionName[unitName] = assert(faction.name)
+            end
+            if faction.flagship then
+                assert(not unitNameToFactionName[faction.flagship])
+                unitNameToFactionName[faction.flagship] = assert(faction.name)
+            end
+            for _, ability in ipairs(faction.abilities or {}) do
+                assert(not abilityToFactionName[ability])
+                abilityToFactionName[ability] = assert(faction.name)
+            end
+        end
+        local rename = {
+            ['^Dark Whistpers$'] = 'Dark Whispers',
+            ['^Raid Shuttle$'] = 'Raid Shuttle I',
+            ['^Jol Nar'] = 'Jol-Nar',
+            ["Vuil'Raith"] = "Vuil'raith",
+            ['^Savages of Cymiae'] = 'Cymiae',
+            ['^Free Systems'] = 'Free-Systems',
+            ['^Khet Drakkol'] = 'Khet-Drakkol',
+            ['Starting Units$'] = 'Fleet'
+        }
+        for _, faction in pairs(_factionHelper.allFactions(true)) do
+            if faction.name ~= faction.frankenName then
+                local escaped = '^' .. string.gsub(faction.name, '-', '%%-')
+                rename[escaped] = faction.frankenName
+            end
+            if faction.tokenName ~= faction.frankenName then
+                local escaped = '^' .. string.gsub(faction.tokenName, '-', '%%-')
+                rename[escaped] = faction.frankenName
+            end
+        end
+        local moveItemSet = {
+            ['A. Draft'] = true,
+            ['B. Build Galaxy'] = true,
+            ['C. Reveal'] = true,
+            ['D. Build Factions'] = true,
+            ['Frankenstein Checklist'] = true,
+        }
+        local moveBagContentSet = {
+            ['Starting Units'] = true,
+            ['Starting Techs'] = true,
+            ['Faction Abilities'] = true,
+            ['Base Unit Tiles'] = true,
+            ['Flagships'] = true,
+            ['Commodity Tiles'] = true,
+        }
+        for _, entry in ipairs(bag.getObjects()) do
+            local outer = bag.takeObject({
+                position          = bag.getPosition() + vector(0, 5, 0),
+                smooth            = false,
+                guid              = entry.guid
+            })
+            coroutine.yield(0)
+            local name = outer.getName()
+            if moveItemSet[name] and not movedNameSet[name] then
+                movedNameSet[name] = true
+                self.putObject(outer)
+                coroutine.yield(0)
+            elseif moveBagContentSet[name] then
+                outer.setLock(true)
+                for _, entry in ipairs(outer.getObjects()) do
+                    local inner = outer.takeObject({
+                        position          = outer.getPosition() + vector(0, 5, 0),
+                        smooth            = false,
+                        guid              = entry.guid
+                    })
+                    coroutine.yield(0)
+                    local name = inner.getName()
+                    while true do
+                        local oldName = name
+                        for a, b in pairs(rename) do
+                            if string.match(name, a) then
+                                name = string.gsub(name, a, b)
+                                print('renaming "' .. oldName .. '" to "' .. name .. '"')
+                                inner.setName(name)
+                                coroutine.yield(0)
+                            end
+                        end
+                        if name == oldName then
+                            break
+                        end
+                    end
+                    if string.match(name, '^Mahact ') and string.match(outer.getName(), '^Blu ') then
+                        name = string.gsub(name, 'Mahact', 'MahactBlu')
+                        inner.setName(name)
+                    end
+                    local faction = false
+                    if not faction then
+                        local factionName = unitNameToFactionName[name]
+                        faction = factionName and _factionHelper.fromTokenName(factionName)
+                    end
+                    if not faction then
+                        local prefix = string.match(name, '^([^ ]*) ')
+                        faction = prefix and _factionHelper.fromTokenName(prefix)
+                    end
+                    if not faction then
+                        local units = _unitHelper.getUnitOverrides()
+                        if units[name] or units[name .. 'I'] then
+                            -- Base unit "override".  Treat as base faction.
+                            faction = {}
+                        end
+                    end
+                    if not faction then
+                        local factionName = abilityToFactionName[name]
+                        faction = factionName and _factionHelper.fromTokenName(factionName)
+                    end
+                    if not faction then
+                        inner.setLock(true)
+                        error('unknown faction "' .. outer.getName() .. '/' .. name .. '"')
+                    end
+                    local dst = false
+                    if restrictToSource and faction.source ~= restrictToSource then
+                        dst = outer
+                    else
+                        dst = getBag(faction.source, outer.getName())
+                        if movedNameSet[name] then
+                            local deleSet = {
+                                ['Infantry I'] = true,
+                                ['Space Dock I'] = true,
+                            }
+                            if deleSet[name] then
+                                print('dele ' .. name)
+                                _safeDelete(inner)
+                                inner = false
+                            else
+                                local a = movedNameSet[name]
+                                local b = outer.getName()
+                                error('duplicate "' .. name .. '" ("' .. a .. '" vs "' .. b .. '")')
+                            end
+                        end
+                        movedNameSet[name] = outer.getName()
+                    end
+                    if inner then
+                        dst.putObject(inner)
+                    end
+                    coroutine.yield(0)
+                end
+                outer.setLock(false)
+                if outer.getQuantity() == 0 then
+                    _safeDelete(outer)
+                else
+                    bag.putObject(outer)
+                end
+                coroutine.yield(0)
+            elseif name == 'Non Draft Parts' then
+                -- Copy over faction ability tiles.
+                outer.setLock(true)
+                for _, entry in ipairs(outer.getObjects()) do
+                    local forceName = entry.guid == '7cf3b7' and 'Creuss Gate' -- tile is missing name
+                    local entryName = forceName or entry.name
+                    local factionName = abilityToFactionName[entryName]
+                    local faction = factionName and _factionHelper.fromTokenName(factionName)
+                    if faction and not movedNameSet[entryName] then
+                        movedNameSet[entryName] = 'Faction Abilities'
+                        local dst = getBag(faction.source, 'Faction Abilities')
+                        local inner = outer.takeObject({
+                            position          = outer.getPosition() + vector(0, 5, 0),
+                            smooth            = false,
+                            guid              = entry.guid
+                        })
+                        if forceName then
+                            inner.setName(forceName)
+                        end
+                        coroutine.yield(0)
+                        dst.putObject(inner)
+                        coroutine.yield(0)
+                    end
+                end
+                bag.putObject(outer)
+                coroutine.yield(0)
+            else
+                print('unknown outer "' .. name .. '"')
+                bag.putObject(outer)
+                coroutine.yield(0)
+            end
+        end
+    end
+
+    -- Split PoK items between base and PoK.
+    processFrankenBag(assert(nameToFrankenBag['PoK Frankenstein Bags']))
+    processFrankenBag(assert(nameToFrankenBag['Blu Frankenstein Bags']), 'Blue Space')
+
+    local names = {}
+    for name, bag in pairs(sourceAndNameToBag) do
+        table.insert(names, name)
+    end
+    table.sort(names)
+    for _, name in ipairs(names) do
+        local bag = assert(sourceAndNameToBag[name])
+        bag.setLock(false)
+        self.putObject(bag)
+        coroutine.yield(0)
+    end
+
+    return 1
+end
+
+-------------------------------------------------------------------------------
+
+HiddenZones = {
+    ZONE = {
+        PLAYER = {
+            name = '_franken_player_',
+            scale = { x = 20, y = 6, z = 10 },
+        },
+        CENTER = {
+            name = '_franken_center_',
+            scale = { x = 20, y = 20, z = 20 },
+        }
+    }
+}
+
+function HiddenZones.getPlayerTransform(color)
+    assert(type(color) == 'string')
+    local zoneAttributes = _zoneHelper.zoneAttributes(color)
+    return {
+        position = {
+            x = zoneAttributes.center.x,
+            y = zoneAttributes.center.y + HiddenZones.ZONE.PLAYER.scale.y / 2,
+            z = zoneAttributes.center.z + 9 * (zoneAttributes.center.z > 0 and -1 or 1),
+        },
+        rotation = {
+            x = 0,
+            y = zoneAttributes.rotation.y,
+            z = 0,
+        },
+    }
+end
+
+function HiddenZones.spawnCenter()
+    local hiddenZone = spawnObject({
+        type              = 'FogOfWarTrigger',
+        position          = { x = 0, y = HiddenZones.ZONE.CENTER.scale.y / 2, z = 0 },
+        rotation          = { x = 0, y = 0, z = 0 },
+        scale             = HiddenZones.ZONE.CENTER.scale,
+        callback_fucntion = nil,
+        sound             = false,
+        params            = {},
+        snap_to_grid      = false,
+    })
+    hiddenZone.setValue('Teal')
+    hiddenZone.setName(HiddenZones.ZONE.CENTER.name)
+end
+
+function HiddenZones.removeCenter()
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Fog' and object.getName() == HiddenZones.ZONE.CENTER.name then
+            _safeDelete(object)
+        end
+    end
+end
+
+function HiddenZones.spawnPlayers()
+    for _, color in ipairs(_zoneHelper.zones()) do
+        local transform = HiddenZones.getPlayerTransform(color)
+        local hiddenZone = spawnObject({
+            type              = 'FogOfWarTrigger',
+            position          = transform.position,
+            rotation          = transform.rotation,
+            scale             = HiddenZones.ZONE.PLAYER.scale,
+            callback_fucntion = nil,
+            sound             = false,
+            params            = {},
+            snap_to_grid      = false,
+        })
+        hiddenZone.setValue(color)
+        hiddenZone.setName(HiddenZones.ZONE.PLAYER.name)
+    end
+end
+
+function HiddenZones.removePlayers()
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Fog' and object.getName() == HiddenZones.ZONE.PLAYER.name then
+            _safeDelete(object)
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
+
+FrankenBags = {
+    DRAFT_SRC_RADIUS = 9,
+    DRAFT_DST_RADIUS = 12,
+
+    SOURCE_BAGS = {
+        -- Franken and faction components.
+        ['Promissory Notes'] = { count = 2 },
+        ['Home Systems'] = { count = 2 },
+        ['Flagships'] = { count = 2 },
+        ['Starting Techs'] = { count = 2 },
+        ['Commodity Tiles'] = { count = 2 },
+        ['Starting Units'] = { count = 2 },
+        ['Faction Abilities'] = { count = 4 },
+        ['Faction Techs'] = { count = 3 },
+        ['Agents'] = { count = 2, pok = true },
+        ['Commanders'] = { count = 2, pok = true },
+        ['Heroes'] = { count = 2, pok = true },
+        ['Mechs'] = { count = 2, pok = true },
+
+        -- Keep these around.
+        ['Non Draft Parts'] = { persist = true },
+        ['Base Unit Tiles'] = { persist = true },
+
+        -- External bags already on the table.
+        ['Blue Planet Tiles'] = { count = { -1, 7, 6, 5, 4, 3, 2, 2 } },
+        ['Red Anomaly Tiles'] = { count = { -1, 2, 2, 3, 2, 2, 1, 1 } },
+    },
+    _nameToBagAttrs = false,
+}
+
+--- Create (or move) source bags to the center area.
+function FrankenBags.createDraftSourceBags()
+    assert(not FrankenBags._nameToBagAttrs, 'FrankenBags.createDraftSourceBags: already created')
+    local log = _getLog('FrankenBags.getDraftSourceBags')
+
+    local function addSourceBag(name, baseAttrs, extraAttrs)
+        assert(type(name) == 'string' and type(baseAttrs) == 'table' and type(extraAttrs) == 'table')
+
+        -- Validate src data.
+        extraAttrs.src = extraAttrs.src or {}
+        if extraAttrs.src.object then
+            -- On table.
+            assert(type(extraAttrs.src.object) == 'userdata')
+            assert(type(extraAttrs.src.position) == 'table')
+            assert(type(extraAttrs.src.rotation) == 'table')
+            assert(type(extraAttrs.src.locked) == 'boolean')
+        elseif extraAttrs.src.container then
+            -- In bag.
+            assert(type(extraAttrs.src.container) == 'userdata')
+            assert(type(extraAttrs.src.guid) == 'string')
+        end
+
+        -- Only add once.
+        assert(FrankenBags.SOURCE_BAGS[name], 'unknown bag "' .. name .. '"')
+        assert(not FrankenBags._nameToBagAttrs[name], 'already added "' .. name .. '"')
+
+        local attrs = {}
+        for k, v in pairs(baseAttrs) do
+            attrs[k] = v
+        end
+        for k, v in pairs(extraAttrs) do
+            attrs[k] = v
+        end
+
+        FrankenBags._nameToBagAttrs[name] = attrs
+    end
+
+    -- Scan the table to find any existing bags.
+    FrankenBags._nameToBagAttrs = {}
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        local baseAttrs = FrankenBags.SOURCE_BAGS[name]
+        if object.tag == 'Bag' and baseAttrs then
+            addSourceBag(name, baseAttrs, {
+                src = {
+                    object = object,
+                    position = object.getPosition(),
+                    rotation = object.getRotation(),
+                    locked = object.getLock(),
+                },
+            })
+        end
+    end
+    coroutine.yield(0)
+
+    -- Find any bags inside self (only at the root level).
+    for _, entry in ipairs(self.getObjects()) do
+        local name = entry.name
+        local baseAttrs = FrankenBags.SOURCE_BAGS[name]
+        if baseAttrs then
+            addSourceBag(name, baseAttrs, {
+                src = {
+                    container = self,
+                    guid = entry.guid,
+                },
+            })
+        end
+    end
+    coroutine.yield(0)
+
+    -- Add missing bags to create.
+    for name, baseAttrs in pairs(FrankenBags.SOURCE_BAGS) do
+        if not FrankenBags._nameToBagAttrs[name] then
+            addSourceBag(name, baseAttrs, {})
+        end
+    end
+
+    -- Move or create bags.
+    local numBags = 0
+    for _, _ in pairs(FrankenBags._nameToBagAttrs) do
+        numBags = numBags + 1
+    end
+    local i = 0
+    for name, attrs in pairs(FrankenBags._nameToBagAttrs) do
+        i = i + 1
+        local radius = FrankenBags.DRAFT_SRC_RADIUS
+        local phi = i * math.pi * 2 / numBags
+        local pos = {
+            x = math.sin(phi) * radius,
+            y = _zoneHelper.getTableY() + 5,
+            z = math.cos(phi) * radius
+        }
+        local rot = {
+            x = 0,
+            y = 0,
+            z = 0
+        }
+        local bag = false
+        assert(attrs.src)
+        if attrs.src.object then
+            log.d('moving existing "' .. name .. '"')
+            bag = attrs.src.object
+            bag.setLock(false)
+            local collide = false
+            local fast = false
+            bag.setPositionSmooth(pos, collide, fast)
+            bag.setRotationSmooth(rot, collide, fast)
+        elseif attrs.src.container then
+            log.d('unpacking "' .. name .. '" from self')
+            bag = attrs.src.container.takeObject({
+                position          = pos,
+                rotation          = rot,
+                smooth            = false,
+                guid              = assert(attrs.src.guid),
+            })
+        else
+            log.d('creating new "' .. name .. '" from self')
+            bag = spawnObject({
+                type              = 'Bag',
+                position          = pos,
+                rotation          = rot,
+                sound             = false,
+                snap_to_grid      = false,
+            })
+            bag.setName(name)
+        end
+        assert(bag)
+        bag.setLock(true)
+        bag.use_grid = false
+        bag.use_snap_points = false
+        attrs.bag = bag
+        coroutine.yield(0)
+    end
+end
+
+--- Return any moved draft source bags to their original location.  Pack any
+-- created bags into self (in case players want to inspect, make adjustments).
+function FrankenBags.stowDraftSourceBags()
+    assert(FrankenBags._nameToBagAttrs, 'FrankenBags.stowDraftSourceBags: not created')
+
+    for name, attrs in pairs(FrankenBags._nameToBagAttrs) do
+        local bag = assert(attrs.bag, 'missing bag "' .. name .. '"')
+        bag.setLock(false)
+        assert(attrs.src, 'missing src')
+        if attrs.src.object then
+            local collide = false
+            local fast = false
+            bag.setPositionSmooth(attrs.src.position, collide, fast)
+            bag.setRotationSmooth(attrs.src.rotation, collide, fast)
+            Wait.time(function() bag.setLock(attrs.src.locked) end, 10)
+        elseif attrs.src.container then
+            attrs.src.container.putObject(bag)
+        elseif not attrs.persist then
+            -- We spawned this bag.  Do not destroy, stow in self for player inspection.
+            self.putObject(bag)
+        end
+    end
+    FrankenBags._nameToBagAttrs = false
+end
+
+function FrankenBags.getDraftCandidates()
+    local frankenNameSet = {}
+    local flagshipSet = {}
+    local abilitySet = {}
+    local unitSet = {}
+
+    local factionsBox = assert(_findItemOnTable('Factions', 'Bag'))
+    for _, entry in ipairs(factionsBox.getObjects()) do
+        local name = string.match(entry.name, '^(.*) Box$')
+        local faction = name and _factionHelper.fromTokenName(name)
+        if faction then
+            frankenNameSet[faction.frankenName or '-'] = true
+            flagshipSet[faction.flagship or '-'] = true
+            for _, ability in ipairs(faction.abilities or {}) do
+                abilitySet[ability] = true
+            end
+            for _, unit in ipairs(faction.units) do
+                unitSet[unit] = true
+            end
+        end
+    end
+
+    -- There is no list of "base" units, so build the set of faction units
+    -- not included above.
+    local excludeUnitSet = {}
+    for _, faction in pairs(_factionHelper.allFactions(true)) do
+        for _, unit in ipairs(faction.units or {}) do
+            if not unitSet[unit] then
+                excludeUnitSet[unit] = true
+            end
+        end
+    end
+
+    -- Faction Helper has an updated "Jol-Nar" name, but if using with an
+    -- old Faction Helper it might still be using "Jol Nar".  In that case,
+    -- add the new (used by these objects) version.  Old faction helper will
+    -- recognize both, it just advertises the old style.
+    if frankenNameSet['Jol Nar'] then
+        frankenNameSet['Jol-Nar'] = true
+    end
+
+    return {
+        frankenNameSet = frankenNameSet,
+        flagshipSet = flagshipSet,
+        abilitySet = abilitySet,
+        excludeUnitSet = excludeUnitSet,
+    }
+end
+
+function FrankenBags.fillSourceBagsFromSelf()
+    local candidates = FrankenBags.getDraftCandidates()
+    coroutine.yield(0)
+
+    for _, entry in ipairs(self.getObjects()) do
+        local object = self.takeObject({
+            position          = self.getPosition() + vector(0, 5, 0),
+            smooth            = false,
+            guid              = entry.guid
+        })
+        coroutine.yield(0)
+        local name = object.getName()
+
+        local dstNameToAboveSlot = {}
+        local function moveTileToDst(name, guid, dstName)
+            if UNDRAFTABLE[name] then
+                dstName = 'Non Draft Parts'
+            end
+            local dstAttrs = FrankenBags._nameToBagAttrs[dstName]
+            assert(dstAttrs, 'unknown bag "' .. dstName .. '"')
+            local dst = dstAttrs.bag
+            assert(dst, 'missing bag "' .. dstName .. '"')
+            local i = dstNameToAboveSlot[dstName] or 0
+            dstNameToAboveSlot[dstName] = i + 1
+            object.takeObject({
+                position          = object.getPosition() + vector(0, 5 + i * 0.2, 0),
+                callback_function = function(object) dst.putObject(object) end,
+                smooth            = false,
+                guid              = guid
+            })
+        end
+
+        if object.tag == 'Bag' then
+            object.setLock(true)
+
+            -- Does this bag has "$FACTION Starting Tech" style names?
+            local isFrankenName = false
+            isFrankenName = isFrankenName or string.match(name, '^Starting Units')
+            isFrankenName = isFrankenName or string.match(name, '^Starting Tech')
+            isFrankenName = isFrankenName or string.match(name, '^Commodity Tiles')
+            if isFrankenName then
+                for _, entry in ipairs(object.getObjects()) do
+                    local prefix = string.match(entry.name, '^([^ ]*) ')
+                    if candidates.frankenNameSet[prefix] then
+                        local dstName = assert(string.match(name, '^(.*) %(.*%)$'))
+                        moveTileToDst(entry.name, entry.guid, dstName)
+                    end
+                end
+            end
+
+            if string.match(name, '^Flagships') then
+                for _, entry in ipairs(object.getObjects()) do
+                    if candidates.flagshipSet[entry.name] then
+                        moveTileToDst(entry.name, entry.guid, 'Flagships')
+                    end
+                end
+            end
+
+            if string.match(name, '^Faction Abilities') then
+                for _, entry in ipairs(object.getObjects()) do
+                    if candidates.abilitySet[entry.name] then
+                        moveTileToDst(entry.name, entry.guid, 'Faction Abilities')
+                    end
+                end
+            end
+
+            if string.match(name, '^Base Unit Tiles') then
+                for _, entry in ipairs(object.getObjects()) do
+                    if not candidates.excludeUnitSet[entry.name] then
+                        moveTileToDst(entry.name, entry.guid, 'Base Unit Tiles')
+                    end
+                end
+            end
+
+            coroutine.yield(0)
+
+            object.setLock(false)
+            self.putObject(object)
+            coroutine.yield(0)
+        end
+    end
+end
+
+function FrankenBags.fillSourceBagsFromFactionBoxes()
+    -- No need to check if a faction belongs.  If it is in the factions box,
+    -- that is signal enough.  (E.g. no PoK factions will be there for base.)
+    local factionsBox = assert(_findItemOnTable('Factions', 'Bag'))
+    for _, entry in ipairs(factionsBox.getObjects()) do
+        local name = string.match(entry.name, '^(.*) Box$')
+        local faction = name and _factionHelper.fromTokenName(name)
+        if faction then
+            local factionBox = factionsBox.takeObject({
+                position          = factionsBox.getPosition() + vector(0, 5, 0),
+                smooth            = false,
+                guid              = entry.guid
+            })
+            coroutine.yield(0)
+            factionBox.setLock(true)
+            FrankenBags._fillSourceBagsFromFactionBox(faction, factionBox)
+            factionBox.setLock(false)
+            factionsBox.putObject(factionBox)
+            coroutine.yield(0)
+        end
+    end
+end
+
+function FrankenBags._fillSourceBagsFromFactionBox(faction, factionBox)
+    local function takeBag(pattern, i)
+        for _, entry in ipairs(factionBox.getObjects()) do
+            if string.match(entry.name, pattern) then
+                local bag = factionBox.takeObject({
+                    position          = factionBox.getPosition() + vector(i * 3, 5, 0),
+                    smooth            = false,
+                    guid              = entry.guid
+                })
+                bag.setLock(true)
+                return bag
+            end
+        end
+    end
+
+    local function takeAll(bag)
+        local objects = {}
+        for i, entry in ipairs(bag.getObjects()) do
+            local object = bag.takeObject({
+                position          = bag.getPosition() + vector(0, 5 + i, 0),
+                smooth            = false,
+                guid              = entry.guid
+            })
+            table.insert(objects, object)
+        end
+        return objects
+    end
+
+    local function destroyBag(bag)
+        bag.setLock(false)
+        _safeDelete(bag)
+    end
+
+    -- Try to do a lot in parallel between yields for faster action.
+    local bagHandlers = {
+        {
+            bagNamePattern = 'Promissory Bag$',
+            defaultDstBagName = 'Promissory Notes',
+        },
+        {
+            bagNamePattern = 'Tech Bag$',
+            defaultDstBagName = 'Faction Techs',
+        },
+        {
+            bagNamePattern = 'Planets Bag$',
+            discard = true,
+        },
+        {
+            bagNamePattern = 'Leaders Bag$',
+            defaultDstBagName = 'Agents',
+            overrideDstBagName = function(name)
+                local overrides = _unitHelper.getUnitOverrides()
+                local override = overrides[name]
+                if override and override.override == 'Mech' then
+                    return 'Mechs'
+                elseif name == faction.commander then
+                    return 'Commanders'
+                elseif name == faction.hero then
+                    return 'Heroes'
+                end
+            end,
+        },
+    }
+
+    -- Take all bags at once.
+    for i, bagHandler in ipairs(bagHandlers) do
+        bagHandler.bag = takeBag(bagHandler.bagNamePattern, i)
+    end
+    coroutine.yield(0)
+
+    -- Take all sub-objects at once.
+    for _, bagHandler in ipairs(bagHandlers) do
+        bagHandler.objects = takeAll(bagHandler.bag)
+    end
+    coroutine.yield(0)
+
+    -- Transfer all sub-objects at once.
+    for _, bagHandler in ipairs(bagHandlers) do
+        for i, object in ipairs(bagHandler.objects) do
+            local name = object.getName()
+            if bagHandler.discard then
+                local success = _deckHelper.discardCard({
+                    guid = object.getGUID(),
+                    name = name,
+                    index = i
+                })
+                assert(success, 'error discarding "' .. name .. '"')
+            else
+                local dstName = bagHandler.defaultDstBagName
+                if bagHandler.overrideDstBagName then
+                    dstName = bagHandler.overrideDstBagName(name) or dstName
+                end
+
+                if UNDRAFTABLE[name] then
+                    dstName = 'Non Draft Parts'
+                end
+                local dstAttrs = FrankenBags._nameToBagAttrs[dstName]
+                assert(dstAttrs, 'unknown bag "' .. dstName .. '"')
+                local dst = dstAttrs.bag
+                assert(dst, 'missing bag "' .. dstName .. '"')
+                dst.putObject(object)
+            end
+        end
+    end
+    coroutine.yield(0)
+
+    -- Destroy all handled bags at once.
+    for _, bagHandler in ipairs(bagHandlers) do
+        destroyBag(bagHandler.bag)
+    end
+    coroutine.yield(0)
+
+    -- Move home system tile, and any other undraftable items.
+    local homeSystem = false
+    local undraftables = {}
+    for _, entry in ipairs(factionBox.getObjects()) do
+        if UNDRAFTABLE[entry.name] then
+            local object = factionBox.takeObject({
+                position          = factionBox.getPosition() + vector(0, 6 + (#undraftables), 0),
+                smooth            = false,
+                guid              = entry.guid,
+            })
+            table.insert(undraftables, object)
+        elseif entry.name == faction.tokenName .. ' Tile' then
+            homeSystem = factionBox.takeObject({
+                position          = factionBox.getPosition() + vector(0, 5, 0),
+                smooth            = false,
+                guid              = entry.guid,
+            })
+        end
+    end
+    coroutine.yield(0)
+
+    assert(homeSystem)
+    FrankenBags._nameToBagAttrs['Home Systems'].bag.putObject(homeSystem)
+    for _, object in ipairs(undraftables) do
+        FrankenBags._nameToBagAttrs['Non Draft Parts'].bag.putObject(object)
+    end
+    coroutine.yield(0)
+end
+
+function FrankenBags.createDraftBags()
+    assert(not FrankenBags._colorToDraftBag, 'FrankenBags.createDraftBags: already created')
+
+    FrankenBags._colorToDraftBag = {}
+    local numZones = #_zoneHelper.zones()
+    for i, zoneAttributes in ipairs(_zoneHelper.zonesAttributes()) do
+        assert(zoneAttributes.color)
+        local p = zoneAttributes.center
+        local magnitude = math.sqrt(p.x ^ 2 + p.z ^2)
+        local normalized = { x = p.x / magnitude, y = p.y, z = p.z / magnitude }
+        p = {
+            x = normalized.x * FrankenBags.DRAFT_DST_RADIUS,
+            y = _zoneHelper.getTableY() + 5,
+            z = normalized.z * FrankenBags.DRAFT_DST_RADIUS
+        }
+        local bag = spawnObject({
+            type              = 'Bag',
+            position          = p,
+            sound             = false,
+            snap_to_grid      = false,
+        })
+        bag.use_grid = true
+        bag.use_snap_points = false
+        bag.setColorTint(zoneAttributes.color or 'White')
+        bag.setName('Franken Draft Bag ' .. i .. '/' .. numZones)
+        bag.setLock(true)
+        FrankenBags._colorToDraftBag[zoneAttributes.color] = bag
+    end
+end
+
+-------------------------------------------------------------------------------
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

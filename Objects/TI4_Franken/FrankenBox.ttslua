@@ -131,26 +131,20 @@ local UNDRAFTABLE = {
 
 -- Unpack items directly to these positions.
 local UNPACK_TRANSFORMS = {
-    ['Base Unit Tiles'] = {
-        position = {70, 2, 15},
-    },
-    ['Non Draft Parts'] = {
-        position = {70, 2, 12},
-    },
     ['A. Draft'] = {
-        position = {79, 2, -17},
+        position = {100, 2, -17},
         rotation = {0, 90, 0},
     },
     ['B. Build Galaxy'] = {
-        position = {76, 3, -17},
+        position = {95, 3, -17},
         rotation = {0, 90, 0},
     },
     ['C. Reveal'] = {
-        position = {73, 4, -17},
+        position = {90, 4, -17},
         rotation = {0, 90, 0},
     },
     ['D. Build Factions'] = {
-        position = {70, 5, -17},
+        position = {85, 5, -17},
         rotation = {0, 90, 0},
     },
 }
@@ -160,8 +154,23 @@ local CLONE_TO_HIDDEN = {
 }
 
 local HELP_MESSAGE = [[
-Hello world.
-]]
+WELCOME TO FRANKEN
+
+First, use the game setup tile to choose between base game, PoK, etc.  This Franken tool will create draft pools from available factions.
+
+To use homebrew factions, place their faction boxes in the "factions" box, and make sure their Franken components are present inside the Franken box.  For example, the "Blue Space Faction Pack" is already supported.
+
+Then use the right-click options in order:
+
+1. Gather draft items: creates draft source bags, moving Franken tiles from the Franken box and faction components from faction boxes.  Undraftable items are placed in the "Non Draft Parts" bag.
+
+Before proceeding, remove any "banned" abilities or components from the draft source bags.
+
+2. Build draft bags: creates one bag per player with the correct draft items.  This also removes the draft source bags (stowing them in the Franken box if needed).
+
+3. Remove draft bags: removes draft bags (stowing them in the Franken box) and per-player hidden zones.
+
+Home system planet cards are in the planets deck.]]
 local function printHelpMessage()
     local delim = ''
     for _ = 1, 20 do
@@ -169,7 +178,7 @@ local function printHelpMessage()
     end
     local message = {
         delim,
-        string.match(HELP_MESSAGE, '^%s*(.-)%s*$'),
+        HELP_MESSAGE,
         delim
     }
     message = table.concat(message, '\n')
@@ -213,7 +222,12 @@ function gatherDraftItemsCoroutine()
     end
     log.i('starting')
 
+    log.i('telling other tools this is Franken')
     _sendOnFrankenEnabled(true)
+    coroutine.yield(0)
+
+    log.i('unpacking Franken note cards')
+    _unpackGlobal()
     coroutine.yield(0)
 
     log.i('creating draft source bags')
@@ -325,6 +339,22 @@ function _sendOnFrankenEnabled(value)
             end
         end
         Wait.frames(callListener, i)
+    end
+end
+
+function _unpackGlobal()
+    for name, transform in pairs(UNPACK_TRANSFORMS) do
+        for _, entry in ipairs(self.getObjects()) do
+            if entry.name == name then
+                self.takeObject({
+                    position          = transform.position,
+                    rotation          = transform.rotation,
+                    smooth            = true,
+                    guid              = entry.guid
+                })
+                coroutine.yield(0)
+            end
+        end
     end
 end
 
@@ -1264,7 +1294,7 @@ function FrankenBags._fillSourceBagsFromFactionBox(faction, factionBox)
                     return 'Heroes'
                 else
                     object.setDescription('Agent')
-                    return 'Agent'
+                    return 'Agents'
                 end
             end,
         },

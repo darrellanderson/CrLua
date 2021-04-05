@@ -22,6 +22,7 @@ function getHelperClient(helperObjectName)
 end
 local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
+local _setupHelper = getHelperClient('TI4_SETUP_HELPER')
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _unitHelper = getHelperClient('TI4_UNIT_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
@@ -182,6 +183,9 @@ function gatherDraftItemsCoroutine()
     end
     log.i('starting')
 
+    _sendOnFrankenEnabled(true)
+    coroutine.yield(0)
+
     log.i('creating draft source bags')
     FrankenBags.createDraftSourceBags()
     coroutine.yield(0)
@@ -211,18 +215,19 @@ function buildDraftBagsCoroutine()
     end
     log.i('starting')
 
-    HiddenZones.spawnCenter()
-    coroutine.yield(0)
-
     FrankenBags.createDraftBags()
     coroutine.yield(0)
 
-    -- TODO populate draft bags
+    HiddenZones.spawnCenter()
+    coroutine.yield(0)
 
-    --FrankenBags.stowDraftSourceBags()
+    FrankenBags.fillDraftBags()
     coroutine.yield(0)
 
     HiddenZones.removeCenter()
+    coroutine.yield(0)
+
+    FrankenBags.stowDraftSourceBags()
     coroutine.yield(0)
 
     HiddenZones.spawnPlayers()
@@ -584,7 +589,7 @@ HiddenZones = {
         },
         CENTER = {
             name = '_franken_center_',
-            scale = { x = 20, y = 20, z = 20 },
+            scale = { x = 30, y = 30, z = 30 },
         }
     }
 }
@@ -1170,6 +1175,45 @@ function FrankenBags.createDraftBags()
         bag.setName('Franken Draft Bag ' .. i .. '/' .. numZones)
         bag.setLock(true)
         FrankenBags._colorToDraftBag[zoneAttributes.color] = bag
+    end
+end
+
+function FrankenBags.fillDraftBags()
+    assert(FrankenBags._nameToBagAttrs, 'FrankenBags.fillDraftBags: src bags not created')
+    assert(FrankenBags._colorToDraftBag, 'FrankenBags.fillDraftBags: dst bags not created')
+    local log = _getLog('FrankenBags.fillDraftBags')
+
+    local numPlayers = #_zoneHelper.zones()
+    for srcBagName, bagAttrs in pairs(FrankenBags._nameToBagAttrs) do
+        local srcBag = assert(bagAttrs.bag)
+        srcBag.shuffle()
+        coroutine.yield(0)
+
+        local count = bagAttrs.count
+        if count and type(count) == 'table' then
+            count = count[numPlayers]
+        end
+
+        if bagAttrs.pok and not _setupHelper.getPoK() then
+            count = false
+        end
+
+        if count and count > 0 then
+            log.i('adding ' .. count .. ' from ' .. srcBagName)
+            assert(srcBag.getQuantity() >= count * numPlayers, 'too few ' .. srcBagName)
+            for _, dstBag in pairs(FrankenBags._colorToDraftBag) do
+                for i = 1, count do
+                    local object = srcBag.takeObject({
+                        position          = srcBag.getPosition() + vector(0, 5, 0),
+                        smooth            = false,
+                        top               = true,
+                    })
+                    coroutine.yield(0)
+                    dstBag.putObject(object)
+                    coroutine.yield(0)
+                end
+            end
+        end
     end
 end
 

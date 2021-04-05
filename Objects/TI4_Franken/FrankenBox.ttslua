@@ -159,8 +159,21 @@ local CLONE_TO_HIDDEN = {
     'Frankenstein Checklist',
 }
 
+local HELP_MESSAGE = [[
+Hello world.
+]]
 local function printHelpMessage()
-    printToAll('HELLO WORLD', 'Yellow')
+    local delim = ''
+    for _ = 1, 20 do
+        delim = delim .. '\u{2550}'
+    end
+    local message = {
+        delim,
+        string.match(HELP_MESSAGE, '^%s*(.-)%s*$'),
+        delim
+    }
+    message = table.concat(message, '\n')
+    printToAll(message, 'Yellow')
 end
 
 -------------------------------------------------------------------------------
@@ -169,14 +182,31 @@ function onLoad(save_state)
     self.addContextMenuItem('0. HELP', printHelpMessage)
     self.addContextMenuItem('1. Gather draft items', function() startLuaCoroutine(self, 'gatherDraftItemsCoroutine') end)
     self.addContextMenuItem('2. Build draft bags', function() startLuaCoroutine(self, 'buildDraftBagsCoroutine') end)
-    self.addContextMenuItem('3. Cleanup', function() startLuaCoroutine(self, 'packFrankenCoroutine') end)
+    self.addContextMenuItem('3. Remove draft bags', function() startLuaCoroutine(self, 'removeDraftBagsCoroutine') end)
 
-    self.addContextMenuItem('_init_', function() startLuaCoroutine(self, '_initializeSelfFromOldStyleFrankenBags') end)
+    self.addContextMenuItem('Report Factions', function() _factionHelper.reportFactions() end)
+
+    -- Temporary function: seed self initial contents by moving from existing franken bags.
+    if self.getQuantity() == 0 then
+        self.addContextMenuItem('_init_', function() startLuaCoroutine(self, '_initializeSelfFromOldStyleFrankenBags') end)
+    end
 end
 
 local _1_gatherDone = false
 function gatherDraftItemsCoroutine()
     local log = _getLog('Gather draft items')
+
+    -- Make sure setup is finished and no factions were already unpacked.
+    for _, object in ipairs(getAllObjects()) do
+        if object.getName() == 'Game Setup Options' and object.tag == 'Generic' then
+            log.e('Game Setup Options not done (please select PoK, etc), aborting')
+            return 1
+        end
+    end
+    for color, faction in pairs(_factionHelper.allFactions(false)) do
+        log.e(color .. ' has already unpacked a faction, aborting')
+        return 1
+    end
     if _1_gatherDone then
         log.e('already done, aborting')
         return 1
@@ -200,6 +230,7 @@ function gatherDraftItemsCoroutine()
 
     _1_gatherDone = true
     log.i('finished')
+    printToAll('FRANKEN: draft candidate bags assembled.  If you wish to remove any items do so now, then select "build draft bags" to proceed', 'Yellow')
     return 1
 end
 
@@ -212,41 +243,64 @@ function buildDraftBagsCoroutine()
     elseif _2_buildDone then
         log.e('already done, aborting')
         return 1
+    elseif not FrankenBags.validateSourceBagsQuantities() then
+        log.e('validate failed, aborting')
+        return 1
     end
     log.i('starting')
 
+    log.i('creating draft bags')
     FrankenBags.createDraftBags()
     coroutine.yield(0)
 
+    log.i('creating draft hidden zone')
     HiddenZones.spawnCenter()
     coroutine.yield(0)
 
+    log.i('filling draft bags')
     FrankenBags.fillDraftBags()
     coroutine.yield(0)
 
+    log.i('removing draft hidden zone')
     HiddenZones.removeCenter()
     coroutine.yield(0)
 
+    log.i('placing draft source bags inside Franken box (if want to inspect)')
     FrankenBags.stowDraftSourceBags()
     coroutine.yield(0)
 
+    log.i('creating player hidden zones')
     HiddenZones.spawnPlayers()
+    coroutine.yield(0)
+
+    log.i('creating player items')
+    HiddenZones.setupPlayerItems()
     coroutine.yield(0)
 
     _2_buildDone = true
     log.i('finished')
+    printToAll('FRANKEN: draft bags assembled.  When the draft is complete select "remove draft bags" to remove draft bags and hidden zones', 'Yellow')
     return 1
 end
 
-function packFrankenCoroutine()
-    local log = _getLog('Pack Franken')
+function removeDraftBagsCoroutine()
+    local log = _getLog('Remove draft bags')
+    if not _2_buildDone then
+        log.e('must do gather/build first, aborting')
+        return 1
+    end
     log.i('starting')
 
-
+    log.i('removing player hidden zones')
     HiddenZones.removePlayers()
     coroutine.yield(0)
 
+    log.i('placing draft bags inside Franken box (if want to inspect)')
+    FrankenBags.stowDraftBags()
+    coroutine.yield(0)
+
     log.i('finished')
+    printToAll('FRANKEN: All set, good luck!', 'Yellow')
     return 1
 end
 
@@ -557,6 +611,9 @@ function _initializeSelfFromOldStyleFrankenBags()
                 bag.putObject(outer)
                 coroutine.yield(0)
             end
+            coroutine.yield(0)
+            coroutine.yield(0)
+            coroutine.yield(0)
         end
     end
 
@@ -652,6 +709,74 @@ function HiddenZones.spawnPlayers()
     end
 end
 
+function HiddenZones.setupPlayerItems()
+    -- Grab JSON
+    local jsonList = {}
+    for _, name in ipairs(CLONE_TO_HIDDEN) do
+        for _, entry in ipairs(self.getObjects()) do
+            if entry.name == name then
+                local object = self.takeObject({
+                    position          = self.getPosition() + vector(0, 5, 0),
+                    smooth            = false,
+                    guid              = entry.guid,
+                })
+                coroutine.yield(0)
+                local json = object.getJSON()
+                self.putObject(object)
+                coroutine.yield(0)
+                table.insert(jsonList, json)
+            end
+        end
+    end
+
+    -- Clone CLONE_TO_HIDDEN items.
+    for _, color in ipairs(_zoneHelper.zones()) do
+        local transform = HiddenZones.getPlayerTransform(color)
+        local p = transform.position
+        for i, json in ipairs(jsonList) do
+            local clone = spawnObjectJSON({
+                json = json,
+                position = vector(p.x, p.y, p.z) + vector(i - 1 * 3, 3, 0),
+                rotation = transform.rotation,
+                sound             = false,
+                snap_to_grid      = false,
+            })
+            clone.use_grid = false
+            clone.use_snap_points = false
+            clone.sticky = false
+            coroutine.yield(0)
+        end
+    end
+
+    -- Create per-player bags.
+    for _, color in ipairs(_zoneHelper.zones()) do
+        local transform = HiddenZones.getPlayerTransform(color)
+        local p = transform.position
+        local deltas = {
+            { x = 4, y = 3, z = 0 },
+            { x = 8, y = 3, z = 0 },
+        }
+        for _, delta in ipairs(deltas) do
+            local bag = spawnObject({
+                type = 'Bag',
+                position = {
+                    x = p.x + delta.x * (p.z < 1 and 1 or -1),
+                    y = p.y + delta.y,
+                    z = p.z + delta.z,
+                },
+                rotation = transform.rotation,
+                sound = false,
+                snap_to_grid = true,
+            })
+            bag.use_grid = true
+            bag.use_snap_points = false
+            bag.sticky = false
+            coroutine.yield(0)
+        end
+        coroutine.yield(0)
+    end
+end
+
 function HiddenZones.removePlayers()
     for _, object in ipairs(getAllObjects()) do
         if object.tag == 'Fog' and object.getName() == HiddenZones.ZONE.PLAYER.name then
@@ -668,26 +793,85 @@ FrankenBags = {
 
     SOURCE_BAGS = {
         -- Franken and faction components.
-        ['Promissory Notes'] = { count = 2 },
-        ['Home Systems'] = { count = 2 },
-        ['Flagships'] = { count = 2 },
-        ['Starting Techs'] = { count = 2 },
-        ['Commodity Tiles'] = { count = 2 },
-        ['Starting Units'] = { count = 2 },
-        ['Faction Abilities'] = { count = 4 },
-        ['Faction Techs'] = { count = 3 },
-        ['Agents'] = { count = 2, pok = true },
-        ['Commanders'] = { count = 2, pok = true },
-        ['Heroes'] = { count = 2, pok = true },
-        ['Mechs'] = { count = 2, pok = true },
+        {
+            name = 'Promissory Notes',
+            count = 2,
+        },
+        {
+            name = 'Starting Units',
+            count = 2,
+        },
+        {
+            name = 'Starting Techs',
+            count = 2,
+        },
+        {
+            name = 'Commodity Tiles',
+            count = 2,
+        },
 
-        -- Keep these around.
-        ['Non Draft Parts'] = { persist = true },
-        ['Base Unit Tiles'] = { persist = true },
+        {
+            name = 'Flagships',
+            count = 2,
+        },
+        {
+            name = 'Faction Techs',
+            count = 3,
+        },
+        {
+            name = 'Faction Abilities',
+            count = 4,
+        },
+
+        {
+            name = 'Agents',
+            count = 2,
+            pok = true,
+        },
+        {
+            name = 'Commanders',
+            count = 2,
+            pok = true,
+        },
+        {
+            name = 'Heroes',
+            count = 2,
+            pok = true,
+        },
+        {
+            name = 'Mechs',
+            count = 2,
+            pok = true,
+        },
+
+        {
+            name = 'Home Systems',
+            count = 2,
+        },
 
         -- External bags already on the table.
-        ['Blue Planet Tiles'] = { count = { -1, 7, 6, 5, 4, 3, 2, 2 } },
-        ['Red Anomaly Tiles'] = { count = { -1, 2, 2, 3, 2, 2, 1, 1 } },
+        {
+            name = 'Blue Planet Tiles',
+            count = { -1, 7, 6, 5, 4, 3, 2, 2 },
+        },
+        {
+            name = 'Red Anomaly Tiles',
+            count = { -1, 2, 2, 3, 2, 2, 1, 1 },
+        },
+
+        -- Keep these around.
+        {
+            name = 'Non Draft Parts',
+            persist = true,
+            pos = { x = -2, z = 5 },
+            color = 'Pink',
+        },
+        {
+            name = 'Base Unit Tiles',
+            persist = true,
+            pos = { x = 2, z = 5 },
+            color = 'Pink',
+        },
     },
     _nameToBagAttrs = false,
 }
@@ -696,6 +880,12 @@ FrankenBags = {
 function FrankenBags.createDraftSourceBags()
     assert(not FrankenBags._nameToBagAttrs, 'FrankenBags.createDraftSourceBags: already created')
     local log = _getLog('FrankenBags.getDraftSourceBags')
+
+    FrankenBags._nameToBagAttrs = {}
+    local nameToBaseAttrs = {}
+    for _, baseAttrs in ipairs(FrankenBags.SOURCE_BAGS) do
+        nameToBaseAttrs[assert(baseAttrs.name)] = baseAttrs
+    end
 
     local function addSourceBag(name, baseAttrs, extraAttrs)
         assert(type(name) == 'string' and type(baseAttrs) == 'table' and type(extraAttrs) == 'table')
@@ -715,7 +905,6 @@ function FrankenBags.createDraftSourceBags()
         end
 
         -- Only add once.
-        assert(FrankenBags.SOURCE_BAGS[name], 'unknown bag "' .. name .. '"')
         assert(not FrankenBags._nameToBagAttrs[name], 'already added "' .. name .. '"')
 
         local attrs = {}
@@ -730,10 +919,9 @@ function FrankenBags.createDraftSourceBags()
     end
 
     -- Scan the table to find any existing bags.
-    FrankenBags._nameToBagAttrs = {}
     for _, object in ipairs(getAllObjects()) do
         local name = object.getName()
-        local baseAttrs = FrankenBags.SOURCE_BAGS[name]
+        local baseAttrs = nameToBaseAttrs[name]
         if object.tag == 'Bag' and baseAttrs then
             addSourceBag(name, baseAttrs, {
                 src = {
@@ -750,7 +938,7 @@ function FrankenBags.createDraftSourceBags()
     -- Find any bags inside self (only at the root level).
     for _, entry in ipairs(self.getObjects()) do
         local name = entry.name
-        local baseAttrs = FrankenBags.SOURCE_BAGS[name]
+        local baseAttrs = nameToBaseAttrs[name]
         if baseAttrs then
             addSourceBag(name, baseAttrs, {
                 src = {
@@ -763,26 +951,31 @@ function FrankenBags.createDraftSourceBags()
     coroutine.yield(0)
 
     -- Add missing bags to create.
-    for name, baseAttrs in pairs(FrankenBags.SOURCE_BAGS) do
+    for _, baseAttrs in ipairs(FrankenBags.SOURCE_BAGS) do
+        local name = baseAttrs.name
         if not FrankenBags._nameToBagAttrs[name] then
             addSourceBag(name, baseAttrs, {})
         end
     end
 
     -- Move or create bags.
-    local numBags = 0
-    for _, _ in pairs(FrankenBags._nameToBagAttrs) do
-        numBags = numBags + 1
+    local numAutoPlacementBags = 0
+    for _, bagAttrs in pairs(FrankenBags._nameToBagAttrs) do
+        if not bagAttrs.pos then
+            numAutoPlacementBags = numAutoPlacementBags + 1
+        end
     end
     local i = 0
-    for name, attrs in pairs(FrankenBags._nameToBagAttrs) do
+    for _, baseAttrs in ipairs(FrankenBags.SOURCE_BAGS) do
+        local name = baseAttrs.name
+        local bagAttrs = assert(FrankenBags._nameToBagAttrs[name])
         i = i + 1
         local radius = FrankenBags.DRAFT_SRC_RADIUS
-        local phi = i * math.pi * 2 / numBags
+        local phi = i * math.pi * 2 / numAutoPlacementBags
         local pos = {
-            x = math.sin(phi) * radius,
-            y = _zoneHelper.getTableY() + 5,
-            z = math.cos(phi) * radius
+            x = (bagAttrs.pos and bagAttrs.pos.x) or math.sin(phi) * radius,
+            y = _zoneHelper.getTableY() + 3,
+            z = (bagAttrs.pos and bagAttrs.pos.z) or math.cos(phi) * radius
         }
         local rot = {
             x = 0,
@@ -790,25 +983,25 @@ function FrankenBags.createDraftSourceBags()
             z = 0
         }
         local bag = false
-        assert(attrs.src)
-        if attrs.src.object then
+        assert(bagAttrs.src)
+        if bagAttrs.src.object then
             log.d('moving existing "' .. name .. '"')
-            bag = attrs.src.object
+            bag = bagAttrs.src.object
             bag.setLock(false)
             local collide = false
             local fast = false
             bag.setPositionSmooth(pos, collide, fast)
             bag.setRotationSmooth(rot, collide, fast)
-        elseif attrs.src.container then
+        elseif bagAttrs.src.container then
             log.d('unpacking "' .. name .. '" from self')
-            bag = attrs.src.container.takeObject({
+            bag = bagAttrs.src.container.takeObject({
                 position          = pos,
                 rotation          = rot,
                 smooth            = false,
-                guid              = assert(attrs.src.guid),
+                guid              = assert(bagAttrs.src.guid),
             })
         else
-            log.d('creating new "' .. name .. '" from self')
+            log.d('creating "' .. name .. '"')
             bag = spawnObject({
                 type              = 'Bag',
                 position          = pos,
@@ -816,13 +1009,13 @@ function FrankenBags.createDraftSourceBags()
                 sound             = false,
                 snap_to_grid      = false,
             })
+            bag.use_grid = false
+            bag.use_snap_points = false
             bag.setName(name)
+            bag.setColorTint(bagAttrs.color or 'Yellow')
         end
         assert(bag)
-        bag.setLock(true)
-        bag.use_grid = false
-        bag.use_snap_points = false
-        attrs.bag = bag
+        bagAttrs.bag = bag
         coroutine.yield(0)
     end
 end
@@ -1057,15 +1250,21 @@ function FrankenBags._fillSourceBagsFromFactionBox(faction, factionBox)
         {
             bagNamePattern = 'Leaders Bag$',
             defaultDstBagName = 'Agents',
-            overrideDstBagName = function(name)
+            overrideDstBagName = function(object)
+                local name = object.getName()
                 local overrides = _unitHelper.getUnitOverrides()
                 local override = overrides[name]
                 if override and override.override == 'Mech' then
                     return 'Mechs'
                 elseif name == faction.commander then
+                    object.setDescription('Commander')
                     return 'Commanders'
                 elseif name == faction.hero then
+                    object.setDescription('Hero')
                     return 'Heroes'
+                else
+                    object.setDescription('Agent')
+                    return 'Agent'
                 end
             end,
         },
@@ -1097,7 +1296,7 @@ function FrankenBags._fillSourceBagsFromFactionBox(faction, factionBox)
             else
                 local dstName = bagHandler.defaultDstBagName
                 if bagHandler.overrideDstBagName then
-                    dstName = bagHandler.overrideDstBagName(name) or dstName
+                    dstName = bagHandler.overrideDstBagName(object) or dstName
                 end
 
                 if UNDRAFTABLE[name] then
@@ -1160,7 +1359,7 @@ function FrankenBags.createDraftBags()
         local normalized = { x = p.x / magnitude, y = p.y, z = p.z / magnitude }
         p = {
             x = normalized.x * FrankenBags.DRAFT_DST_RADIUS,
-            y = _zoneHelper.getTableY() + 5,
+            y = _zoneHelper.getTableY() + 3,
             z = normalized.z * FrankenBags.DRAFT_DST_RADIUS
         }
         local bag = spawnObject({
@@ -1173,9 +1372,54 @@ function FrankenBags.createDraftBags()
         bag.use_snap_points = false
         bag.setColorTint(zoneAttributes.color or 'White')
         bag.setName('Franken Draft Bag ' .. i .. '/' .. numZones)
-        bag.setLock(true)
         FrankenBags._colorToDraftBag[zoneAttributes.color] = bag
     end
+end
+
+function FrankenBags.stowDraftBags()
+    assert(FrankenBags._colorToDraftBag, 'FrankenBags.stowDraftBags: dst bags not created')
+
+    for color, bag in pairs(FrankenBags._colorToDraftBag) do
+        self.putObject(bag)
+        coroutine.yield(0)
+    end
+    FrankenBags._colorToDraftBag = false
+end
+
+--- Make sure there are enough items in source bags.
+function FrankenBags.validateSourceBagsQuantities()
+    assert(FrankenBags._nameToBagAttrs, 'FrankenBags.validateSourceBagsQuantities: src bags not created')
+
+    local errors = false
+    local numPlayers = #_zoneHelper.zones()
+    for srcBagName, bagAttrs in pairs(FrankenBags._nameToBagAttrs) do
+        local srcBag = assert(bagAttrs.bag)
+        local count = bagAttrs.count
+        if count and type(count) == 'table' then
+            count = count[numPlayers]
+        end
+
+        if bagAttrs.pok and not _setupHelper.getPoK() then
+            count = false
+        end
+
+        if count then
+            local have = srcBag.getQuantity()
+            local need = count * numPlayers
+            if have < need then
+                errors = errors or {}
+                table.insert(errors, srcBagName .. ' has ' .. have .. ' needs ' .. need )
+            end
+        end
+    end
+
+    if errors then
+        local message = 'FrankbenBags.validateSourceBagsQuantities: ' .. table.concat(errors, ', ')
+        printToAll(message, 'Red')
+        return false
+    end
+
+    return true
 end
 
 function FrankenBags.fillDraftBags()
@@ -1184,10 +1428,10 @@ function FrankenBags.fillDraftBags()
     local log = _getLog('FrankenBags.fillDraftBags')
 
     local numPlayers = #_zoneHelper.zones()
-    for srcBagName, bagAttrs in pairs(FrankenBags._nameToBagAttrs) do
+    for _, baseAttrs in ipairs(FrankenBags.SOURCE_BAGS) do
+        local srcBagName = assert(baseAttrs.name)
+        local bagAttrs = assert(FrankenBags._nameToBagAttrs[srcBagName])
         local srcBag = assert(bagAttrs.bag)
-        srcBag.shuffle()
-        coroutine.yield(0)
 
         local count = bagAttrs.count
         if count and type(count) == 'table' then
@@ -1199,12 +1443,14 @@ function FrankenBags.fillDraftBags()
         end
 
         if count and count > 0 then
-            log.i('adding ' .. count .. ' from ' .. srcBagName)
+            log.i('adding ' .. count .. ' ' .. srcBagName)
+            srcBag.shuffle()
+            coroutine.yield(0)
             assert(srcBag.getQuantity() >= count * numPlayers, 'too few ' .. srcBagName)
             for _, dstBag in pairs(FrankenBags._colorToDraftBag) do
                 for i = 1, count do
                     local object = srcBag.takeObject({
-                        position          = srcBag.getPosition() + vector(0, 5, 0),
+                        position          = dstBag.getPosition() + vector(0, 5 + i * 0.1, 0),
                         smooth            = false,
                         top               = true,
                     })

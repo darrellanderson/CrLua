@@ -172,7 +172,7 @@ local _factionAttributes = {
         factionTech = { "Super-Dreadnought II", "Inheritance Systems" },
         flagship = '[0.0.1]',
         flagshipDescription = 'During a space combat, hits produced by this ship and by your dreadnoughts in this system must be assigned to non-fighter ships if able.',
-        abilities = { 'Assimilate' },
+        abilities = { 'Assimilate', 'Harrow' },
         units = { 'Super-Dreadnought I', 'Super-Dreadnought II', 'Annihilator' },
         commander = '2RAM',
         hero = 'The Helmsman',
@@ -251,8 +251,8 @@ local _factionAttributes = {
 
     ['The Universities of Jol-Nar'] = {
         tokenName = 'Universities of Jol-Nar',
-        frankenName = 'Jol Nar',
-        shortName = 'Jol-Nar',  -- should fix Franken objects and remove this
+        frankenName = 'Jol-Nar',
+        shortName = 'Jol Nar', -- TODO REMOVE when new franken box is ready
         home = 12,
         startingUnits = { Infantry = 2, Fighter = 1, Carrier = 2, Dreadnought = 1, Space_Dock = 1, PDS = 2 },
         startingTech = { 'Antimass Deflectors', 'Neural Motivator', 'Sarween Tools', 'Plasma Scoring' },
@@ -488,14 +488,14 @@ local _factionAttributes = {
         startingTech = { 'Neural Motivator', 'Plasma Scoring' },
         flagship = 'Nightingale II',
         flagshipDescription = 'Other players cannot play action cards during a space combat in this system.',
-        abilities = { 'Bounty Hunters', 'Contract Network', 'Smuggler Captiains' },
+        abilities = { 'Bounty Hunters', 'Contract Network', 'Smuggler Captains' },
         units = { 'Wraith Corvette I', 'Wraith Corvette II' },
     },
 
     ['The Free Systems Alliance'] = {
         source = 'Blue Space',
         tokenName = 'Free Systems Alliance',
-        frankenName = 'Free Systems',
+        frankenName = 'Free-Systems',
         home = 3007,
         startingUnits = { Infantry = 4, Fighter = 2, Cruiser = 2, Carrier = 1, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Neural Motivator' },
@@ -547,7 +547,7 @@ local _factionAttributes = {
     ['The Khet Drakkol Union'] = {
         source = 'Blue Space',
         tokenName = 'Khet Drakkol Union',
-        frankenName = 'Khet Drakkol',
+        frankenName = 'Khet-Drakkol',
         home = 3003,
         startingUnits = { Infantry = 4, Fighter = 3, Destroyer = 1, Dreadnought = 2, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Sarween Tools' },
@@ -587,7 +587,7 @@ local _factionAttributes = {
     ['The Mahact Sorcerer Kings'] = {
         source = 'Blue Space',
         tokenName = 'Mahact Sorcerer Kings',
-        frankenName = 'Mahact',
+        frankenName = 'MahactBlu',
         home = 3017,
         startingUnits = { Infantry = 4, Fighter = 2, Cruiser = 1, Carrier = 2, Space_Dock = 1, PDS = 2 },
         startingTech = { },
@@ -692,7 +692,7 @@ local _factionAttributes = {
     ['The Savages of Cymiae'] = {
         source = 'Other Homebrew',
         tokenName = 'Savages of Cymiae',
-        frankenName = 'Savages of Cymiae',
+        frankenName = 'Cymiae',
         home = 3018,
         startingUnits = { Infantry = 2, Fighter = 2, Cruiser = 1, Carrier = 1, Space_Dock = 1, PDS = 1 },
         startingTech = { 'Plasma Scoring', 'Magen Defense Grid' },
@@ -955,11 +955,6 @@ function _factionIsValid(faction)
     local frankenName = faction.frankenName
     if not frankenName or type(frankenName) ~= 'string' or string.len(frankenName) == 0 then
         return false, 'faction.frankenName must be a non-empty string'
-    end
-
-    local shortName = faction.shortName
-    if not shortName or type(shortName) ~= 'string' or string.len(shortName) == 0 then
-        return false, 'faction.shortName must be a non-empty string'
     end
 
     local home = faction.home

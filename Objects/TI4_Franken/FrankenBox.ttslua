@@ -22,6 +22,7 @@ function getHelperClient(helperObjectName)
 end
 local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
+local _gameDataHelper = getHelperClient('TI4_GAME_DATA_HELPER')
 local _setupHelper = getHelperClient('TI4_SETUP_HELPER')
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
 local _unitHelper = getHelperClient('TI4_UNIT_HELPER')
@@ -223,6 +224,10 @@ function gatherDraftItemsCoroutine()
     log.i('starting')
 
     log.i('telling other tools this is Franken')
+    _gameDataHelper.addExtraData({
+        name = 'FrankenBox',
+        value = true
+    })
     _sendOnFrankenEnabled(true)
     coroutine.yield(0)
 

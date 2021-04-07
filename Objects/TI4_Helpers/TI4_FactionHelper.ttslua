@@ -235,6 +235,7 @@ local _factionAttributes = {
     ["The Sardakk N'orr"] = {
         tokenName = "Sardakk N'orr",
         frankenName = 'Sardakk',
+        shortName = "N'orr",
         home = 13,
         startingUnits = { Infantry = 5, Cruiser = 1, Carrier = 2, Space_Dock = 1, PDS = 1 },
         startingTech = {},
@@ -396,6 +397,7 @@ local _factionAttributes = {
         source = 'PoK',
         tokenName = 'Titans of Ul',
         frankenName = 'Titans',
+        shortName = 'Ul',
         home = 55,
         startingUnits = { Infantry = 3, Fighter = 2, Cruiser = 2, Dreadnought = 1, Space_Dock = 1 },
         startingTech = { 'Antimass Deflectors', 'Scanlink Drone Network' },

@@ -36,6 +36,10 @@ function onLoad()
     createButton()
 end
 
+function onObjectStateChange(changedObject, oldGuid)
+    ignoreGuidSet[oldGuid] = true
+end
+
 function onObjectEnterContainer(bag, enterObject)
     if bag == self then
         if objectWillEnterSelfSet[enterObject] then
@@ -85,9 +89,24 @@ function onObjectDestroy(dyingObject)
             -- Typical deletion after putting something in a bag or deck.
             objectEnteredContainerSet[dyingObject] = nil
         elseif shouldZombie(dyingObject) then
-            local zombie = createZombie(dyingObject)
-            objectWillEnterSelfSet[zombie] = true
-            self.putObject(zombie)
+            local guid = dyingObject.getGUID()
+            local json = dyingObject.getJSON()
+            -- Wait a moment before cloning, in case was a state change event.
+            local function delayedPutSelf()
+                if ignoreGuidSet[guid] then
+                    ignoreGuidSet[guid] = nil
+                    return
+                end
+                local zombie = spawnObjectJSON({
+                    json              = json,
+                    position          = self.getPosition() + vector(0, 5, 0),
+                    sound             = false,
+                    snap_to_grid      = false
+                })
+                objectWillEnterSelfSet[zombie] = true
+                self.putObject(zombie)
+            end
+            Wait.time(delayedPutSelf, 0.5)
         end
 
         lastErrorTimestamp = false

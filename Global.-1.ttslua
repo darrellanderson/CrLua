@@ -28,6 +28,7 @@ function getHelperClient(helperObjectName)
 end
 
 local _deckHelper = getHelperClient('TI4_DECK_HELPER')
+local _gameDataHelper = getHelperClient('TI4_GAME_DATA_HELPER')
 local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 local _setupHelper = getHelperClient('TI4_SETUP_HELPER')
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
@@ -840,18 +841,45 @@ function onChat(message, srcPlayer)
         if srcPlayer.admin or srcPlayer.promoted then
             srcPlayer.changeColor('Teal')
         else
-            printToAll('!tealme failed for ' .. srcPlayer.color .. ', must be promoted to use', 'Teal')
+            printToAll('!tealme failed for ' .. srcPlayer.color .. ', must be promoted to use', 'Yellow')
         end
         return false
     end
 
     if string.lower(message) == '!seats' then
-        _randomizeSeats(srcPlayer.color)
+        if srcPlayer.admin or srcPlayer.promoted then
+            _randomizeSeats(srcPlayer.color)
+        else
+            printToAll('!seats failed for ' .. srcPlayer.color .. ', must be promoted to use', 'Yellow')
+        end
         return false
     end
 
     if string.lower(message) == '!help' then
         _help(srcPlayer.color)
+        return false
+    end
+
+    -- '!gamedata' or '!gamedata <key:string> <delay:number>'
+    if string.match(string.lower(message), '!gamedata') then
+        if srcPlayer.admin or srcPlayer.promoted then
+            local parts = {}
+            for part in string.gmatch(message, '%S+') do
+                table.insert(parts, part)
+            end
+            if #parts > 1 then
+                local delay = _gameDataHelper.startPeriodicUpdates({
+                    key = parts[2],
+                    delay = parts[3] and tonumber(parts[3])
+                })
+                printToAll('!gamedata enabled by ' .. srcPlayer.color .. ' delay ' .. delay, 'Yellow')
+            else
+                _gameDataHelper.stopPeriodicUpdates()
+                printToAll('!gamedata disabled by ' .. srcPlayer.color, 'Yellow')
+            end
+        else
+            printToAll('!gamedata failed for ' .. srcPlayer.color .. ', must be promoted to use', 'Yellow')
+        end
         return false
     end
 
@@ -925,6 +953,25 @@ function onObjectNumberTyped(object, playerColor, number)
             count = number
         })
         return true  -- stop TTS from dealing the card(s)
+    end
+end
+
+-------------------------------------------------------------------------------
+
+local _deletedItemsBagGuid = false
+function onObjectStateChange(changedObject, oldGuid)
+    local deletedItemsBag = _deletedItemsBagGuid and getObjectFromGUID(_deletedItemsBagGuid)
+    if not deletedItemsBag then
+        for _, object in ipairs(getAllObjects()) do
+            if object.tag == 'Bag' and object.getName() == 'TI4 Deleted Items' then
+                _deletedItemsBagGuid = object.getGUID()
+                deletedItemsBag = object
+                break
+            end
+        end
+    end
+    if deletedItemsBag then
+        deletedItemsBag.call('ignoreGuid', oldGuid)
     end
 end
 

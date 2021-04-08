@@ -413,8 +413,17 @@ function placeTilesCoroutine()
 
     local buildList = parseMapString(mapString)
 
+    -- Lift the custudians token, (re)place it when finished.
+    local custodiansToken = getObjectFromGUID(CUSTODIANS_TOKEN_GUID)
+    if custodiansToken then
+        local p = custodiansToken.getPosition() + vector(0, 5, 0)
+        custodiansToken.setPosition(p)
+        custodiansToken.setLock(true)
+    end
+    coroutine.yield(0)
+
     -- If map string does not start with Mecatol put it away.
-    if #buildList > 0 and buildList[1].tile ~= MECATOL_TILE then
+    if (#buildList > 0) and (buildList[1].tile ~= MECATOL_TILE) then
         local system = assert(_systemHelper.systemFromTile(MECATOL_TILE))
         local mecatolTile = getObjectFromGUID(system.guid)
         if mecatolTile then
@@ -422,7 +431,6 @@ function placeTilesCoroutine()
             mecatolTile.setLock(false)
             blueBag.putObject(mecatolTile)
         end
-        coroutine.yield(0)
         coroutine.yield(0)
     end
 
@@ -448,17 +456,6 @@ function placeTilesCoroutine()
                 end
             end
         end
-    end
-    coroutine.yield(0)
-
-    -- Lift the custudians token.
-    local custodiansToken = getObjectFromGUID(CUSTODIANS_TOKEN_GUID)
-    if custodiansToken then
-        local p = custodiansToken.getPosition()
-        p.y = p.y + 5
-        local collide = false
-        local fast = false -- move slowly so time to swap tile beneath
-        custodiansToken.setPositionSmooth(p, collide, fast)
     end
     coroutine.yield(0)
 
@@ -493,6 +490,24 @@ function placeTilesCoroutine()
             coroutine.yield(0)
         end
     end
+
+    -- Release custodians token, move to mecatol location if present.
+    if custodiansToken then
+        custodiansToken.setLock(false)
+        local system = assert(_systemHelper.systemFromTile(MECATOL_TILE))
+        local mecatolTile = getObjectFromGUID(system.guid)
+        if mecatolTile then
+            while mecatolTile.isSmoothMoving() do
+                coroutine.yield(0)
+            end
+            local p = mecatolTile.getPosition() + vector(0, 5, 0)
+            local collide = false
+            local fast = false
+            custodiansToken.setPositionSmooth(p, collide, fast)
+        end
+    end
+
+    printToAll('Builing map finished')
     return 1
 end
 
@@ -530,6 +545,15 @@ function placeTile(system, bag, position, rotation)
             broadcastToAll('cannot find system tile for ' .. system.string, 'Red')
         end
     end
+end
+
+-- Expose for outside callers.
+function cloneSystem(params)
+    assert(type(params.system) == 'table')
+    assert(type(params.position) == 'table')
+    assert(type(params.rotation) == 'table')
+    assert(type(params.lock) == 'boolean')
+    _cloneSystem(params.system, params.position, params.rotation, params.lock)
 end
 
 function _cloneSystem(system, position, rotation, lock)

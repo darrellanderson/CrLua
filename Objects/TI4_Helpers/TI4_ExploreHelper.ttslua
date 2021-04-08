@@ -579,13 +579,17 @@ function checkCardForToken(object_spawned, planetName)
                 end
             end
 
-            explorationBag.takeObject({
+            local token = explorationBag.takeObject({
                 position = position,
                 rotation = rotation,
                 guid = token.guid,
                 smooth = false,  -- move there quickly to reduce opportunity to grab it
                 callback_function = takeCallback
             })
+
+            -- Just in case the card is in hand, mark the token as use_hands
+            -- so it will get added to the hand rather than fall through it.
+            token.use_hands = true
 
             -- Only get each token once.
             tokensToRetrieveSet[token.name] = nil

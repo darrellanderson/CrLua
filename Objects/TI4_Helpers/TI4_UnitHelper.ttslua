@@ -1910,17 +1910,17 @@ function _isToggleActiveCard(object)
             return modifier.toggleActive
         end
 
-        -- Also support the old style.
-        local factionColor = string.match(name, '^Alliance %((.*)%)$')
-        local faction = factionColor and _factionHelper.fromColor(factionColor)
-        local commander = faction and faction.commander
-        local modifier = commander and _unitModifiers[commander]
-        if modifier and modifier.alias then
-            modifier = _unitModifiers[modifier.alias]
-        end
-        if modifier then
-            return modifier.toggleActive
-        end
+        -- COMMENTED OUT FOR NOW, ONLY USE NEW STYLE.  Also support the old style.
+        -- local factionColor = string.match(name, '^Alliance %((.*)%)$')
+        -- local faction = factionColor and _factionHelper.fromColor(factionColor)
+        -- local commander = faction and faction.commander
+        -- local modifier = commander and _unitModifiers[commander]
+        -- if modifier and modifier.alias then
+        --     modifier = _unitModifiers[modifier.alias]
+        -- end
+        -- if modifier then
+        --     return modifier.toggleActive
+        -- end
 
         return false
     end

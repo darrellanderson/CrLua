@@ -159,7 +159,7 @@ WELCOME TO FRANKEN
 
 First, use the game setup tile to choose between base game, PoK, etc.  This Franken tool will create draft pools from available factions.
 
-To use homebrew factions, place their faction boxes in the "factions" box, and make sure their Franken components are present inside the Franken box.  For example, the "Blue Space Faction Pack" is already supported.
+To use homebrew factions, make sure their factions boxes are inside a container on the table named "(whatever) Faction Pack", as well as their Franken components are present inside the Franken box.  For example, the "Blue Space Faction Pack" is already supported.
 
 Then use the right-click options in order:
 
@@ -1086,21 +1086,34 @@ function FrankenBags.getDraftCandidates()
     local abilitySet = {}
     local unitSet = {}
 
-    local factionsBox = assert(_findItemOnTable('Factions', 'Bag'))
-    for _, entry in ipairs(factionsBox.getObjects()) do
-        local name = string.match(entry.name, '^(.*) Box$')
-        local faction = name and _factionHelper.fromTokenName(name)
-        if faction then
-            frankenNameSet[faction.frankenName or '-'] = true
-            flagshipSet[faction.flagship or '-'] = true
-            for _, ability in ipairs(faction.abilities or {}) do
-                abilitySet[ability] = true
-            end
-            for _, unit in ipairs(faction.units) do
-                unitSet[unit] = true
+    local function processFactionsBox(factionsBox)
+        for _, entry in ipairs(factionsBox.getObjects()) do
+            local name = string.match(entry.name, '^(.*) Box$')
+            local faction = name and _factionHelper.fromTokenName(name)
+            if faction then
+                frankenNameSet[faction.frankenName or '-'] = true
+                flagshipSet[faction.flagship or '-'] = true
+                for _, ability in ipairs(faction.abilities or {}) do
+                    abilitySet[ability] = true
+                end
+                for _, unit in ipairs(faction.units) do
+                    unitSet[unit] = true
+                end
             end
         end
     end
+
+    for _, object in ipairs(getAllObjects()) do
+        if object.tag == 'Bag' then
+            local name = object.getName()
+            if name == 'Factions' then
+                processFactionsBox(object)
+            elseif string.match(name, ' Faction Pack$') then
+                processFactionsBox(object)
+            end
+        end
+    end
+    coroutine.yield(0)
 
     -- There is no list of "base" units, so build the set of faction units
     -- not included above.
@@ -1212,10 +1225,32 @@ function FrankenBags.fillSourceBagsFromSelf()
     end
 end
 
-function FrankenBags.fillSourceBagsFromFactionBoxes()
+function FrankenBags.fillSourceBagsFromFactionBoxes(factionsBox)
+    -- If no factions box is given, run again with the default, plus any
+    -- "X Faction Pack" bags on the table.
+    if not factionsBox then
+        local factionsBoxes = {}
+        for _, object in ipairs(getAllObjects()) do
+            if object.tag == 'Bag' then
+                local name = object.getName()
+                if name == 'Factions' then
+                    table.insert(factionsBoxes, object)
+                elseif string.match(name, ' Faction Pack$') then
+                    table.insert(factionsBoxes, object)
+                end
+            end
+        end
+        coroutine.yield(0)
+        assert(#factionsBoxes > 0)
+        for _, factionsBox in ipairs(factionsBoxes) do
+            FrankenBags.fillSourceBagsFromFactionBoxes(factionsBox)
+            coroutine.yield(0)
+        end
+        return
+    end
+
     -- No need to check if a faction belongs.  If it is in the factions box,
     -- that is signal enough.  (E.g. no PoK factions will be there for base.)
-    local factionsBox = assert(_findItemOnTable('Factions', 'Bag'))
     for _, entry in ipairs(factionsBox.getObjects()) do
         local name = string.match(entry.name, '^(.*) Box$')
         local faction = name and _factionHelper.fromTokenName(name)
@@ -1237,12 +1272,13 @@ end
 
 function FrankenBags._fillSourceBagsFromFactionBox(faction, factionBox)
     local function takeBag(pattern, i)
-        for _, entry in ipairs(factionBox.getObjects()) do
+        for i, entry in ipairs(factionBox.getObjects()) do
             if string.match(entry.name, pattern) then
                 local bag = factionBox.takeObject({
                     position          = factionBox.getPosition() + vector(i * 3, 5, 0),
                     smooth            = false,
-                    guid              = entry.guid
+                    --guid              = entry.guid
+                    index             = entry.index -- Boo, blue space has guid collisions
                 })
                 bag.setLock(true)
                 return bag
@@ -1313,13 +1349,15 @@ function FrankenBags._fillSourceBagsFromFactionBox(faction, factionBox)
 
     -- Take all sub-objects at once.
     for _, bagHandler in ipairs(bagHandlers) do
-        bagHandler.objects = takeAll(bagHandler.bag)
+        if bagHandler.bag then
+            bagHandler.objects = takeAll(bagHandler.bag)
+        end
     end
     coroutine.yield(0)
 
     -- Transfer all sub-objects at once.
     for _, bagHandler in ipairs(bagHandlers) do
-        for i, object in ipairs(bagHandler.objects) do
+        for i, object in ipairs(bagHandler.objects or {}) do
             local name = object.getName()
             if bagHandler.discard then
                 local success = _deckHelper.discardCard({
@@ -1349,7 +1387,9 @@ function FrankenBags._fillSourceBagsFromFactionBox(faction, factionBox)
 
     -- Destroy all handled bags at once.
     for _, bagHandler in ipairs(bagHandlers) do
-        destroyBag(bagHandler.bag)
+        if bagHandler.bag then
+            destroyBag(bagHandler.bag)
+        end
     end
     coroutine.yield(0)
 

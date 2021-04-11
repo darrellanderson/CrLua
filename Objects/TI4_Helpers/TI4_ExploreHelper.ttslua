@@ -563,11 +563,16 @@ function checkCardForToken(object_spawned, planetName)
     end
 
     local explorationBag = _getByName('Exploration Bag', 'Bag')
-    for i, token in ipairs(explorationBag.getObjects()) do
-        if tokensToRetrieveSet[token.name] then
+    local deltaY = 1
+    for _, entry in ipairs(explorationBag.getObjects()) do
+        if tokensToRetrieveSet[entry.name] then
+            -- Only get each token once.
+            tokensToRetrieveSet[entry.name] = nil
 
             local position = object_spawned.getPosition()
-            position.y = position.y + i * 0.3
+            position.y = position.y + deltaY
+            deltaY = deltaY + 0.3
+            
             local rotation = object_spawned.getRotation()
 
             local function takeCallback(object)
@@ -582,7 +587,7 @@ function checkCardForToken(object_spawned, planetName)
             local token = explorationBag.takeObject({
                 position = position,
                 rotation = rotation,
-                guid = token.guid,
+                guid = entry.guid,
                 smooth = false,  -- move there quickly to reduce opportunity to grab it
                 callback_function = takeCallback
             })
@@ -590,9 +595,6 @@ function checkCardForToken(object_spawned, planetName)
             -- Just in case the card is in hand, mark the token as use_hands
             -- so it will get added to the hand rather than fall through it.
             token.use_hands = true
-
-            -- Only get each token once.
-            tokensToRetrieveSet[token.name] = nil
         end
     end
 end

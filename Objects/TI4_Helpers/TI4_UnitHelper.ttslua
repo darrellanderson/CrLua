@@ -512,15 +512,14 @@ local _unitModifiers = {
         type = TYPE.ADJUST,
         isCombat = false,
         apply = function(unitAttrs)
-            local currentCost = unitAttrs['Infantry'].cost
-            local currentProductionConsumed = unitAttrs['Infantry'].productionConsumed or 1
-            local currentUnitsPerResource = math.floor(0.5 + (1.0 / currentCost)) --simulate math.round
-
-            local newUnitsPerResource = currentUnitsPerResource + 1
+            local oldCost = unitAttrs['Infantry'].cost
+            local oldUnitsPerResource = math.floor(0.5 + (1.0 / oldCost)) -- math.round
+            local newUnitsPerResource = oldUnitsPerResource + 1
             local newCost = 1.0 / newUnitsPerResource
-            local newProductionConsumed = (newCost / currentCost) * currentProductionConsumed
-
             unitAttrs['Infantry'].cost = newCost
+
+            local oldProductionConsumed = unitAttrs['Infantry'].productionConsumed or 1
+            local newProductionConsumed = (oldUnitsPerResource / newUnitsPerResource) * oldProductionConsumed
             unitAttrs['Infantry'].productionConsumed = newProductionConsumed
         end
     },
@@ -711,15 +710,14 @@ local _unitModifiers = {
         type = TYPE.ADJUST,
         isCombat = false,
         apply = function(unitAttrs, params)
-            local currentCost = unitAttrs['Fighter'].cost or 0.5
-            local currentProductionConsumed = unitAttrs['Fighter'].productionConsumed or 1
-            local currentUnitsPerResource = math.floor(0.5 + (1.0 / currentCost)) --simulate math.round
-
-            local newUnitsPerResource = currentUnitsPerResource + 1
+            local oldCost = unitAttrs['Fighter'].cost
+            local oldUnitsPerResource = math.floor(0.5 + (1.0 / oldCost)) -- math.round
+            local newUnitsPerResource = oldUnitsPerResource + 1
             local newCost = 1.0 / newUnitsPerResource
-            local newProductionConsumed = (newCost / currentCost) * currentProductionConsumed
-
             unitAttrs['Fighter'].cost = newCost
+
+            local oldProductionConsumed = unitAttrs['Fighter'].productionConsumed or 1
+            local newProductionConsumed = (oldUnitsPerResource / newUnitsPerResource) * oldProductionConsumed
             unitAttrs['Fighter'].productionConsumed = newProductionConsumed
         end
     },

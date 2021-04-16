@@ -1,4 +1,5 @@
 --- Gather game data (score, tech, etc).
+-- Alec/Root's Twitch overlay: https://ti4-tts-gamedata-display-tool.herokuapp.com/
 -- @author Darrell
 -- #include <~/CrLua/Objects/TI4_Helpers/TI4_GameDataHelper>
 
@@ -1745,6 +1746,7 @@ function _uploadGameDataCallback(data)
         end
     end
     WebRequest.post(url, JSON.encode(data), callback)
+    Analytics.throttleReport()  -- periodic event to guage session length
 end
 
 -------------------------------------------------------------------------------
@@ -1785,6 +1787,71 @@ function _logTable(message, table, depth)
         print(indentedPrefix .. '...')
     end
     print(prefix .. '}')
+end
+
+-------------------------------------------------------------------------------
+
+-- https://developers.google.com/analytics/devguides/collection/protocol/v1/devguide
+Analytics = {
+    URL = 'https://www.google-analytics.com/batch',
+    PAYLOAD = {
+        v = 1,
+        tid = 'UA-4959479-17',
+        cid = '-', -- client (user) id
+        t = 'pageview',
+        dp = '%2Fgamedata', -- URL escaped "page" name being visited
+    },
+    _lastReport = false,
+}
+
+function Analytics.report()
+    -- Use "batch" to send one result per player.  This should help
+    -- capture repeat visits, at the expense of tracking number of players
+    -- instead of number of games.
+    local payloads = {}
+    local function addPayload(cid, page)
+        local payload = {}
+        for k, v in pairs(Analytics.PAYLOAD) do
+            if (k == 'cid') and cid then
+                v = cid
+            end
+            if (k == 'dp') and page then
+                v = page
+            end
+            table.insert(payload, k .. '=' .. v)
+        end
+        payload = table.concat(payload, '&')
+        table.insert(payloads, payload)
+    end
+
+    for _, player in ipairs(Player.getPlayers()) do
+        -- Hash ids, and only gather after opt-in on setup tile.
+        local cid = player.steam_id and string.format('%x', CRC32.hash(player.steam_id))
+        addPayload(cid, false)
+    end
+
+    local function callback(e)
+        -- if e.is_error then
+        --     print('response error: ' .. e.error)
+        -- end
+        -- if e.text then
+        --     print('response text: ' .. e.text)
+        -- end
+    end
+    local download = true
+    local body = table.concat(payloads, '\n')
+    local headers = {}
+    WebRequest.custom(Analytics.URL, 'POST', download, body, headers, callback)
+end
+
+function Analytics.throttleReport()
+    -- Anaytics limits hits per session to 500, aggressively throttle to help
+    -- ensure game length "approximation" can be estimated.
+    local now = Time.time
+    if (not Analytics._lastReport) or (now - Analytics._lastReport) > 900 then
+        Analytics._lastReport = now
+        Analytics.report()
+    end
 end
 
 -------------------------------------------------------------------------------

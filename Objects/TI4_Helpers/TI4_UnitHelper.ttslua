@@ -1016,7 +1016,7 @@ local _unitModifiers = {
 
     ['Tekklar Legion'] = {
         description = '+1 to GROUND COMBAT rolls for attacker, -1 to Sardakk if opponent owns',  -- -1 to Sardakk if other player has it
-        owner = OWNER.ANY,
+        owner = OWNER.SELF,
         type = TYPE.ADJUST,
         isCombat = true,
         excludeFaction = "The Sardakk N'orr",

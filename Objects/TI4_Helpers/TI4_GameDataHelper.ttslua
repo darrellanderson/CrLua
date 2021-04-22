@@ -51,6 +51,8 @@ local _gameDataKey = false
 local _timerId = false  -- for regular gamedata updates
 local _timerPeriodicSeconds = false
 
+local _analyticsTimerId = false
+
 -- Time based throttle for external pokes.
 local _triggerUploadGameDataWaitId = false
 
@@ -84,8 +86,14 @@ function triggerUploadGameData()
     local function wrappedUploadGameData()
         _triggerUploadGameDataWaitId = false
         _uploadGameData()
+        _uploadAnalytics()
     end
     _triggerUploadGameDataWaitId = Wait.time(wrappedUploadGameData, 10)
+end
+
+--- Expose the setup timestamp.
+function getGameDataTimestamp()
+    return _state.setupTimestamp
 end
 
 -------------------------------------------------------------------------------
@@ -254,15 +262,21 @@ function asyncGatherDataCoroutine()
     coroutine.yield(0)
     coroutine.yield(0)
 
-    -- Get the round.  Reject if any players are missing a strategy card.
-    -- (Objective flipped but not yet started new round).
+    -- Get the round.
     local round = result.round or 0
-    local requiredStrategyCardCount = (#result.players) < 5 and 2 or 1
-    for color, playerResult in pairs(colorToPlayerResult) do
-        local strategyCards = playerResult.strategyCards or {}
-        if (#strategyCards) < requiredStrategyCardCount then
-            round = false
-            break
+    -- Reject if turns are not enabled (disabled when all have passed).
+    -- Otherwise reject if any players are missing a strategy card.
+    -- (Objective flipped but not yet started new round).
+    if not Turns.enable then
+        round = false
+    else
+        local requiredStrategyCardCount = (#result.players) < 5 and 2 or 1
+        for color, playerResult in pairs(colorToPlayerResult) do
+            local strategyCards = playerResult.strategyCards or {}
+            if (#strategyCards) < requiredStrategyCardCount then
+                round = false
+                break
+            end
         end
     end
     local prevRound = 0
@@ -1625,6 +1639,11 @@ end
 -- - includePoK (nil or boolean).
 -- - playerTools (nil or boolean).
 function onSetupHelperSetupFinished(params)
+    if params.isRightClick then
+        printToAll('Game data onSetupHelperSetupFinished is a right click, ignoring')
+        return
+    end
+
     _gamedataOptIn = params.gamedataOptIn
 
     _state.setupTimestamp = math.floor(os.time() * 1000) / 1000
@@ -1684,9 +1703,22 @@ function startPeriodicUpdates(params)
         delay = delay,
         repetitions = 0,  -- until stopped
     })
+    _uploadGameData()  -- do not wait for first timer, upload one now
 
-    -- Timer does not trigger until delay, do an upload now.
-    _uploadGameData()
+    -- Start analytics on a separate timer.
+    if _analyticsTimerId then
+        Timer.destroy(_analyticsTimerId)
+        _analyticsTimerId = false
+    end
+    _analyticsTimerId = self.getGUID() .. '_periodicAnalytics'
+    Timer.create({
+        identifier = _analyticsTimerId,
+        function_name = '_uploadAnalytics',
+        function_owner = self,
+        delay = 14 * 60,
+        repetitions = 0,  -- until stopped
+    })
+    _uploadAnalytics()  -- do not wait for first timer, upload one now
 
     return delay  -- tell caller the update delay
 end
@@ -1697,22 +1729,28 @@ function stopPeriodicUpdates()
         Timer.destroy(_timerId)
         _timerId = false
     end
+    if _analyticsTimerId then
+        Timer.destroy(_analyticsTimerId)
+        _analyticsTimerId = false
+    end
 end
 
 -------------------------------------------------------------------------------
 
-function _uploadGameData()
-    local active = false
+function _sendGameData()
     if _gameDataKey then
         -- ALWAYS send when game data key is present
-        active = true
+        return true
     elseif _gamedataOptIn then
         -- To help prevent curiosity and solo griefing corruption REQUIRE
         -- multiple players before uploading vonulary anonymized game data.
         local seated = getSeatedPlayers()
-        active = seated and #seated > 1
+        return seated and #seated > 1
     end
-    if not active then
+end
+
+function _uploadGameData()
+    if not _sendGameData() then
         return
     end
     asyncGatherData({
@@ -1746,7 +1784,13 @@ function _uploadGameDataCallback(data)
         end
     end
     WebRequest.post(url, JSON.encode(data), callback)
-    Analytics.throttleReport()  -- periodic event to guage session length
+end
+
+function _uploadAnalytics()
+    if not _sendGameData() then
+        return
+    end
+    Analytics.report()
 end
 
 -------------------------------------------------------------------------------
@@ -1805,6 +1849,15 @@ Analytics = {
 }
 
 function Analytics.report()
+    -- For drop-off reporting track a page for the session progress?
+    local maxScore = 0
+    for color, score in pairs(colorToScore()) do
+        if score > maxScore then
+            maxScore = score
+        end
+    end
+    local page = '%2Fscore' .. maxScore
+
     -- Use "batch" to send one result per player.  This should help
     -- capture repeat visits, at the expense of tracking number of players
     -- instead of number of games.
@@ -1823,11 +1876,24 @@ function Analytics.report()
         payload = table.concat(payload, '&')
         table.insert(payloads, payload)
     end
-
+    -- Add a hit for each SEATED player (ignore spectators).
+    local seatedSet = {}
+    for _, color in ipairs(getSeatedPlayers()) do
+        seatedSet[color] = true
+    end
     for _, player in ipairs(Player.getPlayers()) do
-        -- Hash ids, and only gather after opt-in on setup tile.
-        local cid = player.steam_id and string.format('%x', CRC32.hash(player.steam_id))
-        addPayload(cid, false)
+        if seatedSet[player.color] then
+            -- Hash ids, and only gather after opt-in on setup tile.
+            local cid = player.steam_id and string.format('%x', CRC32.hash(player.steam_id))
+            addPayload(cid, page)
+        end
+    end
+    local body = table.concat(payloads, '\n')
+
+    -- Do not send analytics for localhost tests.
+    if _gameDataKey == GAME_DATA_LOCALHOST_KEY then
+        print('LOCALHOST REPORT:\n' .. body)
+        return
     end
 
     local function callback(e)
@@ -1839,19 +1905,8 @@ function Analytics.report()
         -- end
     end
     local download = true
-    local body = table.concat(payloads, '\n')
     local headers = {}
     WebRequest.custom(Analytics.URL, 'POST', download, body, headers, callback)
-end
-
-function Analytics.throttleReport()
-    -- Anaytics limits hits per session to 500, aggressively throttle to help
-    -- ensure game length "approximation" can be estimated.
-    local now = Time.time
-    if (not Analytics._lastReport) or (now - Analytics._lastReport) > 900 then
-        Analytics._lastReport = now
-        Analytics.report()
-    end
 end
 
 -------------------------------------------------------------------------------

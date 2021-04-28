@@ -8,42 +8,39 @@
 -- and all tokens flip back to active.
 
 local TAG = 'ActivePassedToken'
+local _isActive = nil
 
 -------------------------------------------------------------------------------
 -- OBJECT EVENT METHODS
 
 function onLoad()
     self.addContextMenuItem('Report', report)
-
-    math.randomseed(tonumber(self.getGUID(), 16))
-    local _lastIsActive = nil
-
-    local function periodicCheck()
-        local active = isActive(self)
-        if _lastIsActive ~= active then
-            _lastIsActive = active
-            local color = myColor()
-            if not active and color then
-                local message = 'Active/Passed: ' .. color .. ' passes'
-                broadcastToAll(message, color)
-            end
-        end
-        Wait.time(periodicCheck, 2.5 + (math.random() * 0.5))
-    end
-    Wait.time(periodicCheck, 0.5 + (math.random() * 0.5))
+    _isActive = not self.is_face_down
 end
 
 function onPlayerTurnStart(playerColorStart, playerColorPrevious)
     -- Do not manipulate any Turns state now, let all objects process the
     -- same turn start values and maybe pass the turn after a few frames.
     if isMyTurn() then
-        Wait.frames(maybePassTurn, 2)
+        Wait.frames(maybePassTurn, 3)
     end
 end
 
 function onPlayerChangeColor(playerColor)
     if playerColor == myColor() and not isActive(self) then
         self.flip()
+    end
+end
+
+function onRotate(spin, flip, player_color, old_spin, old_flip)
+    local newIsActive = (flip < 90) or (flip > 270)
+    if _isActive ~= newIsActive then
+        _isActive = newIsActive
+        local color = myColor()
+        if (not nextIsActive) and color then
+            local message = 'Active/Passed: ' .. color .. ' passes'
+            broadcastToAll(message, color)
+        end
     end
 end
 
@@ -56,7 +53,7 @@ function report(playerColor)
             '(' .. i .. ')',
             tokenState.color,
             tokenState.active and 'Active' or 'Passed',
-            tokenState.seated and 'Seated' or 'NotSeated'
+            tokenState.seated and 'Seated' or 'NotSeated',
         }, ' '))
     end
     message = table.concat(message, '\n')
@@ -86,7 +83,11 @@ end
 -- @return boolean true if active.
 function isActive(token)
     assert(type(token) == 'userdata')
-    return not token.is_face_down
+    if token == self then
+        return _isActive
+    end
+    local z = token.getRotation().z
+    return (z < 90) or (z > 270)
 end
 
 -------------------------------------------------------------------------------
@@ -108,12 +109,12 @@ function getAllActivePassedTokens()
             if seenSet[color] then
                 printToAll('Warning: ' .. color .. ' has multiple active/passed tokens', color)
             else
-                table.insert(result, CrLua.LockTable.readOnlyRequireKey('tokenState', {
+                table.insert(result, {
                     object = object,
                     color = color,
                     active = isActive(object),
                     seated = seatedSet[color] or false
-                }))
+                })
             end
         end
     end
@@ -160,7 +161,6 @@ function maybePassTurn()
     -- was waiting to be called, or in some cases such as hot-seat games
     -- it appears TTS calls onPlayerTurnStart twice each turn.
     if not isMyTurn() then
-        CrLua.Log.d(TAG, 'maybePassTurn: not my turn, aborting')
         return
     end
 
@@ -169,7 +169,6 @@ function maybePassTurn()
 
     -- Do nothing if still active (play normally).
     if isActive(self) then
-        CrLua.Log.d(TAG, 'maybePassTurn: still active, aborting')
         return
     end
 
@@ -181,14 +180,14 @@ function maybePassTurn()
     local myColor = assert(myColor())
     local activeSeated, activeNotSeated = anyIsActive(activePassedTokens)
     if activeSeated then
-        CrLua.Log.d(TAG, 'maybePassTurn: at least one active seated peer, passing turn')
+        -- At least one active seated peer, passing turn.
         broadcastToAll(myColor .. ' passed.', myColor)
         Turns.turn_color = Turns.getNextTurnColor()
     elseif activeNotSeated then
-        CrLua.Log.d(TAG, 'maybePassTurn: at least one active unseated peer, aborting')
+        -- At least one active unseated peer, aborting.
         broadcastToAll('All seated players have passed, but not-at-table ' .. table.concat(activeNotSeated, ', ') .. ' still active.')
     else
-        CrLua.Log.d(TAG, 'maybePassTurn: no active peers, disabling turns')
+        -- No active peers, disabling turns.
         broadcastToAll('All players have passed.')
         resetActive(activePassedTokens)
         Turns.enable = false
@@ -196,12 +195,12 @@ function maybePassTurn()
 end
 
 -------------------------------------------------------------------------------
-
-#include <~/CrLua/CrLua>
-#include <~/CrLua/LockGlobals>
-
-#include <~/CrLua/LockTable>
-#include <~/CrLua/Log>
-
-CrLua.assertRequired({'Log'}) -- do this BEFORE lock
-CrLua.lock()
+-- Index is only called when the key does not already exist.
+local _lockGlobalsMetaTable = {}
+function _lockGlobalsMetaTable.__index(table, key)
+    error('Accessing missing global "' .. tostring(key or '<nil>') .. '", typo?', 2)
+end
+function _lockGlobalsMetaTable.__newindex(table, key, value)
+    error('Globals are locked, cannot create global variable "' .. tostring(key or '<nil>') .. '"', 2)
+end
+setmetatable(_G, _lockGlobalsMetaTable)

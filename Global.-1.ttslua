@@ -883,6 +883,13 @@ function onChat(message, srcPlayer)
         return false
     end
 
+    if string.match(string.lower(message), '!timestamp') then
+        local timestamp = _gameDataHelper.getGameDataTimestamp()
+        timestamp = timestamp or '<awaiting setup>'
+        printToColor('!timestamp: ' .. timestamp, srcPlayer.color, 'Yellow')
+        return false
+    end
+
     local colorSet = {}
     for _, color in ipairs(getSeatedPlayers()) do
         colorSet[color] = true

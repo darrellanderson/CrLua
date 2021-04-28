@@ -1583,20 +1583,34 @@ function SetupFaction.unpackOther(faction, factionBox, zone)
     assert(factionBox.tag == 'Bag' and type(zone) == 'table')
     debugLog('SetupFaction.unpackOther ' .. faction.name)
 
+    local function shouldUnpack(name)
+        if string.match(name, 'Alliance$') and (not _includePoK) then
+            return false
+        end
+        if string.match(name, '^' .. faction.tokenName:gsub('-', '%%-') .. ' .* Bag$') then
+            return false
+        end
+        return true
+    end
     local offset = {
-        x = SetupFaction.OTHER_OFFSET.x,
-        y = SetupFaction.OTHER_OFFSET.y,
-        z = SetupFaction.OTHER_OFFSET.z,
+        x = SetupFaction.OTHER_OFFSET.x or 0,
+        y = SetupFaction.OTHER_OFFSET.y or 0,
+        z = SetupFaction.OTHER_OFFSET.z or 0,
     }
     for _, entry in ipairs(factionBox.getObjects()) do
-        if not string.match(entry.name, '^' .. faction.tokenName:gsub('-', '%%-') .. ' .* Bag$') then
+        if shouldUnpack(entry.name) then
+            local rotation = zoneRotation(zone, offset)
+            if string.match(entry.name, 'Alliance$') then
+                rotation.y = (rotation.y + 270) % 360
+            end
             local object = factionBox.takeObject({
                 guid              = entry.guid,
                 position          = offsetPosition(zone.center, offset),
-                rotation          = zoneRotation(zone, offset),
+                rotation          = rotation,
                 smooth            = false,
             })
             offset.x = offset.x + (SetupFaction.OTHER_OFFSET.dx or 0)
+            offset.y = offset.y + 0.2
             offset.z = offset.z + (SetupFaction.OTHER_OFFSET.dz or 0)
         end
     end

@@ -1,6 +1,6 @@
 -- @author Darrell for context menu stuff
 -- @author Milty for adapting to exploration
--- #include <~/CrLua/Objects/TI4_Helpers/TI4_ExploreHelper>
+--
 
 function getHelperClient(helperObjectName)
     local function getHelperObject()
@@ -377,6 +377,24 @@ function onObjectDrop(playerColor, droppedObject)
             AttachLib.anchor(droppedObject)  -- move beneath any units and lock
         end
     end
+
+    -- Workaround for decals disappearing when dropped on a snap point.
+    -- This is a TTS bug (TODO: put tracking URL here), can remove this workaround when fixed.
+    if droppedObject.tag == 'Card' then
+        local name = droppedObject.getName()
+        local decals = AttachLib._planetNameToDecals[name]
+        if decals then
+            local guid = droppedObject.getGUID()
+            local function delayedReapply()
+                local object = getObjectFromGUID(guid)
+                local decals = AttachLib._planetNameToDecals[name]
+                if object and decals then
+                    object.setDecals(decals)
+                end
+            end
+            Wait.time(delayedReapply, 3)
+        end
+    end
 end
 
 function onObjectPickUp(playerColor, pickupObject)
@@ -572,7 +590,7 @@ function checkCardForToken(object_spawned, planetName)
             local position = object_spawned.getPosition()
             position.y = position.y + deltaY
             deltaY = deltaY + 0.3
-            
+
             local rotation = object_spawned.getRotation()
 
             local function takeCallback(object)

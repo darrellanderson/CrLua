@@ -276,3 +276,64 @@
     <Button color="red" textColor="black" text="Pass" id="imperial_pass" onClick="notFollow(Imperial)"></Button>
     <Button color="black" textColor="white" text="Close Menu" id="imperial_close" onClick="closeMenu(imperial)"></Button>
 </VerticalLayout>
+
+<VerticalLayout
+    active="true"
+    width="240"
+    height="445"
+    offsetXY="50 -5"
+    childForceExpandHeight="false"
+>
+<Button
+    rectAlignment="UpperLeft"
+    minHeight="30"
+    text="ACTIONS"
+    onClick="toggleSummary(actionSummary)"
+/>
+<Panel id="actionSummary"
+    color="#000000c0"
+    padding="10 10 10 10"
+    rectAlignment="UpperLeft"
+    visibility=""
+    active="false"
+>
+<!-- Supported:
+- "<textsize size="#"></textsize>"
+- "<br/>
+- nbsp not supported, so far the "best" indent seems to be transparent text, ugh
+- not entirely clear when <br/> is needed
+-->
+<Text
+    fontSize="14"
+    color="#ffffff"
+    alignment="UpperLeft"
+    outline="black"
+    outlineSize="1 1"
+>
+<textsize size="16">Strategic Action</textsize>
+<br/><textcolor color="Yellow">Primary of chosen strategy card</textcolor>
+<br/>
+<br/><textsize size="16">Component Action</textsize>
+<br/><textcolor color="Yellow">Faction sheet or card (technology, leader, action, etc) with “ACTION:”</textcolor>
+<br/>
+<br/><textsize size="16">Tactical Action</textsize>
+<br/><textcolor color="Yellow">1. Activation</textcolor>
+<br/><textcolor color="Yellow">2. Movement</textcolor>
+<br/><textcolor color="#00000000">---</textcolor>a. Move ships
+<textcolor color="#00000000">---</textcolor>b. Space cannon offense
+<textcolor color="Yellow">3. Space combat</textcolor>
+<br/><textcolor color="#00000000">---</textcolor>a. Anti-fighter barrage
+<textcolor color="#00000000">---</textcolor>b. Announce retreat
+<textcolor color="#00000000">---</textcolor>c. Combat rolls
+<textcolor color="#00000000">---</textcolor>d. Assign hits
+<textcolor color="#00000000">---</textcolor>e. Retreat
+<textcolor color="Yellow">4. Invasion</textcolor>
+<br/><textcolor color="#00000000">---</textcolor>a. Bombardment
+<textcolor color="#00000000">---</textcolor>b. Commit ground forces
+<textcolor color="#00000000">---</textcolor>c. Space cannon defense
+<textcolor color="#00000000">---</textcolor>d. Ground combat
+<textcolor color="#00000000">---</textcolor>e. Establish control
+<textcolor color="Yellow">5. Production</textcolor>
+</Text>
+</Panel>
+</VerticalLayout>

@@ -1645,6 +1645,14 @@ function _init()
             unitType = 'Infantry',
             count = 3
         },
+        ['Infantry Counter'] = {
+            unitType = 'Infantry',
+            count = 0
+        },
+        ['Fighter Counter'] = {
+            unitType = 'Fighter',
+            count = 0
+        },
     }
 
     -- Add flagships.  Do not know the color (and may change).
@@ -1699,13 +1707,21 @@ function getUnits()
     local result = {}
     local guidToPosition = {}
     for _, object in ipairs(getAllObjects()) do
-        local unitData = _objectNameToUnitData[object.getName()]
+        local name = object.getName()
+        local unitData = _objectNameToUnitData[name]
         -- Treat 'figurine' as 'generic'.
         local tag = object.tag == 'Figurine' and 'Generic' or object.tag
-        if unitData and unitData.tag == tag then
+        if unitData and ((not unitData.tag) or unitData.tag == tag) then
             local unitData = _copy(unitData)
             unitData.guid = object.getGUID()
             unitData.position = object.getPosition()
+            if name == 'Infantry Counter' or name == 'Fighter Counter' then
+                -- Require object store count in a global.  Object.getValue not universal.
+                local count = object.getVar('_unitCount')
+                if count and type(count) == 'number' and count >= 0 then
+                    unitData.count = count
+                end
+            end
             table.insert(result, unitData)
             guidToPosition[unitData.guid] = unitData.position
         end

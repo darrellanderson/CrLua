@@ -1807,7 +1807,7 @@ function getUnitTypeToCount(units)
     assert(type(units) == 'table', 'units must be a table')
     local unitTypeToCount = {}
     for _, unit in ipairs(units) do
-        unitTypeToCount[unit.unitType] = (unitTypeToCount[unit.unitType] or 0) + unit.count
+        unitTypeToCount[unit.unitType] = (unitTypeToCount[unit.unitType] or 0) + (unit.count or 1)
     end
     return unitTypeToCount
 end

@@ -34,6 +34,7 @@ local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 local _technologyHelper = getHelperClient('TI4_TECHNOLOGY_HELPER')
 local _setupHelper = getHelperClient('TI4_SETUP_HELPER')
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
+local _unitHelper = getHelperClient('TI4_UNIT_HELPER')
 local _zoneHelper = getHelperClient('TI4_ZONE_HELPER')
 
 local GAME_DATA_HOST = 'http://ti4-game-data.appspot.com'
@@ -155,6 +156,10 @@ function asyncGatherDataCoroutine()
     local naaluToken = Objects.getByName('Zero Strategy Token')
     local tokenZone = naaluToken and _zoneHelper.zoneFromPosition(naaluToken.getPosition())
     result.naaluToken = tokenZone or nil
+    coroutine.yield(0)
+    coroutine.yield(0)
+
+    result.hexSummary = getHexSummaryWithYields()
     coroutine.yield(0)
     coroutine.yield(0)
 
@@ -720,6 +725,260 @@ function colorToHandSummary()
             result[player.color] = Cards.summarize(cards)
         end
     end
+    return result
+end
+
+function getHexSummaryWithYields()
+    -- system: tile, cartesian coords (hex w, h scaled)
+    -- units: count, color, unitType (include control token), planet index (0 for space) [3ri0]
+    --    color -> planet index -> unitType & count
+    --    r:{0:{3i,...}}
+    --    OR maybe planet list, first entry is space
+    --    r:[{3i,...},{}...]
+    -- attach tokens: name to tile/planet
+    --
+    -- So...
+    -- [{ tile = #, x = #, y = #, space = {}, planets = [{}*] }*]
+    -- {} = {color|unitType|count}
+    -- Packed:
+    -- [ {TILE# , X#, Y#, [{COLOR|UNITTYPE|COUNT}*]}* ]
+
+    -- Get existing system tiles, index by hex (if stacked only one wins).
+    local guidToSystem = _systemHelper.systems()
+    local hexToSystem = {}
+    for _, object in ipairs(getAllObjects()) do
+        local system = guidToSystem[object.getGUID()]
+        if system then
+            local hex = _systemHelper.hexFromPosition(object.getPosition())
+            hexToSystem[hex] = system
+        end
+    end
+    coroutine.yield(0)
+
+    -- Get units, assign colors to flagships, anonymous infantry/fighter tokens.
+    local units = _unitHelper.getUnits()
+    coroutine.yield(0)
+    units = _unitHelper.fillUnitColors(units)
+    coroutine.yield(0)
+
+    -- Add owner tokens.
+    local ownerTokenNameToColor = {}
+    local commandTokenNameToColor = {}
+    for color, faction in pairs(_factionHelper.allFactions()) do
+        ownerTokenNameToColor[faction.tokenName .. ' Owner Token'] = faction.color
+        commandTokenNameToColor[faction.tokenName .. ' Command Token'] = faction.color
+    end
+    for _, ownerToken in ipairs(Tokens.getTokens('Owner')) do
+        local color = ownerTokenNameToColor[ownerToken.getName()]
+        local hex = _systemHelper.hexFromPosition(ownerToken.getPosition())
+        if color and hexToSystem[hex] then
+            table.insert(units, {
+                unitType = 'ownerToken',
+                position = ownerToken.getPosition(),
+                color = color,
+                hex = hex
+            })
+        end
+    end
+    coroutine.yield(0)
+
+    -- Add command tokens.
+    for _, commandToken in ipairs(Tokens.getTokens('Command')) do
+        local color = commandTokenNameToColor[commandToken.getName()]
+        local hex = _systemHelper.hexFromPosition(commandToken.getPosition())
+        if color and hexToSystem[hex] then
+            table.insert(units, {
+                unitType = 'commandToken',
+                position = commandToken.getPosition(),
+                color = color,
+                hex = hex
+            })
+        end
+    end
+    coroutine.yield(0)
+
+    -- Add wormhole tokens.
+    for _, object in ipairs(getAllObjects()) do
+        local wormhole = string.match(object.getName(), '^(.*) Wormhole Token$')
+        local hex = wormhole and _systemHelper.hexFromPosition(object.getPosition())
+        if wormhole and hexToSystem[hex] then
+            table.insert(units, {
+                unitType = string.lower(wormhole) .. 'WormholeToken',
+                position = object.getPosition(),
+                color = '',
+                hex = hex
+            })
+        end
+    end
+    coroutine.yield(0)
+
+    -- Split into hexes.
+    local hexToUnits = {}
+    for _, unit in ipairs(units) do
+        local hex = assert(unit.hex)
+        if hexToSystem[hex] then
+            local unitList = hexToUnits[unit.hex]
+            if not unitList then
+                unitList = {}
+                hexToUnits[unit.hex] = unitList
+            end
+            table.insert(unitList, unit)
+        end
+    end
+    coroutine.yield(0)
+
+    -- Assign planets for non-ships (in system hexes).
+    local unitTypeToAttrs = _unitHelper.getUnitAttributes({})
+    local i = 0
+    for hex, system in pairs(hexToSystem) do
+        local units = hexToUnits[hex] or {}
+        for _, unit in ipairs(units) do
+            local attrs = unitTypeToAttrs[unit.unitType] or {}
+            if not attrs.ship then
+                local planet = _systemHelper.planetFromPosition({
+                    systemGuid = system.guid,
+                    position = unit.position,
+                    exact = not (attrs.structure or string.match(unit.unitType, 'ownerToken')),
+                })
+                unit.planetName = planet and planet.name
+                i = i + 1
+                if i % 50 == 0 then
+                    coroutine.yield(0)
+                end
+            end
+        end
+    end
+    coroutine.yield(0)
+
+    -- Pack <color[A-Z]><count[0-9]*><unit[a-z]> where color and count are sticky
+    local colorToCode = {
+        ['White'] = 'W',
+        ['Blue'] = 'B',
+        ['Purple'] = 'P',
+        ['Yellow'] = 'Y',
+        ['Red'] = 'R',
+        ['Green'] = 'G',
+        ['Orange'] = 'E', -- 'O' vs '0' bad
+        ['Pink'] = 'K',
+        ['Brown'] = 'N',
+        [''] = '',
+    }
+    local unitTypeToCode = {
+        ['Carrier'] = 'c',
+        ['Cruiser'] = 'r',
+        ['Destroyer'] = 'y',
+        ['Dreadnought'] = 'd',
+        ['Fighter'] = 'f',
+        ['Flagship'] = 'p',
+        ['Infantry'] = 'i',
+        ['Mech'] = 'm',
+        ['PDS'] = 'p',
+        ['Space Dock'] = 's',
+        ['War Sun'] = 'w',
+        ['ownerToken'] = 'o',
+        ['commandToken'] = 't',
+        ['alphaWormholeToken'] = 'a',
+        ['betaWormholeToken'] = 'b',
+        ['gammaWormholeToken'] = 'g',
+    }
+
+    local hexInTileOrder = {}
+    for hex, _ in pairs(hexToSystem) do
+        table.insert(hexInTileOrder, hex)
+    end
+    table.sort(hexInTileOrder, function(a, b) return hexToSystem[a].tile < hexToSystem[b].tile end)
+
+    local result = {}
+    for _, hex in pairs(hexInTileOrder) do
+        local system = assert(hexToSystem[hex])
+        local units = hexToUnits[hex] or {}
+
+        -- Per-planet summaries.
+        local foundUnits = false
+        local summaries = {}
+        for i = 1, #(system.planets or {}) + 1 do
+            -- Get all units for this planet (or space area)
+            local planet = i > 1 and system.planets[i - 1]
+            local planetUnits = {}
+            for _, unit in ipairs(units) do
+                local summaryPlanetName = planet and planet.name or false
+                local unitPlanetName = unit.planetName or false
+                if summaryPlanetName == unitPlanetName then
+                    unit.count = unit.count or 1 -- make sure has count
+                    table.insert(planetUnits, unit)
+                end
+            end
+            foundUnits = foundUnits or #planetUnits > 0
+
+            -- Convert to a list of {color, unitType, count} entries.
+            local summary = {}
+            local colorToUnits = _unitHelper.getColorToUnits(planetUnits)
+            for color, units in pairs(colorToUnits) do
+                local unitTypeToCount = _unitHelper.getUnitTypeToCount(units)
+                for unitType, count in pairs(unitTypeToCount) do
+                    if string.match(unitType, 'Token$') then
+                        count = 1
+                    end
+                    table.insert(summary, {
+                        color = color,
+                        unitType = unitType,
+                        count = count
+                    })
+                end
+            end
+
+            -- Pack into a tight string.
+            local function sortBy(a, b)
+                if a.color < b.color then return true end
+                if a.color > b.color then return false end
+                if a.count < b.count then return true end
+                if a.count > b.count then return false end
+                return a.unitType < b.unitType
+            end
+            table.sort(summary, sortBy)
+            local lastColor = false
+            local lastCount = 1
+            local packed = {}
+            for _, item in ipairs(summary) do
+                if lastColor ~= item.color then
+                    lastColor = item.color
+                    table.insert(packed, assert(colorToCode[lastColor]))
+                end
+                if lastCount ~= item.count then
+                    lastCount = item.count
+                    table.insert(packed, lastCount)
+                end
+                table.insert(packed, assert(unitTypeToCode[item.unitType]))
+            end
+            summary = table.concat(packed, '')
+
+            -- Attachments?  For now just signal there is one.
+            if planet and planet._attachments then
+                summary = summary .. '*'
+            end
+
+            table.insert(summaries, summary)
+        end
+        local unitSummaries = foundUnits and table.concat(summaries, ';') or nil
+
+        local p = _systemHelper.hexToPosition(hex)
+        local sx = 5.25
+        local sy = 3.03
+        local x = math.floor((p.x / sx) + 0.5)
+        local y = math.floor((p.z / sy) + 0.5)
+        x = '' .. (x >= 0 and ('+' .. x) or x)
+        y = '' .. (y >= 0 and ('+' .. y) or y)
+
+        local entry = {
+            system.tile,
+            x,
+            y,
+            unitSummaries
+        }
+        table.insert(result, table.concat(entry, ''))
+    end
+    result = table.concat(result, ',')
+
     return result
 end
 

@@ -52,6 +52,7 @@ function getHelperClient(helperObjectName)
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
 
+local _buttonHelper = getHelperClient('TI4_BUTTON_HELPER')
 local _gameDataHelper = getHelperClient('TI4_GAME_DATA_HELPER')
 local _factionHelper = getHelperClient('TI4_FACTION_HELPER')
 local _setupHelper = getHelperClient('TI4_SETUP_HELPER')
@@ -80,56 +81,46 @@ _lastScale = false
 
 local BUTTONS = {
     {
-        stateful = false,
         id = 'toggleWormholesAndLegendaries',
-        label1 = '<>',
-        function1 = 'toggleWormholesAndLegendaries',
+        label = '<>',
+        onClick = 'toggleWormholesAndLegendaries',
         LABEL_TEMPLATE = 'More wormholes\nand legendary\nplanets: $VALUE',
         tooltip = 'Make sure wormholes and legendaries are well represented when building slices?'
     },
     {
-        stateful = false,
         id = 'numSlices',
-        label1 = '<>',
-        function1 = 'changeSliceCount',
+        label = '<>',
+        onClick = 'changeSliceCount',
         LABEL_TEMPLATE = '#Slices: $VALUE\nLeft +/Right -',
         tooltip = 'Left click to increase, right click to decrease',
     },
     {
-        stateful = false,
         id = 'numFactions',
-        label1 = '<>',
-        function1 = 'changeFactionCount',
+        label = '<>',
+        onClick = 'changeFactionCount',
         LABEL_TEMPLATE = '#Factions: $VALUE\nLeft +/Right -',
         tooltip = 'Left click to increase, right click to decrease',
     },
     {
-        stateful = true,
         id = 'setup',
-        label1 = 'Setup',
-        function1 = 'confirmSetup',
-        label2 = 'CLICK AGAIN\nTO CONFIRM',
-        function2 = 'doSetup',
+        label = 'Setup',
+        onClick = 'doSetup',
         tooltip = 'Place (or replace) draft slices, factions, and seat tokens',
+        confirm = true,
     },
     {
-        stateful = false,
-        label1 = 'Reverse\nTurn\nOrder',
-        function1 = 'doReverseTurns',
+        label = 'Reverse\nTurn\nOrder',
+        onClick = 'doReverseTurns',
         tooltip = 'Change next player direction (forward / reverse)',
     },
     {
-        stateful = true,
         id = 'finish',
-        label1 = 'Finish',
-        function1 = 'confirmFinish',
-        label2 = 'CLICK AGAIN\nTO CONFIRM',
-        function2 = 'doFinish',
+        label = 'Finish',
+        onClick = 'doFinish',
         tooltip = 'Move players to their drafted seats, factions, and slices (found in the drafting player\'s area)',
+        confirm = true,
     }
 }
-
-local _buttonIsState2 = {}
 
 function onLoad(saveState)
     math.randomseed(os.time())
@@ -145,18 +136,29 @@ function onLoad(saveState)
     self.clearButtons()
     for i, button in ipairs(BUTTONS) do
         self.createButton({
-            click_function = button.function1 or 'doNothing',
+            click_function = button.onClick,
             function_owner = self,
-            label          = button.label1,
+            label          = button.label,
             position       = Slots.getPosition(0, i - 1, Slots.DRAFT_MAT),
             rotation       = { x = 0, y = 0, z = 0 },
             scale          = { x = 1, y = 1, z = 1 },
-            width          = button.function1 and 1900 or 0,
-            height         = button.function1 and 1200 or 0,
+            width          = button.onClick and 1900 or 0,
+            height         = button.onClick and 1200 or 0,
             font_size      = 240,
-            font_color     = button.function1 and 'Black' or 'White',
+            font_color     = button.onClick and 'Black' or 'White',
             tooltip        = button.tooltip,
         })
+        if button.confirm then
+            _buttonHelper.addConfirmStep({
+                guid = self.getGUID(),
+                buttonIndex = i - 1,
+                confirm = {
+                    label = 'CLICK AGAIN\nTO CONFIRM',
+                    --font_size = #,
+                    -- color = string
+                }
+            })
+        end
     end
     resetButtons()
 
@@ -217,20 +219,8 @@ end
 
 -------------------------------------------------------------------------------
 
-function doNothing()
-end
-
 function resetButtons()
     for i, values in ipairs(BUTTONS) do
-        if values.stateful then
-            local color = _buttonIsState2[values.id] and { r = 1, g = 0, b = 0 } or { r = 1, g = 1, b = 1 }
-            self.editButton({
-                index          = i - 1,
-                click_function = _buttonIsState2[values.id] and values.function2 or values.function1,
-                label          = _buttonIsState2[values.id] and values.label2 or values.label1,
-                color          = color,
-            })
-        end
         if values.id == 'toggleWormholesAndLegendaries' then
             local value = VolverMilty.pushWormholesLegends and 'YES' or 'NO'
             local label = string.gsub(values.LABEL_TEMPLATE, '$VALUE', value)
@@ -254,29 +244,6 @@ function resetButtons()
             })
         end
     end
-end
-
-function confirmSetup()
-    _confirm('setup')
-end
-
-function confirmFinish()
-    _confirm('finish')
-end
-
-function _confirm(buttonId)
-    _buttonIsState2[buttonId] = true
-    resetButtons()
-
-    local function delayedReset()
-        _reset(buttonId)
-    end
-    Wait.time(delayedReset, 5)
-end
-
-function _reset(buttonId)
-    _buttonIsState2[buttonId] = false
-    resetButtons()
 end
 
 -------------------------------------------------------------------------------
@@ -310,7 +277,6 @@ function changeFactionCount(clickObject, clickerColor, altClick)
 end
 
 function doSetup()
-    _reset('setup')
     startLuaCoroutine(self, 'setupCoroutine')
 end
 
@@ -321,7 +287,6 @@ function doReverseTurns()
 end
 
 function doFinish()
-    _reset('finish')
     _gameDataHelper.addExtraData({
         name = 'MiltyDraft',
         value = true

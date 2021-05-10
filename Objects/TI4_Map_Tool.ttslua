@@ -40,6 +40,7 @@ function getHelperClient(helperObjectName)
     end
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
+local _buttonHelper = getHelperClient('TI4_BUTTON_HELPER')
 local _deckHelper = getHelperClient('TI4_DECK_HELPER')
 local _exploreHelper = getHelperClient('TI4_EXPLORE_HELPER')
 local _systemHelper = getHelperClient('TI4_SYSTEM_HELPER')
@@ -391,6 +392,19 @@ function createInputs()
         height         = 0,
         font_size      = fontSizeMinor,
     })
+
+    -- Add a confirm step to come buttons.
+    for _, buttonIndex in ipairs({ 0, 2, 3, 4, 5 }) do
+        _buttonHelper.addConfirmStep({
+            guid = self.getGUID(),
+            buttonIndex = buttonIndex,
+            confirm = {
+                label = 'CLICK AGAIN\nTO CONFIRM',
+                font_size = fontSizeMajor * 6 / 10,
+                -- color = string
+            }
+        })
+    end
 end
 
 function pass() end

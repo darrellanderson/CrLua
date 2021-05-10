@@ -17,6 +17,7 @@ function getHelperClient(helperObjectName)
     end
     return setmetatable({}, { __index = function(t, k) return getCallWrapper(k) end })
 end
+local _buttonHelper = getHelperClient('TI4_BUTTON_HELPER')
 local _strategyCardHelper = getHelperClient('TI4_STRATEGY_CARD_HELPER')
 
 local _tradeGoodBagGuid = false
@@ -45,8 +46,6 @@ local BUTTONS = {
     }
 }
 
-local _buttonIsState2 = {}
-
 -------------------------------------------------------------------------------
 
 function onLoad(saveState)
@@ -64,9 +63,9 @@ function onLoad(saveState)
     self.clearButtons()
 
     self.createButton({
-        click_function = 'doNothing',
+        click_function = 'placeTradeGoodsAndSetTurns',
         function_owner = self,
-        label          = '',
+        label          = 'Place Trade Goods\nand Set Turns',
         position       = { x = dx, y = y, z = z },
         rotation       = { x = 0, y = 0, z = 0 },
         width          = width,
@@ -75,9 +74,9 @@ function onLoad(saveState)
         tooltip        = 'End of strategy phase: place trade goods on unclaimed strategy cards and set turn order',
     })
     self.createButton({
-        click_function = 'doNothing',
+        click_function = 'dealActionCards',
         function_owner = self,
-        label          = '',
+        label          = 'Deal Action Cards',
         position       = { x = 0, y = y, z = z },
         rotation       = { x = 0, y = 0, z = 0 },
         width          = width,
@@ -86,9 +85,9 @@ function onLoad(saveState)
         tooltip        = 'After status phase scoring: deal action cards to all players in initiative order, shuffling the discard if necessary',
     })
     self.createButton({
-        click_function = 'doNothing',
+        click_function = 'returnStrategyCardsAndEndStatusPhase',
         function_owner = self,
-        label          = '',
+        label          = 'Return Strategy Cards\nand End Status Phase',
         position       = { x = -dx, y = y, z = z },
         rotation       = { x = 0, y = 0, z = 0 },
         width          = width,
@@ -97,7 +96,18 @@ function onLoad(saveState)
         tooltip        = 'End of status phase: return and gain command tokens, ready cards, repair units, and return strategy cards'
     })
 
-    resetButtons()
+    -- Add a confirm second click.
+    for buttonIndex = 0, 2 do
+        _buttonHelper.addConfirmStep({
+            guid = self.getGUID(),
+            buttonIndex = buttonIndex,
+            confirm = {
+                label = 'CLICK AGAIN\nTO CONFIRM',
+                --font_size = #,
+                -- color = string
+            }
+        })
+    end
 end
 
 function getSnapPoint(index)
@@ -157,51 +167,7 @@ end
 
 -------------------------------------------------------------------------------
 
-function resetButtons()
-    for i, values in ipairs(BUTTONS) do
-        local color = _buttonIsState2[values.id] and { r = 1, g = 0, b = 0 } or { r = 1, g = 1, b = 1 }
-        self.editButton({
-            index          = i - 1,
-            click_function = _buttonIsState2[values.id] and values.function2 or values.function1,
-            label          = _buttonIsState2[values.id] and values.label2 or values.label1,
-            color          = color,
-        })
-    end
-end
-
-function doNothing()
-end
-
-function _confirm(buttonId)
-    _buttonIsState2[buttonId] = true
-    resetButtons()
-
-    local function delayedReset()
-        _reset(buttonId)
-    end
-    Wait.time(delayedReset, 5)
-end
-
-function _reset(buttonId)
-    _buttonIsState2[buttonId] = false
-    resetButtons()
-end
-
-function confirmPlaceTradeGoodsAndSetTurns(obj, playerClickerColor, altClick)
-    _confirm('place')
-end
-function confirmDealActionCards(obj, playerClickerColor, altClick)
-    _confirm('deal')
-end
-function confirmReturnStrategyCardsAndEndStatusPhase(obj, playerClickerColor, altClick)
-    _confirm('return')
-end
-
--------------------------------------------------------------------------------
-
 function placeTradeGoodsAndSetTurns(obj, playerClickerColor, altClick)
-    _reset('place')
-
     local initiativeOrder = _strategyCardHelper.getInitiativeOrder()
     local unpickedStrategyCards = {}
     for guid, color in pairs(initiativeOrder.strategyCardGuidToPlayerColor) do
@@ -252,12 +218,10 @@ function placeTradeGoodsAndSetTurns(obj, playerClickerColor, altClick)
 end
 
 function dealActionCards(obj, playerClickerColor, altClick)
-    _reset('deal')
     _strategyCardHelper.dealAllActionCards(Turns.order)
 end
 
 function returnStrategyCardsAndEndStatusPhase(obj, playerClickerColor, altClick)
-    _reset('return')
     _strategyCardHelper.endStatusPhase()
 end
 

@@ -1618,8 +1618,17 @@ end
 -------------------------------------------------------------------------------
 
 local _objectNameToUnitData = false
+local _objectNameToUnitDataTimestamp = false
 
-function _init()
+function _getObjectNameToUnitData()
+    if _objectNameToUnitData and _objectNameToUnitDataTimestamp then
+        local age = Time.time - _objectNameToUnitDataTimestamp
+        if age < 60 then
+            return _objectNameToUnitData
+        end
+    end
+    _objectNameToUnitDataTimestamp = Time.time
+
     -- Build a COMPLETE map from name to { unitType, color, count } attributes.
     -- This way table scans can do a simple membership check rather than
     -- string.match or other heavier lifting to identify units.  In some cases
@@ -1677,6 +1686,8 @@ function _init()
             }
         end
     end
+
+    return  _objectNameToUnitData
 end
 
 function isUnitUpgradeName(name)
@@ -1686,7 +1697,8 @@ end
 
 function isUnitName(name)
     assert(type(name) == 'string')
-    return _objectNameToUnitData[name] and true or false
+    local objectNameToUnitData = _getObjectNameToUnitData()
+    return objectNameToUnitData[name] and true or false
 end
 
 function getUnitUpgradeNames()
@@ -1704,11 +1716,12 @@ end
 -- call fillUnitColors to add them.
 -- @return table : list of unit data tables.
 function getUnits()
+    local objectNameToUnitData = _getObjectNameToUnitData()
     local result = {}
     local guidToPosition = {}
     for _, object in ipairs(getAllObjects()) do
         local name = object.getName()
-        local unitData = _objectNameToUnitData[name]
+        local unitData = objectNameToUnitData[name]
         -- Treat 'figurine' as 'generic'.
         local tag = object.tag == 'Figurine' and 'Generic' or object.tag
         if unitData and ((not unitData.tag) or unitData.tag == tag) then
@@ -2033,9 +2046,6 @@ function onLoad(saveState)
     for name, mod in pairs(_unitModifiers) do
         mod.name = name
     end
-
-    -- More complicated unit finding initialization.
-    _init()
 
     -- Make toggle cards toggle-able.
     Wait.frames(_applyToggleActiveCards, 3)

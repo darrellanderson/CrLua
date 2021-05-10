@@ -799,11 +799,15 @@ function getHexSummaryWithYields()
 
     -- Add wormhole tokens.
     for _, object in ipairs(getAllObjects()) do
-        local wormhole = string.match(object.getName(), '^(.*) Wormhole Token$')
+        local name = object.getName()
+        local wormhole = string.match(name, '^(.*) Wormhole Token$')
+        if name == 'Ion Storm Token' then
+            wormhole = 'Ion Storm'
+        end
         local hex = wormhole and _systemHelper.hexFromPosition(object.getPosition())
         if wormhole and hexToSystem[hex] then
             table.insert(units, {
-                unitType = string.lower(wormhole) .. 'WormholeToken',
+                unitType = name,
                 position = object.getPosition(),
                 color = '',
                 hex = hex
@@ -834,7 +838,11 @@ function getHexSummaryWithYields()
         local units = hexToUnits[hex] or {}
         for _, unit in ipairs(units) do
             local attrs = unitTypeToAttrs[unit.unitType] or {}
-            if not attrs.ship then
+            local getPlanet = not attrs.ship
+            if string.match(unit.unitType('Token$') and unit.unitType ~= 'ownerToken') then
+                getPlanet = false
+            end
+            if getPlanet then
                 local planet = _systemHelper.planetFromPosition({
                     systemGuid = system.guid,
                     position = unit.position,
@@ -877,9 +885,10 @@ function getHexSummaryWithYields()
         ['War Sun'] = 'w',
         ['ownerToken'] = 'o',
         ['commandToken'] = 't',
-        ['alphaWormholeToken'] = 'a',
-        ['betaWormholeToken'] = 'b',
-        ['gammaWormholeToken'] = 'g',
+        ['Alpha Wormhole Token'] = 'a',
+        ['Beta Wormhole Token'] = 'b',
+        ['Gamma Wormhole Token'] = 'g',
+        ['Ion Storm Token'] = 'n',
     }
 
     local hexInTileOrder = {}
@@ -893,17 +902,23 @@ function getHexSummaryWithYields()
         local system = assert(hexToSystem[hex])
         local units = hexToUnits[hex] or {}
 
+        local regionNames = { false } -- false is space
+        for _, planet in ipairs(system.planets or {}) do
+            table.insert(regionNames, planet.name)
+        end
+        for _, wormholeName in ipairs(system.wormholes or {}) do
+            table.insert(regionNames, wormholeName)
+        end
+
         -- Per-planet summaries.
+        local lastColor = false
         local foundUnits = false
         local summaries = {}
-        for i = 1, #(system.planets or {}) + 1 do
+        for i, regionName in ipairs(regionNames) do
             -- Get all units for this planet (or space area)
-            local planet = i > 1 and system.planets[i - 1]
             local planetUnits = {}
             for _, unit in ipairs(units) do
-                local summaryPlanetName = planet and planet.name or false
-                local unitPlanetName = unit.planetName or false
-                if summaryPlanetName == unitPlanetName then
+                if (regionName == unit.planetName) or (not regionName and not unit.planetName) then
                     unit.count = unit.count or 1 -- make sure has count
                     table.insert(planetUnits, unit)
                 end
@@ -936,7 +951,6 @@ function getHexSummaryWithYields()
                 return a.unitType < b.unitType
             end
             table.sort(summary, sortBy)
-            local lastColor = false
             local lastCount = 1
             local packed = {}
             for _, item in ipairs(summary) do
@@ -953,6 +967,11 @@ function getHexSummaryWithYields()
             summary = table.concat(packed, '')
 
             -- Attachments?  For now just signal there is one.
+            local planet = false
+            if system.planets then
+                local planetIndex = i - 1
+                planet = #system.planets >= planetIndex and system.planets[planetIndex]
+            end
             if planet and planet._attachments then
                 summary = summary .. '*'
             end
@@ -2135,6 +2154,7 @@ function Analytics.report()
         payload = table.concat(payload, '&')
         table.insert(payloads, payload)
     end
+
     -- Add a hit for each SEATED player (ignore spectators).
     local seatedSet = {}
     for _, color in ipairs(getSeatedPlayers()) do
@@ -2165,7 +2185,9 @@ function Analytics.report()
     end
     local download = true
     local headers = {}
-    WebRequest.custom(Analytics.URL, 'POST', download, body, headers, callback)
+    if string.len(body) > 0 then
+        WebRequest.custom(Analytics.URL, 'POST', download, body, headers, callback)
+    end
 end
 
 -------------------------------------------------------------------------------

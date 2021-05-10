@@ -37,7 +37,7 @@ function onRotate(spin, flip, player_color, old_spin, old_flip)
     if _isActive ~= newIsActive then
         _isActive = newIsActive
         local color = myColor()
-        if (not nextIsActive) and color then
+        if (not newIsActive) and color then
             local message = 'Active/Passed: ' .. color .. ' passes'
             broadcastToAll(message, color)
         end

@@ -46,12 +46,17 @@ local MAX_PERIODIC_SECONDS = 3600
 local DEFAULT_KEY_PERIODIC_SECONDS = 30
 local DEFAULT_ANON_PERIODIC_SECONDS = 600
 
-local _state = {}
-local _gamedataOptIn = false
-local _gameDataKey = false
-local _timerId = false  -- for regular gamedata updates
-local _timerPeriodicSeconds = false
+-- Remember opt-in across save/reload.
+local DEFAULT_STATE = {
+    _gamedataOptIn = false,
+}
 
+-- !gamedata registration for streamer overlay needs to be redone manually.
+_gameDataKey = false
+_timerPeriodicSeconds = false
+
+local _state = DEFAULT_STATE
+local _timerId = false  -- for regular gamedata updates
 local _analyticsTimerId = false
 
 -- Time based throttle for external pokes.
@@ -1892,7 +1897,7 @@ function onLoad(saveState)
 
     self.addContextMenuItem('Report Data', _doReport)
     self.addContextMenuItem('Report State', function() _logTable('_state', _state) end)
-    self.addContextMenuItem('Reset State', function() _state = {} end)
+    self.addContextMenuItem('Reset State', function() _state = DEFAULT_STATE end)
 end
 
 function onSave()
@@ -1922,12 +1927,12 @@ function onSetupHelperSetupFinished(params)
         return
     end
 
-    _gamedataOptIn = params.gamedataOptIn
+    _state._gamedataOptIn = params.gamedataOptIn
 
     _state.setupTimestamp = math.floor(os.time() * 1000) / 1000
 
     -- If opt-in and haven't already started (streamer) game data, start now.
-    if _gamedataOptIn and not _timerId then
+    if _state._gamedataOptIn and not _timerId then
         startPeriodicUpdates({
             delay = DEFAULT_ANON_PERIODIC_SECONDS
         })
@@ -1943,7 +1948,7 @@ function onPlayerTurnStart(player_color_start, player_color_previous)
     end
     _didOnPlayerTurnStartCheck = true
 
-    if _gamedataOptIn or _gameDataKey then
+    if _state._gamedataOptIn or _gameDataKey then
         -- If map builder is empty, trigger a save for stats recording
         local mapString = Map.getMapString()
         if (not mapString) or string.len(mapString) == 0 then
@@ -1959,7 +1964,7 @@ function startPeriodicUpdates(params)
     assert((not params.key) or type(params.key) == 'string')
     assert((not params.delay) or (type(params.delay) == 'number'))
 
-    _gameDataKey = params.key
+    _gameDataKey = params.key or false
     local delay = params.delay or DEFAULT_KEY_PERIODIC_SECONDS
     delay = math.max(delay, MIN_PERIODIC_SECONDS)
     delay = math.min(delay, MAX_PERIODIC_SECONDS)
@@ -2019,7 +2024,7 @@ function _sendGameData()
     if _gameDataKey then
         -- ALWAYS send when game data key is present
         return true
-    elseif _gamedataOptIn then
+    elseif _state._gamedataOptIn then
         -- To help prevent curiosity and solo griefing corruption REQUIRE
         -- multiple players before uploading vonulary anonymized game data.
         local seated = getSeatedPlayers()

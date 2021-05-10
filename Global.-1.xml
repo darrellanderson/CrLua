@@ -209,33 +209,33 @@
     </Button>
     <HorizontalLayout id="greenTechs">
         <Button color="green" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Neural Motivator" id="technology_generic" onClick="pickTech(Neural Motivator)" tooltip="During the status phase, draw 2 action&#xA;cards instead of 1."></Button>
-        <Button color="green" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Psycho-&#xA;archaeology" id="technology_generic" onClick="pickTech(Psychoarchaeology)" tooltip="You can use technology specialties on&#xA;planets you control without exhausting&#xA;them, even if those planets are exhausted.&#xA;&#xA;During the action phase, you can exhaust&#xA;planets you control that have technology&#xA;specialties to gain 1 trade good."></Button>
+        <Button color="green" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Psycho-&#xA;archaeology" id="technology_generic" onClick="pickTech(Psychoarchaeology)" tooltip="You can use technology specialties on&#xA;planets you control without exhausting&#xA;them, even if those planets are exhausted.&#xA;&#xA;During the action phase, you can exhaust&#xA;planets you control that have technology&#xA;specialties to gain 1 trade good. [PoK]"></Button>
         <Button color="green" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Dacxive Animators&#xA;(G)" id="technology_generic" onClick="pickTech(Dacxive Animators)" tooltip="After you win a ground combat, you may&#xA;place 1 infantry from your reinforcements&#xA;on that planet."></Button>
-        <Button color="green" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Bio-Stims&#xA;(G)" id="technology_generic" onClick="pickTech(Bio-Stims)" tooltip="You may exhaust this card at the end of&#xA;your turn to ready 1 of your planets that&#xA;has a technology specialty or 1 of your&#xA;other technologies."></Button>
+        <Button color="green" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Bio-Stims&#xA;(G)" id="technology_generic" onClick="pickTech(Bio-Stims)" tooltip="You may exhaust this card at the end of&#xA;your turn to ready 1 of your planets that&#xA;has a technology specialty or 1 of your&#xA;other technologies. [PoK]"></Button>
         <Button color="green" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Hyper Metabolism&#xA;(GG)" id="technology_generic" onClick="pickTech(Hyper Metabolism)" tooltip="During the status phase, gain 3 command&#xA;tokens instead of 2."></Button>
         <Button color="green" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="X-89 Bacterial Weapon Ω&#xA;(GGG)" id="technology_generic" onClick="pickTech(X-89 Bacterial Weapon)" tooltip="After 1 or more of your units use&#xA;BOMBARDMENT against a planet, if at least&#xA;1 of your opponent's infantry was&#xA;destroyed, you may destroy all of your&#xA;oppponent's infantry on that planet."></Button>
     </HorizontalLayout>
     <HorizontalLayout id="redTechs">
         <Button color="red" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Plasma Scoring" id="technology_generic" onClick="pickTech(Plasma Scoring)" tooltip="When 1 or more of your units use&#xA;BOMBARDMENT or SPACE CANNON, 1 of&#xA;those units may roll 1 additional die."></Button>
-        <Button color="red" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="AI Development Algorithm" id="technology_generic" onClick="pickTech(AI Development Algorithm)" tooltip="When you research a unit upgrade&#xA;technology, you may exhaust this card&#xA;to ignore any 1 prerequisite.&#xA;&#xA;When 1 or more of your units use&#xA;PRODUCTION, you may exhaust this card to&#xA;reduce the combined cost of the produced&#xA;units by the number of unit upgrade&#xA;technologies that you own."></Button>
+        <Button color="red" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="AI Development Algorithm" id="technology_generic" onClick="pickTech(AI Development Algorithm)" tooltip="When you research a unit upgrade&#xA;technology, you may exhaust this card&#xA;to ignore any 1 prerequisite.&#xA;&#xA;When 1 or more of your units use&#xA;PRODUCTION, you may exhaust this card to&#xA;reduce the combined cost of the produced&#xA;units by the number of unit upgrade&#xA;technologies that you own. [PoK]"></Button>
         <Button color="red" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Magen Defense Grid&#xA;Ω (R)" id="technology_generic" onClick="pickTech(Magen Defense Grid)" tooltip="At the start of ground combat on a planet&#xA;that contains 1 or more of your structures,&#xA; you may produce 1 hit and assign it to 1 of&#xA;your opponent's ground forces."></Button>
-        <Button color="red" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Self Assembly Routines&#xA;(R)" id="technology_generic" onClick="pickTech(Self Assembly Routines)" tooltip="After 1 or more of your units use&#xA;PRODUCTION, you may exhaust this card to&#xA;place 1 mech from your reinforcements on&#xA;a planet you control in the system.&#xA;&#xA;After 1 of your mechs is destroyed,&#xA;gain 1 trade good."></Button>
+        <Button color="red" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Self Assembly Routines&#xA;(R)" id="technology_generic" onClick="pickTech(Self Assembly Routines)" tooltip="After 1 or more of your units use&#xA;PRODUCTION, you may exhaust this card to&#xA;place 1 mech from your reinforcements on&#xA;a planet you control in the system.&#xA;&#xA;After 1 of your mechs is destroyed,&#xA;gain 1 trade good. [PoK]"></Button>
         <Button color="red" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Duranium Armor&#xA;(RR)" id="technology_generic" onClick="pickTech(Duranium Armor)" tooltip="During each combat round, after you assign&#xA;hits to your units, repair 1 of your damaged&#xA;units that did not use SUSTAIN DAMAGE&#xA;during this combat round."></Button>
         <Button color="red" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Assault Cannon&#xA;(RRR)" id="technology_generic" onClick="pickTech(Assault Cannon)" tooltip="At the start of a space combat in a system&#xA;that contains 3 or more of your non-fighter&#xA;ships, your opponent must destroy 1 of&#xA;their non-fighter ships."></Button>
     </HorizontalLayout>
     <HorizontalLayout id="blueTechs">
         <Button color="blue" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Antimass Deflectors" id="technology_generic" onClick="pickTech(Antimass Deflectors)" tooltip="Your ships can move into and through&#xA;asteroid fields.&#xA;&#xA;When other players' units SPACE&#xA;CANNON against your units, apply -1 to the&#xA;result of each die roll."></Button>
-        <Button color="blue" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Dark Energy Tap" id="technology_generic" onClick="pickTech(Dark Energy Tap)" tooltip="After you perform a tactical action in a&#xA;system that contains a frontier token, if you&#xA;have 1 or more ships in that system, explore&#xA;that token.&#xA;&#xA;Your ships can retreat into adjacent systems&#xA;that do not contain other players’ units,&#xA;even if you do not have units or&#xA;control planets in that system."></Button>
+        <Button color="blue" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Dark Energy Tap" id="technology_generic" onClick="pickTech(Dark Energy Tap)" tooltip="After you perform a tactical action in a&#xA;system that contains a frontier token, if you&#xA;have 1 or more ships in that system, explore&#xA;that token.&#xA;&#xA;Your ships can retreat into adjacent systems&#xA;that do not contain other players’ units,&#xA;even if you do not have units or&#xA;control planets in that system. [PoK]"></Button>
         <Button color="blue" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Gravity Drive&#xA;(B)" id="technology_generic" onClick="pickTech(Gravity Drive)" tooltip="After you activate a system, apply +1 to the&#xA;move value of 1 of your ships during this&#xA;tactical action."></Button>
-        <Button color="blue" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Sling Relay&#xA;(B)" id="technology_generic" onClick="pickTech(Sling Relay)" tooltip="ACTION: Exhaust this card to produce&#xA;1 ship in any system that contains 1 of&#xA;your space docks"></Button>
+        <Button color="blue" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Sling Relay&#xA;(B)" id="technology_generic" onClick="pickTech(Sling Relay)" tooltip="ACTION: Exhaust this card to produce&#xA;1 ship in any system that contains 1 of&#xA;your space docks. [PoK]"></Button>
         <Button color="blue" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Fleet Logistics&#xA;(BB)" id="technology_generic" onClick="pickTech(Fleet Logistics)" tooltip="During each of your turns of the action&#xA;phase, you may perform 2 actions instead&#xA;of 1."></Button>
         <Button color="blue" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Light-Wave Deflector&#xA;(BBB)" id="technology_generic" onClick="pickTech(Light-Wave Deflector)" tooltip="Your ships can move through systems that&#xA;contain other players' ships."></Button>
     </HorizontalLayout>
     <HorizontalLayout id="yellowTechs">
         <Button color="yellow" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Sarween Tools" id="technology_generic" onClick="pickTech(Sarween Tools)" tooltip="When 1 or more of your units use&#xA;PRODUCTION, reduce the combined cost of&#xA;the produced units by 1."></Button>
-        <Button color="yellow" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Scanlink Drone Network" id="technology_generic" onClick="pickTech(Scanlink Drone Network)" tooltip="When you activate a system, you may&#xA;explore 1 planet in that system that&#xA;contains 1 or more of your units."></Button>
+        <Button color="yellow" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Scanlink Drone Network" id="technology_generic" onClick="pickTech(Scanlink Drone Network)" tooltip="When you activate a system, you may&#xA;explore 1 planet in that system that&#xA;contains 1 or more of your units. [PoK]"></Button>
         <Button color="yellow" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Graviton Laser System&#xA;(Y)" id="technology_generic" onClick="pickTech(Graviton Laser System)" tooltip="You may exhaust this card before 1 or&#xA;more of your units use SPACE CANNON;&#xA;hits produced by those units must be&#xA;assigned to non-fighter ships if able."></Button>
-        <Button color="yellow" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Predictive Intelligence&#xA;(Y)" id="technology_generic" onClick="pickTech(Predictive Intelligence)" tooltip="At the end of your turn, you may exhaust this&#xA;card to redistribute your command tokens.&#xA;&#xA;When you cast votes during the agenda&#xA;phase, you may cast 3 additional votes; if&#xA;you do, and the outcome you voted for is not&#xA;resolved, exhaust this card."></Button>
+        <Button color="yellow" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Predictive Intelligence&#xA;(Y)" id="technology_generic" onClick="pickTech(Predictive Intelligence)" tooltip="At the end of your turn, you may exhaust this&#xA;card to redistribute your command tokens.&#xA;&#xA;When you cast votes during the agenda&#xA;phase, you may cast 3 additional votes; if&#xA;you do, and the outcome you voted for is not&#xA;resolved, exhaust this card. [PoK]"></Button>
         <Button color="yellow" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Transit Diodes&#xA;(YY)" id="technology_generic" onClick="pickTech(Transit Diodes)" tooltip="You may exhaust this card at the start of&#xA;your turn during the action phase; remove&#xA;up to 4 of your ground forces from the&#xA;game board and place them on 1 or more&#xA;planets you control."></Button>
         <Button color="yellow" textColor="black" tooltipBackgroundColor="rgba(0,0,0,1)" text="Integrated Economy&#xA;(YYY)" id="technology_generic" onClick="pickTech(Integrated Economy)" tooltip="After you gain control of a planet, you may&#xA;produce any number of units on that planet&#xA;that have a combined cost equal to or less&#xA;than that planet's resource value."></Button>
     </HorizontalLayout>
@@ -277,16 +277,20 @@
     <Button color="black" textColor="white" text="Close Menu" id="imperial_close" onClick="closeMenu(imperial)"></Button>
 </VerticalLayout>
 
-<VerticalLayout
+<VerticalLayout id="actionSummaryLayout"
     active="true"
     width="240"
-    height="445"
-    offsetXY="50 -5"
+    height="460"
+    offsetXY="60 -4"
     childForceExpandHeight="false"
+    childForceExpandWidth="false"
+    visibility="White|Blue|Purple|Yellow|Red|Green|Orange|Pink|Brown"
+    allowDragging="false"
 >
 <Button
-    rectAlignment="UpperLeft"
     minHeight="30"
+    minWidth="60"
+    fontSize="10"
     text="ACTIONS"
     onClick="toggleSummary(actionSummary)"
 />

@@ -179,6 +179,7 @@ function register(parameters)
     local sheet = _getStrategyCardSheet()
     local snapPoint = sheet.call('getSnapPoint', index)
     local position = sheet.positionToWorld(snapPoint.position)
+    position.y = strategyCard.getPosition().y
     local rotation = {
         x = 0,
         y = sheet.getRotation().y + snapPoint.rotation.y,
@@ -188,12 +189,8 @@ function register(parameters)
     local dz = strategyCard.getPosition().z - position.z
     local d = math.sqrt(dx ^ 2 + dz ^ 2)
     if d < 1 then
-        local collide = false
-        local fast = true
-        local abovePos = { x = position.x, y = position.y + 1, z = position.z }
-        strategyCard.setLock(false)  -- paranoia
-        strategyCard.setPositionSmooth(abovePos, collide, fast)
-        strategyCard.setRotationSmooth(rotation, collide, fast)
+        strategyCard.setPosition(position)
+        strategyCard.setRotation(rotation)
     end
 end
 

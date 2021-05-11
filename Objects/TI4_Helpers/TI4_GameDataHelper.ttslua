@@ -802,15 +802,22 @@ function getHexSummaryWithYields()
     end
     coroutine.yield(0)
 
-    -- Add wormhole tokens.
+    -- Add wormhole and frontier tokens.
+    local includeSet = {
+        ['Alpha Wormhole Token'] = 0,
+        ['Beta Wormhole Token'] = 0,
+        ['Gamma Wormhole Token'] = 0,
+        ['Ion Storm Token'] = 0,
+        ['Frontier Token'] = 0,
+        ['Mirage Token'] = 1,
+        ['Stellar Converter Token'] = 1,
+        ['DMZ Token'] = 1,
+    }
     for _, object in ipairs(getAllObjects()) do
         local name = object.getName()
-        local wormhole = string.match(name, '^(.*) Wormhole Token$')
-        if name == 'Ion Storm Token' then
-            wormhole = 'Ion Storm'
-        end
-        local hex = wormhole and _systemHelper.hexFromPosition(object.getPosition())
-        if wormhole and hexToSystem[hex] then
+        local include = includeSet[name]
+        local hex = include and _systemHelper.hexFromPosition(object.getPosition())
+        if include and hexToSystem[hex] then
             table.insert(units, {
                 unitType = name,
                 position = object.getPosition(),
@@ -844,14 +851,19 @@ function getHexSummaryWithYields()
         for _, unit in ipairs(units) do
             local attrs = unitTypeToAttrs[unit.unitType] or {}
             local getPlanet = not attrs.ship
-            if string.match(unit.unitType('Token$') and unit.unitType ~= 'ownerToken') then
+            local exact = getPlanet and not attrs.structure
+            if includeSet[unit.unitType] == 0 then
                 getPlanet = false
+                exact = false
+            elseif includeSet[unit.unitType] == 1 or unit.unitType == 'ownerToken' then
+                getPlanet = true
+                exact = false
             end
             if getPlanet then
                 local planet = _systemHelper.planetFromPosition({
                     systemGuid = system.guid,
                     position = unit.position,
-                    exact = not (attrs.structure or string.match(unit.unitType, 'ownerToken')),
+                    exact = exact,
                 })
                 unit.planetName = planet and planet.name
                 i = i + 1
@@ -882,7 +894,7 @@ function getHexSummaryWithYields()
         ['Destroyer'] = 'y',
         ['Dreadnought'] = 'd',
         ['Fighter'] = 'f',
-        ['Flagship'] = 'p',
+        ['Flagship'] = 'h',
         ['Infantry'] = 'i',
         ['Mech'] = 'm',
         ['PDS'] = 'p',
@@ -894,6 +906,10 @@ function getHexSummaryWithYields()
         ['Beta Wormhole Token'] = 'b',
         ['Gamma Wormhole Token'] = 'g',
         ['Ion Storm Token'] = 'n',
+        ['Frontier Token'] = 'e',
+        ['Mirage Token'] = 'k',
+        ['Stellar Converter Token'] = 'l',
+        ['DMZ Token'] = 'z',
     }
 
     local hexInTileOrder = {}
@@ -959,7 +975,7 @@ function getHexSummaryWithYields()
             local lastCount = 1
             local packed = {}
             for _, item in ipairs(summary) do
-                if lastColor ~= item.color then
+                if lastColor ~= item.color and item.color ~= '' then
                     lastColor = item.color
                     table.insert(packed, assert(colorToCode[lastColor]))
                 end
@@ -972,6 +988,8 @@ function getHexSummaryWithYields()
             summary = table.concat(packed, '')
 
             -- Attachments?  For now just signal there is one.
+            -- May eventually want to include them all, or remove catch-all
+            -- when token is included (e.g. DMZ).
             local planet = false
             if system.planets then
                 local planetIndex = i - 1
@@ -993,8 +1011,19 @@ function getHexSummaryWithYields()
         x = '' .. (x >= 0 and ('+' .. x) or x)
         y = '' .. (y >= 0 and ('+' .. y) or y)
 
+        local tile = system.tile
+        if system.hyperlane then
+            local systemObject = getObjectFromGUID(system.guid)
+            local rotation = systemObject.getRotation().y or 0
+            rotation = rotation - 180  -- 180 is "normal", make 0 based for value
+            rotation = (rotation + 360) % 360
+            rotation = rotation + 15  -- in case not exact, gets closest
+            tile = tile .. (systemObject.is_face_down and 'B' or 'A')
+            tile = tile .. math.floor(rotation / 60)
+        end
+
         local entry = {
-            system.tile,
+            tile,
             x,
             y,
             unitSummaries

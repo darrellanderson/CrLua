@@ -852,7 +852,7 @@ function getHexSummaryWithYields()
             local attrs = unitTypeToAttrs[unit.unitType] or {}
             local getPlanet = not attrs.ship
             local exact = getPlanet and not attrs.structure
-            if includeSet[unit.unitType] == 0 then
+            if includeSet[unit.unitType] == 0 or unit.unitType == 'commandToken' then
                 getPlanet = false
                 exact = false
             elseif includeSet[unit.unitType] == 1 or unit.unitType == 'ownerToken' then

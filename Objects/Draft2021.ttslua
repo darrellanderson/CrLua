@@ -969,7 +969,7 @@ function VolverMilty.addRedTiles(hands, count)
     randTileList = VolverMilty.permute(randTileList)
     --determines which random alpha wormhole to include
     local reserveSpots = 1
-    local randAlpha = math.random(0,1)
+    local randAlpha = math.random() >= 0.5
     -- rearranges tile list to account for forced in tiles
     if VolverMilty.numBeta > 0 then
         local betaIndex = VolverMilty.find(40, redTiles)
@@ -983,7 +983,7 @@ function VolverMilty.addRedTiles(hands, count)
     elseif VolverMilty.numAlpha > 1 then
         local alphaIndex = VolverMilty.find(39, redTiles)
         local alphaAsteroidIndex = VolverMilty.find(79, redTiles)
-        if randAlpha == 0 then
+        if randAlpha then
             redTiles[20-randTileList[reserveSpots]*2], redTiles[alphaIndex] = redTiles[alphaIndex], redTiles[20-randTileList[reserveSpots]*2]
             redTiles[20-randTileList[reserveSpots+1]*2], redTiles[alphaAsteroidIndex] = redTiles[alphaAsteroidIndex], redTiles[20-randTileList[reserveSpots+1]*2]
         else

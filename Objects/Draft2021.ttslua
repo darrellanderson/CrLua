@@ -961,6 +961,10 @@ end
 function VolverMilty.addRedTiles(hands, count)
     local redTiles = SystemTiles.getRedTiles()
     redTiles = VolverMilty.permute(redTiles)
+    local wormholesAlpha = {}
+    local wormholesBeta = {}
+    local betaLess = {}
+    local alphaLess = {}
     -- modifies redTile list to force include wormholes as specified
     local randTileList = {}
     for i=1,#hands do
@@ -969,8 +973,22 @@ function VolverMilty.addRedTiles(hands, count)
     randTileList = VolverMilty.permute(randTileList)
     --determines which random alpha wormhole to include
     local reserveSpots = 1
-    local randAlpha = math.random() >= 0.5
+    local randAlpha = math.random() > 0.5
     -- rearranges tile list to account for forced in tiles
+    for _, hand in ipairs(hands) do
+        if VolverMilty.find(25, hand) or VolverMilty.find(64, hand) then
+            wormholesBeta[_] = true
+        else
+            wormholesBeta[_] = false
+            table.insert(betaLess, _)
+        end
+        if VolverMilty.find(26, hand) then
+            wormholesAlpha[_] = true
+        else
+            wormholesAlpha[_] = false
+            table.insert(alphaLess, _)
+        end
+    end
     if VolverMilty.numBeta > 0 then
         local betaIndex = VolverMilty.find(40, redTiles)
         redTiles[20-randTileList[reserveSpots]*2], redTiles[betaIndex] = redTiles[betaIndex], redTiles[20-randTileList[reserveSpots]*2]
@@ -983,13 +1001,30 @@ function VolverMilty.addRedTiles(hands, count)
     elseif VolverMilty.numAlpha > 1 then
         local alphaIndex = VolverMilty.find(39, redTiles)
         local alphaAsteroidIndex = VolverMilty.find(79, redTiles)
-        if randAlpha then
+        if randAlpha == 0 then
             redTiles[20-randTileList[reserveSpots]*2], redTiles[alphaIndex] = redTiles[alphaIndex], redTiles[20-randTileList[reserveSpots]*2]
             redTiles[20-randTileList[reserveSpots+1]*2], redTiles[alphaAsteroidIndex] = redTiles[alphaAsteroidIndex], redTiles[20-randTileList[reserveSpots+1]*2]
         else
             redTiles[20-randTileList[reserveSpots]*2], redTiles[alphaAsteroidIndex] = redTiles[alphaAsteroidIndex], redTiles[20-randTileList[reserveSpots]*2]
             redTiles[20-randTileList[reserveSpots+1]*2], redTiles[alphaIndex] = redTiles[alphaIndex], redTiles[20-randTileList[reserveSpots+1]*2]
         end
+    end
+    local betaIndex = VolverMilty.find(40, redTiles)
+    if wormholesBeta[math.floor((20-betaIndex)/2)] == true then
+        local randSlice = betaLess[math.random(#betaLess)]
+        redTiles[betaIndex], redTiles[20-2*randSlice] = redTiles[20-2*randSlice], redTiles[betaIndex]
+    end
+    local alphaIndex = VolverMilty.find(39, redTiles)
+    local alphaAsteroidIndex = VolverMilty.find(79, redTiles)
+    if wormholesAlpha[math.floor((20-alphaIndex)/2)] == true then
+        local randSlice = alphaLess[math.random(#alphaLess)]
+        redTiles[alphaIndex], redTiles[20-2*randSlice] = redTiles[20-2*randSlice], redTiles[alphaIndex]
+        wormholesAlpha[randSlice] = true
+        table.remove(alphaLess, VolverMilty.find(randSlice, alphaLess))
+    end
+    if wormholesAlpha[math.floor((20-alphaAsteroidIndex)/2)] == true then
+        local randSlice = alphaLess[math.random(#alphaLess)]
+        redTiles[alphaAsteroidIndex], redTiles[20-2*randSlice] = redTiles[20-2*randSlice], redTiles[alphaAsteroidIndex]
     end
     for _, hand in ipairs(hands) do
         for _ = 1, count do

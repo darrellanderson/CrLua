@@ -188,6 +188,8 @@ end
 
 -------------------------------------------------------------------------------
 
+local _extraDraftBag = false
+
 function onLoad(save_state)
     self.addContextMenuItem('0. HELP', printHelpMessage)
     self.addContextMenuItem('1. Gather draft items', function() startLuaCoroutine(self, 'gatherDraftItemsCoroutine') end)
@@ -195,11 +197,23 @@ function onLoad(save_state)
     self.addContextMenuItem('3. Remove draft bags', function() startLuaCoroutine(self, 'removeDraftBagsCoroutine') end)
 
     self.addContextMenuItem('Report Factions', function() _factionHelper.reportFactions() end)
+    self.addContextMenuItem('Toggle extra bag', toggleExtraDraftBag)
 
     -- Temporary function: seed self initial contents by moving from existing franken bags.
     if self.getQuantity() == 0 then
         self.addContextMenuItem('_init_', function() startLuaCoroutine(self, '_initializeSelfFromOldStyleFrankenBags') end)
     end
+end
+
+function toggleExtraDraftBag()
+    local log = _getLog('Extra draft bag')
+
+    _extraDraftBag = not _extraDraftBag
+    local message = {
+        _extraDraftBag and 'Enabling' or 'Disabling',
+        ' extra draft bag'
+    }
+    log.i(table.concat(message, ''))
 end
 
 local _1_gatherDone = false
@@ -271,6 +285,12 @@ function buildDraftBagsCoroutine()
     log.i('creating draft bags')
     FrankenBags.createDraftBags()
     coroutine.yield(0)
+
+    if _extraDraftBag then
+        log.i('creating extra draft bag')
+        FrankenBags.createExtraDraftBag()
+        coroutine.yield(0)
+    end
 
     log.i('creating draft hidden zone')
     HiddenZones.spawnCenter()
@@ -1449,6 +1469,25 @@ function FrankenBags.createDraftBags()
         bag.setName('Franken Draft Bag ' .. i .. '/' .. numZones)
         FrankenBags._colorToDraftBag[zoneAttributes.color] = bag
     end
+end
+
+function FrankenBags.createExtraDraftBag()
+    local p = {
+        x = 0,
+        y = _zoneHelper.getTableY() + 3,
+        z = 0
+    }
+    local bag = spawnObject({
+        type              = 'Bag',
+        position          = p,
+        sound             = false,
+        snap_to_grid      = false,
+    })
+    bag.use_grid = true
+    bag.use_snap_points = false
+    bag.setColorTint('Teal')
+    bag.setName('EXTRA Franken Draft Bag')
+    FrankenBags._colorToDraftBag['EXTRA'] = bag
 end
 
 function FrankenBags.stowDraftBags()

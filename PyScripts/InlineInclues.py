@@ -11,7 +11,7 @@ import os
 import re
 import sys
 
-includePattern = re.compile('^#include <(~/.*)>$')
+includePattern = re.compile('^#include <(~/.*)>')
 delim = '-- ############################################################################\n'
 
 included = set()

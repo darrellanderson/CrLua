@@ -913,6 +913,25 @@ end
 -- If planets are split between different players do not assign ground owner.
 -- If any planet is not owned, do not assign ground owner.
 function getHexToOwners(hexToThings)
+    -- Build the team colors based on the players teams, choose "lowest" color.
+    local teamToColor = {}
+    for _, player in ipairs(Player.getPlayers()) do
+        if player.team and player.team ~= "None" then
+            if (not teamToColor[player.team]) or player.color < teamToColor[player.team] then
+                teamToColor[player.team] = player.color
+            end
+        end
+    end
+
+    -- Make the color aliases, use team if applicable otherwise player color.
+    local colorToAlias = {}
+    for _, color in ipairs(Player.getColors()) do
+        colorToAlias[color] = color
+    end
+    for _, player in ipairs(Player.getPlayers()) do
+        colorToAlias[player.color] = teamToColor[player.team] or player.color
+    end
+
     local hexToOwners = {}
     for hex, things in pairs(hexToThings) do
         for _, thing in ipairs(things) do
@@ -930,14 +949,14 @@ function getHexToOwners(hexToThings)
             -- Wholely owned ground/space.
             if thing.ground then
                 if owners.ground == nil then
-                    owners.ground = thing.color
-                elseif owners.ground ~= thing.color then
+                    owners.ground = colorToAlias[thing.color]
+                elseif owners.ground ~= colorToAlias[thing.color] then
                     owners.ground = false
                 end
             else
                 if owners.space == nil then
-                    owners.space = thing.color
-                elseif owners.space ~= thing.color then
+                    owners.space = colorToAlias[thing.color]
+                elseif owners.space ~= colorToAlias[thing.color] then
                     warnSystem(owners.system, 'More than one space unit color')
                     owners.space = false
                 end
@@ -946,8 +965,8 @@ function getHexToOwners(hexToThings)
             -- Per-planet.
             if thing.ground and thing.planetName then
                 if owners.planetName[thing.planetName] == nil then
-                    owners.planetName[thing.planetName] = thing.color
-                elseif owners.planetName[thing.planetName] ~= thing.color then
+                    owners.planetName[thing.planetName] = colorToAlias[thing.color]
+                elseif owners.planetName[thing.planetName] ~= colorToAlias[thing.color] then
                     warnSystem(owners.system, 'More than one ground unit color on "' .. thing.planetName .. '"')
                     owners.planetName[thing.planetName] = false
                 end

@@ -578,8 +578,7 @@ local DECKS = {
             ['Codex 2'] = {
                 'Nano-Forge',
                 ['Dynamis Core'] = { purge = true },
-                'JR-XS455-0',  -- careful, is that "oh" or "zero"?
-                'JR-XS455-O',  -- careful, is that "oh" or "zero"?
+                'JR-XS455-0',  -- careful, use "zero" not "oh"
             }
         }
     },
@@ -609,7 +608,6 @@ local _cardNameToCardAttributes = false
 local _dealQueue = {}
 local _dealCoroutineIsActive = false
 local _dealCoroutineHeartbeat = false
-local _deletedItemsBagGuid = false
 
 local function _getParent(parentName)
     local guid = _parentNameToGuid[parentName]
@@ -1251,7 +1249,6 @@ function _dealHack(deck, count, playerColor)
         y = zoneAttrs.rotation.y,
         z = deck.getRotation().z
     }
-    local deletedItems = _getDeletedItemsBag()
 
     local function spawnCallback(card)
         assert(card and card.tag == 'Card')
@@ -1260,13 +1257,10 @@ function _dealHack(deck, count, playerColor)
     local function takeCallback(card)
         assert(card and card.tag == 'Card')
         card.setLock(false)
+
         -- Grab json and spawn a new one.  Clone is simpler but makes a sound.
         local cardJson = card.getJSON()
-        if deletedItems then
-            deletedItems.call('ignoreGuid', card.getGUID())
-        end
-        destroyObject(card)
-        local clone = spawnObjectJSON({
+        local spawnParams = {
             json              = cardJson,
             position          = nextPosition(),
             rotation          = card.getRotation(),
@@ -1275,7 +1269,18 @@ function _dealHack(deck, count, playerColor)
             sound             = false,
             params            = nil,
             snap_to_grid      = false
-        })
+        }
+
+        -- Before destroying the original, mutate it a little as a visual signal
+        -- should TTS somehow preserve it (reports of duplicated actions).
+        local scale = card.getScale()
+        card.setScale({ x = scale.x / 2, y = scale.y, z = scale.z / 2 })
+        card.setDescription('This card is the result of a TTS bug.  Please delete and draw again, and please inform the mod team!')
+
+        card.addTag('DELETED_ITEMS_IGNORE')
+        destroyObject(card)
+
+        local clone = spawnObjectJSON(spawnParams)
     end
 
     for i = 1, count do
@@ -1308,19 +1313,6 @@ function _dealHack(deck, count, playerColor)
                 top               = true
             })
             deck = deck.remainder or deck
-        end
-    end
-end
-
-function _getDeletedItemsBag()
-    local bag = _deletedItemsBagGuid and getObjectFromGUID(_deletedItemsBagGuid)
-    if bag then
-        return bag
-    end
-    for _, object in ipairs(getAllObjects()) do
-        if object.tag == 'Bag' and object.getName() == 'TI4 Deleted Items' then
-            _deletedItemsBagGuid = object.getGUID()
-            return object
         end
     end
 end

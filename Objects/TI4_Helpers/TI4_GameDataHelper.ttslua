@@ -185,6 +185,9 @@ function asyncGatherDataCoroutine()
     for color, factionShort in pairs(colorToFactionAbbrv()) do
         colorToPlayerResult[color].factionShort = factionShort
     end
+    for color, teamName in pairs(colorToTeamName()) do
+        colorToPlayerResult[color].teamName = teamName
+    end
     coroutine.yield(0)
     coroutine.yield(0)
 
@@ -309,6 +312,7 @@ function asyncGatherDataCoroutine()
             playerResult.steamName = nil
             playerResult.factionName = nil
             playerResult.factionShort = nil
+            playerResult.team = nil
             playerResult.active = nil
             playerResult.strategyCardsFaceDown = nil
             playerResult.technologies = #playerResult.technologies  -- same order as main list
@@ -381,6 +385,19 @@ function colorToFactionAbbrv()
     for _, color in ipairs(_zoneHelper.zones()) do
         local faction = _factionHelper.fromColor(color)
         result[color] = faction and faction.frankenName
+    end
+    return result
+end
+
+function colorToTeamName()
+    local result = {}
+    local colorToTeamName = {}
+    for _, player in ipairs(Player.getPlayers()) do
+        colorToTeamName[player.color] = player.team
+    end
+    for _, color in ipairs(_zoneHelper.zones()) do
+        local teamName = colorToTeamName[color]
+        result[color] = (teamName and teamName ~= 'None') and teamName or nil
     end
     return result
 end

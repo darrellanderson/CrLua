@@ -840,12 +840,31 @@ function getColorToCommanders()
         addCommanderIfUnlocked(color, commander, true)
     end
 
+    -- Reject any alliances if a card is toggle and idle.  There may be several
+    -- ways an alliance is added (imperia, promissory, etc) so reject those too.
+    local zoneColorToRejectAllianceColorSet = {}
+    for guid, allianceColor in pairs(guidToAllianceColor) do
+        local card = getObjectFromGUID(guid)
+        if _unitHelper._isToggleActiveCard(card) and not _unitHelper._isToggleActiveCardActive(card) then
+            local zoneColor = guidToZoneColor[guid]
+            local rejectAllianceColorSet = zoneColorToRejectAllianceColorSet[zoneColor]
+            if not rejectAllianceColorSet then
+                rejectAllianceColorSet = {}
+                zoneColorToRejectAllianceColorSet[zoneColor] = rejectAllianceColorSet
+            end
+            rejectAllianceColorSet[allianceColor] = true
+        end
+    end
+
     -- Add alliances.
     for guid, allianceColor in pairs(guidToAllianceColor) do
         -- If the alliance card has toggle active, only add it if active.
         local considerCard = true
         local requireActive = true
         local card = getObjectFromGUID(guid)
+        local zoneColor = guidToZoneColor[guid]
+
+        -- If card is active, do not require commander to be active.
         if _unitHelper._isToggleActiveCard(card) then
             if _unitHelper._isToggleActiveCardActive(card) then
                 requireActive = false  -- alliance marked active
@@ -853,7 +872,13 @@ function getColorToCommanders()
                 considerCard = false  -- alliace marked idle, disregard completely
             end
         end
-        local zoneColor = guidToZoneColor[guid]
+
+        -- If card is idle, reject all alliances to that commander.
+        local rejectAllianceColorSet = zoneColorToRejectAllianceColorSet[zoneColor]
+        if rejectAllianceColorSet and rejectAllianceColorSet[allianceColor] then
+            considerCard = false
+        end
+
         if considerCard and zoneColor and (zoneColor ~= allianceColor) then
             local commander = colorToFactionCommander[allianceColor]
             if commander then

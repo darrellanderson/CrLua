@@ -750,22 +750,102 @@ function colorToHandSummary()
     return result
 end
 
-function getHexSummaryWithYields()
-    -- system: tile, cartesian coords (hex w, h scaled)
-    -- units: count, color, unitType (include control token), planet index (0 for space) [3ri0]
-    --    color -> planet index -> unitType & count
-    --    r:{0:{3i,...}}
-    --    OR maybe planet list, first entry is space
-    --    r:[{3i,...},{}...]
-    -- attach tokens: name to tile/planet
-    --
-    -- So...
-    -- [{ tile = #, x = #, y = #, space = {}, planets = [{}*] }*]
-    -- {} = {color|unitType|count}
-    -- Packed:
-    -- [ {TILE# , X#, Y#, [{COLOR|UNITTYPE|COUNT}*]}* ]
+HexSummary = {
+    -- Upper case signals color.  No-color entries always first.
+    colorToCode = {
+        ['White'] = 'W',
+        ['Blue'] = 'B',
+        ['Purple'] = 'P',
+        ['Yellow'] = 'Y',
+        ['Red'] = 'R',
+        ['Green'] = 'G',
+        ['Orange'] = 'E', -- 'O' vs '0' bad
+        ['Pink'] = 'K',
+        ['Brown'] = 'N',
+        [''] = '',
+    },
+    -- Lower case unit codes.
+    unitToCode = {
+        ['Carrier'] = 'c',
+        ['Cruiser'] = 'r',
+        ['Destroyer'] = 'y',
+        ['Dreadnought'] = 'd',
+        ['Fighter'] = 'f',
+        ['Flagship'] = 'h',
+        ['Infantry'] = 'i',
+        ['Mech'] = 'm',
+        ['PDS'] = 'p',
+        ['Space Dock'] = 's',
+        ['War Sun'] = 'w',
 
-    -- Get existing system tiles, index by hex (if stacked only one wins).
+        -- These appear in the unit portion, leverage color coding.
+        ['ownerToken'] = 'o',
+        ['commandToken'] = 't',
+    },
+    -- Preserve former mixed unit/token codes where applicable, otherwise may conflict.
+    -- Attachment tokens toggle case when flipped.
+    attachmentToCode = {
+        space = {
+            ['Alpha Wormhole Token'] = 'a',
+            ['Beta Wormhole Token'] = 'b',
+            ['Frontier Token'] = 'e',
+            ['Gamma Wormhole Token'] = 'g',
+            ['Ion Storm Token'] = 'n',
+            ['Tear Token (Cabal)'] = 'h',
+            ['Tear Token (Nekro)'] = 'h',
+        },
+        planetStatic = {
+            ['DMZ Token'] = 'z',
+            ['Dyson Sphere Token'] = 'd',
+            ['Lazax Survivors Token'] = 'x',
+            ['Mining World Token'] = 'm',
+            ['Mirage Token'] = 'k',
+            ['Nano-Forge Token'] = 'f',
+            ['Paradise World Token'] = 'p',
+            ['Rich World Token'] = 'r',
+            ['Stellar Converter Token'] = 'l',
+            ['Titan Note Token'] = 't',
+            ['Titan Ultimate Token'] = 'u',
+            ['Tomb of Emphidia Token'] = 'e',
+        },
+        planetFlippable = { -- face down is tech skip side
+            ['Biotic Research Facility Token'] = 'i',
+            ['Cybernetic Research Facility Token'] = 'c',
+            ['Propulsion Research Facility Token'] = 'o',
+            ['Warfare Research Facility Token'] = 'w',
+        }
+    },
+    -- Top: system1,system2,...
+    -- System: <tile><X><Y>space;planet1;planet2;...
+    -- Region: <color[A-Z]><count[0-9]*><unit[a-z]>*<attachments>
+    -- Within a system color is sticky (seed empty for tokens)
+    -- Within a region count is sticky (seed 1), reset to 1 for attachments
+    delimiter = {
+        system = ',',
+        planet = ';',
+        attachments = '*',
+    }
+}
+
+function HexSummary._getPlanetIndex(system, position, exact)
+    local planet = _systemHelper.planetFromPosition({
+        systemGuid = system.guid,
+        position = position,
+        exact = exact,
+    })
+    if planet then
+        local planetName = planet.name
+        for i, planet in ipairs(system.planets or {}) do
+            if planet.name == planetName then
+                return i
+            end
+        end
+    end
+    return 0
+end
+
+-- Get existing system tiles, index by hex (if stacked only one wins).
+function HexSummary.getHexToSystem()
     local guidToSystem = _systemHelper.systems()
     local hexToSystem = {}
     for _, object in ipairs(getAllObjects()) do
@@ -775,74 +855,14 @@ function getHexSummaryWithYields()
             hexToSystem[hex] = system
         end
     end
-    coroutine.yield(0)
+    return hexToSystem
+end
 
-    -- Get units, assign colors to flagships, anonymous infantry/fighter tokens.
+-- Get {tile, planetIndex, color, count, code} list.
+function HexSummary.getUnitSummaries(hexToSystem, results)
     local units = _unitHelper.getUnits()
     coroutine.yield(0)
     units = _unitHelper.fillUnitColors(units)
-    coroutine.yield(0)
-
-    -- Add owner tokens.
-    local ownerTokenNameToColor = {}
-    local commandTokenNameToColor = {}
-    for color, faction in pairs(_factionHelper.allFactions()) do
-        ownerTokenNameToColor[faction.tokenName .. ' Owner Token'] = faction.color
-        commandTokenNameToColor[faction.tokenName .. ' Command Token'] = faction.color
-    end
-    for _, ownerToken in ipairs(Tokens.getTokens('Owner')) do
-        local color = ownerTokenNameToColor[ownerToken.getName()]
-        local hex = _systemHelper.hexFromPosition(ownerToken.getPosition())
-        if color and hexToSystem[hex] then
-            table.insert(units, {
-                unitType = 'ownerToken',
-                position = ownerToken.getPosition(),
-                color = color,
-                hex = hex
-            })
-        end
-    end
-    coroutine.yield(0)
-
-    -- Add command tokens.
-    for _, commandToken in ipairs(Tokens.getTokens('Command')) do
-        local color = commandTokenNameToColor[commandToken.getName()]
-        local hex = _systemHelper.hexFromPosition(commandToken.getPosition())
-        if color and hexToSystem[hex] then
-            table.insert(units, {
-                unitType = 'commandToken',
-                position = commandToken.getPosition(),
-                color = color,
-                hex = hex
-            })
-        end
-    end
-    coroutine.yield(0)
-
-    -- Add wormhole and frontier tokens.
-    local includeSet = {
-        ['Alpha Wormhole Token'] = 0,
-        ['Beta Wormhole Token'] = 0,
-        ['Gamma Wormhole Token'] = 0,
-        ['Ion Storm Token'] = 0,
-        ['Frontier Token'] = 0,
-        ['Mirage Token'] = 1,
-        ['Stellar Converter Token'] = 1,
-        ['DMZ Token'] = 1,
-    }
-    for _, object in ipairs(getAllObjects()) do
-        local name = object.getName()
-        local include = includeSet[name]
-        local hex = include and _systemHelper.hexFromPosition(object.getPosition())
-        if include and hexToSystem[hex] then
-            table.insert(units, {
-                unitType = name,
-                position = object.getPosition(),
-                color = '',
-                hex = hex
-            })
-        end
-    end
     coroutine.yield(0)
 
     -- Split into hexes.
@@ -858,168 +878,210 @@ function getHexSummaryWithYields()
             table.insert(unitList, unit)
         end
     end
+    units = nil
     coroutine.yield(0)
 
-    -- Assign planets for non-ships (in system hexes).
     local unitTypeToAttrs = _unitHelper.getUnitAttributes({})
-    local i = 0
-    for hex, system in pairs(hexToSystem) do
-        local units = hexToUnits[hex] or {}
-        for _, unit in ipairs(units) do
-            local attrs = unitTypeToAttrs[unit.unitType] or {}
-            local getPlanet = not attrs.ship
-            local exact = getPlanet and not attrs.structure
-            if includeSet[unit.unitType] == 0 or unit.unitType == 'commandToken' then
-                getPlanet = false
-                exact = false
-            elseif includeSet[unit.unitType] == 1 or unit.unitType == 'ownerToken' then
-                getPlanet = true
-                exact = false
-            end
-            if getPlanet then
-                local planet = _systemHelper.planetFromPosition({
-                    systemGuid = system.guid,
-                    position = unit.position,
-                    exact = exact,
-                })
-                unit.planetName = planet and planet.name
-                i = i + 1
-                if i % 50 == 0 then
-                    coroutine.yield(0)
-                end
-            end
-        end
-    end
-    coroutine.yield(0)
-
-    -- Pack <color[A-Z]><count[0-9]*><unit[a-z]> where color and count are sticky
-    local colorToCode = {
-        ['White'] = 'W',
-        ['Blue'] = 'B',
-        ['Purple'] = 'P',
-        ['Yellow'] = 'Y',
-        ['Red'] = 'R',
-        ['Green'] = 'G',
-        ['Orange'] = 'E', -- 'O' vs '0' bad
-        ['Pink'] = 'K',
-        ['Brown'] = 'N',
-        [''] = '',
-    }
-    local unitTypeToCode = {
-        ['Carrier'] = 'c',
-        ['Cruiser'] = 'r',
-        ['Destroyer'] = 'y',
-        ['Dreadnought'] = 'd',
-        ['Fighter'] = 'f',
-        ['Flagship'] = 'h',
-        ['Infantry'] = 'i',
-        ['Mech'] = 'm',
-        ['PDS'] = 'p',
-        ['Space Dock'] = 's',
-        ['War Sun'] = 'w',
-        ['ownerToken'] = 'o',
-        ['commandToken'] = 't',
-        ['Alpha Wormhole Token'] = 'a',
-        ['Beta Wormhole Token'] = 'b',
-        ['Gamma Wormhole Token'] = 'g',
-        ['Ion Storm Token'] = 'n',
-        ['Frontier Token'] = 'e',
-        ['Mirage Token'] = 'k',
-        ['Stellar Converter Token'] = 'l',
-        ['DMZ Token'] = 'z',
-    }
-
-    local hexInTileOrder = {}
-    for hex, _ in pairs(hexToSystem) do
-        table.insert(hexInTileOrder, hex)
-    end
-    table.sort(hexInTileOrder, function(a, b) return hexToSystem[a].tile < hexToSystem[b].tile end)
-
-    local result = {}
-    for _, hex in pairs(hexInTileOrder) do
+    for hex, units in pairs(hexToUnits) do
+        -- Split into planets.
         local system = assert(hexToSystem[hex])
-        local units = hexToUnits[hex] or {}
-
-        local regionNames = { false } -- false is space
-        for _, planet in ipairs(system.planets or {}) do
-            table.insert(regionNames, planet.name)
+        local planetNameToIndex = {}
+        local planetIndexToUnits = { [0] = {} }  -- zero is space
+        for i, planet in ipairs(system.planets or {}) do
+            planetNameToIndex[planet.name] = i
+            planetIndexToUnits[i] = {}
         end
-        for _, wormholeName in ipairs(system.wormholes or {}) do
-            table.insert(regionNames, wormholeName)
-        end
-
-        -- Per-planet summaries.
-        local lastColor = false
-        local foundUnits = false
-        local summaries = {}
-        for i, regionName in ipairs(regionNames) do
-            -- Get all units for this planet (or space area)
-            local planetUnits = {}
-            for _, unit in ipairs(units) do
-                if (regionName == unit.planetName) or (not regionName and not unit.planetName) then
-                    unit.count = unit.count or 1 -- make sure has count
-                    table.insert(planetUnits, unit)
-                end
+        for _, unit in ipairs(units) do
+            local unitAttrs = unitTypeToAttrs[unit.unitType]
+            local planetIndex = 0
+            if not unitAttrs.ship then
+                local exact = not unitAttrs.structure
+                planetIndex = HexSummary._getPlanetIndex(system, unit.position, exact) or 0
             end
-            foundUnits = foundUnits or #planetUnits > 0
+            local entry = assert(planetIndexToUnits[planetIndex])
+            table.insert(entry, unit)
+        end
 
-            -- Convert to a list of {color, unitType, count} entries.
-            local summary = {}
-            local colorToUnits = _unitHelper.getColorToUnits(planetUnits)
+        -- Create summaries.
+        for planetIndex, units in pairs(planetIndexToUnits) do
+            local colorToUnits = _unitHelper.getColorToUnits(units)
             for color, units in pairs(colorToUnits) do
                 local unitTypeToCount = _unitHelper.getUnitTypeToCount(units)
                 for unitType, count in pairs(unitTypeToCount) do
-                    if string.match(unitType, 'Token$') then
-                        count = 1
-                    end
-                    table.insert(summary, {
+                    table.insert(results, {
+                        tile = assert(system.tile),
+                        planetIndex = planetIndex,
                         color = color,
-                        unitType = unitType,
-                        count = count
+                        count = count,
+                        code = assert(HexSummary.unitToCode[unitType]),
+                        --unitType = unitType,
                     })
                 end
             end
-
-            -- Pack into a tight string.
-            local function sortBy(a, b)
-                if a.color < b.color then return true end
-                if a.color > b.color then return false end
-                if a.count < b.count then return true end
-                if a.count > b.count then return false end
-                return a.unitType < b.unitType
-            end
-            table.sort(summary, sortBy)
-            local lastCount = 1
-            local packed = {}
-            for _, item in ipairs(summary) do
-                if lastColor ~= item.color and item.color ~= '' then
-                    lastColor = item.color
-                    table.insert(packed, assert(colorToCode[lastColor]))
-                end
-                if lastCount ~= item.count then
-                    lastCount = item.count
-                    table.insert(packed, lastCount)
-                end
-                table.insert(packed, assert(unitTypeToCode[item.unitType]))
-            end
-            summary = table.concat(packed, '')
-
-            -- Attachments?  For now just signal there is one.
-            -- May eventually want to include them all, or remove catch-all
-            -- when token is included (e.g. DMZ).
-            local planet = false
-            if system.planets then
-                local planetIndex = i - 1
-                planet = #system.planets >= planetIndex and system.planets[planetIndex]
-            end
-            if planet and planet._attachments then
-                summary = summary .. '*'
-            end
-
-            table.insert(summaries, summary)
         end
-        local unitSummaries = foundUnits and table.concat(summaries, ';') or nil
+    end
+    return results
+end
 
+-- Get {tile, planetIndex, color, code} list.
+function HexSummary.getCommandAndOwnerTokens(hexToSystem, results)
+    local ownerTokenNameToColor = {}
+    local commandTokenNameToColor = {}
+    for color, faction in pairs(_factionHelper.allFactions()) do
+        ownerTokenNameToColor[faction.tokenName .. ' Owner Token'] = faction.color
+        commandTokenNameToColor[faction.tokenName .. ' Command Token'] = faction.color
+    end
+
+    -- Grab all tokens in a single scan (get planet index seperately).
+    local tokenNameSet = {}
+    for name, _ in pairs(ownerTokenNameToColor) do
+        tokenNameSet[name] = true
+    end
+    for name, _ in pairs(commandTokenNameToColor) do
+        tokenNameSet[name] = true
+    end
+    local hexToTokenDatas = {}
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        if tokenNameSet[name] and (not object.held_by_color) then
+            local position = object.getPosition()
+            local hex = _systemHelper.hexFromPosition(position)
+            local system = hexToSystem[hex]
+            if system then
+                local entry = hexToTokenDatas[hex]
+                if not entry then
+                    entry = {}
+                    hexToTokenDatas[hex] = entry
+                end
+                table.insert(entry, {
+                    name = name,
+                    position = position
+                })
+            end
+        end
+    end
+    coroutine.yield(0)
+
+    -- Assign planet index.
+    for hex, tokenDatas in pairs(hexToTokenDatas) do
+        local system = hexToSystem[hex]
+        for _, tokenData in ipairs(tokenDatas) do
+            local ownerColor = ownerTokenNameToColor[tokenData.name]
+            local commandColor = commandTokenNameToColor[tokenData.name]
+            local code = ownerColor and HexSummary.unitToCode.ownerToken or HexSummary.unitToCode.commandToken
+            local planetIndex = 0
+            if ownerColor then
+                planetIndex = HexSummary._getPlanetIndex(system, tokenData.position, false) or 0
+            end
+            table.insert(results, {
+                tile = assert(system.tile),
+                planetIndex = planetIndex,
+                color = ownerColor or commandColor,
+                code = code,
+                token = true
+            })
+        end
+    end
+    return results
+end
+
+-- Get {tile, planetIndex, color='', code(upper for flipped)} list.
+function HexSummary.getAttachments(hexToSystem, results)
+    -- Find all attachments in one pass, calculate planets seperately.
+    local hexToAttachmentDatas = {}
+    local attachmentNameSet = {}
+    for _, nameToCode in pairs(HexSummary.attachmentToCode) do
+        for name, _ in pairs(nameToCode) do
+            attachmentNameSet[name] = true
+        end
+    end
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        if attachmentNameSet[name] and (not object.held_by_color) then
+            local position = object.getPosition()
+            local hex = _systemHelper.hexFromPosition(position)
+            local system = hexToSystem[hex]
+            if system then
+                local entry = hexToAttachmentDatas[hex]
+                if not entry then
+                    entry = {}
+                    hexToAttachmentDatas[hex] = entry
+                end
+                table.insert(entry, {
+                    name = name,
+                    position = position,
+                    isFaceDown = object.is_face_down
+                })
+            end
+        end
+    end
+    coroutine.yield(0)
+
+    -- Assign planet index, uppercase flipped tokens.
+    for hex, attachmentDatas in pairs(hexToAttachmentDatas) do
+        local system = hexToSystem[hex]
+        for _, attachmentData in ipairs(attachmentDatas) do
+            local name = attachmentData.name
+            local planetIndex = false
+            local code = false
+
+            if HexSummary.attachmentToCode.space[name] then
+                code = HexSummary.attachmentToCode.space[name]
+                planetIndex = 0
+            elseif HexSummary.attachmentToCode.planetStatic[name] then
+                code = HexSummary.attachmentToCode.planetStatic[name]
+                planetIndex = HexSummary._getPlanetIndex(system, attachmentData.position, false) or 0
+            elseif HexSummary.attachmentToCode.planetFlippable[name] then
+                code = HexSummary.attachmentToCode.planetFlippable[name]
+                if attachmentData.isFaceDown then
+                    code = string.upper(code)
+                end
+                planetIndex = HexSummary._getPlanetIndex(system, attachmentData.position, false) or 0
+            else
+                error('bad ' .. name)
+            end
+
+            table.insert(results, {
+                tile = assert(system.tile),
+                planetIndex = planetIndex,
+                code = code,
+                attachment = true
+            })
+        end
+    end
+    return results
+end
+
+function HexSummary.sortResults(results)
+    local function soryBy(a, b)
+        if a.tile < b.tile then return true end
+        if a.tile > b.tile then return false end
+
+        if a.planetIndex < b.planetIndex then return true end
+        if a.planetIndex > b.planetIndex then return false end
+
+        if a.token and (not b.token) then return true end
+        if (not a.token) and b.token then return false end
+
+        if a.attachment and (not b.attachment) then return false end
+        if (not a.attachment) and b.attachment then return true end
+
+        if (a.color or '') < (b.color or '') then return true end
+        if (a.color or '') > (b.color or '') then return false end
+
+        if (a.count or 1) < (b.count or 1) then return true end
+        if (a.count or 1) > (b.count or 1) then return false end
+
+        -- Arbitrary but consistent final tie breaker.
+        return a.code < b.code
+    end
+    table.sort(results, soryBy)
+    return results
+end
+
+function HexSummary.encode(hexToSystem, results)
+    local tileToEncoded = {}
+    for hex, system in pairs(hexToSystem) do
         local p = _systemHelper.hexToPosition(hex)
         local sx = 5.25
         local sy = 3.03
@@ -1027,7 +1089,6 @@ function getHexSummaryWithYields()
         local y = math.floor((p.z / sy) + 0.5)
         x = '' .. (x >= 0 and ('+' .. x) or x)
         y = '' .. (y >= 0 and ('+' .. y) or y)
-
         local tile = system.tile
         if system.hyperlane then
             local systemObject = getObjectFromGUID(system.guid)
@@ -1038,18 +1099,106 @@ function getHexSummaryWithYields()
             tile = tile .. (systemObject.is_face_down and 'B' or 'A')
             tile = tile .. math.floor(rotation / 60)
         end
-
-        local entry = {
-            tile,
-            x,
-            y,
-            unitSummaries
-        }
-        table.insert(result, table.concat(entry, ''))
+        tileToEncoded[system.tile] = tile .. x .. y
     end
-    result = table.concat(result, ',')
 
-    return result
+    local encoded = {}
+
+    local stickyTile = false
+    local stickyPlanetIndex = 0
+    local stickyColor = ''
+    local stickyCount = 1
+    local stickyAttachment = false
+
+    -- Top: system1,system2,...
+    -- System: <tile><X><Y>space;planet1;planet2;...
+    -- Region: <color[A-Z]><count[0-9]*><unit[a-z]>*<attachments>
+    -- Within a system color is sticky (seed empty for tokens)
+    -- Within a region count is sticky (seed 1), reset to 1 for attachments
+    for _, result in ipairs(results) do
+
+        -- Tile change?
+        if result.tile ~= stickyTile then
+            if stickyTile then
+                table.insert(encoded, HexSummary.delimiter.system)
+            end
+            table.insert(encoded, assert(tileToEncoded[result.tile]))
+            stickyTile = result.tile
+            stickyPlanetIndex = 0
+            stickyColor = ''
+            stickyCount = 1
+            stickyAttachment = false
+        end
+
+        -- Planet change?  (Keep tile, color)
+        if result.planetIndex ~= stickyPlanetIndex then
+            table.insert(encoded, HexSummary.delimiter.planet)
+            stickyPlanetIndex = result.planetIndex
+            stickyCount = 1
+            stickyAttachment = false
+        end
+
+        -- Attachment change?
+        result.attachment = result.attachment or false
+        if result.attachment ~= stickyAttachment then
+            assert(result.attachment) -- should only ever toggle to true
+            table.insert(encoded, HexSummary.delimiter.attachments)
+            stickyColor = ''
+            stickyCount = 1
+            stickyAttachment = result.attachment
+        end
+
+        -- Color change?
+        result.color = result.color or ''
+        if result.color ~= stickyColor then
+            table.insert(encoded, HexSummary.colorToCode[result.color])
+            stickyColor = result.color
+            stickyCount = 1
+        end
+
+        -- Count change?
+        result.count = result.count or 1
+        if result.count ~= stickyCount then
+            table.insert(encoded, result.count)
+            stickyCount = result.count
+        end
+
+        table.insert(encoded, result.code)
+
+    end
+    return table.concat(encoded, '')
+end
+
+function getHexSummaryWithYields()
+    -- Get existing system tiles, index by hex (if stacked only one wins).
+    local hexToSystem = HexSummary.getHexToSystem()
+    coroutine.yield(0)
+
+    -- Seed results with an empty entry per tile, in case nothing else there.
+    -- (Needed to encode such empty tiles.)
+    local results = {}
+    for _, system in pairs(hexToSystem) do
+        local numPlanets = system.planets and #system.planets or 0
+        local numWormholes = system.wormholes and #system.wormholes or 0
+        for i = 0, numPlanets + numWormholes do
+            table.insert(results, {
+                tile = system.tile,
+                planetIndex = i
+            })
+        end
+    end
+
+    results = HexSummary.getUnitSummaries(hexToSystem, results)
+    coroutine.yield(0)
+    results = HexSummary.getCommandAndOwnerTokens(hexToSystem, results)
+    coroutine.yield(0)
+    results = HexSummary.getAttachments(hexToSystem, results)
+    coroutine.yield(0)
+    results = HexSummary.sortResults(results)
+    coroutine.yield(0)
+    local encoded = HexSummary.encode(hexToSystem, results)
+    coroutine.yield(0)
+    return encoded
 end
 
 -------------------------------------------------------------------------------

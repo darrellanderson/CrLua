@@ -1724,7 +1724,7 @@ function getUnits()
         local unitData = objectNameToUnitData[name]
         -- Treat 'figurine' as 'generic'.
         local tag = object.tag == 'Figurine' and 'Generic' or object.tag
-        if unitData and ((not unitData.tag) or unitData.tag == tag) then
+        if (not object.held_by_color) and unitData and ((not unitData.tag) or unitData.tag == tag) then
             local unitData = _copy(unitData)
             unitData.guid = object.getGUID()
             unitData.position = object.getPosition()

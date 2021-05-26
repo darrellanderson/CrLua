@@ -806,7 +806,7 @@ HexSummary = {
             ['Stellar Converter Token'] = 'l',
             ['Titan Note Token'] = 't',
             ['Titan Ultimate Token'] = 'u',
-            ['Tomb of Emphidia Token'] = 'e',
+            ['Tomb of Emphidia Token'] = 'j',
         },
         planetFlippable = { -- face down is tech skip side
             ['Biotic Research Facility Token'] = 'i',
@@ -2093,6 +2093,13 @@ function onLoad(saveState)
     self.addContextMenuItem('Report Data', _doReport)
     self.addContextMenuItem('Report State', function() _logTable('_state', _state) end)
     self.addContextMenuItem('Reset State', function() _state = DEFAULT_STATE end)
+
+    -- If resuming a split game restart the game data service.
+    if _state._gamedataOptIn and not _timerId then
+        startPeriodicUpdates({
+            delay = DEFAULT_ANON_PERIODIC_SECONDS
+        })
+    end
 end
 
 function onSave()

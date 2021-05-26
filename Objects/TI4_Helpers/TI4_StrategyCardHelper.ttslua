@@ -281,7 +281,6 @@ end
 function dealAllActionCards(dealOrder)
     local lookForSet = {
         ['Neural Motivator'] = true,
-        ['Minister of Policy'] = true,
     }
 
     local guidToPosition = {}
@@ -296,7 +295,7 @@ function dealAllActionCards(dealOrder)
             guidToPosition[guid] = object.getPosition()
             guidToName[guid] = name
         end
-        if object.getName() == 'Player Eliminated' then
+        if name == 'Player Eliminated' then
             local color = _zoneHelper.zoneFromPosition(object.getPosition())
             if color then
                 eliminatedPlayerSet[color] = true
@@ -337,10 +336,6 @@ function dealAllActionCards(dealOrder)
             count = count + 1
             _safeBroadcastToColor('Scheming.', color, {0.1,0.5,0.1})
         end
-        if abilitiesSet['Minister of Policy'] then
-            count = count + 1
-            _safeBroadcastToColor('Minister of Policy active.', color, {0.1,0.5,0.1})
-        end
 
         -- Deal.
         _deckHelper.deal({
@@ -360,6 +355,45 @@ function dealAllActionCards(dealOrder)
     broadcastToAll('Dealt Action Cards.')
 end
 
+-- "Minister of Policy" gets an action card "at the end of the status phase",
+-- do not mix this in with the standard "draw action cards" action.
+function _dealMinisterOfPolicyActionCard()
+    local ministerOfPolicyColor = false
+    local eliminatedPlayerSet = {}
+
+    local inHandGuidSet = _zoneHelper.inHand()
+    for _, object in ipairs(getAllObjects()) do
+        local name = object.getName()
+        local guid = object.getGUID()
+        if name == 'Minister of Policy' and (not inHandGuidSet[guid]) and (not object.is_face_down) then
+            ministerOfPolicyColor = _zoneHelper.zoneFromPosition(object.getPosition())
+        end
+        if name == 'Player Eliminated' then
+            local color = _zoneHelper.zoneFromPosition(object.getPosition())
+            if color then
+                eliminatedPlayerSet[color] = true
+            end
+        end
+    end
+
+    local color = ministerOfPolicyColor
+    if color and not eliminatedPlayerSet[color] then
+        _safeBroadcastToColor('Minister of Policy active.', color, {0.1,0.5,0.1})
+        local count = 1
+        local faction = _factionHelper.fromColor(ministerOfPolicyColor)
+        for _, ability in ipairs(faction and faction.abilities or {}) do
+            if ability == 'Scheming' then
+                count = count + 1
+                _safeBroadcastToColor('Scheming.', color, {0.1,0.5,0.1})
+            end
+        end
+        _deckHelper.deal({
+            deck = 'Actions',
+            count = count,
+            color = color
+        })
+    end
+end
 -------------------------------------------------------------------------------
 
 --- Compute influence for all players.
@@ -887,6 +921,9 @@ function _endStatusPhaseCoroutine()
     coroutine.yield(0)
 
     _returnStrategyCards()
+    coroutine.yield(0)
+
+    _dealMinisterOfPolicyActionCard()
     coroutine.yield(0)
 
     return 1

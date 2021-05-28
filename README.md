@@ -1,5 +1,4 @@
-# CrLua
-Tabletop Simulator lua utilities
+# The TI4-TTS mod is now https://github.com/darrellanderson/TI4-TTS
 
 # A note about #include
 

@@ -13,6 +13,25 @@ MAT_W = 7.52
 MAT_H = 9.22
 MAT_D = 0.01
 
+# SCPT draft mat
+MAT_W = 36.82
+MAT_H = 26.10
+MAT_D = 0.4
+
+# SCPT selection mat
+MAT_W = 9.58
+MAT_H = 6.90
+MAT_D = 0.4
+
+# DRAFT 2021 mat (7x6)
+MAT_W = 32.28
+MAT_H = 19.7
+
+# DRAFT 2021 selection mat (3x3)
+MAT_W = 14.12
+MAT_H = 10.1
+
+
 CORNERS0 = [
     (-MAT_W / 2.0, 0, -MAT_H / 2.0),
     (-MAT_W / 2.0, 0, MAT_H / 2.0),
